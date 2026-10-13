@@ -7,7 +7,10 @@
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Neraca</h2>
             <p class="text-xs text-ink-500">{{ $client->name }} · posisi per akhir {{ $period }} (akumulasi semua jurnal posted s/d bulan itu)</p>
         </div>
-        @include('partials.period-picker')
+        <div class="flex flex-wrap items-end gap-2">
+            @include('partials.period-picker')
+            @include('reports._actions', ['jenis' => 'neraca'])
+        </div>
     </div>
 
     @unless ($report['balanced'])

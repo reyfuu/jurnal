@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\TaxController;
 use App\Models\Client;
 use App\Models\Document;
 use App\Models\Journal;
@@ -328,6 +327,6 @@ class TaxTest extends TestCase
         $csv = $this->actingAs($this->admin)->get(route('tax.export', [$lain, 'ppn']).'?period=2026-10')->assertOk()->streamedContent();
         $this->assertStringContainsString(config('pajak.disclaimer'), $csv);
         $this->assertStringContainsString("'=HYPERLINK", $csv, 'Formula injection wajib dinetralkan.');
-        $this->assertSame("'=1+1", TaxController::csvSafe('=1+1'));
+        $this->assertSame("'=1+1", \App\Support\Csv::safe('=1+1'));
     }
 }

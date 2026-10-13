@@ -10,6 +10,7 @@ use App\Models\TaxFiling;
 use App\Models\TaxRate;
 use App\Services\Tax\TaxRecap;
 use App\Support\Audit;
+use App\Support\Csv;
 use App\Support\Rupiah;
 use App\Support\TaxId;
 use Illuminate\Http\RedirectResponse;
@@ -130,23 +131,7 @@ class TaxController extends Controller
         Audit::log('export', 'tax_export', null, $client->id, null, ['jenis' => $jenis, 'period' => $period]);
         $name = sprintf('pajak-%s-%s-%s.csv', $client->slug, $jenis, $period);
 
-        return response()->streamDownload(function () use ($client, $period, $header, $lines) {
-            $fh = fopen('php://output', 'w');
-            fwrite($fh, "\xEF\xBB\xBF");
-            fputcsv($fh, [config('pajak.disclaimer')], ';');
-            fputcsv($fh, ["Klien: {$client->name}", "Masa: {$period}"], ';');
-            fputcsv($fh, $header, ';');
-            foreach ($lines as $line) {
-                fputcsv($fh, array_map(self::csvSafe(...), $line), ';');
-            }
-            fclose($fh);
-        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
-    }
-
-    /** Cegah formula injection di Excel: sel yang diawali = + - @ diberi petik. */
-    public static function csvSafe(mixed $value): mixed
-    {
-        return is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
+        return Csv::download($name, [[config('pajak.disclaimer')], ["Klien: {$client->name}", "Masa: {$period}"]], $header, $lines);
     }
 
     // ── Admin: tarif & audit ─────────────────────────────────────────────────

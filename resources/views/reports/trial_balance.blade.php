@@ -7,7 +7,10 @@
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Neraca Saldo</h2>
             <p class="text-xs text-ink-500">Mutasi debit/kredit per akun di periode {{ $period }}. Hanya jurnal <em>posted</em>.</p>
         </div>
-        @include('partials.period-picker')
+        <div class="flex flex-wrap items-end gap-2">
+            @include('partials.period-picker')
+            @include('reports._actions', ['jenis' => 'neraca-saldo'])
+        </div>
     </div>
 
     @unless ($report['balanced'])

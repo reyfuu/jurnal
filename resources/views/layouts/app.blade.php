@@ -21,10 +21,10 @@
     $link = fn (bool $active) => $active ? 'nav-link-active' : 'nav-link';
 @endphp
 
-<div class="group/shell min-h-screen lg:grid lg:grid-cols-[16rem_1fr]" data-shell>
+<div class="group/shell min-h-screen lg:grid lg:grid-cols-[16rem_1fr] print:block" data-shell>
     {{-- ── Sidebar ─────────────────────────────────────────────────────────── --}}
     <div class="fixed inset-0 z-30 bg-ink-900/30 hidden group-data-open/shell:block lg:hidden!" data-nav-close></div>
-    <aside class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full group-data-open/shell:translate-x-0 transition-transform duration-200 ease-snappy
+    <aside class="print:hidden fixed inset-y-0 left-0 z-40 w-64 -translate-x-full group-data-open/shell:translate-x-0 transition-transform duration-200 ease-snappy
                   lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 flex flex-col border-r border-ink-200 bg-ink-50">
         <div class="flex h-14 items-center justify-between px-4">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-semibold tracking-tight text-ink-900">
@@ -122,18 +122,18 @@
 
     {{-- ── Konten ─────────────────────────────────────────────────────────── --}}
     <div class="min-w-0">
-        <header class="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-ink-200 bg-ink-50/85 px-4 backdrop-blur lg:hidden">
+        <header class="print:hidden sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-ink-200 bg-ink-50/85 px-4 backdrop-blur lg:hidden">
             <button type="button" class="nav-link" data-nav-open aria-label="Buka menu"><x-icon name="menu" class="size-5"/></button>
             <span class="truncate font-medium text-ink-900">{{ $client?->exists ? $client->name : config('app.name') }}</span>
         </header>
 
-        <main class="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
+        <main class="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
             @include('partials.client-nav', ['client' => $client])
             @include('partials.flash')
             @yield('content')
         </main>
 
-        <footer class="mx-auto max-w-7xl px-4 pb-8 text-xs text-ink-400 lg:px-8">
+        <footer class="print:hidden mx-auto max-w-7xl px-4 pb-8 text-xs text-ink-400 lg:px-8">
             Hasil baca AI selalu wajib direview sebelum masuk buku.
         </footer>
     </div>

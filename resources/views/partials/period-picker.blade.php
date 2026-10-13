@@ -1,5 +1,5 @@
 {{-- Pemilih periode: dropdown bulan yang ada jurnalnya + input bebas untuk bulan lain. --}}
-<form method="GET" class="flex flex-wrap items-end gap-2">
+<form method="GET" class="flex flex-wrap items-end gap-2 print:hidden">
     <div>
         <label class="label" for="period">Periode</label>
         <input type="month" id="period" name="period" value="{{ $period }}" class="field w-40">

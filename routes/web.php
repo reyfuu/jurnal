@@ -63,6 +63,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/klien/{client}/laporan/laba-rugi', [ReportController::class, 'incomeStatement'])->name('reports.income-statement');
     Route::get('/klien/{client}/laporan/neraca', [ReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/klien/{client}/laporan/arus-kas', [ReportController::class, 'cashFlow'])->name('reports.cash-flow');
+    Route::get('/klien/{client}/laporan/ekspor/{jenis}', [ReportController::class, 'export'])->name('reports.export');
 
     // ── Pajak (docs/perpajakan) ─────────────────────────────────────────────
     Route::get('/klien/{client}/pajak', [TaxController::class, 'index'])->name('tax.index');

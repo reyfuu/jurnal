@@ -14,6 +14,6 @@
                 <p class="mt-0.5 text-xs text-ink-500">{{ $client->legal_name }}</p>
             @endif
         </div>
-        <a href="{{ route('documents.create', $client) }}" class="btn-primary"><x-icon name="plus"/> Dokumen baru</a>
+        <a href="{{ route('documents.create', $client) }}" class="btn-primary print:hidden"><x-icon name="plus"/> Dokumen baru</a>
     </div>
 @endif

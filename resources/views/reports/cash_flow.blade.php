@@ -7,7 +7,10 @@
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Laporan Arus Kas</h2>
             <p class="text-xs text-ink-500">{{ $client->name }} · periode {{ $period }} · metode langsung</p>
         </div>
-        @include('partials.period-picker')
+        <div class="flex flex-wrap items-end gap-2">
+            @include('partials.period-picker')
+            @include('reports._actions', ['jenis' => 'arus-kas'])
+        </div>
     </div>
 
     @php

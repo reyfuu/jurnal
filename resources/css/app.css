@@ -143,3 +143,11 @@
 @layer components {
     .th.num { font-family: var(--font-sans); }
 }
+
+/* Cetak / simpan PDF: laporan bergaya dokumen, tanpa chrome aplikasi. */
+@media print {
+    @page { margin: 14mm; }
+    body { background: white; }
+    .card { border-color: var(--color-ink-300); }
+    tr { break-inside: avoid; }
+}

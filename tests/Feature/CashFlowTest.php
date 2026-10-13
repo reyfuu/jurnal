@@ -49,4 +49,20 @@ class CashFlowTest extends TestCase
 
         $this->actingAs($user)->get(route('reports.cash-flow', $client).'?period=2026-10')->assertOk()->assertSee('Arus Kas');
     }
+
+    public function test_semua_laporan_bisa_diekspor_csv(): void
+    {
+        $client = Client::create(['name' => 'Uji', 'type' => Client::TYPE_EXTERNAL]);
+        app(ChartOfAccounts::class)->seedFor($client);
+        $a = fn (string $code) => $client->accounts()->where('code', $code)->value('id');
+        app(JournalPoster::class)->record(['client_id' => $client->id, 'date' => '2026-10-02'], [['account_id' => $a('1102'), 'debit' => 5_000_000], ['account_id' => $a('4101'), 'credit' => 5_000_000]]);
+        $user = User::create(['name' => 'S', 'email' => 's@t.id', 'password' => 'secret123', 'role' => User::ROLE_STAFF, 'is_active' => true]);
+
+        foreach (['neraca-saldo' => 'Neraca Saldo', 'laba-rugi' => 'Laba Rugi', 'neraca' => 'Neraca', 'arus-kas' => 'Arus Kas'] as $jenis => $judul) {
+            $csv = $this->actingAs($user)->get(route('reports.export', [$client, $jenis]).'?period=2026-10')->assertOk()->streamedContent();
+            $this->assertStringStartsWith("\xEF\xBB\xBF{$judul};", $csv, $jenis);
+            $this->assertStringContainsString('5000000', $csv, $jenis);
+        }
+        $this->actingAs($user)->get(route('reports.export', [$client, 'ngawur']))->assertNotFound();
+    }
 }
