@@ -1,0 +1,145 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@source '../../app/**/*.php';
+@source '../../resources/views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    /* Palet dikunci eksplisit supaya tampilan tidak bergeser saat Tailwind update.
+       ink = netral hangat (stone), brand = terakota. Lihat docs/DESIGN-BRIEF.md §4.
+       Nama token sengaja tidak diganti: seluruh view memakai ink-* / brand-*. */
+    --color-ink-50: #fafaf9;
+    --color-ink-100: #f2f1ef;
+    --color-ink-200: #e4e2de;
+    --color-ink-300: #d3d0ca;
+    --color-ink-400: #a19e97;
+    --color-ink-500: #6b6862;
+    --color-ink-600: #54524d;
+    --color-ink-700: #3d3b37;
+    --color-ink-800: #292825;
+    --color-ink-900: #1c1b19;
+    --color-brand-50: #fdf3ee;
+    --color-brand-100: #fae2d6;
+    --color-brand-200: #f3c0a8;
+    --color-brand-500: #d4622f;
+    --color-brand-600: #b5532a;
+    --color-brand-700: #964222;
+    --color-brand-900: #4f2213;
+
+    /* Penanda angka hasil AI yang belum dilihat manusia. */
+    --color-ai-50: #fefce8;
+    --color-ai-500: #ca8a04;
+    --color-ai-700: #854d0e;
+
+    --ease-snappy: cubic-bezier(.2, 0, 0, 1);
+}
+
+@layer base {
+    body {
+        @apply bg-ink-50 text-ink-800 font-sans antialiased;
+        font-feature-settings: 'ss01', 'cv11';
+    }
+    input[type='checkbox'], input[type='radio'] {
+        accent-color: var(--color-brand-600);
+    }
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+        @apply outline-2 outline-offset-2 outline-brand-500;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: .01ms !important;
+            transition-duration: .01ms !important;
+        }
+    }
+}
+
+/* Komponen didaftarkan sebagai @utility (bukan @layer components) supaya bisa
+   dipakai di dalam @apply utility lain — Tailwind v4 tidak mengizinkan @apply
+   terhadap class biasa yang kita definisikan sendiri. */
+
+/* Angka rupiah selalu rata kanan & monospace: kolom nominal harus bisa
+   dibandingkan sekilas tanpa menghitung digit. */
+@utility num {
+    @apply text-right font-mono tabular-nums whitespace-nowrap;
+}
+
+@utility card {
+    @apply bg-white rounded-[10px] border border-ink-200;
+}
+
+@utility btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium
+           transition-colors duration-150 ease-snappy cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+}
+@utility btn-primary {
+    @apply btn bg-ink-900 text-white hover:bg-ink-700;
+}
+@utility btn-ghost {
+    @apply btn bg-white text-ink-800 border border-ink-200 hover:bg-ink-100;
+}
+@utility btn-danger {
+    @apply btn bg-rose-600 text-white hover:bg-rose-700;
+}
+@utility btn-sm {
+    @apply px-2.5 py-1 text-xs;
+}
+
+@utility field {
+    @apply w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400
+           transition-colors duration-150 ease-snappy
+           focus:border-brand-500 focus:ring-3 focus:ring-brand-100 focus:outline-none;
+}
+@utility label {
+    @apply block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500 mb-1;
+}
+
+@utility th {
+    @apply px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500
+           bg-ink-50 border-b border-ink-200;
+}
+@utility td {
+    @apply px-3 py-2 text-sm border-b border-ink-100 align-top;
+}
+
+@utility badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
+}
+@utility badge-ok {
+    @apply badge bg-emerald-100 text-emerald-800;
+}
+@utility badge-warn {
+    @apply badge bg-amber-100 text-amber-800;
+}
+@utility badge-bad {
+    @apply badge bg-rose-100 text-rose-800;
+}
+@utility badge-mute {
+    @apply badge bg-ink-100 text-ink-600;
+}
+@utility badge-info {
+    @apply badge bg-brand-50 text-brand-700;
+}
+@utility badge-ai {
+    @apply badge bg-ai-50 text-ai-700 ring-1 ring-inset ring-ai-500/30;
+}
+
+/* Navigasi sidebar. */
+@utility nav-link {
+    @apply flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-ink-600
+           transition-colors duration-150 ease-snappy hover:bg-ink-100 hover:text-ink-900;
+}
+@utility nav-link-active {
+    @apply nav-link bg-white text-ink-900 font-medium ring-1 ring-ink-200;
+}
+@utility nav-heading {
+    @apply px-2.5 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400;
+}
+
+/* Header kolom angka tetap rata kanan tapi pakai font label, bukan mono. */
+@layer components {
+    .th.num { font-family: var(--font-sans); }
+}
