@@ -35,7 +35,7 @@
         <div>
             <label class="label" for="gemini_model">Model</label>
             <input id="gemini_model" name="gemini_model" class="field max-w-sm font-mono" required value="{{ old('gemini_model', $model) }}">
-            <p class="mt-1 text-xs text-ink-500">Default <code class="font-mono">{{ config('ai.gemini.model') }}</code>. Harus model yang bisa membaca gambar.</p>
+            <p class="mt-1 text-xs text-ink-500">Default <code class="font-mono">{{ config('ai.gemini.model') }}</code> — alias Google yang selalu menunjuk ke model Flash terbaru. Ganti hanya kalau perlu model tertentu.</p>
         </div>
 
         <div class="flex items-center gap-2 border-t border-ink-100 pt-4">

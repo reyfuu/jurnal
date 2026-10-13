@@ -25,7 +25,7 @@ return [
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'base' => env('GEMINI_API_BASE', 'https://generativelanguage.googleapis.com/v1beta/openai'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-flash-latest'),
     ],
 
     'anthropic' => [
