@@ -54,15 +54,16 @@ Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 - Menghapus validasi balance, isolasi klien, atau anti-dobel demi diff pendek.
 - Commit `.env` / API key. Key ada di `~/api/.env`.
 
-## Urutan kerja berikutnya (dari HANDOFF §7)
+## Urutan kerja berikutnya
 
-1. Tunnel: `jurnal:cek-publik` lalu `cloudflared tunnel --url http://127.0.0.1:8001`.
-2. Tuntaskan checklist uji manual `TESTING-LOKAL.md` §4 — fokus kejujuran AI (nota buram → warning, bukan angka karangan).
-3. Laporan Arus Kas (operasi / investasi / pendanaan dari mutasi akun kas/bank).
-4. Queue untuk pembacaan AI.
-5. Ekspor laporan PDF/Excel.
-5b. Perpajakan MVP sudah jalan (docs/perpajakan/README.md) — tarif wajib diverifikasi konsultan sebelum dipakai klien.
-6. Putuskan opsi A/B (HANDOFF §2) — keputusan user, bukan agent.
+Selesai 13 Okt 2026: Arus Kas, queue AI (opt-in `AI_QUEUE`), ekspor laporan
+(CSV + cetak/PDF), perpajakan MVP + sebagian Fase 2 (docs/perpajakan/README.md).
+
+Terblokir input dari luar:
+1. Key AI valid — key 9router di `~/api/.env` ditolak (401).
+2. Verifikasi tarif pajak oleh konsultan (BRD §7) → tandai di /pajak/tarif.
+3. Keputusan Freddie: opsi A/B (HANDOFF §2), default pajak TRD Q1–Q3, dark mode.
+4. Uji manual dokumen asli `TESTING-LOKAL.md` §4 (butuh nomor 1).
 
 ## Skill & tooling wajib
 

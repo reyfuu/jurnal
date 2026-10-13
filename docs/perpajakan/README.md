@@ -26,5 +26,13 @@ Menyimpang dari TRD (sengaja, lebih sedikit kode):
   bukan dari form; tiap pajak punya centang "Catat".
 - `fromTransactions()` (mutasi bank) belum membaca pajak.
 
-Belum: Fase 2 (draft jurnal setoran dari rekap, kalender lintas klien, template
-Excel Coretax, PPh 21 manual) dan semua angka BRD §7 masih **belum diverifikasi**.
+Fase 2 sebagian jalan: draft jurnal akrual/setor dari rekap (US-14), kalender
+pajak lintas klien di dashboard (US-15), jurnal manual di akun pajak bermakna
+tunggal tercatat otomatis — PPh 21 diisi manusia (US-18, `config/pajak.php`
+`manual_map`).
+
+Belum, dan kenapa:
+- Template Excel Coretax (US-16): menunggu format impor diverifikasi (BRD V22).
+- Pengingat email/WA (US-17, Fase 3), register bukti potong, PJAP.
+- Pajak di mutasi bank: sesuai TRD Q5 tidak dipetakan otomatis.
+- Semua angka BRD §7 masih **belum diverifikasi** konsultan.

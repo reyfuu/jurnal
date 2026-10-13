@@ -196,5 +196,8 @@ mobile (§5), P1 review (bukti sticky, penanda AI → "dikoreksi", Ledger Seam y
 mematikan tombol saat tidak balance), P3 dashboard, warna semantik laporan, login
 dengan tombol mata. 134 test hijau, 13 halaman 200.
 
-Belum: command palette ⌘K, dropzone + paste di upload (P2), print CSS laporan (P4),
-dialog void (P5), toast, dark mode.
+Menyusul (13 Okt): palet ⌘K, dropzone + paste screenshot (P2), print CSS +
+tombol Cetak/PDF & CSV di semua laporan (P4), dialog konfirmasi `<dialog>`
+pengganti `confirm()` (P5), toast.
+
+Belum: dark mode (menunggu keputusan §11.3).
