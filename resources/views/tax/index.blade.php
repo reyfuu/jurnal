@@ -34,7 +34,7 @@
                     <li><span class="font-mono">{{ $m['account']->code }}</span> {{ $m['account']->name }}: di buku Rp{{ $R($m['booked']) }}, tercatat sebagai pajak Rp{{ $R($m['recorded']) }}.</li>
                 @endforeach
             </ul>
-            <p class="mt-1 text-xs">Biasanya karena jurnal manual menyentuh akun pajak tanpa catatan pajak. Rekap di bawah hanya menghitung yang tercatat.</p>
+            <p class="mt-1 text-xs">Biasanya karena jurnal manual memakai akun pajak umum (mis. 2103 Hutang Pajak) yang tidak bisa dipetakan otomatis ke jenis pajak. Rekap di bawah hanya menghitung yang tercatat.</p>
         </div>
     @endif
 
@@ -104,6 +104,11 @@
                 <div class="p-4">
                     <p class="label">{{ $ppn['net'] >= 0 ? 'Kurang bayar' : 'Lebih bayar' }}</p>
                     <p class="num text-left text-lg font-semibold {{ $ppn['net'] > 0 ? 'text-ai-700' : '' }}">{{ $R(abs($ppn['net'])) }}</p>
+                    @if ($ppn['net'] > 0)
+                        <a href="{{ route('tax.draft', [$client, 'ppn-setor']) }}?period={{ $period }}" class="mt-1 inline-block text-xs text-brand-700 hover:underline">Buat draft jurnal setor →</a>
+                    @elseif ($ppn['net'] < 0)
+                        <p class="mt-1 text-xs text-ink-500">Lebih bayar — umumnya dikompensasi ke masa berikutnya.</p>
+                    @endif
                 </div>
             </div>
             @if ($ppn['rows']->isNotEmpty())
@@ -133,7 +138,12 @@
                                 <td class="td">{{ $g['direction'] === 'out' ? 'Utang — wajib disetor klien' : 'Kredit pajak — minta bukti potong' }}</td>
                                 <td class="td num">{{ $g['count'] }}</td>
                                 <td class="td num">{{ $R($g['base']) }}</td>
-                                <td class="td num font-semibold">{{ $R($g['amount']) }}</td>
+                                <td class="td num font-semibold">
+                                    {{ $R($g['amount']) }}
+                                    @if ($g['direction'] === 'out')
+                                        <a href="{{ route('tax.draft', [$client, 'pph-setor']) }}?period={{ $period }}&kode={{ $g['tax_code'] }}" class="block text-xs font-normal text-brand-700 hover:underline">draft setor →</a>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -161,6 +171,12 @@
                     <div class="flex justify-between"><dt class="text-ink-500">Tarif</dt><dd>{{ $final['rate']?->label() ?? 'tidak ada tarif berlaku' }}</dd></div>
                     <div class="flex justify-between border-t border-ink-200 pt-1.5 font-semibold"><dt>PPh Final terutang</dt><dd class="num">{{ $final['tax'] === null ? '—' : 'Rp'.$R($final['tax']) }}</dd></div>
                 </dl>
+                @if ($final['tax'])
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <a href="{{ route('tax.draft', [$client, 'final-akrual']) }}?period={{ $period }}" class="btn-ghost btn-sm">Draft jurnal akrual</a>
+                        <a href="{{ route('tax.draft', [$client, 'final-setor']) }}?period={{ $period }}" class="btn-ghost btn-sm">Draft jurnal setor</a>
+                    </div>
+                @endif
                 <p class="mt-3 text-xs text-ink-400">Omzet = akun pendapatan usaha (Penjualan, Pendapatan Jasa) dari jurnal posted. Pendapatan lain-lain tidak dihitung.</p>
             </div>
         </section>

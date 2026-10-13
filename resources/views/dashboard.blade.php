@@ -37,6 +37,29 @@
         @endforeach
     </div>
 
+    @if ($taxDue->isNotEmpty())
+        <section class="mb-8">
+            <h2 class="mb-2 font-semibold text-ink-900">Pajak jatuh tempo bulan ini</h2>
+            <div class="card overflow-x-auto">
+                <table class="w-full">
+                    <thead><tr><th class="th">Klien</th><th class="th">Pajak</th><th class="th">Masa</th><th class="th">Setor sebelum</th><th class="th">Lapor sebelum</th><th class="th">Status</th></tr></thead>
+                    <tbody>
+                        @foreach ($taxDue as $o)
+                            <tr class="hover:bg-ink-50">
+                                <td class="td"><a href="{{ route('tax.index', $o['client']) }}?period={{ $o['period'] }}" class="font-medium text-brand-700 hover:underline">{{ $o['client']->name }}</a></td>
+                                <td class="td">{{ $o['name'] }}</td>
+                                <td class="td font-mono text-xs">{{ $o['period'] }}</td>
+                                <td class="td num text-left">{{ \Illuminate\Support\Carbon::parse($o['pay_due'])->format('d/m') }}</td>
+                                <td class="td num text-left">{{ \Illuminate\Support\Carbon::parse($o['file_due'])->format('d/m') }}</td>
+                                <td class="td"><span class="{{ $o['overdue'] ? 'badge-bad' : ($o['status'] === 'setor' ? 'badge-info' : 'badge-mute') }}">{{ $o['overdue'] ? 'Lewat · ' : '' }}{{ \App\Models\TaxFiling::STATUSES[$o['status']] }}</span></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
+
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 class="font-semibold text-ink-900">Posisi tiap klien — {{ $period }}</h2>
         @if (auth()->user()->isAdmin())

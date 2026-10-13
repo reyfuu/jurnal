@@ -41,7 +41,7 @@
                     </tr>
                 </thead>
                 <tbody id="journal-lines">
-                    @for ($i = 0; $i < 2; $i++)
+                    @for ($i = 0; $i < max(2, count(old('lines', []))); $i++)
                         <tr data-line>
                             <td class="td">
                                 <select name="lines[{{ $i }}][account_id]" class="field">

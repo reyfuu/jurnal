@@ -25,6 +25,15 @@ return [
         'other' => ['name' => 'Pajak lain', 'kind' => 'other', 'subtype_in' => 'tax_in', 'subtype_out' => 'tax_out', 'pay_day' => null, 'file_day' => null],
     ],
 
+    // Jurnal manual: baris di sisi normal akun pajak ini otomatis jadi catatan pajak.
+    // Hanya subtype yang maknanya tunggal; 2103 Hutang Pajak & 1403 Dibayar Dimuka
+    // ambigu (bisa PPh apa saja) → tidak dicatat otomatis, muncul di cek silang.
+    'manual_map' => [
+        'tax_in' => 'ppn', 'vat_out' => 'ppn',
+        'wht_payable_pph21' => 'pph21', 'wht_payable_pph23' => 'pph23', 'wht_payable_pph4_2' => 'pph4_2',
+        'final_payable' => 'final_umkm',
+    ],
+
     // Selisih pajak AI vs hitungan sistem yang masih dianggap cocok (rupiah per item).
     'toleransi_rupiah' => 1,
 

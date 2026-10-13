@@ -64,7 +64,7 @@ class JournalController extends Controller
                 'description' => $data['description'] ?? null,
                 'type' => $data['type'] ?? 'general',
                 'created_by' => $request->user()->id,
-            ], $data['lines']);
+            ], $data['lines'], Journal::STATUS_POSTED, $this->taxEntries($client, $data['lines']));
         } catch (AccountingException $e) {
             return back()->withInput()->withErrors(['lines' => $e->getMessage()]);
         }
@@ -88,6 +88,40 @@ class JournalController extends Controller
         $journal->delete();
 
         return back()->with('status', "Jurnal #{$id} dihapus permanen.");
+    }
+
+    /**
+     * Jurnal manual tidak punya panel pajak (TRD Q3). Baris di sisi normal akun
+     * pajak yang maknanya tunggal (config pajak.manual_map) dicatat otomatis
+     * sebagai catatan pajak "manual" — mis. akrual PPh 21 atau PPh Final.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function taxEntries(Client $client, array $lines): array
+    {
+        $map = config('pajak.manual_map');
+        $accounts = $client->accounts()->whereIn('subtype', array_keys($map))->get()->keyBy('id');
+        $entries = [];
+
+        foreach ($lines as $line) {
+            $account = $accounts->get((int) ($line['account_id'] ?? 0));
+            if (! $account) {
+                continue;
+            }
+            $asset = $account->type === \App\Models\Account::TYPE_ASSET;
+            $amount = (int) round((float) ($line[$asset ? 'debit' : 'credit'] ?? 0));
+            if ($amount <= 0) {
+                continue; // sisi berlawanan = setoran/kompensasi, bukan kejadian pajak
+            }
+            $code = $map[$account->subtype];
+            $entries[] = [
+                'tax_code' => $code, 'account_id' => $account->id, 'direction' => $asset ? 'in' : 'out',
+                'withheld' => str_starts_with($account->subtype, 'wht_'), 'noncreditable' => false,
+                'base' => 0, 'amount' => $amount, 'match_status' => 'manual',
+            ];
+        }
+
+        return $entries;
     }
 
     private function assertOwned(Client $client, Journal $journal): void

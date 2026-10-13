@@ -329,4 +329,47 @@ class TaxTest extends TestCase
         $this->assertStringContainsString("'=HYPERLINK", $csv, 'Formula injection wajib dinetralkan.');
         $this->assertSame("'=1+1", \App\Support\Csv::safe('=1+1'));
     }
+
+    // ── Fase 2 ──────────────────────────────────────────────────────────────
+
+    public function test_jurnal_manual_pph21_tercatat_otomatis_setoran_tidak(): void
+    {
+        $post = fn (array $lines, string $date = '2026-10-25') => $this->actingAs($this->admin)
+            ->post(route('journals.store', $this->client), ['date' => $date, 'lines' => $lines])->assertRedirect();
+
+        // Gaji 10 jt, PPh 21 dipotong 250 rb (nilai diisi manusia).
+        $post([['account_id' => $this->akun('6101'), 'debit' => 10_000_000], ['account_id' => $this->akun('2107'), 'credit' => 250_000], ['account_id' => $this->akun('1102'), 'credit' => 9_750_000]]);
+        // Setoran bulan yang sama: sisi berlawanan, bukan kejadian pajak.
+        $post([['account_id' => $this->akun('2107'), 'debit' => 250_000], ['account_id' => $this->akun('1102'), 'credit' => 250_000]], '2026-10-30');
+
+        $entry = TaxEntry::sole();
+        $this->assertSame('pph21', $entry->tax_code);
+        $this->assertTrue($entry->withheld);
+        $this->assertSame('manual', $entry->match_status);
+        $this->assertSame([], app(TaxRecap::class)->reconcile($this->client, '2026-10'), 'Setoran tidak boleh dianggap selisih.');
+        $this->assertSame('pph21', collect(app(TaxRecap::class)->obligations($this->client, '2026-10'))->pluck('tax_code')->last());
+    }
+
+    public function test_draft_jurnal_dari_rekap_hanya_mengisi_form(): void
+    {
+        $op = $this->klien('Bu Sari', ['is_pkp' => false, 'pph_regime' => 'final_umkm', 'taxpayer_type' => 'badan']);
+        $this->jurnal($op, '2026-10-10', [['account_id' => $this->akun('1101', $op), 'debit' => 20_000_000], ['account_id' => $this->akun('4101', $op), 'credit' => 20_000_000]]);
+
+        $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'final-akrual']).'?period=2026-10')
+            ->assertRedirect(route('journals.create', $op))
+            ->assertSessionHasInput('lines.0.debit', 100_000);
+        $this->assertSame(1, Journal::count(), 'Draft tidak boleh langsung diposting.');
+
+        $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'ppn-setor']).'?period=2026-10')->assertNotFound();
+        $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'ngawur']))->assertNotFound();
+    }
+
+    public function test_dashboard_menampilkan_pajak_jatuh_tempo_lintas_klien(): void
+    {
+        $this->travelTo('2026-11-03');
+        $this->actingAs($this->admin)->get(route('dashboard'))
+            ->assertSee('Pajak jatuh tempo bulan ini')
+            ->assertSee('PT Uji')
+            ->assertSee('2026-10');
+    }
 }

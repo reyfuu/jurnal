@@ -70,6 +70,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/klien/{client}/pajak/status', [TaxController::class, 'storeFiling'])->name('tax.filing');
     Route::get('/klien/{client}/pajak/ekspor/{jenis}', [TaxController::class, 'export'])->name('tax.export');
     Route::get('/klien/{client}/pajak/profil', [TaxController::class, 'profile'])->name('tax.profile');
+    Route::get('/klien/{client}/pajak/draft/{jenis}', [TaxController::class, 'draft'])->name('tax.draft');
     Route::middleware('admin')->group(function () {
         Route::put('/klien/{client}/pajak/profil', [TaxController::class, 'updateProfile'])->name('tax.profile.update');
         Route::get('/pajak/tarif', [TaxController::class, 'rates'])->name('tax.rates');

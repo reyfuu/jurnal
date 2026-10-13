@@ -106,8 +106,10 @@ class TaxRecap
     }
 
     /**
-     * Cek silang dengan buku: mutasi akun pajak di masa ini vs catatan pajak.
-     * Selisih biasanya = jurnal manual yang menyentuh akun pajak tanpa catatan.
+     * Cek silang dengan buku: untuk tiap akun pajak, jumlah baris di SISI
+     * NORMALnya (aset → debit, liabilitas → kredit) di masa ini vs catatan pajak.
+     * Sisi berlawanan = setoran/kompensasi, bukan kejadian pajak → diabaikan.
+     * Selisih biasanya = jurnal manual di akun pajak ambigu (mis. 2103) tanpa catatan.
      *
      * @return array<int,array{account:Account,booked:int,recorded:int}>
      */
@@ -121,9 +123,8 @@ class TaxRecap
         $out = [];
         foreach ($accounts as $id => $account) {
             $m = $moves->get($id);
-            $booked = $m ? (int) round(abs((float) $m->debit - (float) $m->credit)) : 0;
-            $byEntry = $entries->where('account_id', $id);
-            $recorded = (int) abs($byEntry->where('direction', 'in')->sum('amount') - $byEntry->where('direction', 'out')->sum('amount'));
+            $booked = $m ? (int) round((float) ($account->type === Account::TYPE_ASSET ? $m->debit : $m->credit)) : 0;
+            $recorded = (int) $entries->where('account_id', $id)->sum('amount');
             if ($booked !== $recorded) {
                 $out[] = ['account' => $account, 'booked' => $booked, 'recorded' => $recorded];
             }
