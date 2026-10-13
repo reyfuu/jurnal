@@ -32,5 +32,14 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- AI dikunci netral: test tidak boleh ikut .env / env shell mesin (key asli, router). -->
+        <env name="AI_PROVIDER" value="openai" force="true"/>
+        <env name="AI_MODEL" value="gpt-4o-mini" force="true"/>
+        <env name="AI_QUEUE" value="false" force="true"/>
+        <env name="OPENAI_API_KEY" value="" force="true"/>
+        <env name="OPENAI_API_BASE" value="https://api.openai.com/v1" force="true"/>
+        <env name="ANTHROPIC_API_KEY" value="" force="true"/>
+        <env name="AI_BACKUP_KEY" value="" force="true"/>
+        <env name="AI_BACKUP_MODEL" value="" force="true"/>
     </php>
 </phpunit>

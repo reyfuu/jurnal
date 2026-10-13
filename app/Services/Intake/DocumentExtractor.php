@@ -134,7 +134,11 @@ class DocumentExtractor
             Document::KIND_BANK => 'Dokumen ini MUTASI REKENING / E-WALLET: banyak baris transaksi dalam satu '
                 .'gambar. Isi array "transactions" (satu objek per baris mutasi), biarkan "items" kosong. '
                 .'Tentukan "direction": "in" kalau saldo bertambah (uang masuk), "out" kalau berkurang. '
-                .'JANGAN masukkan baris saldo awal/akhir sebagai transaksi.',
+                .'JANGAN masukkan baris saldo awal/akhir sebagai transaksi. '
+                .'"payment_method": "bank" untuk mutasi rekening bank (m-BCA, KlikBCA, Livin, BRImo, BNI, dll.), '
+                .'"ewallet" HANYA untuk riwayat aplikasi e-wallet (GoPay, OVO, DANA, ShopeePay). Nama merchant di '
+                .'keterangan (mis. "SHOPEE PAY SETTLE") tidak membuat mutasi bank jadi e-wallet. '
+                .'"account_code" = akun LAWAN transaksi, JANGAN akun rekening itu sendiri.',
             Document::KIND_INVOICE => 'Dokumen ini INVOICE/FAKTUR dari supplier atau vendor. Isi array "items" '
                 .'per baris barang/jasa. Pisahkan PPN/PPh ke field "tax". Ambil nomor invoice ke '
                 .'"document_number" dan tanggal jatuh tempo ke "due_date" kalau ada.',
@@ -163,6 +167,8 @@ class DocumentExtractor
         ATURAN KERAS:
         - JANGAN mengarang. Angka/tanggal/nama yang tidak ada di dokumen → null, bukan tebakan.
         - Kalau tulisan buram atau ambigu, isi sebisanya, turunkan "confidence", dan jelaskan di "warnings".
+        - Digit yang tertutup/buram/ditulis "?" JANGAN ditebak diam-diam. Kalau tetap mengisi perkiraan, "confidence"
+          maksimal 0.5 DAN tulis di "warnings" angka mana yang tidak terbaca (mis. "kampas rem: 6?.000 tidak terbaca jelas").
         - Semua uang dalam RUPIAH sebagai ANGKA MURNI tanpa pemisah dan tanpa "Rp" (1250000, bukan "Rp 1.250.000").
         - Tanggal format YYYY-MM-DD. Dokumen Indonesia sering menulis DD/MM/YYYY — 03/04/2026 berarti 3 April 2026, BUKAN 4 Maret.
         - "account_code" WAJIB salah satu kode dari DAFTAR AKUN di bawah. Dilarang mengarang kode baru.
@@ -365,6 +371,14 @@ class DocumentExtractor
                     Rupiah::format($itemsSum), Rupiah::format($tax), Rupiah::format($discount),
                     Rupiah::format($expected), Rupiah::format($total), Rupiah::format(abs($expected - $total)),
                 );
+            }
+        }
+
+        // Titik ribuan yang lolos sebagai desimal JSON ("15.000" → 15). Nominal
+        // transaksi di bawah Rp100 hampir selalu salah baca — tandai, jangan diubah.
+        foreach ([...$items, ...$transactions] as $row) {
+            if ($row['amount'] < 100) {
+                $warnings[] = sprintf('"%s" bernilai Rp%s — sangat kecil, mungkin titik ribuan terbaca sebagai desimal. Cek dokumen aslinya.', mb_substr($row['description'], 0, 40), Rupiah::format($row['amount']));
             }
         }
 

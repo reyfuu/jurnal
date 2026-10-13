@@ -278,3 +278,21 @@ sebelum kamu mengubah apa pun, itu bug — laporkan.
 | Perubahan `.env` tidak terasa | `php artisan config:clear`, lalu restart `artisan serve` |
 | Upload lama sekali | Normal: menunggu model membaca, ±5–20 detik. Belum pakai queue |
 | `Address already in use` | Port 8001 kepakai → ganti `--port=8002` |
+
+
+## 5. Hasil uji manual dengan AI asli (13 Okt 2026, Mac lokal)
+
+Dokumen **sintetis** (dibuat untuk uji, bukan dokumen klien), klien "Uji Manual"
+(PKP, badan), lewat UI seperti user. Model `openai/gpt-4o-mini` lalu `gpt-4.1-mini` via OpenRouter.
+
+| # | Kasus | Hasil |
+|---|---|---|
+| A1 | Foto struk 4 baris | ✓ vendor, tanggal, 4 baris, total 266.500 |
+| A2 | Nota tulis tangan buram, digit "6?.000" | ✓ setelah prompt dipertegas: warning "tidak terbaca jelas" + confidence 0,5, dan warning selisih total dari PHP. Sebelumnya AI menebak diam-diam |
+| A3 | PDF invoice PPN 12% (DPP nilai lain) + PPh 23 dipotong | ✓ PPN 550.000 cocok → 1402, PPh 23 100.000 → 2108, bayar 5.450.000. Diposting → 2 catatan pajak, rekap & cek silang benar. (Butuh fallback `pdftotext` — PDF font CID tadinya 0 karakter) |
+| A4 | Screenshot m-BCA 6 baris | `gpt-4o-mini` ✗: rekening dibaca e-wallet, 15.000 → 15, 8.120.500 → 8.125.000. `gpt-4.1-mini` ✓ semua benar. Pengaman ditambah: lawan = rekening sendiri dialihkan + ragu; nominal < Rp100 diberi warning |
+| A5 | Teks tempel 3 biaya | ✓ 3 baris, akun berbeda; tanpa tanggal → warning |
+| A6/A7 | "1,5jt", "Rp 1.250.000", "85rb", 03/04/2026 | ✓ 1.500.000 / 1.250.000 / 85.000, tanggal 3 April |
+
+Belum diuji dengan AI asli: B6 upload identik, kasus non-PKP & Final UMKM dari
+dokumen (sudah dijaga test otomatis). Saldo OpenRouter habis di tengah uji.

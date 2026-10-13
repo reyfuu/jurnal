@@ -13,16 +13,17 @@ mendarat di layar review. Yang masuk buku hanya angka yang sudah dilihat manusia
 
 ## Status folder ini
 
-Source diekstrak (13 Okt 2026) dari `origin/claude/quirky-cori-kbvckj:jurnal-ai/`
-di `~/skinku-b2b-portal` via `git archive` — commit `9be6dcd`. Folder ini belum
-repo git sendiri. Setup lokal Mac sudah jalan: SQLite, seed + DemoSeeder, 134 test hijau.
+Repo git sendiri (branch `main`), diekstrak 13 Okt 2026 dari
+`skinku-b2b-portal@9be6dcd:jurnal-ai/`. Lokal Mac jalan: SQLite + DemoSeeder.
 Login lokal: `admin@example.com` / `password123` (diubah langsung di DB; seed ulang
-mengembalikan ke bawaan `admin@jurnal.test` / `password123`). Jangan taruh
-`SEED_ADMIN_*` di `.env` lokal — `SeederGuardTest` ikut membacanya dan merah.
+mengembalikan ke bawaan `admin@jurnal.test`). Jangan taruh `SEED_ADMIN_*` di `.env`
+lokal — `SeederGuardTest` ikut membacanya.
 
-AI belum tersambung: key 9router di `~/api/.env` ditolak (401). Isi
-`OPENAI_API_KEY` / `OPENAI_API_BASE` / `AI_MODEL` di `.env` dengan key valid
-(model wajib vision), lalu `php artisan config:clear`.
+AI lokal: OpenRouter (`OPENAI_API_BASE=https://openrouter.ai/api/v1`,
+`AI_MODEL=openai/gpt-4.1-mini` — `gpt-4o-mini` salah baca mutasi bank). **Shell
+user meng-export `OPENAI_API_KEY` lama (ditolak) yang menang atas `.env`** —
+jalankan server dengan `env -u OPENAI_API_KEY php artisan serve --port=8001`.
+`phpunit.xml` mengunci env AI (`force="true"`) supaya test tidak ikut `.env`/shell.
 
 ## Stack & perintah
 
@@ -59,11 +60,13 @@ Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 Selesai 13 Okt 2026: Arus Kas, queue AI (opt-in `AI_QUEUE`), ekspor laporan
 (CSV + cetak/PDF), perpajakan MVP + sebagian Fase 2 (docs/perpajakan/README.md).
 
+Uji manual dengan AI asli: lihat `TESTING-LOKAL.md` §5.
+
 Terblokir input dari luar:
-1. Key AI valid — key 9router di `~/api/.env` ditolak (401).
+1. Saldo OpenRouter hampir habis (free tier) — top up, atau ganti key.
 2. Verifikasi tarif pajak oleh konsultan (BRD §7) → tandai di /pajak/tarif.
 3. Keputusan Freddie: opsi A/B (HANDOFF §2), default pajak TRD Q1–Q3, dark mode.
-4. Uji manual dokumen asli `TESTING-LOKAL.md` §4 (butuh nomor 1).
+4. Uji dengan dokumen ASLI klien (yang sudah: dokumen sintetis, §5).
 
 ## Skill & tooling wajib
 

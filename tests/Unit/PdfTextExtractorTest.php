@@ -45,4 +45,18 @@ class PdfTextExtractorTest extends TestCase
         $this->assertSame('', PdfTextExtractor::fromBytes('%PDF-1.4 tanpa stream'));
         $this->assertSame('', PdfTextExtractor::fromBytes(''));
     }
+
+    public function test_pdf_font_cid_dibaca_lewat_pdftotext_kalau_ada(): void
+    {
+        if (! is_executable(trim((string) shell_exec('command -v pdftotext')))) {
+            $this->markTestSkipped('pdftotext (poppler) tidak terpasang di mesin ini.');
+        }
+
+        // PDF hasil "Simpan sebagai PDF" Chrome: teks tersimpan sebagai glyph CID.
+        $text = PdfTextExtractor::fromBytes(file_get_contents(__DIR__.'/../fixtures/invoice-cid-font.pdf'));
+
+        $this->assertFalse(PdfTextExtractor::looksUnreadable($text));
+        $this->assertStringContainsString('INV/2026/10/0457', $text);
+        $this->assertStringContainsString('5.450.000', $text);
+    }
 }

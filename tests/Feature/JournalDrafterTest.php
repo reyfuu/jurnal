@@ -235,4 +235,19 @@ class JournalDrafterTest extends TestCase
         $this->assertSame($debit, $credit, 'Sisa baris tetap harus balance.');
         $this->assertSame(100000.0, $debit);
     }
+
+    public function test_mutasi_tanpa_mode_bayar_masuk_bank_dan_lawan_rekening_sendiri_dialihkan(): void
+    {
+        $drafts = $this->drafter->draft($this->dokumen([
+            'flow' => 'income', 'payment_method' => 'unknown', 'document_date' => '2026-10-01',
+            'transactions' => [
+                ['date' => '2026-10-01', 'description' => 'CR TOKOPEDIA SETTLEMENT', 'amount' => 12450000, 'direction' => 'in', 'account_code' => '1102', 'confidence' => 0.9],
+                ['date' => '2026-10-02', 'description' => 'DB META ADS', 'amount' => 2000000, 'direction' => 'out', 'account_code' => '6102', 'confidence' => 0.9],
+            ],
+        ], Document::KIND_BANK));
+
+        $this->assertSame(['1102', '4101'], [$drafts[0]['lines'][0]['account_code'], $drafts[0]['lines'][1]['account_code']], 'Rekening = Bank; lawan dialihkan ke Penjualan.');
+        $this->assertSame(0.3, $drafts[0]['lines'][1]['confidence']);
+        $this->assertSame('1102', $drafts[1]['lines'][1]['account_code'], 'Uang keluar dari Bank, bukan Kas.');
+    }
 }

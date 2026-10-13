@@ -232,4 +232,15 @@ class DocumentExtractorTest extends TestCase
             fn ($w) => $w === 'Tulisan buram',
         )));
     }
+
+    public function test_nominal_sangat_kecil_diberi_warning_tanpa_diubah(): void
+    {
+        $out = $this->extractor->normalize([
+            'flow' => 'expense', 'document_date' => '2026-10-03',
+            'transactions' => [['date' => '2026-10-03', 'description' => 'BIAYA ADM', 'amount' => 15.000, 'direction' => 'out', 'account_code' => '7102']],
+        ], $this->client);
+
+        $this->assertSame(15.0, $out['transactions'][0]['amount']);
+        $this->assertTrue(collect($out['warnings'])->contains(fn ($w) => str_contains($w, 'BIAYA ADM') && str_contains($w, 'titik ribuan')));
+    }
 }

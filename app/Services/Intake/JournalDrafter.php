@@ -233,8 +233,11 @@ class JournalDrafter
      */
     private function fromTransactions(array $extraction, $accounts, Document $document): array
     {
-        // Akun kas sisi rekening: ikut mode bayar dokumen (bank / e-wallet).
-        $bank = $this->paymentAccount($extraction, $accounts, false)
+        // Akun kas sisi rekening: ikut mode bayar dokumen (bank / e-wallet). Mode
+        // tidak terbaca → mutasi rekening hampir pasti rekening bank, bukan kas tunai.
+        $method = $extraction['payment_method'] ?? 'unknown';
+        $bank = (isset(self::PAYMENT_SUBTYPE[$method]) ? null : $accounts->first(fn (Account $a) => $a->subtype === 'bank'))
+            ?? $this->paymentAccount($extraction, $accounts, false)
             ?? $accounts->get(ChartOfAccounts::DEFAULT_CASH);
         if (! $bank) {
             return [];
@@ -250,6 +253,14 @@ class JournalDrafter
             $amount = (float) $row['amount'];
             $date = $row['date'] ?? $extraction['document_date'] ?? now()->toDateString();
             $in = $row['direction'] === 'in';
+
+            // Lawan = rekening itu sendiri → jurnal D Bank / K Bank yang tidak bermakna.
+            // Alihkan ke akun default dan tandai ragu supaya manusia memilih.
+            if ($counter->id === $bank->id) {
+                $counter = $accounts->get($in ? ChartOfAccounts::DEFAULT_REVENUE : ChartOfAccounts::DEFAULT_EXPENSE) ?? $counter;
+                $row['confidence'] = 0.3;
+                $row['account_reason'] = 'AI memilih akun rekening ini sendiri sebagai lawan — dialihkan ke akun default, pilih akun yang benar.';
+            }
 
             // Masuk: D rekening / K akun lawan. Keluar: D akun lawan / K rekening.
             $lines = $in

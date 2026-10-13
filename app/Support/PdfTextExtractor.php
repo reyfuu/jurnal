@@ -9,8 +9,9 @@ namespace App\Support;
  *
  * PDF "bersih" (teks asli, bukan hasil scan) terekstrak rapi dan hemat token:
  * tidak perlu kirim gambar ke model. PDF hasil scan atau ber-font CID custom
- * menghasilkan teks kosong/berantakan — looksUnreadable() mendeteksinya sebagai
- * sinyal untuk fallback ke pembacaan multimodal.
+ * menghasilkan teks kosong/berantakan — kalau begitu dicoba `pdftotext`
+ * (poppler) bila terpasang; masih gagal → looksUnreadable() jadi sinyal untuk
+ * fallback ke pembacaan multimodal.
  */
 class PdfTextExtractor
 {
@@ -33,7 +34,26 @@ class PdfTextExtractor
             }
         }
 
-        return trim($text);
+        $text = trim($text);
+
+        return self::looksUnreadable($text) ? (self::viaPdftotext($data) ?? $text) : $text;
+    }
+
+    /**
+     * PDF ber-font CID (Chrome, banyak generator invoice & e-Faktur) menyimpan
+     * glyph id, bukan teks — butuh peta ToUnicode. Tidak ditulis ulang di sini;
+     * pakai poppler kalau ada di mesin. Tidak ada / gagal → null, perilaku lama.
+     */
+    private static function viaPdftotext(string $data): ?string
+    {
+        try {
+            $process = new \Symfony\Component\Process\Process(['pdftotext', '-layout', '-enc', 'UTF-8', '-', '-']);
+            $process->setInput($data)->setTimeout(15)->run();
+        } catch (\Throwable) {
+            return null; // binari tidak ada / timeout
+        }
+
+        return $process->isSuccessful() && trim($process->getOutput()) !== '' ? trim($process->getOutput()) : null;
     }
 
     /**
