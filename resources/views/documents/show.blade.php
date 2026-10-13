@@ -2,6 +2,14 @@
 @section('title', 'Review dokumen')
 
 @section('content')
+    @if ($document->status === \App\Models\Document::STATUS_UPLOADED && config('ai.queue'))
+        @push('head')<meta http-equiv="refresh" content="5">@endpush
+        <div class="mb-4 flex items-center gap-3 rounded-[10px] border border-ai-500/30 bg-ai-50 px-4 py-3 text-sm text-ink-800" role="status">
+            <span class="size-2 animate-pulse rounded-full bg-ai-500"></span>
+            AI sedang membaca dokumen ini (biasanya 5–20 detik). Halaman memuat ulang otomatis.
+        </div>
+    @endif
+
     @php
         $e = $document->extraction ?? [];
         $warnings = $e['warnings'] ?? [];

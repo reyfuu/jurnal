@@ -12,6 +12,9 @@ return [
     'token_param' => env('AI_TOKEN_PARAM', 'max_tokens'),
     'request_timeout' => (int) env('AI_REQUEST_TIMEOUT', 120),
     'connect_timeout' => (int) env('AI_CONNECT_TIMEOUT', 10),
+    // true = pembacaan lewat antrian (upload tidak menunggu 5–20 detik). WAJIB
+    // ada worker: `php artisan queue:work`. false = baca langsung saat upload.
+    'queue' => (bool) env('AI_QUEUE', false),
 
     'openai' => [
         'key' => env('OPENAI_API_KEY'),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AccountingException;
+use App\Jobs\ExtractDocument;
 use App\Models\Client;
 use App\Models\Document;
 use App\Models\Journal;
@@ -112,6 +113,14 @@ class DocumentController extends Controller
 
         $document = $client->documents()->create($attributes);
 
+        if (config('ai.queue')) {
+            ExtractDocument::dispatch($document);
+
+            return redirect()->route('documents.show', [$client, $document])
+                ->with('status', 'Dokumen tersimpan. AI sedang membacanya — halaman ini akan memuat ulang sendiri.')
+                ->with('duplicate_of', $duplicate?->id);
+        }
+
         try {
             $this->extractor->extract($document);
         } catch (AiException $e) {
@@ -157,6 +166,13 @@ class DocumentController extends Controller
     public function reextract(Client $client, Document $document): RedirectResponse
     {
         $this->assertOwned($client, $document);
+
+        if (config('ai.queue')) {
+            $document->update(['status' => Document::STATUS_UPLOADED, 'error' => null]);
+            ExtractDocument::dispatch($document);
+
+            return back()->with('status', 'AI sedang membaca ulang dokumen ini.');
+        }
 
         try {
             $this->extractor->extract($document);
