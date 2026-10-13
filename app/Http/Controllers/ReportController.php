@@ -41,6 +41,16 @@ class ReportController extends Controller
         ]);
     }
 
+    public function cashFlow(Client $client, Request $request)
+    {
+        [$period, $periods] = $this->period($client, $request);
+
+        return view('reports.cash_flow', [
+            'client' => $client, 'period' => $period, 'periods' => $periods,
+            'report' => $this->reports->cashFlow($client->id, $period),
+        ]);
+    }
+
     /** @return array{0:string,1:array<int,string>} */
     private function period(Client $client, Request $request): array
     {

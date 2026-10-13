@@ -85,6 +85,7 @@
                 <a href="{{ route('reports.trial-balance', $client) }}" class="{{ $link(request()->routeIs('reports.trial-balance')) }}"><x-icon name="scale"/> Neraca Saldo</a>
                 <a href="{{ route('reports.income-statement', $client) }}" class="{{ $link(request()->routeIs('reports.income-statement')) }}"><x-icon name="trend"/> Laba Rugi</a>
                 <a href="{{ route('reports.balance-sheet', $client) }}" class="{{ $link(request()->routeIs('reports.balance-sheet')) }}"><x-icon name="landmark"/> Neraca</a>
+                <a href="{{ route('reports.cash-flow', $client) }}" class="{{ $link(request()->routeIs('reports.cash-flow')) }}"><x-icon name="flow"/> Arus Kas</a>
 
                 <p class="nav-heading">Pajak</p>
                 <a href="{{ route('tax.index', $client) }}" class="{{ $link(request()->routeIs('tax.index')) }}"><x-icon name="receipt"/> Ringkasan pajak</a>

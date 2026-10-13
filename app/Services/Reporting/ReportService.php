@@ -236,4 +236,63 @@ class ReportService
             'top_expenses' => $expenses,
         ];
     }
+
+    /** Subtype akun lawan → aktivitas arus kas. Selain ini = operasi. */
+    private const CASH_FLOW_ACTIVITY = [
+        'fixed_asset' => 'investing', 'contra_asset' => 'investing',
+        'loan' => 'financing', 'capital' => 'financing', 'drawing' => 'financing', 'retained' => 'financing',
+    ];
+
+    /**
+     * Laporan Arus Kas metode langsung. Untuk tiap jurnal posted yang menyentuh
+     * kas/bank/e-wallet, kontribusi kas tiap baris NON-kas = kredit − debit
+     * (jurnal balance ⇒ jumlahnya tepat = perubahan kas jurnal itu, tanpa alokasi
+     * proporsional). Transfer antar akun kas tidak punya baris non-kas → netral.
+     *
+     * @return array{groups:array<string,array<int,array{account:Account,value:float}>>,totals:array<string,float>,opening:float,net:float,closing:float,balanced:bool}
+     */
+    public function cashFlow(int $clientId, string $period): array
+    {
+        $cashIds = Account::where('client_id', $clientId)->payment()->pluck('id');
+        $journalIds = JournalLine::query()
+            ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
+            ->where('journals.client_id', $clientId)
+            ->where('journals.status', Journal::STATUS_POSTED)
+            ->where('journals.period', $period)
+            ->whereIn('journal_lines.account_id', $cashIds)
+            ->distinct()->pluck('journal_lines.journal_id');
+
+        $byAccount = JournalLine::query()
+            ->whereIn('journal_id', $journalIds)
+            ->whereNotIn('account_id', $cashIds)
+            ->groupBy('account_id')
+            ->selectRaw('account_id, COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) value')
+            ->pluck('value', 'account_id');
+
+        $accounts = Account::whereIn('id', $byAccount->keys())->orderBy('code')->get();
+        $groups = ['operating' => [], 'investing' => [], 'financing' => []];
+        foreach ($accounts as $account) {
+            $value = round((float) $byAccount[$account->id], 2);
+            if (abs($value) >= 0.005) {
+                $groups[self::CASH_FLOW_ACTIVITY[$account->subtype] ?? 'operating'][] = ['account' => $account, 'value' => $value];
+            }
+        }
+        $totals = array_map(fn ($rows) => round(array_sum(array_column($rows, 'value')), 2), $groups);
+
+        $cashBalance = function (string $upTo) use ($clientId, $cashIds): float {
+            $c = $this->cumulative($clientId, $upTo);
+
+            return round($cashIds->sum(fn ($id) => (float) ($c[$id]->debit ?? 0) - (float) ($c[$id]->credit ?? 0)), 2);
+        };
+        $prev = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $period.'-01')->subMonth()->format('Y-m');
+        $opening = $cashBalance($prev);
+        $closing = $cashBalance($period);
+        $net = round(array_sum($totals), 2);
+
+        return [
+            'groups' => $groups, 'totals' => $totals,
+            'opening' => $opening, 'net' => $net, 'closing' => $closing,
+            'balanced' => abs($opening + $net - $closing) < 0.005,
+        ];
+    }
 }
