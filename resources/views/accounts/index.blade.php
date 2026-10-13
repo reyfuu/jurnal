@@ -81,7 +81,7 @@
                                         <td class="td w-40 text-right">
                                             <button form="acc-{{ $account->id }}" class="btn-ghost btn-sm">Simpan</button>
                                             <button form="acc-del-{{ $account->id }}" class="btn-danger btn-sm"
-                                                    onclick="return confirm('Hapus akun ini? Kalau sudah dipakai jurnal, akun hanya dinonaktifkan.')">Hapus</button>
+                                                    data-confirm="Hapus akun ini? Kalau sudah dipakai jurnal, akun hanya dinonaktifkan.">Hapus</button>
                                         </td>
                                     @else
                                         <td class="td w-28 font-mono text-xs">{{ $account->code }}</td>

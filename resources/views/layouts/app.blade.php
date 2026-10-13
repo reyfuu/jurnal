@@ -68,6 +68,10 @@
             </div>
         </details>
 
+        <button type="button" data-palette-open class="mx-3 mt-2 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-ink-500 hover:bg-ink-100 cursor-pointer">
+            <x-icon name="search"/> Cari & loncat… <kbd class="ml-auto rounded border border-ink-200 bg-white px-1.5 font-mono text-[10px] text-ink-500">⌘K</kbd>
+        </button>
+
         <nav class="mt-2 grow overflow-y-auto px-3 pb-4" aria-label="Navigasi utama">
             <a href="{{ route('dashboard') }}" class="{{ $link(request()->routeIs('dashboard')) }}"><x-icon name="dashboard"/> Dashboard</a>
             <a href="{{ route('clients.index') }}" class="{{ $link(request()->routeIs('clients.index', 'clients.create', 'clients.edit')) }}"><x-icon name="users"/> Semua klien</a>
@@ -104,9 +108,10 @@
         </nav>
 
         <div class="border-t border-ink-200 p-3 text-sm">
-            <p class="flex items-center gap-2 px-2.5 pb-2 text-xs text-ink-500" title="{{ $aiReady ? 'Pembacaan dokumen otomatis aktif' : 'Isi API key AI di .env' }}">
+            {{-- Hanya cek key terisi, bukan valid — validitas baru ketahuan saat dokumen dibaca. --}}
+            <p class="flex items-center gap-2 px-2.5 pb-2 text-xs text-ink-500" title="{{ $aiReady ? 'Key terisi. Valid atau tidaknya baru ketahuan saat dokumen dibaca — cek status dokumen.' : 'Isi API key AI di .env' }}">
                 <span class="size-2 rounded-full {{ $aiReady ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                {{ $aiReady ? 'AI tersambung' : 'AI belum terpasang' }}
+                {{ $aiReady ? 'Key AI terisi' : 'AI belum terpasang' }}
             </p>
             <div class="flex items-center justify-between gap-2 px-2.5">
                 <span class="min-w-0">
@@ -137,6 +142,53 @@
             Hasil baca AI selalu wajib direview sebelum masuk buku.
         </footer>
     </div>
+
+{{-- Konfirmasi aksi berisiko (pengganti confirm() bawaan browser). --}}
+<dialog id="confirm-dialog" class="m-auto w-full max-w-sm rounded-[10px] border border-ink-200 bg-white p-0 shadow-[0_1px_2px_rgb(0_0_0/.05),0_8px_24px_rgb(0_0_0/.08)] backdrop:bg-ink-900/30">
+    <form method="dialog" class="p-5">
+        <p class="font-semibold text-ink-900">Yakin?</p>
+        <p class="mt-1 text-sm text-ink-600" data-confirm-message></p>
+        <div class="mt-5 flex justify-end gap-2">
+            <button value="cancel" class="btn-ghost" autofocus>Batal</button>
+            <button value="ok" class="btn-danger">Ya, lanjutkan</button>
+        </div>
+    </form>
+</dialog>
+
+{{-- Palet ⌘K: loncat ke klien/halaman tanpa menu. --}}
+<dialog id="palette" class="mx-auto mt-[12vh] w-full max-w-lg rounded-[10px] border border-ink-200 bg-white p-0 shadow-[0_1px_2px_rgb(0_0_0/.05),0_8px_24px_rgb(0_0_0/.08)] backdrop:bg-ink-900/30">
+    <div class="flex items-center gap-2 border-b border-ink-200 px-4">
+        <x-icon name="search" class="size-4 text-ink-400"/>
+        <input type="text" data-palette-input placeholder="Cari klien, laporan, aksi…" class="w-full bg-transparent py-3 text-sm outline-none" aria-label="Cari">
+    </div>
+    <ul class="max-h-80 overflow-y-auto p-1" data-palette-list>
+        @php
+            $items = [['Dashboard', route('dashboard')], ['Semua klien', route('clients.index')]];
+            if ($client?->exists) {
+                array_push($items,
+                    ['Upload dokumen — '.$client->name, route('documents.create', $client)],
+                    ['Jurnal manual — '.$client->name, route('journals.create', $client)],
+                    ['Dokumen — '.$client->name, route('documents.index', $client)],
+                    ['Jurnal — '.$client->name, route('journals.index', $client)],
+                    ['Neraca Saldo — '.$client->name, route('reports.trial-balance', $client)],
+                    ['Laba Rugi — '.$client->name, route('reports.income-statement', $client)],
+                    ['Neraca — '.$client->name, route('reports.balance-sheet', $client)],
+                    ['Arus Kas — '.$client->name, route('reports.cash-flow', $client)],
+                    ['Pajak — '.$client->name, route('tax.index', $client)],
+                );
+            }
+            foreach ($navClients as $c) {
+                $items[] = ['Klien: '.$c->name, route('clients.show', $c)];
+            }
+            if (auth()->user()->isAdmin()) {
+                array_push($items, ['Tarif pajak', route('tax.rates')], ['Audit log', route('audit')], ['Klien baru', route('clients.create')]);
+            }
+        @endphp
+        @foreach ($items as [$label, $url])
+            <li><a href="{{ $url }}" data-palette-item class="block rounded px-3 py-2 text-sm text-ink-700 hover:bg-ink-100 aria-selected:bg-ink-100">{{ $label }}</a></li>
+        @endforeach
+    </ul>
+</dialog>
 </div>
 </body>
 </html>

@@ -211,6 +211,91 @@ function wireReveal() {
     });
 }
 
+/**
+ * Konfirmasi lewat <dialog> untuk form/tombol ber-data-confirm. Tanpa JS,
+ * form tetap terkirim (server tetap menjaga: void bukan hapus, dst.).
+ */
+function wireConfirm() {
+    const dialog = document.getElementById('confirm-dialog');
+    if (!dialog) return;
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        const source = e.submitter?.dataset.confirm ? e.submitter : form;
+        if (!source.dataset?.confirm || form.dataset.confirmed) return;
+        e.preventDefault();
+        dialog.querySelector('[data-confirm-message]').textContent = source.dataset.confirm;
+        dialog.returnValue = '';
+        dialog.showModal();
+        dialog.addEventListener('close', () => {
+            if (dialog.returnValue !== 'ok') return;
+            form.dataset.confirmed = '1';
+            form.requestSubmit(e.submitter ?? undefined);
+        }, { once: true });
+    });
+}
+
+function wireToast() {
+    document.querySelectorAll('[data-toast]').forEach((toast) => {
+        const hide = () => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); };
+        toast.querySelector('[data-toast-close]')?.addEventListener('click', hide);
+        setTimeout(hide, 6000);
+    });
+}
+
+/** Palet ⌘K / Ctrl+K: saring daftar tautan, Enter = buka yang pertama/terpilih. */
+function wirePalette() {
+    const dialog = document.getElementById('palette');
+    if (!dialog) return;
+    const input = dialog.querySelector('[data-palette-input]');
+    const items = [...dialog.querySelectorAll('[data-palette-item]')];
+    let active = 0;
+    const visible = () => items.filter((a) => !a.parentElement.hidden);
+    const mark = () => visible().forEach((a, i) => a.setAttribute('aria-selected', String(i === active)));
+    const filter = () => {
+        const q = input.value.toLowerCase().trim();
+        items.forEach((a) => { a.parentElement.hidden = q !== '' && !a.textContent.toLowerCase().includes(q); });
+        active = 0;
+        mark();
+    };
+    const open = () => { input.value = ''; filter(); dialog.showModal(); input.focus(); };
+
+    document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); open(); }
+    });
+    document.querySelectorAll('[data-palette-open]').forEach((b) => b.addEventListener('click', open));
+    input.addEventListener('input', filter);
+    input.addEventListener('keydown', (e) => {
+        const list = visible();
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, list.length - 1); mark(); list[active]?.scrollIntoView({ block: 'nearest' }); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); mark(); list[active]?.scrollIntoView({ block: 'nearest' }); }
+        if (e.key === 'Enter' && list[active]) { e.preventDefault(); window.location = list[active].href; }
+    });
+    dialog.addEventListener('click', (e) => e.target === dialog && dialog.close());
+}
+
+/** Dropzone + paste screenshot ke input file upload dokumen. */
+function wireDropzone() {
+    const zone = document.querySelector('[data-dropzone]');
+    const input = zone?.querySelector('input[type=file]');
+    if (!zone || !input) return;
+    const label = zone.querySelector('[data-dropzone-label]');
+    const take = (files) => {
+        if (!files?.length) return;
+        const dt = new DataTransfer();
+        dt.items.add(files[0]);
+        input.files = dt.files;
+        label.textContent = `Siap diupload: ${files[0].name || 'gambar dari clipboard'}`;
+    };
+    input.addEventListener('change', () => input.files.length && (label.textContent = `Siap diupload: ${input.files[0].name}`));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.setAttribute('data-over', ''); });
+    zone.addEventListener('dragleave', () => zone.removeAttribute('data-over'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.removeAttribute('data-over'); take(e.dataTransfer.files); });
+    document.addEventListener('paste', (e) => {
+        const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf');
+        if (files.length && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); take(files); }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-journal]').forEach((root) => {
         wireBalance(root);
@@ -222,4 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
     wireAiMarkers();
     wireSeam();
     wireReveal();
+    wireConfirm();
+    wireToast();
+    wirePalette();
+    wireDropzone();
 });

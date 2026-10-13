@@ -3,7 +3,7 @@
 
 @section('content')
     @unless ($aiReady)
-        <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div class="mb-5 rounded-[10px] border border-ai-500/30 bg-ai-50 px-4 py-3 text-sm text-ink-800">
             Otak AI belum terpasang (API key kosong di <code class="font-mono">.env</code>). Dokumen akan tersimpan,
             tapi pembacaan otomatis gagal — kamu masih bisa catat lewat jurnal manual.
         </div>
@@ -43,9 +43,14 @@
             </div>
 
             <div>
-                <label class="label" for="file">Berkas</label>
-                <input type="file" id="file" name="file" accept="image/*,.pdf" class="field file:mr-3 file:rounded file:border-0 file:bg-ink-100 file:px-3 file:py-1 file:text-sm">
-                <p class="mt-1 text-xs text-ink-400">JPG / PNG / WEBP / HEIC / PDF, maksimal {{ number_format($maxKb / 1024, 0) }} MB.</p>
+                <span class="label">Berkas</span>
+                <label for="file" data-dropzone
+                       class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 border-dashed border-ink-200 bg-ink-50 px-4 py-8 text-center text-sm text-ink-600 transition-colors hover:border-brand-500 data-[over]:border-brand-500 data-[over]:bg-brand-50">
+                    <x-icon name="download" class="size-5 rotate-180 text-ink-400"/>
+                    <span data-dropzone-label><b class="text-ink-900">Tarik berkas ke sini</b>, klik untuk memilih, atau <b class="text-ink-900">paste screenshot</b> (⌘V)</span>
+                    <span class="text-xs text-ink-400">JPG / PNG / WEBP / HEIC / PDF, maksimal {{ number_format($maxKb / 1024, 0) }} MB</span>
+                    <input type="file" id="file" name="file" accept="image/*,.pdf" class="sr-only">
+                </label>
             </div>
 
             <div class="relative">

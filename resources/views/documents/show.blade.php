@@ -42,7 +42,7 @@
             </form>
             @if (auth()->user()->isAdmin())
                 <form method="POST" action="{{ route('documents.destroy', [$client, $document]) }}"
-                      onsubmit="return confirm('Hapus dokumen ini? Jurnal yang sudah diposting tetap tersimpan.')">
+                      data-confirm="Hapus dokumen ini? Jurnal yang sudah diposting tetap tersimpan.">
                     @csrf @method('DELETE')
                     <button class="btn-danger btn-sm">Hapus</button>
                 </form>

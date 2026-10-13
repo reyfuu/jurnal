@@ -71,7 +71,7 @@
             @if ($client->exists)
                 <span class="grow"></span>
                 <button form="delete-client" class="btn-danger btn-sm"
-                        onclick="return confirm('Hapus klien ini? Kalau sudah ada jurnal posted, klien hanya dinonaktifkan.')">Hapus klien</button>
+                        data-confirm="Hapus klien ini? Kalau sudah ada jurnal posted, klien hanya dinonaktifkan.">Hapus klien</button>
             @endif
         </div>
     </form>

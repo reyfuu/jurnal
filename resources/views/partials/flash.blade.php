@@ -1,6 +1,10 @@
 @if (session('status'))
-    <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-        {{ session('status') }}
+    {{-- Toast: konfirmasi singkat, hilang sendiri. Error tetap inline di bawah (harus dibaca). --}}
+    <div data-toast role="status" aria-live="polite"
+         class="fixed top-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-[10px] border border-ink-200 bg-white px-4 py-3 text-sm text-ink-800 shadow-[0_1px_2px_rgb(0_0_0/.05),0_8px_24px_rgb(0_0_0/.08)] transition-opacity duration-300 print:hidden">
+        <span class="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"></span>
+        <span class="grow">{{ session('status') }}</span>
+        <button type="button" data-toast-close class="text-ink-400 hover:text-ink-800 cursor-pointer" aria-label="Tutup"><x-icon name="x" class="size-3.5"/></button>
     </div>
 @endif
 

@@ -49,14 +49,14 @@
                         @endif
                         @if ($journal->status !== 'void')
                             <form method="POST" action="{{ route('journals.void', [$client, $journal]) }}"
-                                  onsubmit="return confirm('Void jurnal ini? Nilainya berhenti dihitung di laporan.')">
+                                  data-confirm="Void jurnal ini? Nilainya berhenti dihitung di laporan.">
                                 @csrf
                                 <button class="btn-ghost btn-sm">Void</button>
                             </form>
                         @endif
                         @if (auth()->user()->isAdmin())
                             <form method="POST" action="{{ route('journals.destroy', [$client, $journal]) }}"
-                                  onsubmit="return confirm('Hapus permanen? Lebih aman pakai Void supaya jejaknya tetap ada.')">
+                                  data-confirm="Hapus permanen? Lebih aman pakai Void supaya jejaknya tetap ada.">
                                 @csrf @method('DELETE')
                                 <button class="btn-danger btn-sm">Hapus</button>
                             </form>
