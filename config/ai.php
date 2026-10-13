@@ -1,7 +1,8 @@
 <?php
 
 return [
-    // openai = semua endpoint OpenAI-compatible · anthropic = Claude Messages API.
+    // openai = semua endpoint OpenAI-compatible · anthropic = Claude Messages API ·
+    // gemini = Google Gemini. Key Gemini dari halaman Pengaturan selalu menang.
     'provider' => env('AI_PROVIDER', 'openai'),
     'model' => env('AI_MODEL', 'gpt-4o-mini'),
     'max_output_tokens' => (int) env('AI_MAX_OUTPUT_TOKENS', 4000),
@@ -19,6 +20,12 @@ return [
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
         'base' => env('OPENAI_API_BASE', 'https://api.openai.com/v1'),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'base' => env('GEMINI_API_BASE', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     ],
 
     'anthropic' => [

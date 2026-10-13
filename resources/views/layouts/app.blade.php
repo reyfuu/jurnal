@@ -115,13 +115,16 @@
                 @if ($me->may('tax.rates'))
                     <a href="{{ route('tax.rates') }}" class="{{ $link(request()->routeIs('tax.rates')) }}"><x-icon name="percent"/> Tarif pajak</a>
                 @endif
+                @if ($me->may('settings.manage'))
+                    <a href="{{ route('settings.edit') }}" class="{{ $link(request()->routeIs('settings.*')) }}"><x-icon name="settings"/> Pengaturan AI</a>
+                @endif
                 <a href="{{ route('audit') }}" class="{{ $link(request()->routeIs('audit')) }}"><x-icon name="history"/> Audit log</a>
             @endif
         </nav>
 
         <div class="border-t border-ink-200 p-3 text-sm">
             {{-- Hanya cek key terisi, bukan valid — validitas baru ketahuan saat dokumen dibaca. --}}
-            <p class="flex items-center gap-2 px-2.5 pb-2 text-xs text-ink-500" title="{{ $aiReady ? 'Key terisi. Valid atau tidaknya baru ketahuan saat dokumen dibaca — cek status dokumen.' : 'Isi API key AI di .env' }}">
+            <p class="flex items-center gap-2 px-2.5 pb-2 text-xs text-ink-500" title="{{ $aiReady ? 'Key terisi. Cek validitasnya lewat Pengaturan AI → Tes koneksi.' : 'Isi API key Gemini di menu Pengaturan AI' }}">
                 <span class="size-2 rounded-full {{ $aiReady ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
                 {{ $aiReady ? 'Key AI terisi' : 'AI belum terpasang' }}
             </p>
@@ -201,6 +204,9 @@
             }
             if ($me->may('tax.rates')) {
                 $items[] = ['Tarif pajak', route('tax.rates')];
+            }
+            if ($me->may('settings.manage')) {
+                $items[] = ['Pengaturan AI', route('settings.edit')];
             }
             if ($me->may('clients.manage')) {
                 array_push($items, ['Audit log', route('audit')], ['Klien baru', route('clients.create')]);

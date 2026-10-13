@@ -39,6 +39,7 @@
         <env name="OPENAI_API_KEY" value="" force="true"/>
         <env name="OPENAI_API_BASE" value="https://api.openai.com/v1" force="true"/>
         <env name="ANTHROPIC_API_KEY" value="" force="true"/>
+        <env name="GEMINI_API_KEY" value="" force="true"/>
         <env name="AI_BACKUP_KEY" value="" force="true"/>
         <env name="AI_BACKUP_MODEL" value="" force="true"/>
     </php>

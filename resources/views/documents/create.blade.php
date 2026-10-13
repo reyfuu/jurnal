@@ -4,7 +4,7 @@
 @section('content')
     @unless ($aiReady)
         <div class="mb-5 rounded-[10px] border border-ai-500/30 bg-ai-50 px-4 py-3 text-sm text-ink-800">
-            Otak AI belum terpasang (API key kosong di <code class="font-mono">.env</code>). Dokumen akan tersimpan,
+            Otak AI belum terpasang (admin belum mengisi API key Gemini di Pengaturan AI). Dokumen akan tersimpan,
             tapi pembacaan otomatis gagal — kamu masih bisa catat lewat jurnal manual.
         </div>
     @endunless

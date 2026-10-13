@@ -2,8 +2,11 @@
 
 namespace App\Services\Ai;
 
+use App\Models\Setting;
+
 /**
- * Satu-satunya tempat yang tahu "lagi pakai otak apa". Provider & model dari
+ * Satu-satunya tempat yang tahu "lagi pakai otak apa". Key Gemini yang disimpan
+ * admin di halaman Pengaturan menang; kalau kosong, provider & model dari
  * config/ai.php (.env), plus rantai cadangan yang aktif hanya kalau key & model
  * cadangan benar-benar terisi.
  */
@@ -37,6 +40,18 @@ class AiProviderFactory
         $timeout = (int) config('ai.request_timeout', 120);
         $connect = (int) config('ai.connect_timeout', 10);
 
+        // Gemini lewat endpoint OpenAI-compatible-nya — cukup reuse OpenAiProvider.
+        $geminiKey = (string) (Setting::get('gemini_key') ?: config('ai.gemini.key'));
+        if ($geminiKey !== '' || $provider === 'gemini') {
+            if ($geminiKey === '') {
+                throw new AiException('API key Gemini belum diisi — buka menu Pengaturan.');
+            }
+
+            return new OpenAiProvider(
+                $geminiKey, (string) config('ai.gemini.base'), self::geminiModel(), $maxTokens, $timeout, $connect,
+            );
+        }
+
         if ($provider === 'anthropic') {
             $key = (string) config('ai.anthropic.key');
             if ($key === '') {
@@ -58,6 +73,11 @@ class AiProviderFactory
             $key, (string) config('ai.openai.base'), $model, $maxTokens, $timeout, $connect,
             (string) config('ai.token_param', 'max_tokens'),
         );
+    }
+
+    public static function geminiModel(): string
+    {
+        return (string) (Setting::get('gemini_model') ?: config('ai.gemini.model'));
     }
 
     /**

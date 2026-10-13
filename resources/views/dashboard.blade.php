@@ -12,8 +12,8 @@
     @unless ($aiReady)
         <div class="mb-6 rounded-[10px] border border-ai-500/30 bg-ai-50 px-4 py-3 text-sm text-ink-800">
             <p class="font-semibold text-ai-700">Otak AI belum terpasang.</p>
-            <p>Isi <code class="font-mono">OPENAI_API_KEY</code> (atau <code class="font-mono">ANTHROPIC_API_KEY</code> + set
-            <code class="font-mono">AI_PROVIDER=anthropic</code>) di <code class="font-mono">.env</code>.
+            <p>Admin: isi API key Gemini di <a href="{{ route('settings.edit') }}" class="underline">Pengaturan AI</a>
+            (atau key AI di <code class="font-mono">.env</code>).
             Tanpa itu, upload dokumen tetap tersimpan tapi tidak bisa dibaca otomatis — jurnal manual tetap jalan.</p>
         </div>
     @endunless

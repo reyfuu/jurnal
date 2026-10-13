@@ -41,6 +41,7 @@ class User extends Authenticatable
     private const ABILITIES = [
         'users.manage' => [self::ROLE_ADMIN],
         'tax.rates' => [self::ROLE_ADMIN],
+        'settings.manage' => [self::ROLE_ADMIN],
         'records.delete' => [self::ROLE_ADMIN],
         'clients.all' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR],
         'clients.manage' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR],

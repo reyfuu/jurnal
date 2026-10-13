@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -87,6 +88,12 @@ Route::middleware(['auth', 'active', 'client.access'])->group(function () {
         Route::get('/pajak/tarif', [TaxController::class, 'rates'])->name('tax.rates');
         Route::post('/pajak/tarif', [TaxController::class, 'storeRate'])->name('tax.rates.store');
         Route::post('/pajak/tarif/{rate}/verifikasi', [TaxController::class, 'verifyRate'])->name('tax.rates.verify');
+    });
+
+    Route::middleware('ability:settings.manage')->group(function () {
+        Route::get('/pengaturan', [SettingController::class, 'edit'])->name('settings.edit');
+        Route::put('/pengaturan', [SettingController::class, 'update'])->name('settings.update');
+        Route::post('/pengaturan/tes', [SettingController::class, 'test'])->middleware('throttle:6,1')->name('settings.test');
     });
 
     Route::middleware('ability:users.manage')->group(function () {

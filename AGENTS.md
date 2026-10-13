@@ -19,7 +19,10 @@ Login lokal: `admin@example.com` / `password123` (diubah langsung di DB; seed ul
 mengembalikan ke bawaan `admin@jurnal.test`). Jangan taruh `SEED_ADMIN_*` di `.env`
 lokal — `SeederGuardTest` ikut membacanya.
 
-AI lokal: OpenRouter (`OPENAI_API_BASE=https://openrouter.ai/api/v1`,
+AI: **Gemini** — admin isi key di menu **Pengaturan AI** (`/pengaturan`, tabel `settings`,
+terenkripsi APP_KEY; ganti APP_KEY = isi ulang key). Key tersimpan menang atas `.env`;
+kalau kosong, jatuh ke `.env` (`AI_PROVIDER=gemini|openai|anthropic`).
+Sebelumnya lokal: OpenRouter (`OPENAI_API_BASE=https://openrouter.ai/api/v1`,
 `AI_MODEL=openai/gpt-4.1-mini` — `gpt-4o-mini` salah baca mutasi bank). **Shell
 user meng-export `OPENAI_API_KEY` lama (ditolak) yang menang atas `.env`** —
 jalankan server dengan `env -u OPENAI_API_KEY php artisan serve --port=8001`.
