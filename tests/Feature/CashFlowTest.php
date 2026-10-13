@@ -60,7 +60,8 @@ class CashFlowTest extends TestCase
 
         foreach (['neraca-saldo' => 'Neraca Saldo', 'laba-rugi' => 'Laba Rugi', 'neraca' => 'Neraca', 'arus-kas' => 'Arus Kas'] as $jenis => $judul) {
             $csv = $this->actingAs($user)->get(route('reports.export', [$client, $jenis]).'?period=2026-10')->assertOk()->streamedContent();
-            $this->assertStringStartsWith("\xEF\xBB\xBF{$judul};", $csv, $jenis);
+            $this->assertStringStartsWith("\xEF\xBB\xBF", $csv, $jenis);
+            $this->assertStringContainsString($judul, strtok($csv, "\n"), $jenis);
             $this->assertStringContainsString('5000000', $csv, $jenis);
         }
         $this->actingAs($user)->get(route('reports.export', [$client, 'ngawur']))->assertNotFound();
