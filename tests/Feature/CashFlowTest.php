@@ -45,7 +45,8 @@ class CashFlowTest extends TestCase
     public function test_halaman_arus_kas_bisa_dibuka(): void
     {
         $client = Client::create(['name' => 'Uji', 'type' => Client::TYPE_EXTERNAL]);
-        $user = User::create(['name' => 'S', 'email' => 's@t.id', 'password' => 'secret123', 'role' => User::ROLE_STAFF, 'is_active' => true]);
+        $user = User::create(['name' => 'S', 'email' => 's@t.id', 'password' => 'secret123', 'role' => User::ROLE_AKUNTAN, 'is_active' => true]);
+        $user->clients()->attach($client);
 
         $this->actingAs($user)->get(route('reports.cash-flow', $client).'?period=2026-10')->assertOk()->assertSee('Arus Kas');
     }
@@ -56,7 +57,8 @@ class CashFlowTest extends TestCase
         app(ChartOfAccounts::class)->seedFor($client);
         $a = fn (string $code) => $client->accounts()->where('code', $code)->value('id');
         app(JournalPoster::class)->record(['client_id' => $client->id, 'date' => '2026-10-02'], [['account_id' => $a('1102'), 'debit' => 5_000_000], ['account_id' => $a('4101'), 'credit' => 5_000_000]]);
-        $user = User::create(['name' => 'S', 'email' => 's@t.id', 'password' => 'secret123', 'role' => User::ROLE_STAFF, 'is_active' => true]);
+        $user = User::create(['name' => 'S', 'email' => 's@t.id', 'password' => 'secret123', 'role' => User::ROLE_AKUNTAN, 'is_active' => true]);
+        $user->clients()->attach($client);
 
         foreach (['neraca-saldo' => 'Neraca Saldo', 'laba-rugi' => 'Laba Rugi', 'neraca' => 'Neraca', 'arus-kas' => 'Arus Kas'] as $jenis => $judul) {
             $csv = $this->actingAs($user)->get(route('reports.export', [$client, $jenis]).'?period=2026-10')->assertOk()->streamedContent();

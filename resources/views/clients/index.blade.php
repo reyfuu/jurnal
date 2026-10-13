@@ -4,7 +4,7 @@
 @section('content')
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
         <h1 class="text-xl font-semibold tracking-tight text-ink-900">Database Klien</h1>
-        @if (auth()->user()->isAdmin())
+        @if (auth()->user()->may('clients.manage'))
             <a href="{{ route('clients.create') }}" class="btn-primary">+ Klien baru</a>
         @endif
     </div>
@@ -57,7 +57,7 @@
                             <span class="{{ $client->is_active ? 'badge-ok' : 'badge-bad' }}">{{ $client->is_active ? 'Aktif' : 'Nonaktif' }}</span>
                         </td>
                         <td class="td text-right">
-                            @if (auth()->user()->isAdmin())
+                            @if (auth()->user()->may('clients.manage'))
                                 <a href="{{ route('clients.edit', $client) }}" class="btn-ghost btn-sm">Ubah</a>
                             @endif
                         </td>

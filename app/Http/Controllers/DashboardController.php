@@ -14,9 +14,17 @@ class DashboardController extends Controller
 
     public function index()
     {
+        $user = auth()->user();
+        // Anggota tidak melihat angka keuangan — langsung ke dokumen klien pertamanya.
+        if (! $user->may('books.view')) {
+            $first = Client::active()->visibleTo($user)->orderBy('name')->first();
+
+            return $first ? redirect()->route('documents.index', $first) : view('dashboard-empty');
+        }
+
         $period = now()->format('Y-m');
 
-        $clients = Client::active()->orderBy('type')->orderBy('name')->get()
+        $clients = Client::active()->visibleTo($user)->orderBy('type')->orderBy('name')->get()
             ->map(fn (Client $client) => [
                 'client' => $client,
                 'snapshot' => $this->reports->snapshot($client->id, $period),
@@ -41,8 +49,8 @@ class DashboardController extends Controller
             'taxDue' => $taxDue,
             'totals' => [
                 'clients' => $clients->count(),
-                'documents' => Document::count(),
-                'journals' => Journal::posted()->count(),
+                'documents' => Document::whereIn('client_id', $clients->pluck('client.id'))->count(),
+                'journals' => Journal::posted()->whereIn('client_id', $clients->pluck('client.id'))->count(),
                 'pending' => $clients->sum('pending'),
             ],
         ]);

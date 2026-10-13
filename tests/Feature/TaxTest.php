@@ -295,7 +295,8 @@ class TaxTest extends TestCase
 
     public function test_staff_tidak_bisa_ubah_profil_atau_tarif(): void
     {
-        $staff = User::create(['name' => 'Staff', 'email' => 's@test.id', 'password' => 'secret123', 'role' => User::ROLE_STAFF, 'is_active' => true]);
+        $staff = User::create(['name' => 'Staff', 'email' => 's@test.id', 'password' => 'secret123', 'role' => User::ROLE_AKUNTAN, 'is_active' => true]);
+        $staff->clients()->attach($this->client);
 
         $this->actingAs($staff)->put(route('tax.profile.update', $this->client), ['is_pkp' => 0, 'pph_regime' => 'normal'])->assertForbidden();
         $this->actingAs($staff)->post(route('tax.rates.store'), [])->assertForbidden();

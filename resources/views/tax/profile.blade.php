@@ -2,7 +2,7 @@
 @section('title', 'Profil pajak · '.$client->name)
 
 @section('content')
-    @php($admin = auth()->user()->isAdmin())
+    @php($admin = auth()->user()->may('clients.manage'))
     <div class="mb-6">
         <p class="label mb-0.5">Pajak</p>
         <h2 class="text-xl font-semibold tracking-tight text-ink-900">Profil pajak</h2>
@@ -62,7 +62,7 @@
                 <a href="{{ route('tax.index', $client) }}" class="btn-ghost">Batal</a>
             </div>
         @else
-            <p class="border-t border-ink-100 pt-4 text-sm text-ink-500">Hanya admin yang bisa mengubah profil pajak.</p>
+            <p class="border-t border-ink-100 pt-4 text-sm text-ink-500">Hanya admin & supervisor yang bisa mengubah profil pajak.</p>
         @endif
     </form>
 

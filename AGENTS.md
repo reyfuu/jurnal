@@ -37,6 +37,9 @@ jalankan server dengan `env -u OPENAI_API_KEY php artisan serve --port=8001`.
 Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 
 - **Klien = isolasi penuh.** COA, jurnal, laporan per klien. `JournalPoster` menolak akun milik klien lain.
+- **Peran & akses per klien.** Admin · supervisor · akuntan · anggota; hak per kemampuan di `User::ABILITIES`
+  (middleware `ability:`). Akuntan & anggota hanya klien di `client_user` (middleware `client.access` → 404).
+  Anggota: upload & lihat dokumen saja. Kelola pengguna & tarif: admin. Hapus permanen: admin.
 - **Angka dari AI dicuci di PHP.** `Rupiah::parse()` ("Rp 1.250.000", "85rb", "1,5jt", "(50.000)"). Tanggal gaya Indonesia (`03/04/2026` = 3 April); tahun ngawur ditolak.
 - **Kode akun karangan tidak lolos** → dialihkan ke akun default + warning.
 - **Draft dijamin balance**; selisih dengan total dokumen = **warning**, bukan ditambal diam-diam.

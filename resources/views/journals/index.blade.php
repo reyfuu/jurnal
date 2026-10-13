@@ -54,7 +54,7 @@
                                 <button class="btn-ghost btn-sm">Void</button>
                             </form>
                         @endif
-                        @if (auth()->user()->isAdmin())
+                        @if (auth()->user()->may('records.delete'))
                             <form method="POST" action="{{ route('journals.destroy', [$client, $journal]) }}"
                                   data-confirm="Hapus permanen? Lebih aman pakai Void supaya jejaknya tetap ada.">
                                 @csrf @method('DELETE')

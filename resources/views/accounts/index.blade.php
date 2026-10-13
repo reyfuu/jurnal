@@ -7,7 +7,7 @@
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Chart of Account</h2>
             <p class="text-xs text-ink-500">COA ini milik {{ $client->name }} saja — tidak tercampur klien lain.</p>
         </div>
-        @if (auth()->user()->isAdmin())
+        @if (auth()->user()->may('clients.manage'))
             <form method="POST" action="{{ route('clients.coa.sync', $client) }}">
                 @csrf
                 <button class="btn-ghost btn-sm">Sinkron dari template</button>
@@ -15,7 +15,7 @@
         @endif
     </div>
 
-    @if (auth()->user()->isAdmin())
+    @if (auth()->user()->may('clients.manage'))
         <form method="POST" action="{{ route('accounts.store', $client) }}" class="card mb-5 flex flex-wrap items-end gap-3 p-4">
             @csrf
             <div class="w-28">
@@ -57,7 +57,7 @@
                         <tbody>
                             @foreach ($group as $account)
                                 <tr class="hover:bg-ink-50">
-                                    @if (auth()->user()->isAdmin())
+                                    @if (auth()->user()->may('clients.manage'))
                                         <form method="POST" action="{{ route('accounts.update', [$client, $account]) }}" id="acc-{{ $account->id }}">
                                             @csrf @method('PUT')
                                             <input type="hidden" name="type" value="{{ $account->type }}">
@@ -101,7 +101,7 @@
         @endif
     @endforeach
 
-    @if (auth()->user()->isAdmin())
+    @if (auth()->user()->may('clients.manage'))
         @foreach ($accounts->flatten() as $account)
             <form method="POST" action="{{ route('accounts.destroy', [$client, $account]) }}" id="acc-del-{{ $account->id }}" class="hidden">
                 @csrf @method('DELETE')

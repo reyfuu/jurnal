@@ -110,8 +110,9 @@ class SmokePageTest extends TestCase
     {
         $staff = User::create([
             'name' => 'Staff', 'email' => 'staff@test.id', 'password' => 'secret123',
-            'role' => User::ROLE_STAFF, 'is_active' => true,
+            'role' => User::ROLE_AKUNTAN, 'is_active' => true,
         ]);
+        $staff->clients()->attach($this->client);
 
         $this->actingAs($staff)->get(route('accounts.index', $this->client))
             ->assertOk()

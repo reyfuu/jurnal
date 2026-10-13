@@ -12,7 +12,8 @@
     $client = $client ?? null;
     // ponytail: dua query kecil per halaman untuk sidebar. Pindah ke view composer
     // + cache kalau klien sudah ratusan.
-    $navClients = \App\Models\Client::active()->orderBy('type')->orderBy('name')->get(['id', 'name', 'slug', 'type']);
+    $me = auth()->user();
+    $navClients = \App\Models\Client::active()->visibleTo($me)->orderBy('type')->orderBy('name')->get(['id', 'name', 'slug', 'type']);
     $navPending = $client?->exists
         ? $client->documents()->whereIn('status', [\App\Models\Document::STATUS_UPLOADED, \App\Models\Document::STATUS_EXTRACTED])->count()
         : 0;
@@ -52,7 +53,7 @@
             </summary>
             <div class="absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-md border border-ink-200 bg-white p-1 shadow-[0_1px_2px_rgb(0_0_0/.05),0_8px_24px_rgb(0_0_0/.08)]">
                 @forelse ($navClients as $c)
-                    <a href="{{ route('clients.show', $c) }}"
+                    <a href="{{ $me->may('books.view') ? route('clients.show', $c) : route('documents.index', $c) }}"
                        class="flex items-center gap-2.5 rounded px-2 py-1.5 text-sm hover:bg-ink-100 {{ $client?->is($c) ? 'bg-ink-100 font-medium' : '' }}">
                         <span class="grid size-5 place-items-center rounded bg-ink-100 text-[10px] font-semibold text-ink-600">{{ $initials($c->name) }}</span>
                         <span class="truncate">{{ $c->name }}</span>
@@ -60,7 +61,7 @@
                 @empty
                     <p class="px-2 py-1.5 text-sm text-ink-500">Belum ada klien.</p>
                 @endforelse
-                @if (auth()->user()->isAdmin())
+                @if ($me->may('clients.manage'))
                     <a href="{{ route('clients.create') }}" class="mt-1 flex items-center gap-2 border-t border-ink-100 px-2 pt-2 pb-1.5 text-sm text-brand-700 hover:underline">
                         <x-icon name="plus" class="size-3.5"/> Klien baru
                     </a>
@@ -73,16 +74,21 @@
         </button>
 
         <nav class="mt-2 grow overflow-y-auto px-3 pb-4" aria-label="Navigasi utama">
+            @if ($me->may('books.view'))
             <a href="{{ route('dashboard') }}" class="{{ $link(request()->routeIs('dashboard')) }}"><x-icon name="dashboard"/> Dashboard</a>
             <a href="{{ route('clients.index') }}" class="{{ $link(request()->routeIs('clients.index', 'clients.create', 'clients.edit')) }}"><x-icon name="users"/> Semua klien</a>
+            @endif
 
             @if ($client?->exists)
                 <p class="nav-heading">Buku {{ $client->name }}</p>
+                @if ($me->may('books.view'))
                 <a href="{{ route('clients.show', $client) }}" class="{{ $link(request()->routeIs('clients.show')) }}"><x-icon name="home"/> Ringkasan</a>
+                @endif
                 <a href="{{ route('documents.index', $client) }}" class="{{ $link(request()->routeIs('documents.*')) }}">
                     <x-icon name="file"/> Dokumen
                     @if ($navPending)<span class="badge-ai ml-auto">{{ $navPending }}</span>@endif
                 </a>
+                @if ($me->may('books.view'))
                 <a href="{{ route('journals.index', $client) }}" class="{{ $link(request()->routeIs('journals.*')) }}"><x-icon name="book"/> Jurnal</a>
                 <a href="{{ route('accounts.index', $client) }}" class="{{ $link(request()->routeIs('accounts.*')) }}"><x-icon name="tree"/> Akun (COA)</a>
 
@@ -98,11 +104,17 @@
                     <x-icon name="id"/> Profil pajak
                     @unless ($client->hasTaxProfile())<span class="badge-ai ml-auto">isi</span>@endunless
                 </a>
+                @endif
             @endif
 
-            @if (auth()->user()->isAdmin())
+            @if ($me->may('clients.manage'))
                 <p class="nav-heading">Admin</p>
-                <a href="{{ route('tax.rates') }}" class="{{ $link(request()->routeIs('tax.rates')) }}"><x-icon name="percent"/> Tarif pajak</a>
+                @if ($me->may('users.manage'))
+                    <a href="{{ route('users.index') }}" class="{{ $link(request()->routeIs('users.*')) }}"><x-icon name="users"/> Pengguna</a>
+                @endif
+                @if ($me->may('tax.rates'))
+                    <a href="{{ route('tax.rates') }}" class="{{ $link(request()->routeIs('tax.rates')) }}"><x-icon name="percent"/> Tarif pajak</a>
+                @endif
                 <a href="{{ route('audit') }}" class="{{ $link(request()->routeIs('audit')) }}"><x-icon name="history"/> Audit log</a>
             @endif
         </nav>
@@ -116,7 +128,7 @@
             <div class="flex items-center justify-between gap-2 px-2.5">
                 <span class="min-w-0">
                     <span class="block truncate font-medium text-ink-800">{{ auth()->user()->name }}</span>
-                    <span class="block text-[11px] text-ink-500">{{ auth()->user()->isAdmin() ? 'Admin' : 'Staff' }}</span>
+                    <span class="block text-[11px] text-ink-500">{{ $me->roleLabel() }}</span>
                 </span>
                 <form method="POST" action="{{ route('logout') }}">@csrf
                     <button class="nav-link" title="Keluar" aria-label="Keluar"><x-icon name="logout"/></button>
@@ -163,25 +175,35 @@
     </div>
     <ul class="max-h-80 overflow-y-auto p-1" data-palette-list>
         @php
-            $items = [['Dashboard', route('dashboard')], ['Semua klien', route('clients.index')]];
+            $items = $me->may('books.view') ? [['Dashboard', route('dashboard')], ['Semua klien', route('clients.index')]] : [];
             if ($client?->exists) {
-                array_push($items,
-                    ['Upload dokumen — '.$client->name, route('documents.create', $client)],
-                    ['Jurnal manual — '.$client->name, route('journals.create', $client)],
-                    ['Dokumen — '.$client->name, route('documents.index', $client)],
-                    ['Jurnal — '.$client->name, route('journals.index', $client)],
-                    ['Neraca Saldo — '.$client->name, route('reports.trial-balance', $client)],
-                    ['Laba Rugi — '.$client->name, route('reports.income-statement', $client)],
-                    ['Neraca — '.$client->name, route('reports.balance-sheet', $client)],
-                    ['Arus Kas — '.$client->name, route('reports.cash-flow', $client)],
-                    ['Pajak — '.$client->name, route('tax.index', $client)],
-                );
+                $items[] = ['Upload dokumen — '.$client->name, route('documents.create', $client)];
+                $items[] = ['Dokumen — '.$client->name, route('documents.index', $client)];
+                if ($me->may('books.view')) {
+                    array_push($items,
+                        ['Jurnal — '.$client->name, route('journals.index', $client)],
+                        ['Neraca Saldo — '.$client->name, route('reports.trial-balance', $client)],
+                        ['Laba Rugi — '.$client->name, route('reports.income-statement', $client)],
+                        ['Neraca — '.$client->name, route('reports.balance-sheet', $client)],
+                        ['Arus Kas — '.$client->name, route('reports.cash-flow', $client)],
+                        ['Pajak — '.$client->name, route('tax.index', $client)],
+                    );
+                }
+                if ($me->may('books.post')) {
+                    $items[] = ['Jurnal manual — '.$client->name, route('journals.create', $client)];
+                }
             }
             foreach ($navClients as $c) {
-                $items[] = ['Klien: '.$c->name, route('clients.show', $c)];
+                $items[] = ['Klien: '.$c->name, $me->may('books.view') ? route('clients.show', $c) : route('documents.index', $c)];
             }
-            if (auth()->user()->isAdmin()) {
-                array_push($items, ['Tarif pajak', route('tax.rates')], ['Audit log', route('audit')], ['Klien baru', route('clients.create')]);
+            if ($me->may('users.manage')) {
+                $items[] = ['Pengguna', route('users.index')];
+            }
+            if ($me->may('tax.rates')) {
+                $items[] = ['Tarif pajak', route('tax.rates')];
+            }
+            if ($me->may('clients.manage')) {
+                array_push($items, ['Audit log', route('audit')], ['Klien baru', route('clients.create')]);
             }
         @endphp
         @foreach ($items as [$label, $url])

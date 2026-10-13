@@ -63,6 +63,17 @@ class Client extends Model
         return $query->where('is_active', true);
     }
 
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
+
+    /** Klien yang boleh dilihat user ini (admin/supervisor: semua). */
+    public function scopeVisibleTo($query, User $user)
+    {
+        return $user->may('clients.all') ? $query : $query->whereHas('users', fn ($q) => $q->whereKey($user->id));
+    }
+
     public function accounts()
     {
         return $this->hasMany(Account::class);

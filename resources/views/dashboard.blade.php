@@ -62,7 +62,7 @@
 
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 class="font-semibold text-ink-900">Posisi tiap klien — {{ $period }}</h2>
-        @if (auth()->user()->isAdmin())
+        @if (auth()->user()->may('clients.manage'))
             <a href="{{ route('clients.create') }}" class="btn-primary">+ Klien baru</a>
         @endif
     </div>
@@ -71,7 +71,7 @@
         <div class="card p-10 text-center">
             <p class="font-semibold text-ink-800">Belum ada klien.</p>
             <p class="mt-1 text-sm text-ink-500">Buat klien dulu — tiap klien dapat COA standar dan buku jurnalnya sendiri.</p>
-            @if (auth()->user()->isAdmin())
+            @if (auth()->user()->may('clients.manage'))
                 <a href="{{ route('clients.create') }}" class="btn-primary mt-4">Buat klien pertama</a>
             @endif
         </div>

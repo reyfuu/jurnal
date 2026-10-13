@@ -36,11 +36,13 @@
             </p>
         </div>
         <div class="flex gap-2">
+            @if (auth()->user()->may('books.post'))
             <form method="POST" action="{{ route('documents.reextract', [$client, $document]) }}">
                 @csrf
                 <button class="btn-ghost btn-sm">Baca ulang dengan AI</button>
             </form>
-            @if (auth()->user()->isAdmin())
+            @endif
+            @if (auth()->user()->may('records.delete'))
                 <form method="POST" action="{{ route('documents.destroy', [$client, $document]) }}"
                       data-confirm="Hapus dokumen ini? Jurnal yang sudah diposting tetap tersimpan.">
                     @csrf @method('DELETE')
@@ -205,7 +207,12 @@
                 </div>
             @endif
 
-            @if ($drafts)
+            @if ($drafts && ! auth()->user()->may('books.post'))
+                <div class="card p-6 text-sm">
+                    <p class="font-semibold text-ink-900">{{ count($drafts) }} usulan jurnal menunggu review akuntan.</p>
+                    <p class="mt-1 text-ink-500">Peranmu (anggota) bisa upload dan melihat hasil baca, tapi yang memeriksa dan memposting ke buku adalah akuntan atau supervisor.</p>
+                </div>
+            @elseif ($drafts)
                 <form method="POST" action="{{ route('documents.post', [$client, $document]) }}" class="space-y-4">
                     @csrf
                     <div class="flex flex-wrap items-baseline justify-between gap-2">

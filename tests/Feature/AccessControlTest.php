@@ -22,15 +22,19 @@ class AccessControlTest extends TestCase
         app(ChartOfAccounts::class)->seedFor($this->client);
     }
 
-    private function user(string $role = User::ROLE_STAFF, bool $active = true): User
+    /** Akuntan/anggota otomatis ditugaskan ke klien uji (tanpa penugasan mereka tidak melihat klien apa pun). */
+    private function user(string $role = User::ROLE_AKUNTAN, bool $active = true): User
     {
-        return User::create([
+        $user = User::create([
             'name' => ucfirst($role),
             'email' => $role.'-'.uniqid().'@test.id',
             'password' => 'secret123',
             'role' => $role,
             'is_active' => $active,
         ]);
+        $user->clients()->attach($this->client);
+
+        return $user;
     }
 
     public function test_tamu_dialihkan_ke_login(): void
@@ -55,7 +59,7 @@ class AccessControlTest extends TestCase
 
     public function test_user_nonaktif_tidak_bisa_login(): void
     {
-        $user = $this->user(User::ROLE_STAFF, active: false);
+        $user = $this->user(User::ROLE_AKUNTAN, active: false);
 
         $this->post(route('login'), ['email' => $user->email, 'password' => 'secret123'])
             ->assertSessionHasErrors('email');
@@ -75,7 +79,7 @@ class AccessControlTest extends TestCase
 
     public function test_staff_boleh_input_dan_posting_tapi_tak_boleh_ubah_struktur(): void
     {
-        $staff = $this->user(User::ROLE_STAFF);
+        $staff = $this->user(User::ROLE_AKUNTAN);
 
         // Boleh: lihat & input.
         $this->actingAs($staff)->get(route('clients.show', $this->client))->assertOk();
@@ -189,7 +193,7 @@ class AccessControlTest extends TestCase
 
     public function test_jurnal_manual_tidak_balance_ditolak_dengan_pesan_jelas(): void
     {
-        $staff = $this->user(User::ROLE_STAFF);
+        $staff = $this->user(User::ROLE_AKUNTAN);
         $akun = fn (string $code) => $this->client->accounts()->where('code', $code)->value('id');
 
         $this->actingAs($staff)->post(route('journals.store', $this->client), [
@@ -205,7 +209,7 @@ class AccessControlTest extends TestCase
 
     public function test_staff_boleh_void_tapi_tak_boleh_hapus_jurnal(): void
     {
-        $staff = $this->user(User::ROLE_STAFF);
+        $staff = $this->user(User::ROLE_AKUNTAN);
         $akun = fn (string $code) => $this->client->accounts()->where('code', $code)->value('id');
 
         $this->actingAs($staff)->post(route('journals.store', $this->client), [

@@ -20,7 +20,7 @@ class ClientController extends Controller
 
     public function index(Request $request)
     {
-        $clients = Client::query()
+        $clients = Client::query()->visibleTo(auth()->user())
             ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%'.$request->string('q').'%'))
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->withCount(['journals' => fn ($q) => $q->posted()])
