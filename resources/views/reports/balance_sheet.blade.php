@@ -5,7 +5,7 @@
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Neraca</h2>
-            <p class="text-xs text-ink-500">{{ $client->name }} · posisi per akhir {{ $period }} (akumulasi semua jurnal posted s/d bulan itu)</p>
+            <p class="text-xs text-ink-500">{{ $client->name }} · posisi per akhir {{ \App\Models\Journal::periodLabel($period) }} (akumulasi semua jurnal posted s/d bulan itu)</p>
         </div>
         <div class="flex flex-wrap items-end gap-2">
             @include('partials.period-picker')
@@ -71,7 +71,7 @@
                     <tr>
                         <td class="td pl-6">
                             Laba (Rugi) Berjalan
-                            <span class="block text-xs text-ink-400">akumulasi pendapatan − beban s/d {{ $period }}</span>
+                            <span class="block text-xs text-ink-400">akumulasi pendapatan − beban s/d {{ \App\Models\Journal::periodLabel($period) }}</span>
                         </td>
                         <td class="td num {{ $report['retained_earnings'] >= 0 ? '' : 'text-rose-700' }}">
                             {{ \App\Support\Rupiah::format($report['retained_earnings']) }}

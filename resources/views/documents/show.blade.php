@@ -46,7 +46,7 @@
                 <form method="POST" action="{{ route('documents.destroy', [$client, $document]) }}"
                       data-confirm="Hapus dokumen ini? Jurnal yang sudah diposting tetap tersimpan.">
                     @csrf @method('DELETE')
-                    <button class="btn-danger btn-sm">Hapus</button>
+                    <button class="btn-danger-quiet btn-sm">Hapus</button>
                 </form>
             @endif
         </div>

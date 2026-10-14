@@ -9,6 +9,7 @@ use App\Support\SandiLemah;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Kelola pengguna (khusus admin). Tidak ada hapus: pengguna yang sudah pernah
@@ -82,7 +83,16 @@ class UserController extends Controller
             'clients' => ['nullable', 'array'],
             'clients.*' => ['integer', 'exists:clients,id'],
         ]);
-        $data['clients'] = array_map('intval', $data['clients'] ?? []);
+        $data['clients'] = array_values(array_unique(array_map('intval', $data['clients'] ?? [])));
+
+        $limit = User::CLIENT_LIMITS[$data['role']] ?? null;
+        if ($limit === null) {
+            $data['clients'] = []; // admin melihat semua — penugasan tidak berarti
+        } elseif (count($data['clients']) > $limit) {
+            throw ValidationException::withMessages([
+                'clients' => sprintf('%s maksimal memegang %d perusahaan — %d dipilih.', User::ROLES[$data['role']], $limit, count($data['clients'])),
+            ]);
+        }
 
         return $data;
     }

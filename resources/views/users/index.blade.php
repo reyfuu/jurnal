@@ -6,7 +6,7 @@
         <div>
             <p class="label mb-0.5">Admin</p>
             <h1 class="text-2xl font-semibold tracking-tight text-ink-900">Pengguna & peran</h1>
-            <p class="mt-1 text-sm text-ink-500">Akuntan & anggota hanya melihat klien yang ditugaskan. Supervisor & admin melihat semua klien.</p>
+            <p class="mt-1 text-sm text-ink-500">Admin melihat semua perusahaan. Supervisor maks. 3, akuntan maks. 5, anggota maks. 10 perusahaan yang ditugaskan.</p>
         </div>
         <a href="{{ route('users.create') }}" class="btn-primary"><x-icon name="plus"/> Pengguna baru</a>
     </div>
@@ -38,7 +38,10 @@
                             @elseif ($u->clients->isEmpty())
                                 <span class="badge-warn">belum ditugaskan</span>
                             @else
-                                {{ $u->clients->pluck('name')->join(', ') }}
+                                @php($over = $u->clients->count() > $u->clientLimit())
+                                <span class="font-mono text-xs {{ $over ? 'text-rose-700 font-semibold' : 'text-ink-500' }}"
+                                      @if ($over) title="Melebihi batas peran — kurangi lewat Ubah" @endif>{{ $u->clients->count() }}/{{ $u->clientLimit() }}</span>
+                                <span class="line-clamp-2 max-w-md text-ink-700" title="{{ $u->clients->pluck('name')->join(', ') }}">{{ $u->clients->pluck('name')->join(', ') }}</span>
                             @endif
                         </td>
                         <td class="td"><span class="{{ $u->is_active ? 'badge-ok' : 'badge-bad' }}">{{ $u->is_active ? 'Aktif' : 'Nonaktif' }}</span></td>

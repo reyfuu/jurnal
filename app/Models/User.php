@@ -28,9 +28,16 @@ class User extends Authenticatable
 
     public const ROLE_HINTS = [
         self::ROLE_ADMIN => 'Pemilik sistem: semua akses + kelola pengguna & tarif pajak.',
-        self::ROLE_SUPERVISOR => 'Semua klien. Kelola klien, COA, profil pajak, audit. Review & posting.',
-        self::ROLE_AKUNTAN => 'Klien yang ditugaskan saja. Review, posting, void, laporan, pajak.',
-        self::ROLE_ANGGOTA => 'Klien yang ditugaskan saja. Hanya upload & melihat dokumen — tidak bisa posting atau melihat laporan.',
+        self::ROLE_SUPERVISOR => 'Maks. 3 perusahaan yang ditugaskan. Kelola klien, COA, profil pajak, audit. Review & posting.',
+        self::ROLE_AKUNTAN => 'Maks. 5 perusahaan yang ditugaskan. Review, posting, void, laporan, pajak.',
+        self::ROLE_ANGGOTA => 'Maks. 10 perusahaan yang ditugaskan. Hanya upload & melihat dokumen — tidak bisa posting atau melihat laporan.',
+    ];
+
+    /** Batas jumlah perusahaan yang boleh dipegang per peran. Admin tanpa batas (melihat semua). */
+    public const CLIENT_LIMITS = [
+        self::ROLE_SUPERVISOR => 3,
+        self::ROLE_AKUNTAN => 5,
+        self::ROLE_ANGGOTA => 10,
     ];
 
     /**
@@ -43,7 +50,7 @@ class User extends Authenticatable
         'tax.rates' => [self::ROLE_ADMIN],
         'settings.manage' => [self::ROLE_ADMIN],
         'records.delete' => [self::ROLE_ADMIN],
-        'clients.all' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR],
+        'clients.all' => [self::ROLE_ADMIN],
         'clients.manage' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR],
         'books.view' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR, self::ROLE_AKUNTAN],
         'books.post' => [self::ROLE_ADMIN, self::ROLE_SUPERVISOR, self::ROLE_AKUNTAN],
@@ -82,6 +89,12 @@ class User extends Authenticatable
     public function canAccessClient(Client $client): bool
     {
         return $this->may('clients.all') || $this->clients->contains($client);
+    }
+
+    /** Batas perusahaan untuk peran ini; null = tanpa batas (admin). */
+    public function clientLimit(): ?int
+    {
+        return self::CLIENT_LIMITS[$this->role] ?? null;
     }
 
     public function roleLabel(): string

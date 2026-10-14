@@ -39,7 +39,7 @@
         </div>
 
         <div class="card p-5">
-            <h2 class="mb-3 font-semibold tracking-tight text-ink-900">Beban terbesar {{ $period }}</h2>
+            <h2 class="mb-3 font-semibold tracking-tight text-ink-900">Beban terbesar {{ \App\Models\Journal::periodLabel($period) }}</h2>
             @forelse ($snapshot['top_expenses'] as $row)
                 <div class="flex items-baseline justify-between gap-2 border-b border-ink-100 py-1.5 last:border-0">
                     <span class="truncate text-sm text-ink-700">{{ $row['account']->name }}</span>

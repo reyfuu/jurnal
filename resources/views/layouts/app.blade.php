@@ -9,7 +9,11 @@
 </head>
 <body>
 @php
-    $client = $client ?? null;
+    // Klien aktif HANYA dari parameter route {client}. Jangan dari variabel view:
+    // `@foreach ($clients as $client)` di halaman daftar bocor ke layout dan
+    // membuat klien terakhir di loop tampil seolah-olah sedang dibuka.
+    $client = request()->route('client');
+    $client = $client instanceof \App\Models\Client ? $client : null;
     // ponytail: dua query kecil per halaman untuk sidebar. Pindah ke view composer
     // + cache kalau klien sudah ratusan.
     $me = auth()->user();

@@ -6,7 +6,7 @@
 
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-            <p class="label mb-0.5">Pajak masa {{ $period }}</p>
+            <p class="label mb-0.5">Pajak masa {{ \App\Models\Journal::periodLabel($period) }}</p>
             <h2 class="text-xl font-semibold tracking-tight text-ink-900">Ringkasan pajak</h2>
             <p class="mt-1 flex flex-wrap gap-1.5 text-xs">
                 <span class="{{ $client->isPkpOn() ? 'badge-info' : 'badge-mute' }}">{{ $client->isPkpOn() ? 'PKP' : 'Non-PKP' }}</span>
@@ -42,7 +42,7 @@
     <section class="mb-8">
         <h3 class="mb-2 font-semibold text-ink-900">Kewajiban masa ini</h3>
         @if ($obligations === [])
-            <p class="card p-5 text-sm text-ink-500">Tidak ada kewajiban terdeteksi untuk masa {{ $period }}.</p>
+            <p class="card p-5 text-sm text-ink-500">Tidak ada kewajiban terdeteksi untuk masa {{ \App\Models\Journal::periodLabel($period) }}.</p>
         @else
             <div class="card overflow-x-auto">
                 <table class="w-full">

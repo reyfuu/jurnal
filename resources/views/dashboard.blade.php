@@ -4,7 +4,7 @@
 @section('content')
     <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-            <p class="label mb-0.5">Ringkasan {{ $period }}</p>
+            <p class="label mb-0.5">Ringkasan {{ \App\Models\Journal::periodLabel($period) }}</p>
             <h1 class="text-2xl font-semibold tracking-tight text-ink-900">Dashboard</h1>
         </div>
     </div>
@@ -48,8 +48,16 @@
                             <tr class="hover:bg-ink-50">
                                 <td class="td"><a href="{{ route('tax.index', $o['client']) }}?period={{ $o['period'] }}" class="font-medium text-brand-700 hover:underline">{{ $o['client']->name }}</a></td>
                                 <td class="td">{{ $o['name'] }}</td>
-                                <td class="td font-mono text-xs">{{ $o['period'] }}</td>
-                                <td class="td num text-left">{{ \Illuminate\Support\Carbon::parse($o['pay_due'])->format('d/m') }}</td>
+                                <td class="td text-sm">{{ \App\Models\Journal::periodLabel($o['period'], 'M Y') }}</td>
+                                @php $sisa = (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($o['pay_due'])->startOfDay(), false); @endphp
+                                <td class="td">
+                                    <span class="num">{{ \Illuminate\Support\Carbon::parse($o['pay_due'])->format('d/m') }}</span>
+                                    @if ($o['status'] === 'belum')
+                                        <span class="ml-1 text-xs {{ $sisa < 0 ? 'font-semibold text-rose-700' : ($sisa <= 3 ? 'font-semibold text-amber-700' : 'text-ink-500') }}">
+                                            {{ $sisa < 0 ? 'lewat '.abs($sisa).' hari' : ($sisa === 0 ? 'hari ini' : ($sisa === 1 ? 'besok' : $sisa.' hari lagi')) }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="td num text-left">{{ \Illuminate\Support\Carbon::parse($o['file_due'])->format('d/m') }}</td>
                                 <td class="td"><span class="{{ $o['overdue'] ? 'badge-bad' : ($o['status'] === 'setor' ? 'badge-info' : 'badge-mute') }}">{{ $o['overdue'] ? 'Lewat · ' : '' }}{{ \App\Models\TaxFiling::STATUSES[$o['status']] }}</span></td>
                             </tr>
@@ -61,7 +69,7 @@
     @endif
 
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="font-semibold text-ink-900">Posisi tiap klien — {{ $period }}</h2>
+        <h2 class="font-semibold text-ink-900">Posisi tiap klien — {{ \App\Models\Journal::periodLabel($period) }}</h2>
         @if (auth()->user()->may('clients.manage'))
             <a href="{{ route('clients.create') }}" class="btn-primary">+ Klien baru</a>
         @endif
@@ -118,6 +126,6 @@
                 </tbody>
             </table>
         </div>
-        <p class="mt-2 text-xs text-ink-400">Angka pendapatan/beban/laba = mutasi bulan {{ $period }}. Saldo kas = akumulasi sampai akhir bulan itu.</p>
+        <p class="mt-2 text-xs text-ink-400">Angka pendapatan/beban/laba = mutasi bulan {{ \App\Models\Journal::periodLabel($period) }}. Saldo kas = akumulasi sampai akhir bulan itu.</p>
     @endif
 @endsection

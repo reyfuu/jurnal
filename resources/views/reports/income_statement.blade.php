@@ -5,7 +5,7 @@
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Laporan Laba Rugi</h2>
-            <p class="text-xs text-ink-500">{{ $client->name }} · periode {{ $period }}</p>
+            <p class="text-xs text-ink-500">{{ $client->name }} · periode {{ \App\Models\Journal::periodLabel($period) }}</p>
         </div>
         <div class="flex flex-wrap items-end gap-2">
             @include('partials.period-picker')

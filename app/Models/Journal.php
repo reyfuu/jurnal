@@ -63,6 +63,16 @@ class Journal extends Model
     }
 
     /** Bulan buku yang punya jurnal posted, terbaru dulu. Kosong → bulan ini. */
+    /** "2026-10" → "Oktober 2026" (atau format lain, mis. 'M Y' → "Okt 2026"). Untuk tampilan saja. */
+    public static function periodLabel(?string $period, string $format = 'F Y'): string
+    {
+        try {
+            return \Illuminate\Support\Carbon::createFromFormat('!Y-m', (string) $period)->translatedFormat($format);
+        } catch (\Throwable) {
+            return (string) $period;
+        }
+    }
+
     public static function periodsFor(int $clientId): array
     {
         $periods = static::query()->where('client_id', $clientId)->posted()

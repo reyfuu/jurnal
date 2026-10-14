@@ -84,6 +84,11 @@
 @utility btn-danger {
     @apply btn bg-rose-600 text-white hover:bg-rose-700;
 }
+/* Aksi merusak di dalam daftar/tabel: tenang sampai di-hover, supaya merah
+   tidak berulang di tiap baris (merah = salah/berbahaya, bukan dekorasi). */
+@utility btn-danger-quiet {
+    @apply btn bg-white text-rose-700 border border-ink-200 hover:bg-rose-50 hover:border-rose-300;
+}
 @utility btn-sm {
     @apply px-2.5 py-1 text-xs;
 }

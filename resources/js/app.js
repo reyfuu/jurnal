@@ -296,6 +296,32 @@ function wireDropzone() {
     });
 }
 
+/**
+ * Form pengguna: hitung perusahaan terpilih vs batas peran, kunci centang
+ * sisanya saat batas tercapai. Penjaga sebenarnya tetap validasi di server.
+ */
+function wireClientLimit() {
+    const picker = document.querySelector('[data-client-picker]');
+    if (!picker) return;
+    const limits = JSON.parse(picker.dataset.limits || '{}');
+    const boxes = [...picker.querySelectorAll('input[type=checkbox]')];
+    const counter = picker.querySelector('[data-client-count]');
+    const update = () => {
+        const role = document.querySelector('[data-role-radio]:checked')?.value;
+        const limit = limits[role];
+        const picked = boxes.filter((b) => b.checked).length;
+        picker.disabled = limit === undefined; // admin: semua klien, tidak perlu memilih
+        boxes.forEach((b) => { b.disabled = limit !== undefined && !b.checked && picked >= limit; });
+        if (counter) {
+            counter.textContent = limit === undefined ? '' : `${picked}/${limit} dipilih`;
+            counter.classList.toggle('text-rose-700', limit !== undefined && picked > limit);
+        }
+    };
+    picker.addEventListener('change', update);
+    document.querySelectorAll('[data-role-radio]').forEach((r) => r.addEventListener('change', update));
+    update();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-journal]').forEach((root) => {
         wireBalance(root);
@@ -311,4 +337,5 @@ document.addEventListener('DOMContentLoaded', () => {
     wireToast();
     wirePalette();
     wireDropzone();
+    wireClientLimit();
 });

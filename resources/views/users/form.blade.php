@@ -47,9 +47,12 @@
             </div>
         </fieldset>
 
-        <fieldset data-client-picker>
-            <legend class="label">Klien yang ditugaskan</legend>
-            <p class="mb-2 text-xs text-ink-500">Berlaku untuk akuntan & anggota. Admin & supervisor otomatis melihat semua klien.</p>
+        <fieldset data-client-picker data-limits='@json(\App\Models\User::CLIENT_LIMITS)'>
+            <legend class="label">Perusahaan yang ditangani</legend>
+            <p class="mb-2 text-xs text-ink-500">
+                Batas: supervisor {{ \App\Models\User::CLIENT_LIMITS['supervisor'] }} · akuntan {{ \App\Models\User::CLIENT_LIMITS['akuntan'] }} · anggota {{ \App\Models\User::CLIENT_LIMITS['anggota'] }} perusahaan. Admin otomatis melihat semua.
+                <span data-client-count class="ml-1 font-mono font-medium text-ink-800" aria-live="polite"></span>
+            </p>
             @php($picked = collect(old('clients', $user->clients?->pluck('id')->all() ?? []))->map(fn ($id) => (int) $id))
             <div class="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                 @forelse ($clients as $c)

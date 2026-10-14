@@ -84,12 +84,13 @@ class RoleAccessTest extends TestCase
         $this->actingAs($anggota)->get(route('documents.index', $this->b))->assertNotFound();
     }
 
-    public function test_supervisor_semua_klien_dan_struktur_tapi_bukan_pengguna_tarif_hapus(): void
+    public function test_supervisor_klien_ditugaskan_dan_struktur_tapi_bukan_pengguna_tarif_hapus(): void
     {
-        $sup = $this->user(User::ROLE_SUPERVISOR);
+        $sup = $this->user(User::ROLE_SUPERVISOR, [$this->b]);
         $journal = $this->jurnal($this->b);
 
         $this->actingAs($sup)->get(route('clients.show', $this->b))->assertOk();
+        $this->actingAs($sup)->get(route('clients.show', $this->a))->assertNotFound();
         $this->actingAs($sup)->get(route('clients.create'))->assertOk();
         $this->actingAs($sup)->put(route('tax.profile.update', $this->b), ['is_pkp' => 0, 'pph_regime' => 'normal'])->assertRedirect();
         $this->actingAs($sup)->post(route('journals.void', [$this->b, $journal]))->assertRedirect();
@@ -98,6 +99,49 @@ class RoleAccessTest extends TestCase
         $this->actingAs($sup)->get(route('tax.rates'))->assertForbidden();
         $this->actingAs($sup)->delete(route('journals.destroy', [$this->b, $journal]))->assertForbidden();
         $this->assertFalse($this->b->fresh()->is_pkp);
+    }
+
+    /** Batas perusahaan per peran: supervisor 3 · akuntan 5 · anggota 10 · admin tanpa batas. */
+    public function test_batas_perusahaan_per_peran(): void
+    {
+        $admin = $this->user(User::ROLE_ADMIN);
+        $ids = collect(range(1, 11))->map(fn ($i) => Client::create(['name' => "PT {$i}", 'type' => Client::TYPE_EXTERNAL])->id);
+
+        foreach ([User::ROLE_SUPERVISOR => 3, User::ROLE_AKUNTAN => 5, User::ROLE_ANGGOTA => 10] as $role => $limit) {
+            $form = fn (int $n) => ['name' => ucfirst($role), 'email' => "{$role}@t.id", 'role' => $role,
+                'password' => 'Kopi-Tubruk-Senja-27', 'clients' => $ids->take($n)->all()];
+
+            $this->actingAs($admin)->post(route('users.store'), $form($limit + 1))->assertSessionHasErrors('clients');
+            $this->assertFalse(User::where('email', "{$role}@t.id")->exists());
+
+            $this->actingAs($admin)->post(route('users.store'), $form($limit))->assertRedirect(route('users.index'));
+            $user = User::where('email', "{$role}@t.id")->sole();
+            $this->assertCount($limit, $user->clients);
+
+            // Turun peran ke yang batasnya lebih kecil tanpa mengurangi perusahaan → ditolak.
+            if ($role === User::ROLE_ANGGOTA) {
+                $this->actingAs($admin)->put(route('users.update', $user), ['role' => User::ROLE_SUPERVISOR] + $form($limit))->assertSessionHasErrors('clients');
+                $this->assertSame(User::ROLE_ANGGOTA, $user->fresh()->role);
+            }
+        }
+
+        // Admin: penugasan diabaikan, tetap melihat semua.
+        $this->actingAs($admin)->post(route('users.store'), ['name' => 'Bos', 'email' => 'bos@t.id', 'role' => User::ROLE_ADMIN,
+            'password' => 'Kopi-Tubruk-Senja-27', 'clients' => $ids->all()])->assertRedirect();
+        $this->assertCount(0, User::where('email', 'bos@t.id')->sole()->clients);
+    }
+
+    public function test_supervisor_membuat_klien_otomatis_ditugaskan_sampai_batas(): void
+    {
+        $sup = $this->user(User::ROLE_SUPERVISOR, [$this->a, $this->b]);
+
+        $this->actingAs($sup)->post(route('clients.store'), ['name' => 'PT Ketiga', 'type' => Client::TYPE_EXTERNAL])->assertRedirect();
+        $ketiga = Client::where('name', 'PT Ketiga')->sole();
+        $this->assertTrue($sup->fresh()->canAccessClient($ketiga));
+        $this->actingAs($sup->fresh())->get(route('clients.show', $ketiga))->assertOk();
+
+        $this->actingAs($sup->fresh())->post(route('clients.store'), ['name' => 'PT Keempat', 'type' => Client::TYPE_EXTERNAL])->assertSessionHasErrors('name');
+        $this->assertFalse(Client::where('name', 'PT Keempat')->exists());
     }
 
     public function test_admin_kelola_pengguna(): void
@@ -129,6 +173,15 @@ class RoleAccessTest extends TestCase
         $this->actingAs($admin)->put(route('users.update', $admin), ['name' => 'A', 'email' => $admin->email, 'role' => User::ROLE_ANGGOTA])->assertSessionHasErrors('role');
 
         $this->assertSame(['user.create', 'user.update', 'user.deactivate'], AuditLog::orderBy('id')->pluck('action')->all());
+    }
+
+    /** Regresi: variabel loop `$client` di daftar klien pernah bocor ke layout → klien terakhir tampil sebagai klien aktif. */
+    public function test_daftar_klien_tidak_menampilkan_klien_aktif(): void
+    {
+        $this->actingAs($this->user(User::ROLE_ADMIN))->get(route('clients.index'))->assertOk()
+            ->assertSee('Pilih klien')
+            ->assertDontSee(route('documents.create', $this->a))
+            ->assertDontSee(route('documents.create', $this->b));
     }
 
     public function test_hanya_admin_yang_boleh_kelola_pengguna(): void

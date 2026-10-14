@@ -9,7 +9,7 @@
                 <select id="period" name="period" class="field w-36">
                     <option value="">Semua</option>
                     @foreach ($periods as $p)
-                        <option value="{{ $p }}" @selected(($filters['period'] ?? '') === $p)>{{ $p }}</option>
+                        <option value="{{ $p }}" @selected(($filters['period'] ?? '') === $p)>{{ \App\Models\Journal::periodLabel($p) }}</option>
                     @endforeach
                 </select>
             </div>
@@ -58,7 +58,7 @@
                             <form method="POST" action="{{ route('journals.destroy', [$client, $journal]) }}"
                                   data-confirm="Hapus permanen? Lebih aman pakai Void supaya jejaknya tetap ada.">
                                 @csrf @method('DELETE')
-                                <button class="btn-danger btn-sm">Hapus</button>
+                                <button class="btn-danger-quiet btn-sm">Hapus</button>
                             </form>
                         @endif
                     </div>

@@ -8,7 +8,7 @@
         <div class="flex flex-wrap gap-1 pb-1">
             @foreach (array_slice($periods, 0, 6) as $p)
                 <a href="{{ request()->fullUrlWithQuery(['period' => $p]) }}"
-                   class="badge {{ $p === $period ? 'bg-ink-900 text-white' : 'bg-white text-ink-600 ring-1 ring-ink-200 hover:bg-ink-100' }}">{{ $p }}</a>
+                   class="badge {{ $p === $period ? 'bg-ink-900 text-white' : 'bg-white text-ink-600 ring-1 ring-ink-200 hover:bg-ink-100' }}">{{ \App\Models\Journal::periodLabel($p, 'M Y') }}</a>
             @endforeach
         </div>
     @endif

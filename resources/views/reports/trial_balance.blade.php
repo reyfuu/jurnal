@@ -5,7 +5,7 @@
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Neraca Saldo</h2>
-            <p class="text-xs text-ink-500">Mutasi debit/kredit per akun di periode {{ $period }}. Hanya jurnal <em>posted</em>.</p>
+            <p class="text-xs text-ink-500">Mutasi debit/kredit per akun di periode {{ \App\Models\Journal::periodLabel($period) }}. Hanya jurnal <em>posted</em>.</p>
         </div>
         <div class="flex flex-wrap items-end gap-2">
             @include('partials.period-picker')
@@ -42,7 +42,7 @@
                         <td class="td num font-medium">{{ \App\Support\Rupiah::format($row['balance']) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="td py-10 text-center text-sm text-ink-500">Tidak ada mutasi di periode {{ $period }}.</td></tr>
+                    <tr><td colspan="6" class="td py-10 text-center text-sm text-ink-500">Tidak ada mutasi di periode {{ \App\Models\Journal::periodLabel($period) }}.</td></tr>
                 @endforelse
             </tbody>
             @if ($report['rows'])

@@ -41,7 +41,18 @@ class ClientController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Supervisor hanya melihat klien yang ditugaskan: klien buatannya otomatis
+        // jadi miliknya, jadi batas perusahaan per peran ikut berlaku di sini.
+        $user = $request->user();
+        $limit = $user->may('clients.all') ? null : $user->clientLimit();
+        if ($limit !== null && $user->clients()->count() >= $limit) {
+            return back()->withInput()->withErrors(['name' => "Kamu sudah memegang {$limit} perusahaan (batas {$user->roleLabel()}). Minta admin melepas salah satu, atau minta admin yang membuat klien ini."]);
+        }
+
         $client = Client::create($this->validated($request));
+        if ($limit !== null) {
+            $user->clients()->attach($client);
+        }
         $created = $this->coa->seedFor($client);
 
         return redirect()->route('clients.show', $client)
