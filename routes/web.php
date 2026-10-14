@@ -40,6 +40,7 @@ Route::middleware(['auth', 'active', 'client.access'])->group(function () {
         Route::get('/klien', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/klien/{client}', [ClientController::class, 'show'])->name('clients.show');
         Route::get('/klien/{client}/coa', [AccountController::class, 'index'])->name('accounts.index');
+        Route::get('/klien/{client}/coa/ekspor', [AccountController::class, 'export'])->name('accounts.export');
         Route::get('/klien/{client}/jurnal', [JournalController::class, 'index'])->name('journals.index');
 
         Route::get('/klien/{client}/laporan/neraca-saldo', [ReportController::class, 'trialBalance'])->name('reports.trial-balance');
@@ -73,6 +74,7 @@ Route::middleware(['auth', 'active', 'client.access'])->group(function () {
         Route::delete('/klien/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
         Route::post('/klien/{client}/coa/sinkron', [ClientController::class, 'syncCoa'])->name('clients.coa.sync');
         Route::post('/klien/{client}/coa', [AccountController::class, 'store'])->name('accounts.store');
+        Route::post('/klien/{client}/coa/impor', [AccountController::class, 'import'])->name('accounts.import');
         Route::put('/klien/{client}/coa/{account}', [AccountController::class, 'update'])->name('accounts.update');
         Route::delete('/klien/{client}/coa/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');
         Route::put('/klien/{client}/pajak/profil', [TaxController::class, 'updateProfile'])->name('tax.profile.update');

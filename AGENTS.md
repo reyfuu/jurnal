@@ -44,6 +44,8 @@ Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 - **Klien = isolasi penuh.** COA, jurnal, laporan per klien. `JournalPoster` menolak akun milik klien lain.
 - **COA per jenis usaha.** `clients.business_type` (perdagangan · manufaktur · jasa) memilih template di
   `ChartOfAccounts::template()`. Akun yang dipakai mesin & pajak wajib ada di SEMUA template (`CoaTemplateTest`).
+  COA diubah lewat modal; impor/ekspor Excel via `app/Support/Xlsx.php` (tanpa library, ZipArchive). Impor = upsert
+  per kode di klien itu saja, satu baris salah = batal semua. Tipe akun yang sudah dipakai jurnal terkunci.
 - **Tanya pajak (bubble kanan bawah).** `TaxChatController` — AI hanya diberi data klien yang sedang dibuka;
   angka buku hanya untuk peran `books.view` (anggota: profil saja). Read-only, riwayat di sessionStorage.
 - **Peran & akses per klien.** Admin · supervisor · akuntan · anggota; hak per kemampuan di `User::ABILITIES`

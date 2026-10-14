@@ -399,6 +399,56 @@ function wireTaxChat() {
     root.querySelectorAll('[data-chat-ask]').forEach((b) => b.addEventListener('click', () => ask(b.textContent)));
 }
 
+/**
+ * Modal generik (<dialog>): [data-dialog-open="id"] membuka, [data-dialog-close]
+ * menutup, [data-autopen] terbuka sendiri (mis. validasi gagal → isian lama kembali).
+ * Plus pengisi form akun COA: tombol "Akun baru" / "Ubah" memakai modal yang sama.
+ */
+function wireDialogs() {
+    document.querySelectorAll('[data-dialog-open]').forEach((btn) =>
+        btn.addEventListener('click', () => document.getElementById(btn.dataset.dialogOpen)?.showModal()));
+    document.querySelectorAll('[data-dialog-close]').forEach((btn) =>
+        btn.addEventListener('click', () => btn.closest('dialog')?.close()));
+    // Klik di luar panel (backdrop) = tutup.
+    document.querySelectorAll('dialog[data-store-url], dialog#import-dialog').forEach((d) =>
+        d.addEventListener('click', (e) => e.target === d && d.close()));
+    document.querySelectorAll('dialog[data-autopen]').forEach((d) => d.showModal());
+
+    const dialog = document.getElementById('account-dialog');
+    if (!dialog) return;
+    const form = dialog.querySelector('[data-account-form]');
+    const f = (name) => form.elements[name];
+    const typeSelect = form.querySelector('select[name=type]');
+    const typeLocked = form.querySelector('[data-type-locked]');
+
+    const fill = (a, url, title) => {
+        form.action = url;
+        form.querySelector('input[name=_method]').disabled = !a.id;
+        f('_dialog').value = a.id || 'new';
+        dialog.querySelector('[data-dialog-title]').textContent = title;
+        dialog.querySelector('[data-dialog-errors]')?.remove();
+        f('code').value = a.code || '';
+        f('name').value = a.name || '';
+        typeSelect.value = a.type || 'expense';
+        f('subtype').value = a.subtype || '';
+        f('normal_balance').value = a.normal_balance || '';
+        f('is_active').checked = a.is_active ?? true;
+        // Akun yang sudah dipakai jurnal: tipe dikunci (nilai dikirim lewat hidden).
+        typeSelect.disabled = !!a.used;
+        typeLocked.disabled = !a.used;
+        typeLocked.value = a.type || '';
+        dialog.querySelector('[data-used-note]').classList.toggle('hidden', !a.used);
+        dialog.showModal();
+        f('code').focus();
+    };
+    document.querySelector('[data-account-new]')?.addEventListener('click', () =>
+        fill({}, dialog.dataset.storeUrl, 'Akun baru'));
+    document.querySelectorAll('[data-account-edit]').forEach((btn) => btn.addEventListener('click', () => {
+        const a = JSON.parse(btn.dataset.accountEdit);
+        fill(a, a.url, `Ubah akun ${a.code}`);
+    }));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-journal]').forEach((root) => {
         wireBalance(root);
@@ -416,4 +466,5 @@ document.addEventListener('DOMContentLoaded', () => {
     wireDropzone();
     wireClientLimit();
     wireTaxChat();
+    wireDialogs();
 });
