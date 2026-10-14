@@ -106,7 +106,7 @@ class OpenAiProvider implements AiProvider
         }
 
         $pesan = strtolower((string) (
-            $response->json('error.message') ?? $response->json('message') ?? $response->body()
+            $this->errorDetail($response) ?? $response->body()
         ));
 
         foreach (['response_format', 'max_completion_tokens', 'max_tokens'] as $param) {
@@ -155,7 +155,7 @@ class OpenAiProvider implements AiProvider
     {
         if (! $response->successful()) {
             $status = $response->status();
-            $detail = $response->json('error.message');
+            $detail = $this->errorDetail($response);
             throw new AiException($this->explain($status, $detail), transient: $this->isTransient($status, $detail));
         }
 
@@ -165,6 +165,12 @@ class OpenAiProvider implements AiProvider
         }
 
         return new AiTurn($text, $this->model);
+    }
+
+    /** Pesan error penyedia. Gemini (endpoint OpenAI-compatible) membungkusnya dalam array: [{"error": {...}}]. */
+    private function errorDetail(Response $response): ?string
+    {
+        return $response->json('error.message') ?? $response->json('0.error.message') ?? $response->json('message');
     }
 
     private function explain(int $status, ?string $detail): string
@@ -192,6 +198,6 @@ class OpenAiProvider implements AiProvider
 
     private function isQuota(?string $detail): bool
     {
-        return $detail !== null && preg_match('/insufficient_quota|quota|billing|credit/i', $detail) === 1;
+        return $detail !== null && preg_match('/insufficient_quota|quota|billing|credit|spending cap/i', $detail) === 1;
     }
 }

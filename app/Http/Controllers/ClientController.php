@@ -56,7 +56,7 @@ class ClientController extends Controller
         $created = $this->coa->seedFor($client);
 
         return redirect()->route('clients.show', $client)
-            ->with('status', "Klien \"{$client->name}\" dibuat dengan {$created} akun COA standar. Silakan sesuaikan COA-nya kalau perlu.");
+            ->with('status', "Klien \"{$client->name}\" dibuat dengan {$created} akun COA template {$client->businessTypeLabel()}. Silakan sesuaikan COA-nya kalau perlu.");
     }
 
     public function show(Client $client, Request $request)
@@ -111,15 +111,16 @@ class ClientController extends Controller
         $created = $this->coa->seedFor($client);
 
         return redirect()->route('accounts.index', $client)->with('status', $created > 0
-            ? "{$created} akun baru dari template ditambahkan."
-            : 'COA klien sudah lengkap — tidak ada akun template yang perlu ditambah.');
+            ? "{$created} akun baru dari template {$client->businessTypeLabel()} ditambahkan."
+            : "COA klien sudah lengkap untuk template {$client->businessTypeLabel()} — tidak ada akun yang perlu ditambah.");
     }
 
     private function validated(Request $request, ?Client $client = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:160'],
             'type' => ['required', Rule::in(array_keys(Client::TYPES))],
+            'business_type' => ['nullable', Rule::in(array_keys(ChartOfAccounts::BUSINESS_TYPES))],
             'legal_name' => ['nullable', 'string', 'max:190'],
             'npwp' => ['nullable', 'string', 'max:30'],
             'contact_name' => ['nullable', 'string', 'max:120'],
@@ -130,5 +131,11 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
         ]) + ['is_active' => $request->boolean('is_active')];
+
+        // Jenis usaha menentukan template COA saat klien DIBUAT. Mengubahnya
+        // belakangan tidak menghapus akun lama — hanya "Sinkron" menambah yang kurang.
+        $data['business_type'] ??= $client?->business_type ?? 'perdagangan';
+
+        return $data;
     }
 }

@@ -22,6 +22,26 @@
                 </select>
                 <p class="mt-1 text-xs text-ink-400">Keduanya dapat buku & laporan terpisah. Jenis hanya untuk pengelompokan.</p>
             </div>
+            <fieldset class="sm:col-span-2">
+                <legend class="label">Jenis usaha — menentukan template COA <span class="text-rose-600">*</span></legend>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    @foreach (\App\Services\Accounting\ChartOfAccounts::BUSINESS_TYPES as $value => $label)
+                        <label class="flex cursor-pointer items-start gap-2 rounded-md border border-ink-200 p-3 text-sm hover:border-brand-500 has-checked:border-brand-600 has-checked:bg-brand-50">
+                            <input type="radio" name="business_type" value="{{ $value }}" class="mt-0.5" required
+                                   @checked(old('business_type', $client->business_type ?? 'perdagangan') === $value)>
+                            <span><span class="font-medium text-ink-900">{{ \Illuminate\Support\Str::before($label, ' —') }}</span>
+                                <span class="block text-xs text-ink-500">{{ \Illuminate\Support\Str::after($label, '— ') }}</span></span>
+                        </label>
+                    @endforeach
+                </div>
+                <p class="mt-1 text-xs text-ink-400">
+                    @if ($client->exists)
+                        Mengubah jenis usaha tidak menghapus akun yang sudah ada. Pakai "Sinkron dari template" di halaman COA untuk menambah akun yang belum ada.
+                    @else
+                        Perdagangan: persediaan barang dagang & HPP. Manufaktur: bahan baku, barang dalam proses, overhead pabrik. Jasa: pendapatan jasa & beban pokok jasa, tanpa persediaan.
+                    @endif
+                </p>
+            </fieldset>
             <div>
                 <label class="label" for="legal_name">Nama badan hukum</label>
                 <input type="text" id="legal_name" name="legal_name" value="{{ old('legal_name', $client->legal_name) }}" class="field" placeholder="PT / CV …">

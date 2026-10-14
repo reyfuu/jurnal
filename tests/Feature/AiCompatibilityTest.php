@@ -29,6 +29,20 @@ class AiCompatibilityTest extends TestCase
         return ['error' => ['message' => "Unsupported parameter: '{$param}' is not supported by this model."]];
     }
 
+    /** Gemini membungkus error dalam array; kuota habis jangan dilaporkan sebagai "rate limit sementara". */
+    public function test_error_gemini_berbentuk_array_dikenali_sebagai_kuota_habis(): void
+    {
+        Http::fake(['*' => Http::response([['error' => ['code' => 429, 'message' => 'Your project has exceeded its monthly spending cap.', 'status' => 'RESOURCE_EXHAUSTED']]], 429)]);
+
+        try {
+            $this->provider()->chat([['role' => 'user', 'content' => 'halo']]);
+            $this->fail('Harus melempar AiException');
+        } catch (AiException $e) {
+            $this->assertStringContainsString('Kuota/saldo habis', $e->getMessage());
+            $this->assertFalse($e->transient); // jangan diulang-ulang
+        }
+    }
+
     public function test_default_memakai_max_tokens_bukan_max_completion_tokens(): void
     {
         // Mayoritas endpoint pihak ketiga hanya mengenal max_tokens.

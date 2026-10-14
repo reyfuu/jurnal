@@ -35,7 +35,7 @@ class DemoSeeder extends Seeder
 
         $client = Client::firstOrCreate(
             ['slug' => 'skinku'],
-            ['name' => 'SKINKU', 'type' => Client::TYPE_INTERNAL, 'is_active' => true],
+            ['name' => 'SKINKU', 'type' => Client::TYPE_INTERNAL, 'business_type' => 'manufaktur', 'is_active' => true],
         );
         app(ChartOfAccounts::class)->seedFor($client);
 

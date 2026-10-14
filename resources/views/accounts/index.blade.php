@@ -5,12 +5,12 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold tracking-tight text-ink-900">Chart of Account</h2>
-            <p class="text-xs text-ink-500">COA ini milik {{ $client->name }} saja — tidak tercampur klien lain.</p>
+            <p class="text-xs text-ink-500">Template <span class="font-medium text-ink-700">{{ $client->businessTypeLabel() }}</span> · COA ini milik {{ $client->name }} saja — tidak tercampur perusahaan lain.</p>
         </div>
         @if (auth()->user()->may('clients.manage'))
             <form method="POST" action="{{ route('clients.coa.sync', $client) }}">
                 @csrf
-                <button class="btn-ghost btn-sm">Sinkron dari template</button>
+                <button class="btn-ghost btn-sm" title="Tambah akun template {{ $client->businessTypeLabel() }} yang belum ada. Akun yang sudah ada tidak diubah.">Sinkron dari template</button>
             </form>
         @endif
     </div>

@@ -162,6 +162,10 @@
         </footer>
     </div>
 
+@if ($client?->exists)
+    @include('partials.tax-chat', ['client' => $client])
+@endif
+
 {{-- Konfirmasi aksi berisiko (pengganti confirm() bawaan browser). --}}
 <dialog id="confirm-dialog" class="m-auto w-full max-w-sm rounded-[10px] border border-ink-200 bg-white p-0 shadow-[0_1px_2px_rgb(0_0_0/.05),0_8px_24px_rgb(0_0_0/.08)] backdrop:bg-ink-900/30">
     <form method="dialog" class="p-5">

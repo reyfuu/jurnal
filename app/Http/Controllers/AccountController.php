@@ -74,7 +74,7 @@ class AccountController extends Controller
         ]);
 
         $data['normal_balance'] = $data['normal_balance']
-            ?? ChartOfAccounts::normalBalanceFor($data['code'], $data['type']);
+            ?? ChartOfAccounts::normalBalanceFor($data['code'], $data['type'], $data['subtype'] ?? null);
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;

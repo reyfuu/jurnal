@@ -8,6 +8,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\TaxChatController;
 use App\Http\Controllers\TaxController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,7 @@ Route::middleware(['auth', 'active', 'client.access'])->group(function () {
         Route::post('/klien/{client}/dokumen', [DocumentController::class, 'store'])->name('documents.store');
         Route::get('/klien/{client}/dokumen/{document}', [DocumentController::class, 'show'])->name('documents.show');
         Route::get('/klien/{client}/dokumen/{document}/berkas', [DocumentController::class, 'file'])->name('documents.file');
+        Route::post('/klien/{client}/tanya-pajak', [TaxChatController::class, 'ask'])->middleware('throttle:20,1')->name('tax.chat');
     });
 
     // ── Melihat buku: klien, COA, jurnal, laporan, pajak ────────────────────

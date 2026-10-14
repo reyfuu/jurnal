@@ -6,6 +6,7 @@
             <div class="flex items-center gap-2">
                 <h1 class="text-xl font-semibold tracking-tight text-ink-900">{{ $client->name }}</h1>
                 @unless ($client->is_active)<span class="badge-bad">Nonaktif</span>@endunless
+                <span class="badge-mute">{{ $client->businessTypeLabel() }}</span>
                 @if ($client->hasTaxProfile())
                     <span class="badge-mute">{{ $client->isPkpOn() ? 'PKP' : 'Non-PKP' }} · {{ $client->isFinalUmkm() ? 'Final 0,5%' : 'PPh normal' }}</span>
                 @endif

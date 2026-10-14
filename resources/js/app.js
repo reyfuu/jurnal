@@ -322,6 +322,83 @@ function wireClientLimit() {
     update();
 }
 
+/**
+ * Bubble "Tanya pajak". Riwayat per klien di sessionStorage (hilang saat tab
+ * ditutup) dan dikirim ulang tiap pertanyaan. Jawaban ditampilkan sebagai teks
+ * (textContent), tidak pernah sebagai HTML.
+ */
+function wireTaxChat() {
+    const root = document.querySelector('[data-chat]');
+    if (!root) return;
+    const panel = root.querySelector('[data-chat-panel]');
+    const log = root.querySelector('[data-chat-log]');
+    const form = root.querySelector('[data-chat-form]');
+    const input = form.querySelector('textarea');
+    const opener = root.querySelector('[aria-controls=tax-chat-panel]');
+    const key = root.dataset.chatKey;
+    let history = [];
+    try { history = JSON.parse(sessionStorage.getItem(key) || '[]'); } catch { history = []; }
+    const save = () => { try { sessionStorage.setItem(key, JSON.stringify(history.slice(-10))); } catch { /* mode privat */ } };
+
+    const bubble = (role, text) => {
+        const el = document.createElement('p');
+        el.className = role === 'user'
+            ? 'ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-lg bg-ink-900 px-3 py-2 text-white'
+            : role === 'error'
+                ? 'w-fit max-w-[85%] rounded-lg bg-rose-50 px-3 py-2 text-rose-800'
+                : 'w-fit max-w-[90%] whitespace-pre-wrap rounded-lg bg-ink-100 px-3 py-2 text-ink-800';
+        el.textContent = text;
+        log.append(el);
+        log.scrollTop = log.scrollHeight;
+        return el;
+    };
+    history.forEach((m) => bubble(m.role, m.content));
+
+    const toggle = (open = !panel.hasAttribute('data-open')) => {
+        panel.toggleAttribute('data-open', open);
+        opener.setAttribute('aria-expanded', String(open));
+        if (open) { input.focus(); log.scrollTop = log.scrollHeight; } else { opener.focus(); }
+    };
+    root.querySelectorAll('[data-chat-toggle]').forEach((b) => b.addEventListener('click', () => toggle()));
+    panel.addEventListener('keydown', (e) => e.key === 'Escape' && toggle(false));
+
+    const ask = async (question) => {
+        question = question.trim();
+        if (!question || form.dataset.busy) return;
+        form.dataset.busy = '1';
+        root.querySelector('[data-chat-suggest]')?.remove();
+        bubble('user', question);
+        input.value = '';
+        const wait = bubble('assistant', 'Sedang mengecek data pajak…');
+        wait.classList.add('animate-pulse');
+        try {
+            const res = await fetch(root.dataset.chatUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': form.querySelector('[name=_token]').value },
+                body: JSON.stringify({ question, history: history.slice(-10) }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || (res.status === 429 ? 'Terlalu banyak pertanyaan — tunggu sebentar.' : 'Gagal menghubungi AI.'));
+            wait.remove();
+            bubble('assistant', data.answer);
+            history.push({ role: 'user', content: question }, { role: 'assistant', content: data.answer });
+            save();
+        } catch (err) {
+            wait.remove();
+            bubble('error', err.message);
+            input.value = question;
+        } finally {
+            delete form.dataset.busy;
+            input.focus();
+        }
+    };
+    form.addEventListener('submit', (e) => { e.preventDefault(); ask(input.value); });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); }
+    });
+    root.querySelectorAll('[data-chat-ask]').forEach((b) => b.addEventListener('click', () => ask(b.textContent)));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-journal]').forEach((root) => {
         wireBalance(root);
@@ -338,4 +415,5 @@ document.addEventListener('DOMContentLoaded', () => {
     wirePalette();
     wireDropzone();
     wireClientLimit();
+    wireTaxChat();
 });

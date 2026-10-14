@@ -17,7 +17,7 @@ class Client extends Model
     ];
 
     protected $fillable = [
-        'name', 'slug', 'type', 'legal_name', 'npwp', 'contact_name',
+        'name', 'slug', 'type', 'business_type', 'legal_name', 'npwp', 'contact_name',
         'phone', 'email', 'address', 'fiscal_year_start', 'notes', 'is_active',
         'taxpayer_type', 'tax_id', 'is_pkp', 'pkp_since', 'pph_regime',
     ];
@@ -111,6 +111,11 @@ class Client extends Model
     public function isFinalUmkm(): bool
     {
         return $this->pph_regime === 'final_umkm';
+    }
+
+    public function businessTypeLabel(): string
+    {
+        return \Illuminate\Support\Str::before(\App\Services\Accounting\ChartOfAccounts::BUSINESS_TYPES[$this->business_type ?? 'perdagangan'] ?? '', ' —');
     }
 
     public function hasTaxProfile(): bool

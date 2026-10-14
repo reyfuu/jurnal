@@ -53,7 +53,7 @@ class DatabaseSeeder extends Seeder
         $coa = app(ChartOfAccounts::class);
 
         foreach ([
-            ['name' => 'SKINKU', 'type' => Client::TYPE_INTERNAL, 'notes' => 'Brand body care. Fee marketplace TikTok/Shopee ke akun 6108.'],
+            ['name' => 'SKINKU', 'type' => Client::TYPE_INTERNAL, 'business_type' => 'manufaktur', 'notes' => 'Brand body care. Fee marketplace TikTok/Shopee ke akun 6108.'],
             ['name' => 'Klien Contoh', 'type' => Client::TYPE_EXTERNAL, 'notes' => 'Contoh klien jasa pembukuan — hapus kalau tidak dipakai.'],
         ] as $attributes) {
             $client = Client::firstOrCreate(

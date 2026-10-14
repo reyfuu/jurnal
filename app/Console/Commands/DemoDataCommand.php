@@ -35,22 +35,22 @@ class DemoDataCommand extends Command
     private const EMAIL_DOMAIN = '@demo.jurnal.id';
 
     /**
-     * [nama, jenis, omzet/bulan, akun pendapatan, kanal terima uang, rasio HPP, PKP, rezim, wajib pajak, dipotong PPh23, beban/bulan]
+     * [nama, jenis usaha (template COA), jenis klien, omzet/bulan, akun pendapatan, kanal terima uang, rasio HPP, PKP, rezim, wajib pajak, dipotong PPh23, beban/bulan]
      * ponytail: profil di kode, bukan file fixture — cukup untuk data coba.
      */
     private const PERUSAHAAN = [
-        ['Kopi Senja Nusantara', 'external', 68_000_000, '4101', '1103', 0.38, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 14_000_000, '6104' => 6_500_000, '6105' => 2_100_000, '6102' => 1_800_000]],
-        ['Batik Larasati', 'external', 145_000_000, '4101', '1104', 0.45, false, 'final_umkm', 'badan', false, ['6101' => 18_500_000, '6102' => 16_000_000, '6108' => 9_800_000, '6106' => 4_200_000]],
-        ['Klinik Gigi Senyum Sehat', 'external', 210_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', false, ['6101' => 62_000_000, '6104' => 15_000_000, '6105' => 4_800_000, '6112' => 3_500_000]],
-        ['Toko Bangunan Sinar Jaya', 'external', 380_000_000, '4101', '1102', 0.72, true, 'normal', 'badan', false, ['6101' => 28_000_000, '6106' => 11_000_000, '6105' => 3_200_000, '6107' => 1_400_000]],
-        ['Studio Kreatif Lensa', 'external', 96_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', true, ['6101' => 31_000_000, '6116' => 8_500_000, '6114' => 3_100_000, '6110' => 4_600_000]],
-        ['Roti Hangat Bakery', 'external', 82_000_000, '4101', '1101', 0.42, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 16_000_000, '6104' => 7_000_000, '6105' => 3_900_000, '6106' => 1_600_000]],
-        ['CV Logistik Cepat', 'external', 240_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', true, ['6101' => 54_000_000, '6106' => 38_000_000, '6112' => 12_000_000, '6105' => 2_700_000]],
-        ['Laundry Bersih Kilat', 'external', 46_000_000, '4102', '1103', 0.0, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 12_500_000, '6105' => 5_400_000, '6107' => 2_300_000, '6104' => 4_000_000]],
-        ['PT Agro Tani Makmur', 'external', 520_000_000, '4101', '1102', 0.66, true, 'normal', 'badan', false, ['6101' => 74_000_000, '6106' => 26_000_000, '6110' => 9_000_000, '6109' => 7_500_000]],
-        ['RM Padang Rasa Bundo', 'external', 124_000_000, '4101', '1101', 0.48, false, 'final_umkm', 'badan', false, ['6101' => 22_000_000, '6104' => 9_500_000, '6105' => 4_100_000, '6111' => 1_200_000]],
-        ['Konveksi Jahit Rapi', 'external', 175_000_000, '4101', '1102', 0.55, true, 'normal', 'badan', false, ['6101' => 41_000_000, '6105' => 6_200_000, '6112' => 2_800_000, '6106' => 5_300_000]],
-        ['Glow Lab Skincare', 'internal', 290_000_000, '4101', '1104', 0.35, true, 'normal', 'badan', false, ['6101' => 38_000_000, '6102' => 42_000_000, '6103' => 19_000_000, '6108' => 21_000_000]],
+        ['Kopi Senja Nusantara', 'perdagangan', 'external', 68_000_000, '4101', '1103', 0.38, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 14_000_000, '6104' => 6_500_000, '6105' => 2_100_000, '6102' => 1_800_000]],
+        ['Batik Larasati', 'perdagangan', 'external', 145_000_000, '4101', '1104', 0.45, false, 'final_umkm', 'badan', false, ['6101' => 18_500_000, '6102' => 16_000_000, '6108' => 9_800_000, '6106' => 4_200_000]],
+        ['Klinik Gigi Senyum Sehat', 'jasa', 'external', 210_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', false, ['6101' => 62_000_000, '6104' => 15_000_000, '6105' => 4_800_000, '6112' => 3_500_000]],
+        ['Toko Bangunan Sinar Jaya', 'perdagangan', 'external', 380_000_000, '4101', '1102', 0.72, true, 'normal', 'badan', false, ['6101' => 28_000_000, '6106' => 11_000_000, '6105' => 3_200_000, '6107' => 1_400_000]],
+        ['Studio Kreatif Lensa', 'jasa', 'external', 96_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', true, ['6101' => 31_000_000, '6116' => 8_500_000, '6114' => 3_100_000, '6110' => 4_600_000]],
+        ['Roti Hangat Bakery', 'manufaktur', 'external', 82_000_000, '4101', '1101', 0.42, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 16_000_000, '6104' => 7_000_000, '6105' => 3_900_000, '6106' => 1_600_000]],
+        ['CV Logistik Cepat', 'jasa', 'external', 240_000_000, '4102', '1102', 0.0, true, 'normal', 'badan', true, ['6101' => 54_000_000, '6106' => 38_000_000, '6112' => 12_000_000, '6105' => 2_700_000]],
+        ['Laundry Bersih Kilat', 'jasa', 'external', 46_000_000, '4102', '1103', 0.0, false, 'final_umkm', 'orang_pribadi', false, ['6101' => 12_500_000, '6105' => 5_400_000, '6107' => 2_300_000, '6104' => 4_000_000]],
+        ['PT Agro Tani Makmur', 'manufaktur', 'external', 520_000_000, '4101', '1102', 0.66, true, 'normal', 'badan', false, ['6101' => 74_000_000, '6106' => 26_000_000, '6110' => 9_000_000, '6109' => 7_500_000]],
+        ['RM Padang Rasa Bundo', 'perdagangan', 'external', 124_000_000, '4101', '1101', 0.48, false, 'final_umkm', 'badan', false, ['6101' => 22_000_000, '6104' => 9_500_000, '6105' => 4_100_000, '6111' => 1_200_000]],
+        ['Konveksi Jahit Rapi', 'manufaktur', 'external', 175_000_000, '4101', '1102', 0.55, true, 'normal', 'badan', false, ['6101' => 41_000_000, '6105' => 6_200_000, '6112' => 2_800_000, '6106' => 5_300_000]],
+        ['Glow Lab Skincare', 'manufaktur', 'internal', 290_000_000, '4101', '1104', 0.35, true, 'normal', 'badan', false, ['6101' => 38_000_000, '6102' => 42_000_000, '6103' => 19_000_000, '6108' => 21_000_000]],
     ];
 
     /** [nama, email, peran, indeks perusahaan] — patuh batas: supervisor 3 · akuntan 5 · anggota 10. */
@@ -85,12 +85,12 @@ class DemoDataCommand extends Command
             $clients = [];
             foreach (self::PERUSAHAAN as $i => $p) {
                 $client = Client::create([
-                    'name' => $p[0], 'slug' => 'demo-'.Str::slug($p[0]), 'type' => $p[1], 'is_active' => true,
+                    'name' => $p[0], 'slug' => 'demo-'.Str::slug($p[0]), 'business_type' => $p[1], 'type' => $p[2], 'is_active' => true,
                     'legal_name' => str_starts_with($p[0], 'PT') || str_starts_with($p[0], 'CV') ? $p[0] : null,
                     'contact_name' => 'Pemilik '.Str::before($p[0], ' '), 'phone' => '0812'.str_pad((string) (55_000_000 + $i * 7_331), 8, '0', STR_PAD_LEFT),
                     'notes' => '[DEMO] Data dummy — hapus dengan `php artisan jurnal:demo --hapus`.',
-                    'taxpayer_type' => $p[8], 'is_pkp' => $p[6], 'pph_regime' => $p[7],
-                    'pkp_since' => $p[6] ? '2024-01-01' : null,
+                    'taxpayer_type' => $p[9], 'is_pkp' => $p[7], 'pph_regime' => $p[8],
+                    'pkp_since' => $p[7] ? '2024-01-01' : null,
                     'tax_id' => sprintf('0%d.%03d.%03d.%d-%03d.000', $i % 9 + 1, 100 + $i * 37, 200 + $i * 53, $i % 10, 400 + $i * 11),
                 ]);
                 $coa->seedFor($client);
@@ -122,7 +122,7 @@ class DemoDataCommand extends Command
     /** Tiga bulan pembukuan: saldo awal, penjualan mingguan (+PPN/PPh23), HPP, pembelian, gaji (+PPh21), beban, pajak final. */
     private function isiBuku(JournalPoster $poster, Client $client, array $p, int $userId): void
     {
-        [, , $omzet, $akunPendapatan, $kanal, $rasioHpp, $pkp, $rezim, $wp, $pph23, $beban] = $p;
+        [, , , $omzet, $akunPendapatan, $kanal, $rasioHpp, $pkp, $rezim, $wp, $pph23, $beban] = $p;
         mt_srand(crc32($client->slug));
         $akun = $client->accounts()->pluck('id', 'code');
         $catat = function (string $date, string $desc, string $type, array $lines, array $pajak = []) use ($poster, $client, $akun, $userId) {
@@ -140,7 +140,7 @@ class DemoDataCommand extends Command
         $acak = fn (float $n) => (int) (round($n * mt_rand(82, 118) / 100 / 1000) * 1000);
         $bank = '1102';
         $hpp = $rasioHpp > 0;
-        $nama = collect(ChartOfAccounts::template())->pluck('name', 'code');
+        $nama = collect(ChartOfAccounts::template($client->business_type))->pluck('name', 'code');
 
         $awal = now()->startOfMonth()->subMonths(2);
         $catat($awal->format('Y-m-01'), 'Saldo awal: modal & persediaan', 'adjustment', array_filter([
@@ -241,7 +241,7 @@ class DemoDataCommand extends Command
     private function isiDokumen(DocumentExtractor $extractor, Client $client, array $p, int $i, int $uploaderId): void
     {
         $tanggal = now()->subDays(2)->toDateString();
-        $item = $p[5] > 0
+        $item = $p[6] > 0
             ? [['description' => 'Bahan/barang dagang', 'qty' => 50, 'unit' => 'pcs', 'unit_price' => 42_000, 'amount' => 2_100_000, 'account_code' => '1301', 'account_reason' => 'Barang untuk dijual kembali → persediaan.', 'confidence' => 0.91],
                 ['description' => 'Ongkos kirim supplier', 'qty' => 1, 'unit' => 'kali', 'unit_price' => 85_000, 'amount' => 85_000, 'account_code' => '6106', 'account_reason' => 'Biaya angkut pembelian.', 'confidence' => 0.62]]
             : [['description' => 'Perlengkapan operasional', 'qty' => 12, 'unit' => 'pak', 'unit_price' => 37_500, 'amount' => 450_000, 'account_code' => '6107', 'account_reason' => 'Habis pakai untuk operasional.', 'confidence' => 0.88],

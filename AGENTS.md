@@ -42,6 +42,10 @@ jalankan server dengan `env -u OPENAI_API_KEY php artisan serve --port=8001`.
 Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 
 - **Klien = isolasi penuh.** COA, jurnal, laporan per klien. `JournalPoster` menolak akun milik klien lain.
+- **COA per jenis usaha.** `clients.business_type` (perdagangan · manufaktur · jasa) memilih template di
+  `ChartOfAccounts::template()`. Akun yang dipakai mesin & pajak wajib ada di SEMUA template (`CoaTemplateTest`).
+- **Tanya pajak (bubble kanan bawah).** `TaxChatController` — AI hanya diberi data klien yang sedang dibuka;
+  angka buku hanya untuk peran `books.view` (anggota: profil saja). Read-only, riwayat di sessionStorage.
 - **Peran & akses per klien.** Admin · supervisor · akuntan · anggota; hak per kemampuan di `User::ABILITIES`
   (middleware `ability:`). Admin melihat semua klien; peran lain hanya klien di `client_user` (middleware
   `client.access` → 404), dibatasi `User::CLIENT_LIMITS`: supervisor 3 · akuntan 5 · anggota 10 perusahaan.
