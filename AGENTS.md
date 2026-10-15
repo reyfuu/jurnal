@@ -82,11 +82,9 @@ Selesai 13 Okt 2026: Arus Kas, queue AI (opt-in `AI_QUEUE`), ekspor laporan
 
 Uji manual dengan AI asli: lihat `TESTING-LOKAL.md` §5.
 
-Terblokir input dari luar:
-1. Saldo OpenRouter hampir habis (free tier) — top up, atau ganti key.
-2. Verifikasi tarif pajak oleh konsultan (BRD §7) → tandai di /pajak/tarif.
-3. Keputusan Freddie: opsi A/B (HANDOFF §2), default pajak TRD Q1–Q3, dark mode.
-4. Uji dengan dokumen ASLI klien (yang sudah: dokumen sintetis, §5).
+Status terkini, produksi, cara deploy, jebakan, dan langkah berikutnya: **[docs/HANDOFF.md](docs/HANDOFF.md)**.
+Terblokir input dari luar (15 Okt 2026): key Gemini (spend cap habis / belum diisi di server), verifikasi tarif
+pajak oleh konsultan, review akuntan untuk template Manufaktur & Jasa, uji dengan dokumen ASLI klien.
 
 ## Skill & tooling wajib
 
