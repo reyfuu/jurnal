@@ -122,7 +122,7 @@ class JournalDrafterTest extends TestCase
             'document_date' => '2026-10-08',
             'payment_method' => 'credit',
             'tax' => 0, 'discount' => 0, 'total' => 2000000,
-            'items' => [['description' => 'Maklon produksi', 'amount' => 2000000, 'account_code' => '5103']],
+            'items' => [['description' => 'Maklon produksi', 'amount' => 2000000, 'account_code' => '5104']],
         ], Document::KIND_INVOICE));
 
         $this->assertSame(['2101'], $this->kode($drafts[0], 'credit'));
@@ -169,7 +169,7 @@ class JournalDrafterTest extends TestCase
             'items' => [],
             'transactions' => [
                 ['date' => '2026-10-02', 'description' => 'Transfer masuk', 'amount' => 5000000, 'direction' => 'in', 'account_code' => '4101', 'confidence' => 0.9],
-                ['date' => '2026-10-03', 'description' => 'Biaya admin', 'amount' => 15000, 'direction' => 'out', 'account_code' => '7102', 'confidence' => 0.95],
+                ['date' => '2026-10-03', 'description' => 'Biaya admin', 'amount' => 15000, 'direction' => 'out', 'account_code' => '9102', 'confidence' => 0.95],
             ],
         ], Document::KIND_BANK));
 
@@ -179,7 +179,7 @@ class JournalDrafterTest extends TestCase
         $this->assertSame(['1102'], $this->kode($drafts[0], 'debit'));
         $this->assertSame(['4101'], $this->kode($drafts[0], 'credit'));
         // Uang keluar: D beban / K bank.
-        $this->assertSame(['7102'], $this->kode($drafts[1], 'debit'));
+        $this->assertSame(['9102'], $this->kode($drafts[1], 'debit'));
         $this->assertSame(['1102'], $this->kode($drafts[1], 'credit'));
 
         foreach ($drafts as $draft) {

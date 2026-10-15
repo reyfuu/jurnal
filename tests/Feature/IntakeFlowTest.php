@@ -172,7 +172,7 @@ class IntakeFlowTest extends TestCase
             'flow' => 'expense', 'document_date' => '2026-10-01', 'payment_method' => 'bank',
             'transactions' => [
                 ['date' => '2026-10-02', 'description' => 'Masuk', 'amount' => 1000000, 'direction' => 'in', 'account_code' => '4101'],
-                ['date' => '2026-10-03', 'description' => 'Admin', 'amount' => 15000, 'direction' => 'out', 'account_code' => '7102'],
+                ['date' => '2026-10-03', 'description' => 'Admin', 'amount' => 15000, 'direction' => 'out', 'account_code' => '9102'],
             ],
         ]);
         $this->actingAs($this->admin)->post(route('documents.store', $this->client), [
@@ -188,7 +188,7 @@ class IntakeFlowTest extends TestCase
                     ['account_id' => $akun('4101'), 'debit' => 0, 'credit' => 1000000],
                 ]],
                 ['post' => '1', 'date' => '2026-10-03', 'type' => 'bank', 'lines' => [
-                    ['account_id' => $akun('7102'), 'debit' => 15000, 'credit' => 0],
+                    ['account_id' => $akun('9102'), 'debit' => 15000, 'credit' => 0],
                     ['account_id' => $akun('1102'), 'debit' => 0, 'credit' => 99999],
                 ]],
             ],

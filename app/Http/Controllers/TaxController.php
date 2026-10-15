@@ -8,6 +8,7 @@ use App\Models\Journal;
 use App\Models\TaxEntry;
 use App\Models\TaxFiling;
 use App\Models\TaxRate;
+use App\Services\Accounting\ChartOfAccounts;
 use App\Services\Tax\TaxRecap;
 use App\Support\Audit;
 use App\Support\Csv;
@@ -83,8 +84,9 @@ class TaxController extends Controller
         [$description, $lines] = match ($jenis) {
             'final-akrual' => (function () use ($client, $period, $line) {
                 $tax = (int) ($this->recap->finalUmkm($client, $period)['tax'] ?? 0);
+                $beban = $client->accounts()->whereIn('code', ChartOfAccounts::TAX_EXPENSE_CODES)->orderByDesc('code')->value('code') ?? '7103';
 
-                return ["Akrual PPh Final UMKM masa {$period}", [$line('7103', $tax, 0, 'PPh Final 0,5% omzet'), $line('2110', 0, $tax, 'Utang PPh Final')]];
+                return ["Akrual PPh Final UMKM masa {$period}", [$line($beban, $tax, 0, 'PPh Final 0,5% omzet'), $line('2110', 0, $tax, 'Utang PPh Final')]];
             })(),
             'final-setor' => (function () use ($client, $period, $line) {
                 $tax = (int) ($this->recap->finalUmkm($client, $period)['tax'] ?? 0);

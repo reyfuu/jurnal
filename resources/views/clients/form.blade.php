@@ -43,6 +43,25 @@
                 </p>
             </fieldset>
             <div>
+                <label class="label" for="legal_form">Bentuk badan usaha</label>
+                <select id="legal_form" name="legal_form" class="field">
+                    <option value="">— belum dipilih —</option>
+                    @foreach (\App\Services\Accounting\ChartOfAccounts::LEGAL_FORMS as $value => $label)
+                        <option value="{{ $value }}" @selected(old('legal_form', $client->legal_form) === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-400">Template Dagang: PT → akun Utang Dividen; CV/perorangan → akun Prive.</p>
+            </div>
+            <div>
+                <label class="label" for="inventory_method">Metode persediaan</label>
+                <select id="inventory_method" name="inventory_method" class="field">
+                    @foreach (\App\Services\Accounting\ChartOfAccounts::INVENTORY_METHODS as $value => $label)
+                        <option value="{{ $value }}" @selected(old('inventory_method', $client->inventory_method ?? 'perpetual') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-400">Template Dagang: perpetual → akun HPP; periodik → Pembelian, Ongkos Angkut & Retur Pembelian.@if ($client->exists) Kalau diganti, akun yang kurang ditambah lewat "Sinkron dari template" — akun lama tidak dihapus.@endif</p>
+            </div>
+            <div>
                 <label class="label" for="legal_name">Nama badan hukum</label>
                 <input type="text" id="legal_name" name="legal_name" value="{{ old('legal_name', $client->legal_name) }}" class="field" placeholder="PT / CV …">
             </div>

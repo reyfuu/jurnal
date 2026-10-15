@@ -189,7 +189,7 @@ class DocumentExtractorTest extends TestCase
             'transactions' => [
                 ['date' => '2026-10-02', 'description' => 'TRSF E-BANKING CR', 'amount' => '5.000.000', 'direction' => 'in', 'account_code' => '4101'],
                 // Tanggal kosong → warisi tanggal dokumen.
-                ['description' => 'BIAYA ADM', 'amount' => 15000, 'direction' => 'out', 'account_code' => '7102'],
+                ['description' => 'BIAYA ADM', 'amount' => 15000, 'direction' => 'out', 'account_code' => '9102'],
                 // Arah ngawur → dianggap keluar (lebih aman: butuh koreksi manusia).
                 ['description' => 'Entah', 'amount' => 1000, 'direction' => 'kemana', 'account_code' => '6190'],
             ],
@@ -237,7 +237,7 @@ class DocumentExtractorTest extends TestCase
     {
         $out = $this->extractor->normalize([
             'flow' => 'expense', 'document_date' => '2026-10-03',
-            'transactions' => [['date' => '2026-10-03', 'description' => 'BIAYA ADM', 'amount' => 15.000, 'direction' => 'out', 'account_code' => '7102']],
+            'transactions' => [['date' => '2026-10-03', 'description' => 'BIAYA ADM', 'amount' => 15.000, 'direction' => 'out', 'account_code' => '9102']],
         ], $this->client);
 
         $this->assertSame(15.0, $out['transactions'][0]['amount']);

@@ -95,7 +95,8 @@ class TaxCalculator
 
     /**
      * Akun pajak di COA klien untuk kode & arah ini, dicari lewat subtype.
-     * Tidak ketemu (COA lama belum disinkron) → akun pajak lama 1402/2103.
+     * Tidak ketemu → 1402 PPN Masukan / 2103 Hutang Pajak (skema Manufaktur/Jasa;
+     * Dagang tidak punya 2103 → null, baris pajak dilewati & selisihnya jadi warning).
      *
      * @param  Collection<string,Account>  $accounts  akun aktif klien, key = kode
      */

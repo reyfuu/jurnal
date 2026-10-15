@@ -75,19 +75,19 @@ class CoaImportExportTest extends TestCase
     public function test_impor_menambah_dan_memperbarui_hanya_di_klien_ini(): void
     {
         $this->actingAs($this->admin)->post(route('accounts.import', $this->a), ['file' => $this->xlsx([
-            ['6117', 'Beban Riset & Pengembangan', 'Beban', 'opex', '', 'ya'],
+            ['6130', 'Beban Riset & Pengembangan', 'Beban', 'opex', '', 'ya'],
             ['4101', 'Pendapatan Jasa Konsultasi', 'pendapatan', 'service', 'kredit', 'ya'],
             ['1103', 'E-Wallet', 'Aset', 'ewallet', '', 'tidak'],
             ['', '', '', '', '', ''], // baris kosong dilewati
         ])])->assertSessionHasNoErrors()->assertSessionHas('status', 'Impor COA selesai: 1 akun baru, 2 diperbarui.');
 
         $akun = $this->a->accounts()->pluck('name', 'code');
-        $this->assertSame('Beban Riset & Pengembangan', $akun['6117']);
+        $this->assertSame('Beban Riset & Pengembangan', $akun['6130']);
         $this->assertSame('Pendapatan Jasa Konsultasi', $akun['4101']);
         $this->assertFalse($this->a->accounts()->where('code', '1103')->value('is_active'));
-        $this->assertSame('debit', $this->a->accounts()->where('code', '6117')->value('normal_balance'));
+        $this->assertSame('debit', $this->a->accounts()->where('code', '6130')->value('normal_balance'));
         // Klien lain tidak tersentuh.
-        $this->assertFalse($this->b->accounts()->where('code', '6117')->exists());
+        $this->assertFalse($this->b->accounts()->where('code', '6130')->exists());
         $this->assertSame('Penjualan', $this->b->accounts()->where('code', '4101')->value('name'));
     }
 

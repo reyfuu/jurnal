@@ -87,6 +87,9 @@ class DemoDataCommand extends Command
                 $client = Client::create([
                     'name' => $p[0], 'slug' => 'demo-'.Str::slug($p[0]), 'business_type' => $p[1], 'type' => $p[2], 'is_active' => true,
                     'legal_name' => str_starts_with($p[0], 'PT') || str_starts_with($p[0], 'CV') ? $p[0] : null,
+                    // PT/CV dari nama; selain itu bergantian supaya Utang Dividen & Prive sama-sama terlihat di data demo.
+                    'legal_form' => str_starts_with($p[0], 'PT') ? 'pt' : (str_starts_with($p[0], 'CV') ? 'cv' : ($i % 2 ? 'pt' : 'perorangan')),
+                    'inventory_method' => 'perpetual',
                     'contact_name' => 'Pemilik '.Str::before($p[0], ' '), 'phone' => '0812'.str_pad((string) (55_000_000 + $i * 7_331), 8, '0', STR_PAD_LEFT),
                     'notes' => '[DEMO] Data dummy — hapus dengan `php artisan jurnal:demo --hapus`.',
                     'taxpayer_type' => $p[9], 'is_pkp' => $p[7], 'pph_regime' => $p[8],
@@ -125,6 +128,9 @@ class DemoDataCommand extends Command
         [, , , $omzet, $akunPendapatan, $kanal, $rasioHpp, $pkp, $rezim, $wp, $pph23, $beban] = $p;
         mt_srand(crc32($client->slug));
         $akun = $client->accounts()->pluck('id', 'code');
+        // Dua skema kode: Dagang 9xxx, Manufaktur/Jasa 7xxx.
+        $adminBank = $akun->has('9102') ? '9102' : '7102';
+        $bebanPajak = $akun->has('9103') ? '9103' : '7103';
         $catat = function (string $date, string $desc, string $type, array $lines, array $pajak = []) use ($poster, $client, $akun, $userId) {
             if (Carbon::parse($date)->isFuture()) {
                 return;
@@ -211,13 +217,13 @@ class DemoDataCommand extends Command
                 $catat("{$ym}-{$hari}", $nama[$kode], 'expense', [[$kode, $jumlah, 0], [$nilai < 3_000_000 ? '1101' : $bank, 0, $jumlah]]);
             }
 
-            $catat("{$ym}-28", 'Biaya administrasi bank', 'bank', [['7102', 85_000, 0], [$bank, 0, 85_000]]);
+            $catat("{$ym}-28", 'Biaya administrasi bank', 'bank', [[$adminBank, 85_000, 0], [$bank, 0, 85_000]]);
 
             // PPh Final UMKM 0,5% omzet.
             if ($rezim === 'final_umkm') {
                 $final = (int) round($omzetBulan * 0.005);
                 $catat("{$ym}-28", 'PPh Final UMKM 0,5% '.$bulan->translatedFormat('F'), 'adjustment',
-                    [['7103', $final, 0], ['2110', 0, $final, 'Terutang']], [['2110', 'final_umkm', 'out', $omzetBulan, $final]]);
+                    [[$bebanPajak, $final, 0], ['2110', 0, $final, 'Terutang']], [['2110', 'final_umkm', 'out', $omzetBulan, $final]]);
             }
 
             // Bulan tertua sudah setor & lapor, supaya kalender pajak punya dua keadaan.

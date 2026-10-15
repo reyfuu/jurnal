@@ -121,6 +121,8 @@ class ClientController extends Controller
             'name' => ['required', 'string', 'max:160'],
             'type' => ['required', Rule::in(array_keys(Client::TYPES))],
             'business_type' => ['nullable', Rule::in(array_keys(ChartOfAccounts::BUSINESS_TYPES))],
+            'legal_form' => ['nullable', Rule::in(array_keys(ChartOfAccounts::LEGAL_FORMS))],
+            'inventory_method' => ['nullable', Rule::in(array_keys(ChartOfAccounts::INVENTORY_METHODS))],
             'legal_name' => ['nullable', 'string', 'max:190'],
             'npwp' => ['nullable', 'string', 'max:30'],
             'contact_name' => ['nullable', 'string', 'max:120'],
@@ -135,6 +137,7 @@ class ClientController extends Controller
         // Jenis usaha menentukan template COA saat klien DIBUAT. Mengubahnya
         // belakangan tidak menghapus akun lama — hanya "Sinkron" menambah yang kurang.
         $data['business_type'] ??= $client?->business_type ?? 'perdagangan';
+        $data['inventory_method'] ??= $client?->inventory_method ?? 'perpetual';
 
         return $data;
     }

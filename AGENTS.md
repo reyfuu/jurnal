@@ -44,6 +44,10 @@ Tiap poin punya test. Test merah = kode yang salah, bukan test-nya.
 - **Klien = isolasi penuh.** COA, jurnal, laporan per klien. `JournalPoster` menolak akun milik klien lain.
 - **COA per jenis usaha.** `clients.business_type` (perdagangan · manufaktur · jasa) memilih template di
   `ChartOfAccounts::template()`. Akun yang dipakai mesin & pajak wajib ada di SEMUA template (`CoaTemplateTest`).
+  **Dua skema kode:** Dagang = revisi akuntan (`Daftar COA.xlsx`, 15 Okt 2026): pendapatan di luar usaha 8xxx,
+  beban di luar usaha 9xxx, tanpa 2103; akun bersyarat dari `legal_form` (PT → Utang Dividen, lainnya → Prive) &
+  `inventory_method` (perpetual → 5101, periodik → 5102/5103/5105). Manufaktur/Jasa = skema lama (4901, 7xxx, 2103).
+  Laba Rugi mengenali keduanya (8xxx, 7xxx/9xxx); beban pajak lewat `ChartOfAccounts::TAX_EXPENSE_CODES`.
   COA diubah lewat modal; impor/ekspor Excel via `app/Support/Xlsx.php` (tanpa library, ZipArchive). Impor = upsert
   per kode di klien itu saja, satu baris salah = batal semua. Tipe akun yang sudah dipakai jurnal terkunci.
 - **Tanya pajak (bubble kanan bawah).** `TaxChatController` — AI hanya diberi data klien yang sedang dibuka;

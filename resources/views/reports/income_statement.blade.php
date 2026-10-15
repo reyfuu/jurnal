@@ -69,8 +69,22 @@
                     </td>
                 </tr>
 
+                @if ($report['groups']['other_income'])
+                    <tr><td class="th" colspan="2">Pendapatan di Luar Usaha</td></tr>
+                    @foreach ($report['groups']['other_income'] as $row)
+                        <tr>
+                            <td class="td pl-6"><span class="font-mono text-xs text-ink-400">{{ $row['account']->code }}</span> {{ $row['account']->name }}</td>
+                            <td class="td num w-48">{{ \App\Support\Rupiah::format($row['value']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="font-semibold">
+                        <td class="td pl-6">Total Pendapatan Lain-lain</td>
+                        <td class="td num">{{ \App\Support\Rupiah::format($report['totals']['other_income']) }}</td>
+                    </tr>
+                @endif
+
                 @if ($report['groups']['other'])
-                    <tr><td class="th" colspan="2">Beban Non-Operasional</td></tr>
+                    <tr><td class="th" colspan="2">Beban di Luar Usaha</td></tr>
                     @foreach ($report['groups']['other'] as $row)
                         <tr>
                             <td class="td pl-6"><span class="font-mono text-xs text-ink-400">{{ $row['account']->code }}</span> {{ $row['account']->name }}</td>

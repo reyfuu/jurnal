@@ -53,7 +53,7 @@ class ReportServiceTest extends TestCase
         $this->jurnal('2026-10-06', [['5101', 20_000_000], ['1301', 0, 20_000_000]]);      // HPP
         $this->jurnal('2026-10-10', [['6102', 5_000_000], ['1102', 0, 5_000_000]]);        // iklan
         $this->jurnal('2026-10-11', [['6101', 8_000_000], ['1102', 0, 8_000_000]]);        // gaji
-        $this->jurnal('2026-10-20', [['7101', 1_000_000], ['1102', 0, 1_000_000]]);        // bunga
+        $this->jurnal('2026-10-20', [['9101', 1_000_000], ['1102', 0, 1_000_000]]);        // bunga (Dagang: 9xxx)
         $this->jurnal('2026-10-25', [['4104', 2_000_000], ['1102', 0, 2_000_000]]);        // retur penjualan
     }
 
@@ -87,6 +87,28 @@ class ReportServiceTest extends TestCase
         $this->assertSame(28_000_000.0, $pnl['gross_profit']);
         $this->assertSame(15_000_000.0, $pnl['operating_income']);
         $this->assertSame(14_000_000.0, $pnl['net_income']);
+    }
+
+    /** Dagang: 8xxx = pendapatan di luar usaha (bukan omzet), 9xxx = beban di luar usaha. Manufaktur: 7xxx tetap beban di luar usaha. */
+    public function test_laba_rugi_memisahkan_pendapatan_dan_beban_di_luar_usaha_dua_skema(): void
+    {
+        $this->sebulanPembukuan();
+        $this->jurnal('2026-10-26', [['1102', 300_000], ['8101', 0, 300_000]]); // jasa giro
+
+        $pnl = $this->reports->incomeStatement($this->client->id, '2026-10');
+        $this->assertSame(48_000_000.0, $pnl['totals']['revenue']); // tidak ikut omzet
+        $this->assertSame(300_000.0, $pnl['totals']['other_income']);
+        $this->assertSame(['9101'], array_map(fn ($r) => $r['account']->code, $pnl['groups']['other']));
+        $this->assertSame(14_300_000.0, $pnl['net_income']);
+        $this->assertSame(48_300_000.0, $this->reports->snapshot($this->client->id, '2026-10')['revenue']);
+
+        $pabrik = Client::create(['name' => 'Pabrik', 'type' => Client::TYPE_EXTERNAL, 'business_type' => 'manufaktur']);
+        app(ChartOfAccounts::class)->seedFor($pabrik);
+        $id = fn ($code) => $pabrik->accounts()->where('code', $code)->value('id');
+        $this->poster->record(['client_id' => $pabrik->id, 'date' => '2026-10-02'], [['account_id' => $id('7102'), 'debit' => 50_000], ['account_id' => $id('1102'), 'credit' => 50_000]]);
+        $pnl = $this->reports->incomeStatement($pabrik->id, '2026-10');
+        $this->assertSame(50_000.0, $pnl['totals']['other']);
+        $this->assertSame(0.0, $pnl['totals']['opex']);
     }
 
     public function test_neraca_balance_dengan_laba_berjalan_sebagai_ekuitas(): void

@@ -358,8 +358,15 @@ class TaxTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'final-akrual']).'?period=2026-10')
             ->assertRedirect(route('journals.create', $op))
-            ->assertSessionHasInput('lines.0.debit', 100_000);
+            ->assertSessionHasInput('lines.0.debit', 100_000)
+            ->assertSessionHasInput('lines.0.account_id', $this->akun('9103', $op)); // Dagang: Beban Pajak 9103
         $this->assertSame(1, Journal::count(), 'Draft tidak boleh langsung diposting.');
+
+        // Manufaktur/Jasa masih skema lama: Beban Pajak 7103.
+        $pabrik = $this->klien('Pabrik Sari', ['is_pkp' => false, 'pph_regime' => 'final_umkm', 'taxpayer_type' => 'badan', 'business_type' => 'manufaktur']);
+        $this->jurnal($pabrik, '2026-10-10', [['account_id' => $this->akun('1101', $pabrik), 'debit' => 20_000_000], ['account_id' => $this->akun('4101', $pabrik), 'credit' => 20_000_000]]);
+        $this->actingAs($this->admin)->get(route('tax.draft', [$pabrik, 'final-akrual']).'?period=2026-10')
+            ->assertSessionHasInput('lines.0.account_id', $this->akun('7103', $pabrik));
 
         $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'ppn-setor']).'?period=2026-10')->assertNotFound();
         $this->actingAs($this->admin)->get(route('tax.draft', [$op, 'ngawur']))->assertNotFound();

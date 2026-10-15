@@ -17,7 +17,7 @@ class Client extends Model
     ];
 
     protected $fillable = [
-        'name', 'slug', 'type', 'business_type', 'legal_name', 'npwp', 'contact_name',
+        'name', 'slug', 'type', 'business_type', 'legal_form', 'inventory_method', 'legal_name', 'npwp', 'contact_name',
         'phone', 'email', 'address', 'fiscal_year_start', 'notes', 'is_active',
         'taxpayer_type', 'tax_id', 'is_pkp', 'pkp_since', 'pph_regime',
     ];

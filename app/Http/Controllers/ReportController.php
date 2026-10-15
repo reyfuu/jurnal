@@ -77,6 +77,7 @@ class ReportController extends Controller
                     $total('LABA KOTOR', $r['gross_profit']),
                     ...array_map($line, $r['groups']['opex']), $total('Total Beban Operasional', $r['totals']['opex']),
                     $total('LABA OPERASIONAL', $r['operating_income']),
+                    ...array_map($line, $r['groups']['other_income']), $total('Total Pendapatan Lain-lain', $r['totals']['other_income']),
                     ...array_map($line, $r['groups']['other']), $total('Total Beban Lain-lain', $r['totals']['other']),
                     $total('LABA (RUGI) BERSIH', $r['net_income']),
                 ]];

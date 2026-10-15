@@ -106,8 +106,8 @@ class ReportService
         $movements = $this->movements($clientId, $period);
         $accounts = Account::where('client_id', $clientId)->orderBy('code')->get();
 
-        $groups = ['revenue' => [], 'cogs' => [], 'opex' => [], 'other' => []];
-        $totals = ['revenue' => 0.0, 'cogs' => 0.0, 'opex' => 0.0, 'other' => 0.0];
+        $groups = ['revenue' => [], 'cogs' => [], 'opex' => [], 'other_income' => [], 'other' => []];
+        $totals = ['revenue' => 0.0, 'cogs' => 0.0, 'opex' => 0.0, 'other_income' => 0.0, 'other' => 0.0];
 
         foreach ($accounts as $account) {
             if (! in_array($account->type, [Account::TYPE_REVENUE, Account::TYPE_EXPENSE], true)) {
@@ -126,10 +126,13 @@ class ReportService
                 continue;
             }
 
+            // Dua skema kode (lihat ChartOfAccounts::template): Dagang memisahkan
+            // pendapatan di luar usaha (8xxx) & beban di luar usaha (9xxx);
+            // Manufaktur/Jasa memakai 7xxx untuk beban di luar usaha.
             $key = match (true) {
-                $account->type === Account::TYPE_REVENUE => 'revenue',
+                $account->type === Account::TYPE_REVENUE => str_starts_with($account->code, '8') ? 'other_income' : 'revenue',
                 str_starts_with($account->code, '5') => 'cogs',
-                str_starts_with($account->code, '7') => 'other',
+                str_starts_with($account->code, '7'), str_starts_with($account->code, '9') => 'other',
                 default => 'opex',
             };
 
@@ -147,7 +150,7 @@ class ReportService
             'totals' => $totals,
             'gross_profit' => $grossProfit,
             'operating_income' => $operatingIncome,
-            'net_income' => round($operatingIncome - $totals['other'], 2),
+            'net_income' => round($operatingIncome + $totals['other_income'] - $totals['other'], 2),
         ];
     }
 
@@ -229,7 +232,7 @@ class ReportService
 
         return [
             'period' => $period,
-            'revenue' => $pnl['totals']['revenue'],
+            'revenue' => round($pnl['totals']['revenue'] + $pnl['totals']['other_income'], 2),
             'expense' => round($pnl['totals']['cogs'] + $pnl['totals']['opex'] + $pnl['totals']['other'], 2),
             'net_income' => $pnl['net_income'],
             'cash' => round($cash, 2),
