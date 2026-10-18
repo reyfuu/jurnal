@@ -124,3 +124,26 @@ func TestAddTransactionSyncsLedgerAndReports(t *testing.T) {
 		t.Fatalf("expected updated omzet 97_000_000, got %d", is.Omzet)
 	}
 }
+
+func TestAIChatEndpoint(t *testing.T) {
+	srv := NewServer()
+
+	body := `{"query":"Ringkas laporan bulan ini","period":"2026-08"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/chat", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	asOwner(t, srv).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var res map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+		t.Fatalf("decode err: %v", err)
+	}
+	ans, _ := res["answer"].(string)
+	if !strings.Contains(ans, "Ringkasan Laporan Bisnis") {
+		t.Fatalf("expected answer to contain summary, got: %s", ans)
+	}
+}

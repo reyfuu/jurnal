@@ -7,6 +7,7 @@ import { Login } from '@/views/Login'
 import { ArusKas, LaporanKeuangan } from '@/views/Reports'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule, Transaksi } from '@/views/Operations'
 import { Pengguna } from '@/views/Pengguna'
+import { AIAgentBubble } from '@/components/AIAgentBubble'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -76,6 +77,7 @@ export default function App() {
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>
+      <AIAgentBubble />
     </main>
   )
 

@@ -208,3 +208,13 @@ export const listUsers = () => api<{ users: User[]; roles: Record<Role, RoleInfo
 export const createUser = (u: UserInput) => api<User>('/users', { method: 'POST', body: u })
 export const updateUser = (id: number, u: UserInput) => api<User>(`/users/${id}`, { method: 'PUT', body: u })
 export const deleteUser = (id: number) => api<void>(`/users/${id}`, { method: 'DELETE' })
+
+export interface AIChatResponse {
+  answer: string
+  category: string
+  action_suggestions: string[]
+}
+
+export const askAIChat = (query: string, period = '2026-08') =>
+  api<AIChatResponse>('/ai/chat', { method: 'POST', body: { query, period } })
+

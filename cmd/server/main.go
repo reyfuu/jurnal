@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 
+	"pajak/internal/ai"
 	"pajak/internal/auth"
 	"pajak/internal/finance"
 )
@@ -24,6 +25,7 @@ type Server struct {
 	snapshots map[string]finance.DashboardSnapshot
 	ledgers   map[string][]finance.LedgerEntry
 	users     *auth.Store
+	aiEngine  *ai.Engine
 	mux       *http.ServeMux
 }
 
@@ -37,8 +39,9 @@ func NewServer() *Server {
 			"2026-08": finance.SeedLedger("2026-08"),
 			"2026-07": finance.SeedLedger("2026-07"),
 		},
-		users: auth.NewStore(),
-		mux:   http.NewServeMux(),
+		users:    auth.NewStore(),
+		aiEngine: ai.NewEngine(),
+		mux:      http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -58,6 +61,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("arus-kas", s.handleCashflow))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
+	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.guard("transaksi", s.handleAddTransaction))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
@@ -262,6 +266,28 @@ func (s *Server) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee))
+}
+
+func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
+	var req ai.QueryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Query == "" {
+		http.Error(w, "query required", http.StatusBadRequest)
+		return
+	}
+	period := req.Period
+	if period == "" {
+		period = "2026-08"
+	}
+	s.mu.RLock()
+	snap, ok := s.snapshots[period]
+	if !ok {
+		snap = s.snapshots["2026-08"]
+	}
+	ledger := s.ledgers[period]
+	s.mu.RUnlock()
+
+	resp := s.aiEngine.Answer(r.Context(), req, snap, ledger)
+	writeJSON(w, resp)
 }
 
 type addTxReq struct {
