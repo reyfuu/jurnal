@@ -64,24 +64,39 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
   - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
   - Branch `main`: Kode baru Go + React Vite + Auth RBAC + AI Agent Bubble (Laporan Bisnis).
 
-## Fase 4 — CRUD Transaksi & Impor Excel (branch `feat/transaksi-crud`, belum di-merge)
-Meniru demo `bisnis.pakarpajak.id/app?demo=1#transaksi`.
-- **Sumber kebenaran = transaksi bertanggal** ([internal/finance/transaction.go](internal/finance/transaction.go)): 18 jenis (Penjualan, Beli Bahan / Stok, Gaji & Upah, Setor Modal, Bayar Cicilan, Ambil Uang Pribadi, dst.) dipetakan ke pos laporan. `ToLedger` menurunkan buku besar untuk laporan dan AI. Seed 8 bulan di [seed.go](internal/finance/seed.go) diurai jadi transaksi oleh `SeedTransactions`.
-- **Laporan dan KPI dashboard dihitung ulang** dari transaksi periode tersebut (`ApplyKPIs`); grafik riwayat dan sparkline tetap seed. Neraca tetap seimbang untuk modal, pinjaman, aset, cicilan, dan prive. Kas awal per periode diambil dari `OpeningCash(period)`.
-- **Endpoint**:
-  - `GET|POST /api/v1/transactions` untuk semua role yang punya menu Transaksi;
-  - `PUT|DELETE /api/v1/transactions/{id}` butuh izin `transaksi-kelola` (Owner, Admin);
-  - `GET /api/v1/transactions/template` (.xlsx);
-  - `POST /api/v1/transactions/import` (pratinjau; `?commit=1` untuk menyimpan; Owner/Admin).
-- **Impor Excel tanpa dependensi**: [internal/xlsx](internal/xlsx/xlsx.go) membaca dan menulis .xlsx dengan stdlib, sudah diuji bolak-balik dengan LibreOffice. [finance.ParseImport](internal/finance/import.go) mengenali header bebas, alias jenis ("gaji", "kulakan", ...), tanggal YYYY-MM-DD / DD/MM/YYYY / seri Excel, dan nominal "Rp 1.250.000"; baris bermasalah dilaporkan per nomor baris.
-- **Frontend**: [views/Transaksi.tsx](frontend/src/views/Transaksi.tsx) dan [views/ImportDialog.tsx](frontend/src/views/ImportDialog.tsx).
-- **Catatan**: tanggal default "Catat transaksi" adalah hari ini. Transaksi di luar 8 periode seed (Jan–Agu 2026) tampil di daftar tapi belum bisa dipilih sebagai periode laporan.
+## Fase 4 — Multi-Period Dummy Data & Filter Komprehensif di Seluruh View (Live & Selesai)
+- **Multi-Period Data Seed (Januari s.d. Agustus 2026)**:
+  - 8 bulan data realistis di [internal/finance/seed.go](file:///home/reyfuu/pajak/internal/finance/seed.go) & [internal/finance/transaction.go](file:///home/reyfuu/pajak/internal/finance/transaction.go): KPI operasional, tren 11 bulan, transaksi, performa channel, kewajiban (piutang/utang), stok inventori, dan PPh Final UMKM PP 55/2022.
+  - Endpoint `GET /api/v1/periods`: mengembalikan daftar 8 periode yang tersedia beserta label bulannya.
+- **Global Period Switcher**:
+  - Disediakan dropdown pemilih periode di header workspace dan kartu header Dashboard.
+  - Mengubah periode akan memicu reload terkoordinasi untuk `/dashboard`, `/reports/financial`, `/reports/cashflow`, `/reports/balance-sheet`, dan memberikan konteks periode ke AI Agent Bubble (`/api/v1/ai/chat`).
+- **Filter Komprehensif di Seluruh Modul**:
+  - **Transaksi ([views/Transaksi.tsx](file:///home/reyfuu/pajak/frontend/src/views/Transaksi.tsx))**:
+    - Pencarian teks langsung (keterangan, item, pihak, channel, jenis).
+    - Filter Bulan (`Semua bulan` + 8 opsi bulan).
+    - Filter Arah Uang (`Semua arah`, `Pemasukan (Masuk)`, `Pengeluaran (Keluar)`).
+    - Filter Channel Penjualan (`Semua channel`, `Dine-in`, `GoFood`, `GrabFood`, `ShopeeFood`, `Supplier`, `BCA Bisnis`, `B2B Tempo`).
+    - Filter Jenis Transaksi (`Semua jenis` + 18 jenis transaksi).
+  - **Piutang & Utang ([views/Operations.tsx](file:///home/reyfuu/pajak/frontend/src/views/Operations.tsx))**:
+    - Pencarian no invoice, nama pelanggan, supplier.
+    - Filter Jenis (`Semua Jenis`, `Piutang Masuk (Pelanggan)`, `Utang Keluar (Supplier)`).
+    - Filter Status Umur (`Semua Status`, `Lewat 30 Hari (>30 Hari)`, `Belum Jatuh Tempo / Lancar`).
+    - Mini KPI cards menampilkan total nominal piutang dan utang dari baris yang difilter.
+  - **Stok & Gudang ([views/Operations.tsx](file:///home/reyfuu/pajak/frontend/src/views/Operations.tsx))**:
+    - Pencarian SKU atau nama item / bahan.
+    - Filter Kategori (`Semua Kategori`, `Bahan Baku`, `Produk Jadi`).
+    - Filter Status Stok (`Semua Status`, `Stok Menipis (Perlu Restock)`, `Stok Aman / Resep BOM Aktif`).
+- **Pengujian & Deployment**:
+  - 100% Go tests lulus (`internal/finance`, `internal/auth`, `internal/ai`, `cmd/server`).
+  - 100% Vitest frontend lulus (`transaksi.test.ts`, `charts.test.ts`, `format.test.ts`).
+  - Di-build dan di-deploy ke VPS `31.97.66.119` di port `8085` dengan verifikasi live di [https://pajak.aipreneur.co.id](https://pajak.aipreneur.co.id).
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
-1. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
-1a. Daftar periode laporan dibuat dinamis dari bulan-bulan transaksi (sekarang statis Jan–Agu 2026).
-2. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md), termasuk tabel `users` & `sessions` (sekarang user in-memory).
-3. Menambahkan rate limit dan kedaluwarsa sesi pada login.
+1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
+2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
+3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.
+4. Menambahkan rate limiting dan refresh token sesi.
 
 
 
