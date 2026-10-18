@@ -2,85 +2,80 @@ import { useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { simulatePrice, type Dashboard, type PriceSim } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
 const fieldClass = 'h-[38px] bg-[#0d0f13] tabular'
 
-export function Transaksi({ d, onAdd }: { d: Dashboard; onAdd: (tx: { title: string; type: 'INCOME' | 'EXPENSE'; gross: number }) => Promise<void> }) {
-  const [title, setTitle] = useState('Penjualan Catering Rapat 25 Cup')
-  const [type, setType] = useState<'INCOME' | 'EXPENSE'>('INCOME')
-  const [gross, setGross] = useState('1000000')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    const amount = parseInt(gross || '0', 10)
-    if (!title.trim() || amount <= 0) return
-    setBusy(true)
-    try {
-      await onAdd({ title: title.trim(), type, gross: amount })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <PageHeader
-        title="Transaksi Operasional"
-        subtitle="Catat pemasukan & pengeluaran dalam 5 detik. Otomatis memperbarui Dashboard, Arus Kas & Pajak UMKM."
-      />
-      <form className="card" style={{ padding: '18px 20px' }} onSubmit={submit}>
-        <div className="chart-title">Tambah Transaksi Cepat</div>
-        <div className="form-grid">
-          <Input className={fieldClass} aria-label="Keterangan" placeholder="Contoh: Penjualan Kopi Literan 10 Botol" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Select value={type} onValueChange={(v) => setType(v as 'INCOME' | 'EXPENSE')}>
-            <SelectTrigger className={fieldClass + ' w-full'} aria-label="Jenis transaksi">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="INCOME">Pemasukan (+ Omzet)</SelectItem>
-              <SelectItem value="EXPENSE">Pengeluaran (- Biaya)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input className={fieldClass} aria-label="Nominal" type="number" min={1} placeholder="Nominal (Rp)" value={gross} onChange={(e) => setGross(e.target.value)} />
-          <button className="btn-cta" type="submit" disabled={busy}>{busy ? 'Menyimpan…' : '+ Simpan Transaksi'}</button>
-        </div>
-      </form>
-
-      <div className="card" style={{ padding: 20 }}>
-        <div className="chart-title">Riwayat Transaksi Terbaru</div>
-        <table className="data-table tabular">
-          <thead>
-            <tr>
-              <th>ID</th><th>Tanggal</th><th>Keterangan</th><th>Channel</th><th>Bruto</th><th>Potongan</th><th>Kas Bersih</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.recent_transactions.map((t, i) => (
-              <tr key={t.id + i}>
-                <td style={{ color: 'var(--text-muted)' }}>{t.id}</td>
-                <td>{t.date}</td>
-                <td style={{ fontWeight: 600 }}>{t.title}</td>
-                <td>{t.channel}</td>
-                <td>{formatRp(t.gross)}</td>
-                <td style={{ color: '#fb7185' }}>{t.fee > 0 ? '-' + formatRp(t.fee) : 'Rp0'}</td>
-                <td style={{ fontWeight: 700, color: t.net >= 0 ? '#10b981' : '#fb7185' }}>{formatRp(t.net)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
-}
-
 export function PiutangUtang({ d }: { d: Dashboard }) {
+  const [cari, setCari] = useState('')
+  const [kindFilter, setKindFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  const filtered = (d.obligations || []).filter((o) => {
+    if (kindFilter !== 'ALL' && o.kind !== kindFilter) return false
+    if (statusFilter === 'OVERDUE' && o.days_overdue <= 30) return false
+    if (statusFilter === 'CURRENT' && o.days_overdue > 30) return false
+    if (cari.trim()) {
+      const q = cari.toLowerCase()
+      if (!o.invoice_no.toLowerCase().includes(q) && !o.counterparty.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const totalPiutang = filtered.filter((o) => o.kind === 'RECEIVABLE').reduce((s, o) => s + o.amount, 0)
+  const totalUtang = filtered.filter((o) => o.kind === 'PAYABLE').reduce((s, o) => s + o.amount, 0)
+
   return (
     <>
       <PageHeader title="Piutang & Utang" subtitle="Pantau tagihan pelanggan yang lewat 30 hari agar arus kas bisnis tidak macet." />
+
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <Input
+            style={{ flex: '1 1 240px', minWidth: 200, height: 38, background: '#0d0f13' }}
+            placeholder="Cari no invoice, pelanggan, supplier..."
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+          />
+          <select
+            className="period-select"
+            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+          >
+            <option value="ALL">Semua Jenis Tagihan</option>
+            <option value="RECEIVABLE">Piutang Masuk (Pelanggan)</option>
+            <option value="PAYABLE">Utang Keluar (Supplier)</option>
+          </select>
+          <select
+            className="period-select"
+            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">Semua Status Jatuh Tempo</option>
+            <option value="OVERDUE">Lewat 30 Hari (&gt;30 Hari)</option>
+            <option value="CURRENT">Belum Jatuh Tempo / Lancar</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+        <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="kpi-label">Tagihan Tampil</div>
+          <div className="kpi-value tabular" style={{ fontSize: 20 }}>{filtered.length} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>dari {d.obligations.length}</span></div>
+        </div>
+        <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="kpi-label">Total Piutang Tampil</div>
+          <div className="kpi-value tabular" style={{ fontSize: 20, color: '#34d399' }}>{formatRp(totalPiutang)}</div>
+        </div>
+        <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="kpi-label">Total Utang Tampil</div>
+          <div className="kpi-value tabular" style={{ fontSize: 20, color: '#fb7185' }}>{formatRp(totalUtang)}</div>
+        </div>
+      </div>
+
       <div className="card" style={{ padding: 20 }}>
         <table className="data-table tabular">
           <thead>
@@ -89,20 +84,28 @@ export function PiutangUtang({ d }: { d: Dashboard }) {
             </tr>
           </thead>
           <tbody>
-            {d.obligations.map((o) => (
-              <tr key={o.invoice_no}>
-                <td style={{ fontWeight: 600 }}>{o.invoice_no}</td>
-                <td>{o.counterparty}</td>
-                <td>{o.kind === 'RECEIVABLE' ? 'Piutang Masuk' : 'Utang Supplier'}</td>
-                <td>{o.due_date}</td>
-                <td>
-                  <span className={'pill-status ' + (o.days_overdue > 30 ? 'pill-red' : 'pill-green')}>
-                    {o.days_overdue > 30 ? `Lewat ${o.days_overdue} hari (>30 hari)` : 'Belum Jatuh Tempo'}
-                  </span>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)' }}>
+                  Tidak ada data piutang / utang yang cocok dengan filter.
                 </td>
-                <td style={{ fontWeight: 700 }}>{formatRp(o.amount)}</td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((o) => (
+                <tr key={o.invoice_no}>
+                  <td style={{ fontWeight: 600 }}>{o.invoice_no}</td>
+                  <td>{o.counterparty}</td>
+                  <td>{o.kind === 'RECEIVABLE' ? 'Piutang Masuk' : 'Utang Supplier'}</td>
+                  <td>{o.due_date}</td>
+                  <td>
+                    <span className={'pill-status ' + (o.days_overdue > 30 ? 'pill-red' : 'pill-green')}>
+                      {o.days_overdue > 30 ? `Lewat ${o.days_overdue} hari (>30 hari)` : 'Belum Jatuh Tempo'}
+                    </span>
+                  </td>
+                  <td style={{ fontWeight: 700 }}>{formatRp(o.amount)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -111,11 +114,61 @@ export function PiutangUtang({ d }: { d: Dashboard }) {
 }
 
 export function StokModule({ d, title }: { d: Dashboard; title: string }) {
+  const [cari, setCari] = useState('')
+  const [typeFilter, setTypeFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  const filtered = (d.inventory || []).filter((item) => {
+    if (typeFilter !== 'ALL' && item.type !== typeFilter) return false
+    if (statusFilter === 'MENIPIS' && !item.status.includes('Menipis')) return false
+    if (statusFilter === 'AMAN' && item.status.includes('Menipis')) return false
+    if (cari.trim()) {
+      const q = cari.toLowerCase()
+      if (!item.sku.toLowerCase().includes(q) && !item.name.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
   return (
     <>
       <PageHeader title={title} subtitle="Data Master, Resep BOM, Stok Gudang & Panduan Akademi Pajak" />
+
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <Input
+            style={{ flex: '1 1 240px', minWidth: 200, height: 38, background: '#0d0f13' }}
+            placeholder="Cari SKU atau nama item / bahan..."
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+          />
+          <select
+            className="period-select"
+            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="ALL">Semua Kategori</option>
+            <option value="Bahan Baku">Bahan Baku</option>
+            <option value="Produk Jadi">Produk Jadi</option>
+          </select>
+          <select
+            className="period-select"
+            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">Semua Status Stok</option>
+            <option value="MENIPIS">Stok Menipis (Perlu Restock)</option>
+            <option value="AMAN">Stok Aman / Resep BOM Aktif</option>
+          </select>
+        </div>
+      </div>
+
       <div className="card" style={{ padding: 20 }}>
-        <div className="chart-title">Stok Bahan Baku &amp; Produk Jadi ({d.tenant.name})</div>
+        <div className="chart-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span>Stok Bahan Baku &amp; Produk Jadi ({d.tenant.name})</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Menampilkan {filtered.length} dari {d.inventory.length} item</span>
+        </div>
         <table className="data-table tabular">
           <thead>
             <tr>
@@ -123,19 +176,27 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
             </tr>
           </thead>
           <tbody>
-            {d.inventory.map((item) => (
-              <tr key={item.sku}>
-                <td style={{ color: 'var(--text-muted)' }}>{item.sku}</td>
-                <td style={{ fontWeight: 600 }}>{item.name}</td>
-                <td>{item.type}</td>
-                <td>{item.stock}</td>
-                <td>{formatRp(item.cogs)}</td>
-                <td>{item.sell_price > 0 ? formatRp(item.sell_price) : '-'}</td>
-                <td>
-                  <span className={'pill-status ' + (item.status.includes('Menipis') ? 'pill-red' : 'pill-green')}>{item.status}</span>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)' }}>
+                  Tidak ada item stok yang cocok dengan filter.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((item) => (
+                <tr key={item.sku}>
+                  <td style={{ color: 'var(--text-muted)' }}>{item.sku}</td>
+                  <td style={{ fontWeight: 600 }}>{item.name}</td>
+                  <td>{item.type}</td>
+                  <td>{item.stock}</td>
+                  <td>{formatRp(item.cogs)}</td>
+                  <td>{item.sell_price > 0 ? formatRp(item.sell_price) : '-'}</td>
+                  <td>
+                    <span className={'pill-status ' + (item.status.includes('Menipis') ? 'pill-red' : 'pill-green')}>{item.status}</span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

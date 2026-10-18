@@ -14,6 +14,9 @@ import {
 
 const ROLE_ORDER: Role[] = ['owner', 'admin', 'kasir']
 const ROLE_PILL: Record<Role, string> = { owner: 'pill-amber', admin: 'pill-green', kasir: 'pill-status-muted' }
+// Izin di luar menu sidebar (dicek server lewat guard yang sama).
+const EXTRA_PERMISSIONS = [{ view: 'transaksi-kelola', label: 'Ubah & hapus transaksi' }] as const
+
 const EMPTY: UserInput = { name: '', email: '', role: 'kasir', active: true, password: '' }
 
 type Editing = { id: number | null; input: UserInput } | null
@@ -148,7 +151,7 @@ export function Pengguna({ currentUserId }: { currentUserId: number }) {
               </tr>
             </thead>
             <tbody>
-              {NAV.flatMap((g) => g.items).map((item) => (
+              {[...NAV.flatMap((g) => g.items), ...EXTRA_PERMISSIONS].map((item) => (
                 <tr key={item.view}>
                   <td>{item.label}</td>
                   {ROLE_ORDER.map((r) => (

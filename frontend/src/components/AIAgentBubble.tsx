@@ -16,7 +16,7 @@ const INITIAL_SUGGESTIONS = [
   '💡 Bagaimana cara hitung simulasi harga komisi GoFood?',
 ]
 
-export const AIAgentBubble: React.FC = () => {
+export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08' }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -52,7 +52,7 @@ export const AIAgentBubble: React.FC = () => {
     setLoading(true)
 
     try {
-      const res: AIChatResponse = await askAIChat(textToSend)
+      const res: AIChatResponse = await askAIChat(textToSend, period)
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',

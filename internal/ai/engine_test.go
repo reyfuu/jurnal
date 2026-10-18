@@ -63,3 +63,4 @@ func TestAnswer_ReceivablesAndCashflow(t *testing.T) {
 		t.Fatalf("expected mention of piutang, got: %s", resp.Answer)
 	}
 }
+

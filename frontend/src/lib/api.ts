@@ -3,6 +3,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'arus-kas' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'master-data' | 'panduan' | 'pengguna'
+  | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
 
 export type Role = 'owner' | 'admin' | 'kasir'
 
@@ -70,6 +71,7 @@ export interface Transaction {
 
 export interface Dashboard {
   tenant: { name: string; initials: string; category: string; total_transactions: number }
+  period?: string
   period_label: string
   kpis: {
     omzet: TrendKPI
@@ -124,6 +126,7 @@ export interface IncomeStatement {
   cogs: number
   gross_profit: number
   opex: number
+  other_income: number
   net_profit: number
   margin_bps: number
   opex_lines: { label: string; amount: number }[] | null
@@ -137,14 +140,38 @@ export interface CashFlow {
   closing_balance: number
   new_receivables: number
   new_payables: number
+  non_operating: number
 }
 
 export interface BalanceSheet {
-  assets: { cash: number; receivables: number; inventory: number; total: number }
-  liabilities: { payables: number; total: number }
-  equity: { opening_capital: number; current_profit: number; total: number }
+  assets: { cash: number; receivables: number; inventory: number; fixed_assets: number; total: number }
+  liabilities: { payables: number; loans: number; total: number }
+  equity: { opening_capital: number; added_capital: number; current_profit: number; total: number }
   is_balanced: boolean
 }
+
+export interface JenisInfo {
+  nama: string
+  arah: 'masuk' | 'keluar'
+  pos: string
+}
+
+/** Transaksi bertanggal (sumber semua laporan). */
+export interface Tx {
+  id: number
+  tanggal: string
+  jenis: string
+  nominal: number
+  keterangan: string
+  item: string
+  qty: number
+  channel: string
+  pihak: string
+  lunas: boolean
+  tanggal_lunas: string
+}
+
+export type TxInput = Omit<Tx, 'id'>
 
 export interface PriceSim {
   recommended_price: number
@@ -177,26 +204,34 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
   return (res.status === 204 ? undefined : await res.json()) as T
 }
 
-const PERIOD = '?period=2026-08'
+export interface PeriodOption {
+  id: string
+  label: string
+}
+
+export const getPeriods = () => api<PeriodOption[]>('/periods')
 
 export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */
-export async function loadAll(views: View[]): Promise<AppData> {
+export async function loadAll(views: View[], period = '2026-08'): Promise<AppData> {
   const can = (v: View) => views.includes(v)
+  const q = `?period=${encodeURIComponent(period)}`
   const [dash, report, cash, balanceSheet] = await Promise.all([
-    api<Dashboard>('/dashboard' + PERIOD),
-    can('laporan-keuangan') || can('arus-kas') ? api<IncomeStatement>('/reports/financial' + PERIOD) : undefined,
-    can('arus-kas') ? api<CashFlow>('/reports/cashflow' + PERIOD) : undefined,
-    can('laporan-keuangan') ? api<BalanceSheet>('/reports/balance-sheet' + PERIOD) : undefined,
+    api<Dashboard>('/dashboard' + q),
+    can('laporan-keuangan') || can('arus-kas') ? api<IncomeStatement>('/reports/financial' + q) : undefined,
+    can('arus-kas') ? api<CashFlow>('/reports/cashflow' + q) : undefined,
+    can('laporan-keuangan') ? api<BalanceSheet>('/reports/balance-sheet' + q) : undefined,
   ])
   return { dash, report, cash, balanceSheet }
 }
 
-export const addTransaction = (tx: { title: string; type: 'INCOME' | 'EXPENSE'; gross: number }) =>
-  api<Dashboard>('/transactions', { method: 'POST', body: { ...tx, channel: 'Dine-in / B2B', fee_bps: 0 } })
+export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo[]; can_edit: boolean }>('/transactions')
+export const createTransaction = (t: TxInput) => api<Tx>('/transactions', { method: 'POST', body: t })
+export const updateTransaction = (id: number, t: TxInput) => api<Tx>(`/transactions/${id}`, { method: 'PUT', body: t })
+export const deleteTransaction = (id: number) => api<void>(`/transactions/${id}`, { method: 'DELETE' })
 
 export const simulatePrice = (cogs: number, targetProfit: number, feePct: number) =>
   api<PriceSim>('/pricing/simulate', {

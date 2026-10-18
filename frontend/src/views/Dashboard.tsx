@@ -6,7 +6,21 @@ import { formatRp } from '@/lib/format'
 
 const Dot = ({ color }: { color: string }) => <span className="dot" style={{ background: color }} />
 
-export function Dashboard({ d, canSee, onNavigate }: { d: Data; canSee: (v: View) => boolean; onNavigate: (v: View) => void }) {
+export function Dashboard({
+  d,
+  canSee,
+  onNavigate,
+  period,
+  periods,
+  onPeriodChange,
+}: {
+  d: Data
+  canSee: (v: View) => boolean
+  onNavigate: (v: View) => void
+  period?: string
+  periods?: { id: string; label: string }[]
+  onPeriodChange?: (p: string) => void
+}) {
   const k = d.kpis
   const trend = [
     { label: 'Omzet', kpi: k.omzet, color: '#eab308', badge: 'badge-up' },
@@ -18,11 +32,26 @@ export function Dashboard({ d, canSee, onNavigate }: { d: Data; canSee: (v: View
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Gambaran seluruh bisnis dalam satu layar">
-        <button className="period-select tabular">
-          <CalendarDays size={14} />
-          {d.period_label}
-          <ChevronDown size={12} />
-        </button>
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <CalendarDays size={14} style={{ position: 'absolute', left: 10, pointerEvents: 'none', color: '#9ba3af' }} />
+          <select
+            className="period-select tabular"
+            style={{ appearance: 'none', paddingLeft: 30, paddingRight: 28, cursor: 'pointer' }}
+            value={period || d.period || '2026-08'}
+            onChange={(e) => onPeriodChange?.(e.target.value)}
+          >
+            {periods && periods.length > 0 ? (
+              periods.map((p) => (
+                <option key={p.id} value={p.id} style={{ background: '#101318', color: '#fff' }}>
+                  {p.label}
+                </option>
+              ))
+            ) : (
+              <option value={d.period || '2026-08'}>{d.period_label}</option>
+            )}
+          </select>
+          <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: '#9ba3af' }} />
+        </div>
       </PageHeader>
 
       <div className="kpi-grid">

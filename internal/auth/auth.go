@@ -37,9 +37,9 @@ var financeViews = []string{
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.
 var Roles = map[Role]RoleInfo{
-	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "pengguna")},
-	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", financeViews},
-	Kasir: {"Kasir", "Dashboard dan input transaksi saja.", []string{"dashboard", "transaksi"}},
+	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "pengguna")},
+	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola")},
+	Kasir: {"Kasir", "Dashboard dan catat transaksi (tanpa ubah/hapus).", []string{"dashboard", "transaksi"}},
 }
 
 func (r Role) Can(view string) bool { return slices.Contains(Roles[r].Views, view) }

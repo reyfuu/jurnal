@@ -636,3 +636,47 @@
     }
   }
 }
+
+/* Halaman Transaksi */
+@layer components {
+  .tx-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .tx-search {
+    flex: 1 1 260px;
+    max-width: 380px;
+    height: 40px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    padding: 0 16px;
+  }
+  .tx-filter {
+    height: 40px !important;
+    border-radius: 999px;
+    background: var(--bg-card);
+    font-weight: 600;
+  }
+  .tx-note {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    background: var(--bg-card);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .tx-note b {
+    color: var(--text-primary);
+  }
+  .tx-row {
+    cursor: pointer;
+  }
+  .tx-row:hover td {
+    background: rgba(255, 255, 255, 0.025);
+  }
+}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -22,26 +23,32 @@ const sessionCookie = "sid"
 
 type Server struct {
 	mu        sync.RWMutex
-	snapshots map[string]finance.DashboardSnapshot
-	ledgers   map[string][]finance.LedgerEntry
+	snapshots map[string]finance.DashboardSnapshot // seed per periode; KPI dihitung ulang dari txs
+	txs       []finance.Transaction
+	nextTxID  int
+	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
 	users     *auth.Store
 	aiEngine  *ai.Engine
 	mux       *http.ServeMux
 }
 
 func NewServer() *Server {
+	txs := finance.SeedTransactions()
+	snapshots := make(map[string]finance.DashboardSnapshot)
+	seedTx := make(map[string]int)
+	for _, p := range finance.AvailablePeriods() {
+		snapshots[p.ID] = finance.SeedKedaiKopiSenja(p.ID)
+		seedTx[p.ID] = len(finance.ForPeriod(txs, p.ID))
+	}
+
 	s := &Server{
-		snapshots: map[string]finance.DashboardSnapshot{
-			"2026-08": finance.SeedKedaiKopiSenja("2026-08"),
-			"2026-07": finance.SeedKedaiKopiSenja("2026-07"),
-		},
-		ledgers: map[string][]finance.LedgerEntry{
-			"2026-08": finance.SeedLedger("2026-08"),
-			"2026-07": finance.SeedLedger("2026-07"),
-		},
-		users:    auth.NewStore(),
-		aiEngine: ai.NewEngine(),
-		mux:      http.NewServeMux(),
+		snapshots: snapshots,
+		txs:       txs,
+		nextTxID:  len(txs) + 1,
+		seedTx:    seedTx,
+		users:     auth.NewStore(),
+		aiEngine:  ai.NewEngine(),
+		mux:       http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -55,6 +62,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
 	s.mux.HandleFunc("GET /api/v1/auth/me", s.guard("", s.handleMe))
+	s.mux.HandleFunc("GET /api/v1/periods", s.guard("", s.handlePeriods))
 
 	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.handleDashboard))
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.handleFinancial))
@@ -62,7 +70,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
-	s.mux.HandleFunc("POST /api/v1/transactions", s.guard("transaksi", s.handleAddTransaction))
+	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.handleListTransactions))
+	s.mux.HandleFunc("POST /api/v1/transactions", s.guard("transaksi", s.handleCreateTransaction))
+	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleUpdateTransaction))
+	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleDeleteTransaction))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
 	s.mux.HandleFunc("POST /api/v1/users", s.guard("pengguna", s.handleCreateUser))
@@ -151,6 +162,10 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, newMe(currentUser(r)))
 }
 
+func (s *Server) handlePeriods(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, finance.AvailablePeriods())
+}
+
 type usersResp struct {
 	Users []auth.User                 `json:"users"`
 	Roles map[auth.Role]auth.RoleInfo `json:"roles"`
@@ -221,34 +236,40 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ledger(r *http.Request) []finance.LedgerEntry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.ledgers[periodOrDefault(r)]
+	return finance.ToLedger(finance.ForPeriod(s.txs, periodOrDefault(r)))
 }
+
+// ponytail: nilai stok tetap seed (Rp8,25 jt) sampai modul stok menghitung persediaan dari transaksi.
+const inventoryValue int64 = 8_250_000
 
 func (s *Server) handleFinancial(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, finance.BuildIncomeStatement(s.ledger(r)))
 }
 
-// ponytail: opening cash hardcoded to demo tenant (Rp80 jt); read from accounts table once Postgres lands.
 func (s *Server) handleCashflow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.BuildCashFlow(s.ledger(r), 80_000_000))
+	writeJSON(w, finance.BuildCashFlow(s.ledger(r), finance.OpeningCash(periodOrDefault(r))))
 }
 
 func (s *Server) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
-	entries := s.ledger(r)
-	is := finance.BuildIncomeStatement(entries)
-	cf := finance.BuildCashFlow(entries, 80_000_000)
-	const inventoryValue int64 = 8_250_000
-	const openingEquity int64 = 88_250_000 // Modal Awal
-	writeJSON(w, finance.BuildBalanceSheet(cf.ClosingBalance, cf.NewReceivables, cf.NewPayables, inventoryValue, openingEquity, is.NetProfit))
+	opening := finance.OpeningCash(periodOrDefault(r))
+	// Modal awal = kas awal + stok awal (tanpa utang awal).
+	writeJSON(w, finance.BuildBalanceSheet(s.ledger(r), opening, inventoryValue, opening+inventoryValue))
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	period := periodOrDefault(r)
 	s.mu.RLock()
-	snap, ok := s.snapshots[periodOrDefault(r)]
+	snap, ok := s.snapshots[period]
 	if !ok {
-		snap = s.snapshots["2026-08"]
+		period = "2026-08"
+		snap = s.snapshots[period]
 	}
+	txs := finance.ForPeriod(s.txs, period)
+	seedN := s.seedTx[period]
 	s.mu.RUnlock()
+
+	entries := finance.ToLedger(txs)
+	finance.ApplyKPIs(&snap, finance.BuildIncomeStatement(entries), finance.BuildCashFlow(entries, finance.OpeningCash(period)), txs, seedN)
 	writeJSON(w, snap)
 }
 
@@ -283,79 +304,89 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		snap = s.snapshots["2026-08"]
 	}
-	ledger := s.ledgers[period]
+	ledger := finance.ToLedger(finance.ForPeriod(s.txs, period))
 	s.mu.RUnlock()
 
 	resp := s.aiEngine.Answer(r.Context(), req, snap, ledger)
 	writeJSON(w, resp)
 }
 
-type addTxReq struct {
-	Title   string `json:"title"`
-	Type    string `json:"type"`
-	Channel string `json:"channel"`
-	Gross   int64  `json:"gross"`
-	FeeBps  int    `json:"fee_bps"`
+// --- Transaksi ---
+
+type txListResp struct {
+	Transactions []finance.Transaction `json:"transactions"`
+	Jenis        []finance.Jenis       `json:"jenis"`
+	CanEdit      bool                  `json:"can_edit"`
 }
 
-func (s *Server) handleAddTransaction(w http.ResponseWriter, r *http.Request) {
-	var req addTxReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Gross <= 0 {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
+	txs := slices.Clone(s.txs)
+	s.mu.RUnlock()
+	writeJSON(w, txListResp{Transactions: txs, Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola")})
+}
+
+// decodeTx membaca dan memvalidasi body; menulis 400 dan mengembalikan false bila gagal.
+func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
+	var t finance.Transaction
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+		http.Error(w, "data transaksi tidak valid", http.StatusBadRequest)
+		return t, false
+	}
+	if err := finance.Validate(&t); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return t, false
+	}
+	return t, true
+}
+
+func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
+	t, ok := decodeTx(w, r)
+	if !ok {
 		return
 	}
-	fee := (req.Gross * int64(req.FeeBps)) / 10000
-	net := req.Gross - fee
-	if req.Type == "EXPENSE" {
-		net = -req.Gross
-	}
-
 	s.mu.Lock()
-	snap := s.snapshots["2026-08"]
-	snap.Tenant.TotalTransactions++
-	newTx := finance.TransactionItem{
-		ID:       "TX-NEW",
-		Date:     "Baru saja",
-		Type:     req.Type,
-		Category: "Operasional",
-		Title:    req.Title,
-		Channel:  req.Channel,
-		Gross:    req.Gross,
-		Fee:      fee,
-		Net:      net,
-	}
-	snap.RecentTransactions = append([]finance.TransactionItem{newTx}, snap.RecentTransactions...)
-	if req.Type == "INCOME" {
-		snap.KPIs.Omzet.Value += req.Gross
-		snap.KPIs.Omzet.Display = finance.FormatJt(snap.KPIs.Omzet.Value)
-		snap.KPIs.LabaBersih.Value += net
-		snap.KPIs.LabaBersih.Display = finance.FormatJt(snap.KPIs.LabaBersih.Value)
-		snap.KPIs.SaldoKas.Value += net
-		snap.KPIs.SaldoKas.Display = finance.FormatJt(snap.KPIs.SaldoKas.Value)
-	} else {
-		snap.KPIs.LabaBersih.Value -= req.Gross
-		snap.KPIs.LabaBersih.Display = finance.FormatJt(snap.KPIs.LabaBersih.Value)
-		snap.KPIs.SaldoKas.Value -= req.Gross
-		snap.KPIs.SaldoKas.Display = finance.FormatJt(snap.KPIs.SaldoKas.Value)
-	}
-
-	cat := finance.CatSales
-	if req.Type == "EXPENSE" {
-		cat = "OPEX"
-	}
-	s.ledgers["2026-08"] = append(s.ledgers["2026-08"], finance.LedgerEntry{
-		Kind:     req.Type,
-		Category: cat,
-		Title:    req.Title,
-		Channel:  req.Channel,
-		Gross:    req.Gross,
-		Fee:      fee,
-		Settled:  true,
-	})
-	s.snapshots["2026-08"] = snap
+	t.ID = s.nextTxID
+	s.nextTxID++
+	s.txs = append(s.txs, t)
 	s.mu.Unlock()
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, t)
+}
 
-	writeJSON(w, snap)
+// txIndex harus dipanggil dengan s.mu terkunci.
+func (s *Server) txIndex(r *http.Request) int {
+	id, _ := strconv.Atoi(r.PathValue("id"))
+	return slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
+}
+
+func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request) {
+	t, ok := decodeTx(w, r)
+	if !ok {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := s.txIndex(r)
+	if i < 0 {
+		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	t.ID = s.txs[i].ID
+	s.txs[i] = t
+	writeJSON(w, t)
+}
+
+func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := s.txIndex(r)
+	if i < 0 {
+		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	s.txs = slices.Delete(s.txs, i, i+1)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleStatic menyajikan build React (web/dist) dengan fallback SPA ke index.html.

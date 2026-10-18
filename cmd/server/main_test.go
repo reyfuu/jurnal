@@ -104,12 +104,12 @@ func TestAddTransactionSyncsLedgerAndReports(t *testing.T) {
 	srv := NewServer()
 
 	// Tambah transaksi penjualan cash Rp5.000.000
-	body := `{"title":"Penjualan Paket Event","type":"INCOME","channel":"Dine-in","gross":5000000,"fee_bps":0}`
+	body := `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000000,"keterangan":"Penjualan Paket Event","channel":"Dine-in","lunas":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	asOwner(t, srv).ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusCreated {
 		t.Fatalf("add tx failed: status %d", rec.Code)
 	}
 

@@ -55,15 +55,11 @@ func TestCashFlow_EmptyLedger(t *testing.T) {
 	}
 }
 
-
 func TestBalanceSheet_Agustus2026(t *testing.T) {
-	entries := finance.SeedLedger("2026-08")
-	is := finance.BuildIncomeStatement(entries)
-	cf := finance.BuildCashFlow(entries, 80_000_000)
 	const inventoryValue int64 = 8_250_000
 	const openingEquity int64 = 88_250_000 // Modal Awal = Aset Awal (80jt kas + 8.25jt stok) - Utang Awal (0)
 
-	bs := finance.BuildBalanceSheet(cf.ClosingBalance, cf.NewReceivables, cf.NewPayables, inventoryValue, openingEquity, is.NetProfit)
+	bs := finance.BuildBalanceSheet(finance.SeedLedger("2026-08"), 80_000_000, inventoryValue, openingEquity)
 
 	if bs.Assets.Cash != 97_000_000 {
 		t.Errorf("Assets.Cash: want 97_000_000, got %d", bs.Assets.Cash)

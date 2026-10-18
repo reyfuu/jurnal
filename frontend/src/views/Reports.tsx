@@ -29,6 +29,7 @@ export function LaporanKeuangan({ r, bs, periodLabel }: { r: IncomeStatement; bs
               <AmountRow key={i} label={l.label} value={formatRp(-l.amount)} color={RED} />
             ))}
             <AmountRow label="Total beban operasional" value={formatRp(-r.opex)} color={RED} />
+            {r.other_income > 0 && <AmountRow label="Pendapatan lain" value={formatRp(r.other_income)} color={GREEN} />}
             <AmountRow label="Laba bersih" value={formatRp(r.net_profit)} color={GREEN} bold />
           </div>
         </div>
@@ -41,12 +42,15 @@ export function LaporanKeuangan({ r, bs, periodLabel }: { r: IncomeStatement; bs
             <AmountRow label="· Saldo Kas & Bank" value={formatRp(bs.assets.cash)} color={BLUE} />
             <AmountRow label="· Piutang Belum Tertagih" value={formatRp(bs.assets.receivables)} color={RED} />
             <AmountRow label="· Nilai Persediaan Stok" value={formatRp(bs.assets.inventory)} />
+            {bs.assets.fixed_assets !== 0 && <AmountRow label="· Alat & Aset Tetap" value={formatRp(bs.assets.fixed_assets)} />}
             <div style={{ height: 8 }} />
             <AmountRow label="KEWAJIBAN (UTANG)" value={formatRp(bs.liabilities.total)} color={RED} bold />
             <AmountRow label="· Utang Usaha / Operasional" value={formatRp(bs.liabilities.payables)} color={RED} />
+            {bs.liabilities.loans !== 0 && <AmountRow label="· Pinjaman" value={formatRp(bs.liabilities.loans)} color={RED} />}
             <div style={{ height: 8 }} />
             <AmountRow label="MODAL (EKUITAS)" value={formatRp(bs.equity.total)} color={GREEN} bold />
             <AmountRow label="· Modal Awal Disetor" value={formatRp(bs.equity.opening_capital)} />
+            {bs.equity.added_capital !== 0 && <AmountRow label="· Tambahan Modal − Ambil Pribadi" value={formatRp(bs.equity.added_capital)} />}
             <AmountRow label="· Laba Bersih Periode Berjalan" value={formatRp(bs.equity.current_profit)} color={GREEN} />
             <AmountRow
               label="TOTAL PASIVA (Utang + Modal)"
@@ -93,6 +97,9 @@ export function ArusKas({ c, netProfit }: { c: CashFlow; netProfit: number }) {
           <AmountRow label="Laba Bersih (Laporan Laba Rugi)" value={signed(netProfit)} color={GREEN} />
           <AmountRow label="Dikurangi: penjualan tempo yang belum dibayar pelanggan (piutang baru)" value={signed(-c.new_receivables)} color={RED} />
           <AmountRow label="Ditambah: biaya yang belum dibayar (utang baru)" value={signed(c.new_payables)} color={BLUE} />
+          {c.non_operating !== 0 && (
+            <AmountRow label="Modal & pinjaman masuk, dikurangi beli aset, cicilan & ambil pribadi" value={signed(c.non_operating)} color={BLUE} />
+          )}
           <AmountRow
             label="Kenaikan Kas Riil di Rekening Bank & Tunai"
             value={signed(c.net_cash)}
