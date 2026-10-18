@@ -49,6 +49,56 @@ type CashFlow struct {
 	NewPayables    int64 `json:"new_payables"`
 }
 
+type BalanceSheetAssets struct {
+	Cash        int64 `json:"cash"`
+	Receivables int64 `json:"receivables"`
+	Inventory   int64 `json:"inventory"`
+	Total       int64 `json:"total"`
+}
+
+type BalanceSheetLiabilities struct {
+	Payables int64 `json:"payables"`
+	Total    int64 `json:"total"`
+}
+
+type BalanceSheetEquity struct {
+	OpeningCapital int64 `json:"opening_capital"`
+	CurrentProfit  int64 `json:"current_profit"`
+	Total          int64 `json:"total"`
+}
+
+type BalanceSheet struct {
+	Assets      BalanceSheetAssets      `json:"assets"`
+	Liabilities BalanceSheetLiabilities `json:"liabilities"`
+	Equity      BalanceSheetEquity      `json:"equity"`
+	IsBalanced  bool                    `json:"is_balanced"`
+}
+
+func BuildBalanceSheet(cash, receivables, payables, inventory, openingEquity, currentProfit int64) BalanceSheet {
+	totAssets := cash + receivables + inventory
+	totLiabilities := payables
+	totEquity := openingEquity + currentProfit
+	return BalanceSheet{
+		Assets: BalanceSheetAssets{
+			Cash:        cash,
+			Receivables: receivables,
+			Inventory:   inventory,
+			Total:       totAssets,
+		},
+		Liabilities: BalanceSheetLiabilities{
+			Payables: payables,
+			Total:    totLiabilities,
+		},
+		Equity: BalanceSheetEquity{
+			OpeningCapital: openingEquity,
+			CurrentProfit:  currentProfit,
+			Total:          totEquity,
+		},
+		IsBalanced: totAssets == (totLiabilities + totEquity),
+	}
+}
+
+
 func BuildIncomeStatement(entries []LedgerEntry) IncomeStatement {
 	var is IncomeStatement
 	for _, e := range entries {

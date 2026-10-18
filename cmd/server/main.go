@@ -16,6 +16,7 @@ import (
 type Server struct {
 	mu        sync.RWMutex
 	snapshots map[string]finance.DashboardSnapshot
+	ledgers   map[string][]finance.LedgerEntry
 	mux       *http.ServeMux
 }
 
@@ -24,6 +25,10 @@ func NewServer() *Server {
 		snapshots: map[string]finance.DashboardSnapshot{
 			"2026-08": finance.SeedKedaiKopiSenja("2026-08"),
 			"2026-07": finance.SeedKedaiKopiSenja("2026-07"),
+		},
+		ledgers: map[string][]finance.LedgerEntry{
+			"2026-08": finance.SeedLedger("2026-08"),
+			"2026-07": finance.SeedLedger("2026-07"),
 		},
 		mux: http.NewServeMux(),
 	}
@@ -39,6 +44,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/dashboard", s.handleDashboard)
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.handleFinancial)
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.handleCashflow)
+	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.handleBalanceSheet)
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.handleSimulatePrice)
 	s.mux.HandleFunc("POST /api/v1/transactions", s.handleAddTransaction)
 	s.mux.HandleFunc("GET /", s.handleStatic)
@@ -57,13 +63,37 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 func (s *Server) handleFinancial(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.BuildIncomeStatement(finance.SeedLedger(periodOrDefault(r))))
+	period := periodOrDefault(r)
+	s.mu.RLock()
+	entries := s.ledgers[period]
+	s.mu.RUnlock()
+	writeJSON(w, finance.BuildIncomeStatement(entries))
 }
 
 // ponytail: opening cash hardcoded to demo tenant (Rp80 jt); read from accounts table once Postgres lands.
 func (s *Server) handleCashflow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.BuildCashFlow(finance.SeedLedger(periodOrDefault(r)), 80_000_000))
+	period := periodOrDefault(r)
+	s.mu.RLock()
+	entries := s.ledgers[period]
+	s.mu.RUnlock()
+	writeJSON(w, finance.BuildCashFlow(entries, 80_000_000))
 }
+
+func (s *Server) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
+	period := periodOrDefault(r)
+	s.mu.RLock()
+	entries := s.ledgers[period]
+	s.mu.RUnlock()
+
+	is := finance.BuildIncomeStatement(entries)
+	cf := finance.BuildCashFlow(entries, 80_000_000)
+	const inventoryValue int64 = 8_250_000
+	const openingEquity int64 = 88_250_000 // Modal Awal
+
+	bs := finance.BuildBalanceSheet(cf.ClosingBalance, cf.NewReceivables, cf.NewPayables, inventoryValue, openingEquity, is.NetProfit)
+	writeJSON(w, bs)
+}
+
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
@@ -147,8 +177,24 @@ func (s *Server) handleAddTransaction(w http.ResponseWriter, r *http.Request) {
 		snap.KPIs.SaldoKas.Value -= req.Gross
 		snap.KPIs.SaldoKas.Display = finance.FormatJt(snap.KPIs.SaldoKas.Value)
 	}
+
+	cat := finance.CatSales
+	if req.Type == "EXPENSE" {
+		cat = "OPEX"
+	}
+	s.ledgers["2026-08"] = append(s.ledgers["2026-08"], finance.LedgerEntry{
+		Kind:     req.Type,
+		Category: cat,
+		Title:    req.Title,
+		Channel:  req.Channel,
+		Gross:    req.Gross,
+		Fee:      fee,
+		Settled:  true,
+	})
 	s.snapshots["2026-08"] = snap
 	s.mu.Unlock()
+
+
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(snap)

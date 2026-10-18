@@ -83,3 +83,44 @@ func TestReportsEndpoints(t *testing.T) {
 		t.Fatalf("ClosingBalance: want 97_000_000, got %d", cf.ClosingBalance)
 	}
 }
+
+func TestBalanceSheetEndpoint(t *testing.T) {
+	srv := NewServer()
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/balance-sheet?period=2026-08", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("balance-sheet: status %d", rec.Code)
+	}
+	var bs finance.BalanceSheet
+	if err := json.NewDecoder(rec.Body).Decode(&bs); err != nil {
+		t.Fatal(err)
+	}
+	if !bs.IsBalanced {
+		t.Fatalf("expected balance sheet to balance: %+v", bs)
+	}
+}
+
+func TestAddTransactionSyncsLedgerAndReports(t *testing.T) {
+	srv := NewServer()
+
+	// Tambah transaksi penjualan cash Rp5.000.000
+	body := `{"title":"Penjualan Paket Event","type":"INCOME","channel":"Dine-in","gross":5000000,"fee_bps":0}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("add tx failed: status %d", rec.Code)
+	}
+
+	// Cek Laporan Keuangan apakah omzet naik jadi 97.000.000 (92jt + 5jt)
+	recFin := httptest.NewRecorder()
+	srv.ServeHTTP(recFin, httptest.NewRequest(http.MethodGet, "/api/v1/reports/financial?period=2026-08", nil))
+	var is finance.IncomeStatement
+	if err := json.NewDecoder(recFin.Body).Decode(&is); err != nil {
+		t.Fatal(err)
+	}
+	if is.Omzet != 97_000_000 {
+		t.Fatalf("expected updated omzet 97_000_000, got %d", is.Omzet)
+	}
+}

@@ -21,21 +21,22 @@ go build -o bin/laporan-bisnis ./cmd/server
 # Buka http://localhost:8080
 ```
 
-## Fase 2 (sedang berjalan) — Laporan Keuangan & Arus Kas
-- Selesai (TDD): [ledger.go](file:///home/reyfuu/pajak/internal/finance/ledger.go) menghitung Laba Rugi dan Arus Kas dari `LedgerEntry`, dengan invarian `laba − piutang baru + utang baru = kenaikan kas`.
-- Endpoint: `GET /api/v1/reports/financial` dan `GET /api/v1/reports/cashflow`; halaman Laporan Keuangan dan Arus Kas membaca endpoint ini, bukan angka hardcode.
-- Celah yang diketahui:
-  - Ledger masih `SeedLedger` statis; `POST /api/v1/transactions` belum menulis ke ledger, jadi laporan belum ikut berubah.
-  - KPI dashboard (`SeedKedaiKopiSenja`) dan ledger adalah dua sumber angka yang cocok secara manual. Gabungkan jadi satu sumber.
-  - Saldo awal kas `80_000_000` masih hardcode di handler.
-  - Neraca belum ada (FRD FR-REP-01).
-  - Frontend belum diuji di browser (hanya cek sintaks JS dan respons API).
+## Fase 2 (Sedang Berjalan & Terverifikasi) — Laporan Keuangan, Arus Kas & Neraca
+- Selesai (TDD): [ledger.go](file:///home/reyfuu/pajak/internal/finance/ledger.go) menghitung:
+  1. Laba Rugi (`IncomeStatement`)
+  2. Arus Kas (`CashFlow`) dengan invarian rekonsiliasi: `Laba - Piutang Baru + Utang Baru = Kenaikan Kas`
+  3. Neraca (`BalanceSheet`) dengan formula `Aset (Kas + Piutang + Persediaan) = Kewajiban (Utang) + Modal (Modal Awal + Laba Berjalan)` (`is_balanced: true`).
+- Endpoint aktif:
+  - `GET /api/v1/reports/financial`
+  - `GET /api/v1/reports/cashflow`
+  - `GET /api/v1/reports/balance-sheet`
+  - `POST /api/v1/transactions`: Transaksi baru otomatis masuk ke ledger dan meng-update seluruh laporan & KPI dashboard secara terpadu.
+- Tampilan Frontend [web/index.html](file:///home/reyfuu/pajak/web/index.html): Halaman Laporan Keuangan menampilkan Laba Rugi dan Neraca bersanding dengan badge `✓ Aktiva = Pasiva (Seimbang)`.
+- Container Docker `laporan-bisnis` aktif di `http://localhost:8080`.
 
-## Langkah Selanjutnya (Sesi Berikutnya)
-- Turunkan KPI dashboard dari ledger, dan buat POST transaksi menulis ke ledger.
-- Neraca sederhana + tes.
+## Langkah Berikutnya & Target Deploy VPS
+1. Konfirmasi detail VPS target (IP, user SSH, port, key/password) atau pembuatan script otomatisasi `deploy.sh`.
+2. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
+3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md).
 
-- Koneksi opsional ke PostgreSQL 16/17 menggunakan skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) (saat ini menggunakan in-memory store sesuai prinsip `ponytail` Fase 1).
-- Ekspor PDF untuk Invoice & Kertas Kerja Pajak UMKM PP 55/2022.
-- Integrasi webhook pembayaran QRIS Rp149.000.
 

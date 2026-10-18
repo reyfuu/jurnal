@@ -55,3 +55,30 @@ func TestCashFlow_EmptyLedger(t *testing.T) {
 	}
 }
 
+
+func TestBalanceSheet_Agustus2026(t *testing.T) {
+	entries := finance.SeedLedger("2026-08")
+	is := finance.BuildIncomeStatement(entries)
+	cf := finance.BuildCashFlow(entries, 80_000_000)
+	const inventoryValue int64 = 8_250_000
+	const openingEquity int64 = 88_250_000 // Modal Awal = Aset Awal (80jt kas + 8.25jt stok) - Utang Awal (0)
+
+	bs := finance.BuildBalanceSheet(cf.ClosingBalance, cf.NewReceivables, cf.NewPayables, inventoryValue, openingEquity, is.NetProfit)
+
+	if bs.Assets.Cash != 97_000_000 {
+		t.Errorf("Assets.Cash: want 97_000_000, got %d", bs.Assets.Cash)
+	}
+	if bs.Assets.Receivables != 11_000_000 {
+		t.Errorf("Assets.Receivables: want 11_000_000, got %d", bs.Assets.Receivables)
+	}
+	if bs.Assets.Total != 97_000_000+11_000_000+8_250_000 {
+		t.Errorf("Assets.Total: want %d, got %d", 97_000_000+11_000_000+8_250_000, bs.Assets.Total)
+	}
+	if bs.Liabilities.Payables != 3_000_000 {
+		t.Errorf("Liabilities.Payables: want 3_000_000, got %d", bs.Liabilities.Payables)
+	}
+	if !bs.IsBalanced {
+		t.Errorf("Balance sheet not balanced: Total Assets %d != Liabilities (%d) + Equity (%d) [Sum=%d]",
+			bs.Assets.Total, bs.Liabilities.Total, bs.Equity.Total, bs.Liabilities.Total+bs.Equity.Total)
+	}
+}

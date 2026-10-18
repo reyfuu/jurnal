@@ -1198,15 +1198,26 @@
       const gross = parseInt(document.getElementById('tx-gross').value || '0', 10);
       if (!title || gross <= 0) return;
 
-      appState = await fetch('/api/v1/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, type, channel: 'Dine-in / B2B', gross, fee_bps: 0 })
-      }).then(r => r.json());
+      const [dash, fin, cash, bs] = await Promise.all([
+        fetch('/api/v1/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, type, channel: 'Dine-in / B2B', gross, fee_bps: 0 })
+        }).then(r => r.json()),
+        fetch('/api/v1/reports/financial?period=2026-08').then(r => r.json()),
+        fetch('/api/v1/reports/cashflow?period=2026-08').then(r => r.json()),
+        fetch('/api/v1/reports/balance-sheet?period=2026-08').then(r => r.json()),
+      ]);
+
+      appState = dash;
+      appState.report = fin;
+      appState.cash = cash;
+      appState.balanceSheet = bs;
 
       updateSidebarTenant();
       renderCurrentView();
     }
+
 
     function renderPiutangUtang() {
       return `
@@ -1289,25 +1300,58 @@
 
     function renderLaporanKeuangan() {
       const r = appState.report;
+      const bs = appState.balanceSheet || { assets: {}, liabilities: {}, equity: {} };
       const row = (label, amt, color = 'var(--text-primary)', bold = false) =>
         `<div class="list-row"><span>${bold ? '<strong>' + label + '</strong>' : label}</span><strong style="color:${color};">${formatRpFull(amt)}</strong></div>`;
       return `
         <div class="workspace-header">
           <div>
-            <h1 class="workspace-title">Laporan Laba Rugi</h1>
-            <p class="workspace-subtitle">${appState.period_label} · Margin laba bersih ${(r.margin_bps / 100).toFixed(1).replace('.', ',')}%</p>
+            <h1 class="workspace-title">Laporan Keuangan</h1>
+            <p class="workspace-subtitle">${appState.period_label} · Laba Rugi &amp; Neraca Sederhana</p>
           </div>
+          <span class="pill-status ${bs.is_balanced ? 'pill-green' : 'pill-amber'}">
+            ${bs.is_balanced ? '✓ Aktiva = Pasiva (Seimbang)' : 'Memverifikasi Keseimbangan'}
+          </span>
         </div>
-        <div class="card" style="padding:20px;">
-          <div class="list-rows tabular">
-            ${row('Omzet (penjualan kotor)', r.omzet, '#facc15', true)}
-            ${row('Potongan channel / aplikasi', -r.channel_fees, '#fb7185')}
-            ${row('Penjualan bersih', r.net_sales, undefined, true)}
-            ${row('HPP (bahan baku)', -r.cogs, '#fb7185')}
-            ${row('Laba kotor', r.gross_profit, undefined, true)}
-            ${(r.opex_lines || []).map(l => row(l.label, -l.amount, '#fb7185')).join('')}
-            ${row('Total beban operasional', -r.opex, '#fb7185')}
-            ${row('Laba bersih', r.net_profit, '#10b981', true)}
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <!-- Laba Rugi -->
+          <div class="card" style="padding:20px;">
+            <div class="chart-title">Laporan Laba Rugi</div>
+            <div class="chart-subtitle" style="margin-bottom:12px;">Margin laba bersih ${(r.margin_bps / 100).toFixed(1).replace('.', ',')}%</div>
+            <div class="list-rows tabular">
+              ${row('Omzet (penjualan kotor)', r.omzet, '#facc15', true)}
+              ${row('Potongan channel / aplikasi', -r.channel_fees, '#fb7185')}
+              ${row('Penjualan bersih', r.net_sales, undefined, true)}
+              ${row('HPP (bahan baku)', -r.cogs, '#fb7185')}
+              ${row('Laba kotor', r.gross_profit, undefined, true)}
+              ${(r.opex_lines || []).map(l => row(l.label, -l.amount, '#fb7185')).join('')}
+              ${row('Total beban operasional', -r.opex, '#fb7185')}
+              ${row('Laba bersih', r.net_profit, '#10b981', true)}
+            </div>
+          </div>
+
+          <!-- Neraca (Balance Sheet) -->
+          <div class="card" style="padding:20px;">
+            <div class="chart-title">Neraca (Posisi Keuangan)</div>
+            <div class="chart-subtitle" style="margin-bottom:12px;">Posisi Kas, Piutang, Stok vs Utang &amp; Modal</div>
+            <div class="list-rows tabular">
+              ${row('ASET (AKTIVA)', bs.assets.total || 0, '#38bdf8', true)}
+              ${row('· Saldo Kas & Bank', bs.assets.cash || 0, '#38bdf8')}
+              ${row('· Piutang Belum Tertagih', bs.assets.receivables || 0, '#fb7185')}
+              ${row('· Nilai Persediaan Stok', bs.assets.inventory || 0)}
+              <div style="height:8px;"></div>
+              ${row('KEWAJIBAN (UTANG)', bs.liabilities.total || 0, '#fb7185', true)}
+              ${row('· Utang Usaha / Operasional', bs.liabilities.payables || 0, '#fb7185')}
+              <div style="height:8px;"></div>
+              ${row('MODAL (EKUITAS)', bs.equity.total || 0, '#10b981', true)}
+              ${row('· Modal Awal Disetor', bs.equity.opening_capital || 0)}
+              ${row('· Laba Bersih Periode Berjalan', bs.equity.current_profit || 0, '#10b981')}
+              <div class="list-row" style="border:1px solid rgba(16,185,129,0.3); margin-top:6px;">
+                <span><strong>TOTAL PASIVA (Utang + Modal)</strong></span>
+                <strong style="color:#10b981;">${formatRpFull((bs.liabilities.total || 0) + (bs.equity.total || 0))}</strong>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -1318,70 +1362,6 @@
       return 'Rp' + (Number.isInteger(jt) ? jt : jt.toFixed(1).replace('.', ',')) + ' jt';
     }
 
-      return `
-        <div class="workspace-header">
-          <div>
-            <h1 class="workspace-title">Laporan Arus Kas &amp; Rekonsiliasi</h1>
-            <p class="workspace-subtitle">Kenapa Laba Bersih ${FormatJt(p)} tapi kenaikan kas hanya ${FormatJt(c.net_cash)}? Ini jembatan penjelasannya.</p>
-          </div>
-        </div>
-        <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
-          <div class="card">
-            <div class="kpi-label">Saldo Kas Awal Bulan</div>
-            <div class="kpi-value tabular">${FormatJt(c.opening_balance)}</div>
-          </div>
-          <div class="card">
-            <div class="kpi-label">Arus Kas Bersih Bulan Ini</div>
-            <div class="kpi-value tabular" style="color:#10b981;">${c.net_cash >= 0 ? '+' : '-'}${FormatJt(Math.abs(c.net_cash))}</div>
-            <div class="kpi-meta-row"><span>Masuk ${formatRpFull(c.cash_in)} · Keluar ${formatRpFull(c.cash_out)}</span></div>
-          </div>
-          <div class="card">
-            <div class="kpi-label">Saldo Kas Akhir Bulan</div>
-            <div class="kpi-value tabular" style="color:#38bdf8;">${FormatJt(c.closing_balance)}</div>
-          </div>
-        </div>
-        <div class="card" style="padding:20px;">
-          <div class="chart-title">Rekonsiliasi Laba Bersih vs Kenaikan Kas</div>
-          <div class="list-rows tabular">
-            ${row('Laba Bersih (Laporan Laba Rugi)', p, '#10b981')}
-            ${row('Dikurangi: penjualan tempo yang belum dibayar pelanggan (piutang baru)', -c.new_receivables, '#fb7185')}
-            ${row('Ditambah: biaya yang belum dibayar (utang baru)', c.new_payables, '#38bdf8')}
-            ${row('<strong>Kenaikan Kas Riil di Rekening Bank &amp; Tunai</strong>', c.net_cash, '#38bdf8', 'border:1px solid rgba(56,189,248,0.3);')}
-          </div>
-        </div>
-      `;
-    }
-
-    function renderLaporanKeuangan() {
-      const r = appState.report;
-      const row = (label, amt, color = 'var(--text-primary)', bold = false) =>
-        `<div class="list-row"><span>${bold ? '<strong>' + label + '</strong>' : label}</span><strong style="color:${color};">${formatRpFull(amt)}</strong></div>`;
-      return `
-        <div class="workspace-header">
-          <div>
-            <h1 class="workspace-title">Laporan Laba Rugi</h1>
-            <p class="workspace-subtitle">${appState.period_label} · Margin laba bersih ${(r.margin_bps / 100).toFixed(1).replace('.', ',')}%</p>
-          </div>
-        </div>
-        <div class="card" style="padding:20px;">
-          <div class="list-rows tabular">
-            ${row('Omzet (penjualan kotor)', r.omzet, '#facc15', true)}
-            ${row('Potongan channel / aplikasi', -r.channel_fees, '#fb7185')}
-            ${row('Penjualan bersih', r.net_sales, undefined, true)}
-            ${row('HPP (bahan baku)', -r.cogs, '#fb7185')}
-            ${row('Laba kotor', r.gross_profit, undefined, true)}
-            ${(r.opex_lines || []).map(l => row(l.label, -l.amount, '#fb7185')).join('')}
-            ${row('Total beban operasional', -r.opex, '#fb7185')}
-            ${row('Laba bersih', r.net_profit, '#10b981', true)}
-          </div>
-        </div>
-      `;
-    }
-
-    function FormatJt(rp) {
-      const jt = rp / 1_000_000;
-      return 'Rp' + (Number.isInteger(jt) ? jt : jt.toFixed(1).replace('.', ',')) + ' jt';
-    }
 
     function renderGenericModule(title, subtitle) {
       return `
@@ -1469,17 +1449,20 @@
     }
 
     async function boot() {
-      const [dash, fin, cash] = await Promise.all([
+      const [dash, fin, cash, bs] = await Promise.all([
         fetch('/api/v1/dashboard?period=2026-08').then(r => r.json()),
         fetch('/api/v1/reports/financial?period=2026-08').then(r => r.json()),
         fetch('/api/v1/reports/cashflow?period=2026-08').then(r => r.json()),
+        fetch('/api/v1/reports/balance-sheet?period=2026-08').then(r => r.json()),
       ]);
       appState = dash;
       appState.report = fin;
       appState.cash = cash;
+      appState.balanceSheet = bs;
       updateSidebarTenant();
       renderCurrentView();
     }
+
 
     boot();
   </script>
