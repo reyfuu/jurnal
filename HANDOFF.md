@@ -47,15 +47,20 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
   - `POST /api/v1/transactions`: Transaksi baru otomatis masuk ke ledger dan meng-update seluruh laporan & KPI dashboard secara terpadu.
 - Halaman Laporan Keuangan menampilkan Laba Rugi dan Neraca bersanding dengan badge `✓ Aktiva = Pasiva (Seimbang)`.
 
-## Status Deploy VPS & Produksi (Selesai & Live)
+## Status Deploy VPS & Produksi (Selesai & Live — Fase 3 Aktif)
 - **VPS**: `31.97.66.119` (hostname: `hermes`)
 - **Domain**: [https://pajak.aipreneur.co.id](https://pajak.aipreneur.co.id)
+- **Aplikasi Aktif**: Single Page Application (React 19 + Vite + Tailwind/shadcn tokens) dengan sistem autentikasi RBAC (Owner, Admin Keuangan, Kasir) dan backend Go.
+- **Akun Demo**:
+  - Owner: `owner@kedaikopisenja.id` (password: `senja2026`)
+  - Admin: `admin@kedaikopisenja.id` (password: `senja2026`)
+  - Kasir: `kasir@kedaikopisenja.id` (password: `senja2026`)
 - **Container**: Docker `laporan-bisnis` aktif di port `8085` (`0.0.0.0:8085->8080/tcp`).
-- **Nginx Reverse Proxy**: `/etc/nginx/sites-available/jurnal-pajak` dikonfigurasi ke `http://127.0.0.1:8085` dengan sertifikat SSL Let's Encrypt aktif. Backup config lama tersimpan di `/etc/nginx/sites-available/jurnal-pajak.bak.laravel`.
+- **Nginx Reverse Proxy**: `/etc/nginx/sites-available/jurnal-pajak` dikonfigurasi ke `http://127.0.0.1:8085` dengan sertifikat SSL Let's Encrypt aktif.
 - **9Router**: Diperbarui ke versi terbaru `v0.5.104` di server hermes (layanan systemd `9router.service` aktif).
 - **GitHub Repository**: [https://github.com/reyfuu/jurnal.git](https://github.com/reyfuu/jurnal.git)
   - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
-  - Branch `main`: Kode baru Go + React Vite (Laporan Bisnis).
+  - Branch `main`: Kode baru Go + React Vite + Auth RBAC (Laporan Bisnis).
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 1. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
