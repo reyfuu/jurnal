@@ -253,3 +253,21 @@ export interface AIChatResponse {
 export const askAIChat = (query: string, period = '2026-08') =>
   api<AIChatResponse>('/ai/chat', { method: 'POST', body: { query, period } })
 
+
+export interface ImportResult {
+  valid: number
+  errors: { baris: number; pesan: string }[] | null
+  sample: Tx[] | null
+  imported: number
+}
+
+/** Unggah .xlsx; commit=false hanya pratinjau (tidak menyimpan). */
+export async function importTransactions(file: File, commit: boolean): Promise<ImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/v1/transactions/import' + (commit ? '?commit=1' : ''), { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+export const TEMPLATE_URL = '/api/v1/transactions/template'

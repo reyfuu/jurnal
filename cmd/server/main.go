@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"pajak/internal/ai"
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/xlsx"
 )
 
 // ponytail: stdlib net/http + RWMutex in-memory state handles 100 UMKM users with <20MB RAM and sub-ms latency.
@@ -72,6 +74,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.handleListTransactions))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.guard("transaksi", s.handleCreateTransaction))
+	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
+	s.mux.HandleFunc("POST /api/v1/transactions/import", s.guard("transaksi-kelola", s.handleImportTransactions))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleUpdateTransaction))
 	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleDeleteTransaction))
 
@@ -387,6 +391,56 @@ func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	s.txs = slices.Delete(s.txs, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleTransactionsTemplate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="template-transaksi.xlsx"`)
+	_ = xlsx.Write(w, []xlsx.Sheet{
+		{Name: "Transaksi", Rows: finance.TemplateRows()},
+		{Name: "Daftar Jenis", Rows: finance.JenisSheetRows()},
+	})
+}
+
+type importResp struct {
+	Valid    int                   `json:"valid"`
+	Errors   []finance.ImportError `json:"errors"`
+	Sample   []finance.Transaction `json:"sample"`
+	Imported int                   `json:"imported"`
+}
+
+// handleImportTransactions: tanpa ?commit=1 hanya pratinjau (tidak ada yang disimpan).
+func (s *Server) handleImportTransactions(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	f, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "unggah berkas .xlsx (maks 5 MB) di field file", http.StatusBadRequest)
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
+		return
+	}
+	rows, err := xlsx.Read(data)
+	if err != nil {
+		http.Error(w, err.Error()+"; simpan ulang sebagai .xlsx atau pakai template", http.StatusBadRequest)
+		return
+	}
+	txs, errs := finance.ParseImport(rows)
+	res := importResp{Valid: len(txs), Errors: errs, Sample: txs[:min(5, len(txs))]}
+	if r.URL.Query().Get("commit") == "1" {
+		s.mu.Lock()
+		for _, t := range txs {
+			t.ID = s.nextTxID
+			s.nextTxID++
+			s.txs = append(s.txs, t)
+		}
+		s.mu.Unlock()
+		res.Imported = len(txs)
+	}
+	writeJSON(w, res)
 }
 
 // handleStatic menyajikan build React (web/dist) dengan fallback SPA ke index.html.

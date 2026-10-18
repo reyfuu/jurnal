@@ -59,7 +59,9 @@ var jenisAlias = map[string][]string{
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
-func norm(s string) string { return strings.TrimSpace(nonAlnum.ReplaceAllString(strings.ToLower(s), " ")) }
+func norm(s string) string {
+	return strings.TrimSpace(nonAlnum.ReplaceAllString(strings.ToLower(s), " "))
+}
 
 func findJenis(s string) (string, bool) {
 	q := norm(s)

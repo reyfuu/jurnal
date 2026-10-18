@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"pajak/internal/finance"
+	"pajak/internal/xlsx"
 )
 
 type txList struct {
@@ -105,5 +110,92 @@ func TestTransactions_KasirCanOnlyCreate(t *testing.T) {
 	}
 	if rec := do(srv, kasir, http.MethodDelete, "/api/v1/transactions/"+id, ""); rec.Code != http.StatusForbidden {
 		t.Fatalf("kasir delete: want 403, got %d", rec.Code)
+	}
+}
+
+func xlsxUpload(t *testing.T, rows [][]string) (*bytes.Buffer, string) {
+	t.Helper()
+	var file bytes.Buffer
+	if err := xlsx.Write(&file, []xlsx.Sheet{{Name: "Transaksi", Rows: rows}}); err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", "transaksi.xlsx")
+	_, _ = fw.Write(file.Bytes())
+	_ = mw.Close()
+	return &body, mw.FormDataContentType()
+}
+
+func upload(srv *Server, c *http.Cookie, url string, body *bytes.Buffer, ctype string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, url, body)
+	req.Header.Set("Content-Type", ctype)
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestTransactionsTemplate(t *testing.T) {
+	srv := NewServer()
+	kasir := login(t, srv, "kasir@kedaikopisenja.id")
+	rec := do(srv, kasir, http.MethodGet, "/api/v1/transactions/template", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Disposition"), ".xlsx") {
+		t.Fatalf("template: %d %v", rec.Code, rec.Header())
+	}
+	rows, err := xlsx.Read(rec.Body.Bytes())
+	if err != nil || len(rows) < 2 || rows[0][0] != "Tanggal" {
+		t.Fatalf("template content: %v %q", err, rows)
+	}
+}
+
+func TestTransactionsImport_PreviewThenCommit(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	base := omzetAug(t, srv, owner)
+	rows := [][]string{
+		{"Tanggal", "Jenis", "Nominal", "Keterangan"},
+		{"2026-08-29", "Penjualan", "3.000.000", "Impor rekap kasir"},
+		{"2026-08-29", "Sedekah", "100000", "jenis salah"},
+	}
+
+	body, ctype := xlsxUpload(t, rows)
+	rec := upload(srv, owner, "/api/v1/transactions/import", body, ctype)
+	var res importResp
+	_ = json.NewDecoder(rec.Body).Decode(&res)
+	if rec.Code != http.StatusOK || res.Valid != 1 || len(res.Errors) != 1 || res.Errors[0].Baris != 3 || res.Imported != 0 {
+		t.Fatalf("preview: %d %+v", rec.Code, res)
+	}
+	if omzetAug(t, srv, owner) != base {
+		t.Fatal("preview must not save anything")
+	}
+
+	body, ctype = xlsxUpload(t, rows)
+	rec = upload(srv, owner, "/api/v1/transactions/import?commit=1", body, ctype)
+	_ = json.NewDecoder(rec.Body).Decode(&res)
+	if rec.Code != http.StatusOK || res.Imported != 1 {
+		t.Fatalf("commit: %d %+v", rec.Code, res)
+	}
+	if got := omzetAug(t, srv, owner); got != base+3_000_000 {
+		t.Fatalf("omzet after import: want %d, got %d", base+3_000_000, got)
+	}
+}
+
+func TestTransactionsImport_RejectsBadFileAndKasir(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", "data.csv")
+	_, _ = fw.Write([]byte("tanggal,jenis\n"))
+	_ = mw.Close()
+	if rec := upload(srv, owner, "/api/v1/transactions/import", &body, mw.FormDataContentType()); rec.Code != http.StatusBadRequest {
+		t.Fatalf("non-xlsx: want 400, got %d", rec.Code)
+	}
+
+	kasir := login(t, srv, "kasir@kedaikopisenja.id")
+	b, ct := xlsxUpload(t, finance.TemplateRows())
+	if rec := upload(srv, kasir, "/api/v1/transactions/import?commit=1", b, ct); rec.Code != http.StatusForbidden {
+		t.Fatalf("kasir import: want 403, got %d", rec.Code)
 	}
 }

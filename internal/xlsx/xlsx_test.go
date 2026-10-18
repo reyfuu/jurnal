@@ -41,9 +41,9 @@ func TestWriteThenRead_FirstSheet(t *testing.T) {
 // Berkas dari Excel/LibreOffice memakai sharedStrings, sel angka, rich text, dan kolom yang dilompati.
 func TestRead_SharedStringsAndGaps(t *testing.T) {
 	files := map[string]string{
-		"xl/workbook.xml": `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId7"/></sheets></workbook>`,
+		"xl/workbook.xml":            `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId7"/></sheets></workbook>`,
 		"xl/_rels/workbook.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/data.xml"/></Relationships>`,
-		"xl/sharedStrings.xml": `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Tanggal</t></si><si><r><t>Nomi</t></r><r><t>nal</t></r></si></sst>`,
+		"xl/sharedStrings.xml":       `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Tanggal</t></si><si><r><t>Nomi</t></r><r><t>nal</t></r></si></sst>`,
 		"xl/worksheets/data.xml": `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
 			<row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="s"><v>1</v></c></row>
 			<row r="3"><c r="A3"><v>46234</v></c><c r="C3"><v>1500000.5</v></c><c r="D3" t="b"><v>1</v></c></row>

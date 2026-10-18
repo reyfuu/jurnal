@@ -1,4 +1,4 @@
-import { Info, Pencil, Plus } from 'lucide-react'
+import { FileSpreadsheet, Info, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
   createTransaction, deleteTransaction, listTransactions, updateTransaction, type JenisInfo, type Tx, type TxInput,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { ImportDialog } from '@/views/ImportDialog'
 import { channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, summarize } from '@/lib/transaksi'
 
 const PAGE = 100
@@ -30,6 +31,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState<Editing>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   const refresh = useCallback(async () => {
     const res = await listTransactions()
@@ -95,6 +97,11 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
         <button className="btn-cta inline-flex items-center gap-1.5" onClick={openNew}>
           <Plus size={16} strokeWidth={2.4} /> Catat transaksi
         </button>
+        {canEdit && (
+          <Button variant="outline" className="h-10 rounded-full" onClick={() => setImporting(true)}>
+            <FileSpreadsheet /> Impor Excel
+          </Button>
+        )}
         <Input
           className="tx-search"
           aria-label="Cari transaksi"
@@ -320,6 +327,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
           )}
         </DialogContent>
       </Dialog>
+
+      <ImportDialog open={importing} onOpenChange={setImporting} onImported={() => Promise.all([refresh(), onChanged()]).then(() => {})} />
     </>
   )
 }

@@ -11,7 +11,7 @@ func TestParseImport(t *testing.T) {
 		{"Data transaksi Kedai Kopi Senja"}, // judul di atas header boleh
 		{"No", "Tanggal", "Jenis Transaksi", "Nominal (Rp)", "Keterangan", "Produk / Bahan", "Jumlah", "Channel", "Pelanggan / Supplier", "Status Bayar", "Tanggal Lunas"},
 		{"1", "2026-08-01", "Penjualan", "Rp 1.250.000", "Rekap kasir", "Es Kopi Susu", "50", "Dine-in", "", "Lunas", ""},
-		{"2", "46236", "gaji", "12500000", "Gaji barista"},                                         // tanggal seri Excel, alias jenis
+		{"2", "46236", "gaji", "12500000", "Gaji barista"},                                             // tanggal seri Excel, alias jenis
 		{"3", "03/08/2026", "kulakan", "2.000.000,00", "", "Susu", "", "", "Toko Susu", "belum lunas"}, // dd/mm/yyyy, alias, desimal
 		{},                                       // baris kosong dilewati
 		{"5", "2026-08-05", "Sedekah", "100000"}, // jenis tidak dikenal
