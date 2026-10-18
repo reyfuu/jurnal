@@ -15,11 +15,25 @@
 
 ## Cara Menjalankan Aplikasi
 ```bash
-go test -v ./...
+# Backend (Go ≥ 1.24, go.mod memakai crypto/pbkdf2 stdlib)
+go test ./...
+# Frontend (Vite + React + shadcn/ui di frontend/, hasil build ke web/dist)
+cd frontend && npm ci && npx vitest run && npm run build && cd ..
 go build -o bin/laporan-bisnis ./cmd/server
 ./bin/laporan-bisnis
-# Buka http://localhost:8080
+# Buka http://localhost:8080 → halaman login
+# Dev frontend dengan hot reload: jalankan server Go di :8080, lalu `cd frontend && npm run dev` (proxy /api ke :8080)
 ```
+
+Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.27.1, sehingga build gagal ("version does not match"). Pakai `/home/reyfuu/.local/opt/go1.27.1/bin/go` atau rapikan PATH.
+
+## Fase 3 — Frontend React, Login & Manajemen Akses
+- `web/index.html` (vanilla) diganti SPA di [frontend/](file:///home/reyfuu/pajak/frontend). Tampilan dipertahankan: kelas CSS lama ada di `frontend/src/index.css`, token shadcn dipetakan ke palet Dark Obsidian. Grafik SVG tetap buatan sendiri (`src/lib/charts.ts`, ber-test).
+- Navbar marketing dihapus; pintu masuk sekarang halaman login.
+- Auth ([internal/auth](file:///home/reyfuu/pajak/internal/auth/auth.go)): user in-memory, password PBKDF2-SHA256, sesi cookie `sid` HttpOnly. Akun demo (password `senja2026`): `owner@`, `admin@`, `kasir@kedaikopisenja.id`.
+- Role tetap: **Owner** (semua + Pengguna & Akses), **Admin Keuangan** (semua kecuali kelola pengguna), **Kasir** (Dashboard + Transaksi). `auth.Roles` adalah satu-satunya sumber hak akses: server menolak API lewat `guard(view)` (401/403), frontend menyembunyikan menu dari `views` di `/auth/me`.
+- Endpoint baru: `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `GET|POST /api/v1/users`, `PUT|DELETE /api/v1/users/{id}` (khusus Owner). Pengaman: tidak bisa hapus akun sendiri, minimal satu Owner aktif, email unik.
+- Dockerfile kini multi-stage: Node (build frontend) → Go → scratch.
 
 ## Fase 2 (Sedang Berjalan & Terverifikasi) — Laporan Keuangan, Arus Kas & Neraca
 - Selesai (TDD): [ledger.go](file:///home/reyfuu/pajak/internal/finance/ledger.go) menghitung:
@@ -31,12 +45,22 @@ go build -o bin/laporan-bisnis ./cmd/server
   - `GET /api/v1/reports/cashflow`
   - `GET /api/v1/reports/balance-sheet`
   - `POST /api/v1/transactions`: Transaksi baru otomatis masuk ke ledger dan meng-update seluruh laporan & KPI dashboard secara terpadu.
-- Tampilan Frontend [web/index.html](file:///home/reyfuu/pajak/web/index.html): Halaman Laporan Keuangan menampilkan Laba Rugi dan Neraca bersanding dengan badge `✓ Aktiva = Pasiva (Seimbang)`.
-- Container Docker `laporan-bisnis` aktif di `http://localhost:8080`.
+- Halaman Laporan Keuangan menampilkan Laba Rugi dan Neraca bersanding dengan badge `✓ Aktiva = Pasiva (Seimbang)`.
 
-## Langkah Berikutnya & Target Deploy VPS
-1. Konfirmasi detail VPS target (IP, user SSH, port, key/password) atau pembuatan script otomatisasi `deploy.sh`.
-2. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
-3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md).
+## Status Deploy VPS & Produksi (Selesai & Live)
+- **VPS**: `31.97.66.119` (hostname: `hermes`)
+- **Domain**: [https://pajak.aipreneur.co.id](https://pajak.aipreneur.co.id)
+- **Container**: Docker `laporan-bisnis` aktif di port `8085` (`0.0.0.0:8085->8080/tcp`).
+- **Nginx Reverse Proxy**: `/etc/nginx/sites-available/jurnal-pajak` dikonfigurasi ke `http://127.0.0.1:8085` dengan sertifikat SSL Let's Encrypt aktif. Backup config lama tersimpan di `/etc/nginx/sites-available/jurnal-pajak.bak.laravel`.
+- **9Router**: Diperbarui ke versi terbaru `v0.5.104` di server hermes (layanan systemd `9router.service` aktif).
+- **GitHub Repository**: [https://github.com/reyfuu/jurnal.git](https://github.com/reyfuu/jurnal.git)
+  - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
+  - Branch `main`: Kode baru Go + React Vite (Laporan Bisnis).
+
+## Langkah Berikutnya (Pengembangan Lanjutan)
+1. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
+2. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md), termasuk tabel `users` & `sessions` (sekarang user in-memory).
+3. Menambahkan rate limit dan kedaluwarsa sesi pada login.
+
 
 
