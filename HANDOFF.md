@@ -64,8 +64,22 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
   - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
   - Branch `main`: Kode baru Go + React Vite + Auth RBAC + AI Agent Bubble (Laporan Bisnis).
 
+## Fase 4 — CRUD Transaksi & Impor Excel (branch `feat/transaksi-crud`, belum di-merge)
+Meniru demo `bisnis.pakarpajak.id/app?demo=1#transaksi`.
+- **Sumber kebenaran = transaksi bertanggal** ([internal/finance/transaction.go](internal/finance/transaction.go)): 18 jenis (Penjualan, Beli Bahan / Stok, Gaji & Upah, Setor Modal, Bayar Cicilan, Ambil Uang Pribadi, dst.) dipetakan ke pos laporan. `ToLedger` menurunkan buku besar untuk laporan dan AI. Seed 8 bulan di [seed.go](internal/finance/seed.go) diurai jadi transaksi oleh `SeedTransactions`.
+- **Laporan dan KPI dashboard dihitung ulang** dari transaksi periode tersebut (`ApplyKPIs`); grafik riwayat dan sparkline tetap seed. Neraca tetap seimbang untuk modal, pinjaman, aset, cicilan, dan prive. Kas awal per periode diambil dari `OpeningCash(period)`.
+- **Endpoint**:
+  - `GET|POST /api/v1/transactions` untuk semua role yang punya menu Transaksi;
+  - `PUT|DELETE /api/v1/transactions/{id}` butuh izin `transaksi-kelola` (Owner, Admin);
+  - `GET /api/v1/transactions/template` (.xlsx);
+  - `POST /api/v1/transactions/import` (pratinjau; `?commit=1` untuk menyimpan; Owner/Admin).
+- **Impor Excel tanpa dependensi**: [internal/xlsx](internal/xlsx/xlsx.go) membaca dan menulis .xlsx dengan stdlib, sudah diuji bolak-balik dengan LibreOffice. [finance.ParseImport](internal/finance/import.go) mengenali header bebas, alias jenis ("gaji", "kulakan", ...), tanggal YYYY-MM-DD / DD/MM/YYYY / seri Excel, dan nominal "Rp 1.250.000"; baris bermasalah dilaporkan per nomor baris.
+- **Frontend**: [views/Transaksi.tsx](frontend/src/views/Transaksi.tsx) dan [views/ImportDialog.tsx](frontend/src/views/ImportDialog.tsx).
+- **Catatan**: tanggal default "Catat transaksi" adalah hari ini. Transaksi di luar 8 periode seed (Jan–Agu 2026) tampil di daftar tapi belum bisa dipilih sebagai periode laporan.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 1. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
+1a. Daftar periode laporan dibuat dinamis dari bulan-bulan transaksi (sekarang statis Jan–Agu 2026).
 2. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md), termasuk tabel `users` & `sessions` (sekarang user in-memory).
 3. Menambahkan rate limit dan kedaluwarsa sesi pada login.
 
