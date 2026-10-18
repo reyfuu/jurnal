@@ -78,19 +78,31 @@ type record struct {
 	salt, hash []byte
 }
 
+// SessionTTL: sesi login berlaku 12 jam (satu hari kerja), lalu wajib login ulang.
+const SessionTTL = 12 * time.Hour
+
+type session struct {
+	userID  int
+	expires time.Time
+}
+
 type Store struct {
 	mu       sync.RWMutex
 	users    map[int]*record
 	nextID   int
-	sessions map[string]int
+	sessions map[string]session
+	Now      func() time.Time // bisa diganti di test
 }
 
-func NewStore() *Store {
-	s := &Store{users: map[int]*record{}, sessions: map[string]int{}}
+func NewStore() *Store { return NewStoreWithPassword(DemoPassword) }
+
+// NewStoreWithPassword membuat akun seed dengan password tertentu (produksi: env SEED_PASSWORD).
+func NewStoreWithPassword(seedPassword string) *Store {
+	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
 	for _, in := range []Input{
-		{"Bu Sari (Pemilik)", "owner@kedaikopisenja.id", Owner, true, DemoPassword},
-		{"Dimas (Keuangan)", "admin@kedaikopisenja.id", Admin, true, DemoPassword},
-		{"Rani (Kasir)", "kasir@kedaikopisenja.id", Kasir, true, DemoPassword},
+		{"Bu Sari (Pemilik)", "owner@kedaikopisenja.id", Owner, true, seedPassword},
+		{"Dimas (Keuangan)", "admin@kedaikopisenja.id", Admin, true, seedPassword},
+		{"Rani (Kasir)", "kasir@kedaikopisenja.id", Kasir, true, seedPassword},
 	} {
 		if _, err := s.Create(in); err != nil {
 			panic(err)
@@ -180,6 +192,7 @@ func (s *Store) Update(id int, in Input) (User, error) {
 	r.Name, r.Email, r.Role, r.Active = in.Name, in.Email, in.Role, in.Active
 	if in.Password != "" {
 		r.hash = hashPassword(in.Password, r.salt)
+		s.revoke(id)
 	}
 	return r.User, nil
 }
@@ -194,6 +207,7 @@ func (s *Store) Delete(id int) error {
 		return ErrLastOwner
 	}
 	delete(s.users, id)
+	s.revoke(id)
 	return nil
 }
 
@@ -212,10 +226,15 @@ func (s *Store) Login(email, password string) (string, User, error) {
 	email = normEmail(email)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for t, sess := range s.sessions {
+		if !s.Now().Before(sess.expires) {
+			delete(s.sessions, t)
+		}
+	}
 	for _, r := range s.users {
 		if r.Email == email && r.Active && subtle.ConstantTimeCompare(hashPassword(password, r.salt), r.hash) == 1 {
 			token := rand.Text()
-			s.sessions[token] = r.ID
+			s.sessions[token] = session{r.ID, s.Now().Add(SessionTTL)}
 			return token, r.User, nil
 		}
 	}
@@ -232,9 +251,22 @@ func (s *Store) Logout(token string) {
 func (s *Store) UserBySession(token string) (User, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	r, ok := s.users[s.sessions[token]]
+	sess, ok := s.sessions[token]
+	if !ok || !s.Now().Before(sess.expires) {
+		return User{}, false
+	}
+	r, ok := s.users[sess.userID]
 	if !ok || !r.Active {
 		return User{}, false
 	}
 	return r.User, true
+}
+
+// revoke menghapus semua sesi milik user; pemanggil memegang s.mu.
+func (s *Store) revoke(userID int) {
+	for t, sess := range s.sessions {
+		if sess.userID == userID {
+			delete(s.sessions, t)
+		}
+	}
 }

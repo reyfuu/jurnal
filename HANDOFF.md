@@ -53,11 +53,8 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
 - **Aplikasi Aktif**: Single Page Application (React 19 + Vite + Tailwind/shadcn tokens) dengan sistem autentikasi RBAC (Owner, Admin Keuangan, Kasir), backend Go, serta **AI Agent Bubble Konsultan Bisnis & Pajak**.
 - **AI Agent Bubble**: Melayang di pojok kanan bawah, terhubung ke engine Go (`POST /api/v1/ai/chat`) untuk meringkas laporan eksekutif, menganalisis arus kas/piutang >30 hari, dan menjawab aturan pajak UMKM (PP 55/2022).
 - **Panduan Penggunaan PDF**: Tersedia lengkap 8 halaman beserta tangkapan layar antarmuka asli di [docs/Panduan_Laporan_Bisnis_Akademi_Pajak.pdf](file:///home/reyfuu/pajak/docs/Panduan_Laporan_Bisnis_Akademi_Pajak.pdf).
-- **Akun Demo**:
-  - Owner: `owner@kedaikopisenja.id` (password: `senja2026`)
-  - Admin: `admin@kedaikopisenja.id` (password: `senja2026`)
-  - Kasir: `kasir@kedaikopisenja.id` (password: `senja2026`)
-- **Container**: Docker `laporan-bisnis` aktif di port `8085` (`0.0.0.0:8085->8080/tcp`).
+- **Akun Produksi**: email seed sama (`owner@`, `admin@`, `kasir@kedaikopisenja.id`), password dari env `SEED_PASSWORD` di VPS (file `.env` di direktori repo VPS, tidak di-commit). Password demo `senja2026` hanya berlaku lokal/dev; panel akun demo di halaman login hanya muncul di `npm run dev`.
+- **Container**: Docker `laporan-bisnis` di `127.0.0.1:8085->8080/tcp` (hanya lewat nginx).
 - **Nginx Reverse Proxy**: `/etc/nginx/sites-available/jurnal-pajak` dikonfigurasi ke `http://127.0.0.1:8085` dengan sertifikat SSL Let's Encrypt aktif.
 - **9Router**: Diperbarui ke versi terbaru `v0.5.104` di server hermes (layanan systemd `9router.service` aktif).
 - **GitHub Repository**: [https://github.com/reyfuu/jurnal.git](https://github.com/reyfuu/jurnal.git)
@@ -92,11 +89,19 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
   - 100% Vitest frontend lulus (`transaksi.test.ts`, `charts.test.ts`, `format.test.ts`).
   - Di-build dan di-deploy ke VPS `31.97.66.119` di port `8085` dengan verifikasi live di [https://pajak.aipreneur.co.id](https://pajak.aipreneur.co.id).
 
+## Fase 5 — Hardening Keamanan Produksi
+- Cookie `sid` kini `Secure` di balik nginx (`isHTTPS` membaca `X-Forwarded-Proto`), `MaxAge` 12 jam; sesi kedaluwarsa di server (`auth.SessionTTL`) dan dicabut saat password diganti / user dihapus.
+- Rate limit login: 5 gagal per IP (`X-Real-IP`) dalam 15 menit → 429.
+- Header keamanan: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`. CSP belum (ditandai `ponytail:`).
+- `deploy.sh` wajib `SEED_PASSWORD`, port container hanya 127.0.0.1.
+- **Wajib di nginx** `jurnal-pajak`: `proxy_set_header X-Forwarded-Proto $scheme;` dan `proxy_set_header X-Real-IP $remote_addr;` (tanpa X-Real-IP semua klien terlihat sebagai 1 IP dan header bisa dipalsukan).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
+0. **Prioritas**: persistensi SQLite (data masih in-memory, hilang tiap deploy) → multi-tenant per UMKM → KPI dihitung murni dari transaksi.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
 3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.
-4. Menambahkan rate limiting dan refresh token sesi.
+4. Refresh token sesi & CSP.
 
 
 

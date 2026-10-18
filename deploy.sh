@@ -5,6 +5,9 @@ set -euo pipefail
 # Usage: ./deploy.sh [PORT]
 
 APP_PORT="${1:-8085}"
+# Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
+[ -f .env ] && . ./.env
+: "${SEED_PASSWORD:?SEED_PASSWORD wajib di-set (export atau .env) sebelum deploy}"
 IMAGE_NAME="laporan-bisnis:latest"
 CONTAINER_NAME="laporan-bisnis"
 
@@ -19,7 +22,8 @@ docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
-  -p "${APP_PORT}:8080" \
+  -p "127.0.0.1:${APP_PORT}:8080" \
+  -e SEED_PASSWORD="$SEED_PASSWORD" \
   "$IMAGE_NAME"
 
 echo "=== [4/4] Verifying deployment ==="

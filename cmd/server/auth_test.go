@@ -137,3 +137,49 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("delete self: want 400, got %d", rec.Code)
 	}
 }
+
+func TestLoginCookieSecureBehindProxy(t *testing.T) {
+	srv := NewServer()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
+		strings.NewReader(`{"email":"owner@kedaikopisenja.id","password":"`+auth.DemoPassword+`"}`))
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	cs := rec.Result().Cookies()
+	if len(cs) == 0 || !cs[0].Secure || cs[0].MaxAge <= 0 {
+		t.Fatalf("want Secure cookie with MaxAge behind https proxy, got %+v", cs)
+	}
+}
+
+func TestLoginRateLimit(t *testing.T) {
+	srv := NewServer()
+	bad := func(ip string) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
+			strings.NewReader(`{"email":"owner@kedaikopisenja.id","password":"salah"}`))
+		req.Header.Set("X-Real-IP", ip)
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	for i := range maxLoginFailures {
+		if code := bad("203.0.113.9"); code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: want 401, got %d", i+1, code)
+		}
+	}
+	if code := bad("203.0.113.9"); code != http.StatusTooManyRequests {
+		t.Fatalf("want 429 after %d failures, got %d", maxLoginFailures, code)
+	}
+	if code := bad("203.0.113.10"); code != http.StatusUnauthorized {
+		t.Fatalf("other IP must not be blocked, got %d", code)
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	rec := httptest.NewRecorder()
+	NewServer().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil))
+	for k, v := range map[string]string{"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY"} {
+		if got := rec.Header().Get(k); got != v {
+			t.Errorf("%s = %q, want %q", k, got, v)
+		}
+	}
+}

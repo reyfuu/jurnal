@@ -3,6 +3,7 @@ package auth_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"pajak/internal/auth"
 )
@@ -104,5 +105,44 @@ func TestCan(t *testing.T) {
 	}
 	if !auth.Kasir.Can("transaksi") || auth.Kasir.Can("laporan-keuangan") {
 		t.Fatal("kasir: transaksi yes, laporan no")
+	}
+}
+
+func TestSession_Expires(t *testing.T) {
+	s := auth.NewStore()
+	now := time.Now()
+	s.Now = func() time.Time { return now }
+	token, _, err := s.Login("owner@kedaikopisenja.id", auth.DemoPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(auth.SessionTTL - time.Minute)
+	if _, ok := s.UserBySession(token); !ok {
+		t.Fatal("session should still be valid before TTL")
+	}
+	now = now.Add(2 * time.Minute)
+	if _, ok := s.UserBySession(token); ok {
+		t.Fatal("session should expire after TTL")
+	}
+}
+
+func TestSession_RevokedOnPasswordChange(t *testing.T) {
+	s := auth.NewStore()
+	token, u, _ := s.Login("kasir@kedaikopisenja.id", auth.DemoPassword)
+	if _, err := s.Update(u.ID, auth.Input{Name: u.Name, Email: u.Email, Role: u.Role, Active: true, Password: "passwordbaru1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.UserBySession(token); ok {
+		t.Fatal("old session must be revoked after password change")
+	}
+}
+
+func TestNewStoreWithPassword(t *testing.T) {
+	s := auth.NewStoreWithPassword("rahasia-prod-123")
+	if _, _, err := s.Login("owner@kedaikopisenja.id", auth.DemoPassword); err == nil {
+		t.Fatal("demo password must not work when seed password is set")
+	}
+	if _, _, err := s.Login("owner@kedaikopisenja.id", "rahasia-prod-123"); err != nil {
+		t.Fatalf("seed password login: %v", err)
 	}
 }

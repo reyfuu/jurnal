@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, type Me } from '@/lib/api'
 
+// Akun demo hanya tampil di `npm run dev`; build produksi membuangnya (password prod dari env SEED_PASSWORD).
 const DEMO_PASSWORD = 'senja2026'
 const DEMO_ACCOUNTS = [
   { email: 'owner@kedaikopisenja.id', role: 'Owner' },
@@ -65,7 +66,7 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
           </CardContent>
         </Card>
 
-        <div className="mt-5 rounded-xl border border-[var(--border-subtle)] p-3.5 text-xs text-muted-foreground">
+        {import.meta.env.DEV && <div className="mt-5 rounded-xl border border-[var(--border-subtle)] p-3.5 text-xs text-muted-foreground">
           <div className="mb-2 font-semibold text-foreground">Akun demo · password <code className="font-mono">{DEMO_PASSWORD}</code></div>
           <div className="grid gap-1">
             {DEMO_ACCOUNTS.map((a) => (
@@ -80,7 +81,7 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </main>
   )

@@ -1,17 +1,20 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
+	"time"
 
 	"pajak/internal/ai"
 	"pajak/internal/auth"
@@ -30,6 +33,8 @@ type Server struct {
 	nextTxID  int
 	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
 	users     *auth.Store
+	loginMu   sync.Mutex
+	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine
 	mux       *http.ServeMux
 }
@@ -48,7 +53,8 @@ func NewServer() *Server {
 		txs:       txs,
 		nextTxID:  len(txs) + 1,
 		seedTx:    seedTx,
-		users:     auth.NewStore(),
+		users:     auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword)),
+		failures:  map[string]loginFailure{},
 		aiEngine:  ai.NewEngine(),
 		mux:       http.NewServeMux(),
 	}
@@ -57,7 +63,39 @@ func NewServer() *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// ponytail: CSP belum dipasang; perlu audit inline style/script SPA dulu.
+	h := w.Header()
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	s.mux.ServeHTTP(w, r)
+}
+
+// Batas brute force login: maxLoginFailures gagal per IP dalam loginWindow → 429.
+const (
+	maxLoginFailures = 5
+	loginWindow      = 15 * time.Minute
+)
+
+type loginFailure struct {
+	count int
+	since time.Time
+}
+
+// clientIP memakai X-Real-IP dari nginx; container hanya bisa diakses lewat nginx (127.0.0.1).
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func isHTTPS(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 func (s *Server) routes() {
@@ -142,14 +180,36 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	ip := clientIP(r)
+	s.loginMu.Lock()
+	f := s.failures[ip]
+	if time.Since(f.since) > loginWindow {
+		f = loginFailure{}
+	}
+	s.loginMu.Unlock()
+	if f.count >= maxLoginFailures {
+		http.Error(w, "terlalu banyak percobaan login, coba lagi dalam 15 menit", http.StatusTooManyRequests)
+		return
+	}
 	token, u, err := s.users.Login(req.Email, req.Password)
+	s.loginMu.Lock()
+	if err != nil {
+		if f.count == 0 {
+			f.since = time.Now()
+		}
+		f.count++
+		s.failures[ip] = f
+	} else {
+		delete(s.failures, ip)
+	}
+	s.loginMu.Unlock()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: sessionCookie, Value: token, Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil,
+		Name: sessionCookie, Value: token, Path: "/", MaxAge: int(auth.SessionTTL.Seconds()),
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r),
 	})
 	writeJSON(w, newMe(u))
 }
@@ -158,7 +218,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		s.users.Logout(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true})
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r)})
 	w.WriteHeader(http.StatusNoContent)
 }
 
