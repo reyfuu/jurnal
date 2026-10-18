@@ -4,7 +4,7 @@ set -euo pipefail
 # Laporan Bisnis by Akademi Pajak - VPS Deployment Script
 # Usage: ./deploy.sh [PORT]
 
-APP_PORT="${1:-8080}"
+APP_PORT="${1:-8085}"
 IMAGE_NAME="laporan-bisnis:latest"
 CONTAINER_NAME="laporan-bisnis"
 
@@ -30,3 +30,4 @@ if [ "$HTTP_CODE" = "200" ]; then
 else
   echo "⚠ Warning: Expected HTTP 200, got: $HTTP_CODE"
 fi
+

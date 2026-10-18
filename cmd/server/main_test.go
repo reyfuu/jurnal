@@ -15,7 +15,7 @@ func TestDashboardEndpoint(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard?period=2026-08", nil)
 	rec := httptest.NewRecorder()
 
-	srv.ServeHTTP(rec, req)
+	asOwner(t, srv).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
@@ -40,7 +40,7 @@ func TestPriceSimulationEndpoint(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	srv.ServeHTTP(rec, req)
+	asOwner(t, srv).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
@@ -58,7 +58,7 @@ func TestReportsEndpoints(t *testing.T) {
 	srv := NewServer()
 
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/financial?period=2026-08", nil))
+	asOwner(t, srv).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/financial?period=2026-08", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("financial: status %d", rec.Code)
 	}
@@ -71,7 +71,7 @@ func TestReportsEndpoints(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/cashflow?period=2026-08", nil))
+	asOwner(t, srv).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/cashflow?period=2026-08", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("cashflow: status %d", rec.Code)
 	}
@@ -87,7 +87,7 @@ func TestReportsEndpoints(t *testing.T) {
 func TestBalanceSheetEndpoint(t *testing.T) {
 	srv := NewServer()
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/balance-sheet?period=2026-08", nil))
+	asOwner(t, srv).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/balance-sheet?period=2026-08", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("balance-sheet: status %d", rec.Code)
 	}
@@ -108,14 +108,14 @@ func TestAddTransactionSyncsLedgerAndReports(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, req)
+	asOwner(t, srv).ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("add tx failed: status %d", rec.Code)
 	}
 
 	// Cek Laporan Keuangan apakah omzet naik jadi 97.000.000 (92jt + 5jt)
 	recFin := httptest.NewRecorder()
-	srv.ServeHTTP(recFin, httptest.NewRequest(http.MethodGet, "/api/v1/reports/financial?period=2026-08", nil))
+	asOwner(t, srv).ServeHTTP(recFin, httptest.NewRequest(http.MethodGet, "/api/v1/reports/financial?period=2026-08", nil))
 	var is finance.IncomeStatement
 	if err := json.NewDecoder(recFin.Body).Decode(&is); err != nil {
 		t.Fatal(err)
