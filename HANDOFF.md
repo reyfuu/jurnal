@@ -50,7 +50,9 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
 ## Status Deploy VPS & Produksi (Selesai & Live — Fase 3 Aktif)
 - **VPS**: `31.97.66.119` (hostname: `hermes`)
 - **Domain**: [https://pajak.aipreneur.co.id](https://pajak.aipreneur.co.id)
-- **Aplikasi Aktif**: Single Page Application (React 19 + Vite + Tailwind/shadcn tokens) dengan sistem autentikasi RBAC (Owner, Admin Keuangan, Kasir) dan backend Go.
+- **Aplikasi Aktif**: Single Page Application (React 19 + Vite + Tailwind/shadcn tokens) dengan sistem autentikasi RBAC (Owner, Admin Keuangan, Kasir), backend Go, serta **AI Agent Bubble Konsultan Bisnis & Pajak**.
+- **AI Agent Bubble**: Melayang di pojok kanan bawah, terhubung ke engine Go (`POST /api/v1/ai/chat`) untuk meringkas laporan eksekutif, menganalisis arus kas/piutang >30 hari, dan menjawab aturan pajak UMKM (PP 55/2022).
+- **Panduan Penggunaan PDF**: Tersedia lengkap 8 halaman beserta tangkapan layar antarmuka asli di [docs/Panduan_Laporan_Bisnis_Akademi_Pajak.pdf](file:///home/reyfuu/pajak/docs/Panduan_Laporan_Bisnis_Akademi_Pajak.pdf).
 - **Akun Demo**:
   - Owner: `owner@kedaikopisenja.id` (password: `senja2026`)
   - Admin: `admin@kedaikopisenja.id` (password: `senja2026`)
@@ -60,7 +62,7 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
 - **9Router**: Diperbarui ke versi terbaru `v0.5.104` di server hermes (layanan systemd `9router.service` aktif).
 - **GitHub Repository**: [https://github.com/reyfuu/jurnal.git](https://github.com/reyfuu/jurnal.git)
   - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
-  - Branch `main`: Kode baru Go + React Vite + Auth RBAC (Laporan Bisnis).
+  - Branch `main`: Kode baru Go + React Vite + Auth RBAC + AI Agent Bubble (Laporan Bisnis).
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 1. Melengkapi Piutang & Utang (pelunasan / penagihan invoice).
