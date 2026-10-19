@@ -3,10 +3,12 @@ package main
 import (
 	"cmp"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -26,74 +28,93 @@ import (
 
 const sessionCookie = "sid"
 
-type Server struct {
+// tenant: data satu usaha. Usaha 1 = data contoh Kedai Kopi Senja; usaha lain hasil register, mulai kosong.
+type tenant struct {
+	id          int
+	demo        bool // data contoh: saldo awal & dashboard memakai seed
 	mu          sync.RWMutex
 	snapshots   map[string]finance.DashboardSnapshot // seed per periode; KPI dihitung ulang dari txs
 	txs         []finance.Transaction
 	nextTxID    int
 	assets      []finance.Asset // register aset: dasar penyusutan & amortisasi
 	nextAssetID int
-	// opening: neraca awal onboarding; nil = belum diisi, laporan memakai saldo awal seed.
+	// opening: neraca awal onboarding; nil = belum diisi (usaha demo memakai saldo awal seed).
 	opening        *finance.OpeningBalance
 	karyawan       []finance.Karyawan
 	nextKaryawanID int
-	seedTx         map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
-	users          *auth.Store
+	seedTx         map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
-	saveMu         sync.Mutex               // serialisasi penulisan state.json
-	loginMu        sync.Mutex
-	failures       map[string]loginFailure // per IP
-	aiEngine       *ai.Engine
-	mux            *http.ServeMux
+}
+
+type Server struct {
+	tenantsMu sync.RWMutex
+	tenants   map[int]*tenant
+	users     *auth.Store
+	saveMu    sync.Mutex // serialisasi penulisan state
+	loginMu   sync.Mutex
+	failures  map[string]loginFailure // per IP
+	aiEngine  *ai.Engine
+	mux       *http.ServeMux
+}
+
+// newTenant membuat usaha kosong (hasil register).
+func newTenant(id int) *tenant {
+	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1}
+	for _, p := range finance.AvailablePeriods() {
+		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
+	}
+	return t
+}
+
+// demoTenant: usaha 1 berisi data contoh Kedai Kopi Senja.
+func demoTenant() *tenant {
+	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
+		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1}
+	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
+	for _, p := range finance.AvailablePeriods() {
+		t.snapshots[p.ID] = finance.SeedKedaiKopiSenja(p.ID)
+		t.seedTx[p.ID] = len(finance.ForPeriod(t.txs, p.ID))
+	}
+	return t
+}
+
+// restore menimpa data tenant dengan isi berkas state.
+func (t *tenant) restore(st *state) {
+	t.txs, t.nextTxID = st.Transactions, st.NextTxID
+	// state.json dari versi sebelum register aset tidak punya daftar aset: pakai seed.
+	if st.NextAssetID > 0 {
+		t.assets, t.nextAssetID = st.Assets, st.NextAssetID
+	}
+	t.opening = st.Opening
+	if st.NextKaryawanID > 0 {
+		t.karyawan, t.nextKaryawanID = st.Karyawan, st.NextKaryawanID
+	}
 }
 
 func NewServer() *Server {
-	txs := finance.SeedTransactions()
-	snapshots := make(map[string]finance.DashboardSnapshot)
-	seedTx := make(map[string]int)
-	for _, p := range finance.AvailablePeriods() {
-		snapshots[p.ID] = finance.SeedKedaiKopiSenja(p.ID)
-		seedTx[p.ID] = len(finance.ForPeriod(txs, p.ID))
-	}
-
+	demo := demoTenant()
 	users := auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword))
-	nextTxID := len(txs) + 1
-	assets := finance.SeedAssets()
-	nextAssetID := len(assets) + 1
-	st, err := loadState()
+	st, err := loadState(demo.file("state"))
 	if err != nil {
 		log.Fatalf("state.json rusak, perbaiki atau pindahkan dulu: %v", err) // jangan timpa data user dengan seed
 	}
-	karyawan := []finance.Karyawan(nil)
-	nextKaryawanID := 1
-	var opening *finance.OpeningBalance
 	if st != nil {
-		txs, nextTxID, users = st.Transactions, st.NextTxID, auth.Restore(st.Auth)
-		// state.json dari versi sebelum register aset tidak punya daftar aset: pakai seed.
-		if st.NextAssetID > 0 {
-			assets, nextAssetID = st.Assets, st.NextAssetID
-		}
-		opening = st.Opening
-		if st.NextKaryawanID > 0 {
-			karyawan, nextKaryawanID = st.Karyawan, st.NextKaryawanID
-		}
+		demo.restore(st)
+		users = auth.Restore(st.Auth)
 	}
+	demo.profile = loadProfile(demo.file("business"))
+	tenants, err := loadTenants()
+	if err != nil {
+		log.Fatalf("data usaha rusak, perbaiki atau pindahkan dulu: %v", err)
+	}
+	tenants[1] = demo
 
 	s := &Server{
-		snapshots:      snapshots,
-		txs:            txs,
-		nextTxID:       nextTxID,
-		assets:         assets,
-		nextAssetID:    nextAssetID,
-		opening:        opening,
-		karyawan:       karyawan,
-		nextKaryawanID: nextKaryawanID,
-		seedTx:         seedTx,
-		users:          users,
-		failures:       map[string]loginFailure{},
-		profile:        loadProfile(),
-		aiEngine:       ai.NewEngine(),
-		mux:            http.NewServeMux(),
+		tenants:  tenants,
+		users:    users,
+		failures: map[string]loginFailure{},
+		aiEngine: ai.NewEngine(),
+		mux:      http.NewServeMux(),
 	}
 	s.routes()
 	if st == nil {
@@ -140,44 +161,45 @@ func isHTTPS(r *http.Request) bool {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.persisting(s.handleLogin))
+	s.mux.HandleFunc("POST /api/v1/auth/register", s.persisting(s.handleRegister))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.persisting(s.handleLogout))
 	s.mux.HandleFunc("GET /api/v1/auth/me", s.guard("", s.handleMe))
 	s.mux.HandleFunc("GET /api/v1/periods", s.guard("", s.handlePeriods))
 
-	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.handleDashboard))
-	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.handleFinancial))
-	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("laporan-keuangan", s.handleCashflow))
-	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.handleGetBusiness))
-	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.handlePutBusiness))
-	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.handleTaxPlanning))
-	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.handleCoA))
-	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.handleReportCoA))
-	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.handleReportCoAXlsx))
-	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.handleSalesReport))
-	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
-	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
+	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.on((*tenant).handleDashboard)))
+	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.on((*tenant).handleFinancial)))
+	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("laporan-keuangan", s.on((*tenant).handleCashflow)))
+	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.on((*tenant).handleGetBusiness)))
+	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.on((*tenant).handlePutBusiness)))
+	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
+	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
+	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoA)))
+	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoAXlsx)))
+	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
+	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
+	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
-	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.handleListTransactions))
-	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.handleCreateTransaction)))
+	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
+	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
-	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.handleImportTransactions)))
-	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleUpdateTransaction)))
-	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleDeleteTransaction)))
+	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
+	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateTransaction))))
+	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteTransaction))))
 
-	s.mux.HandleFunc("GET /api/v1/assets", s.guard("laporan-keuangan", s.handleListAssets))
-	s.mux.HandleFunc("POST /api/v1/assets", s.persisting(s.guard("laporan-keuangan", s.handleCreateAsset)))
-	s.mux.HandleFunc("PUT /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.handleUpdateAsset)))
-	s.mux.HandleFunc("DELETE /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.handleDeleteAsset)))
+	s.mux.HandleFunc("GET /api/v1/assets", s.guard("laporan-keuangan", s.on((*tenant).handleListAssets)))
+	s.mux.HandleFunc("POST /api/v1/assets", s.persisting(s.guard("laporan-keuangan", s.on((*tenant).handleCreateAsset))))
+	s.mux.HandleFunc("PUT /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.on((*tenant).handleUpdateAsset))))
+	s.mux.HandleFunc("DELETE /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.on((*tenant).handleDeleteAsset))))
 
-	s.mux.HandleFunc("GET /api/v1/onboarding/template", s.guard("impor-data", s.handleOnboardingTemplate))
-	s.mux.HandleFunc("POST /api/v1/onboarding/import", s.persisting(s.guard("impor-data", s.handleOnboardingImport)))
-	s.mux.HandleFunc("GET /api/v1/opening", s.guard("laporan-keuangan", s.handleGetOpening))
-	s.mux.HandleFunc("PUT /api/v1/opening", s.persisting(s.guard("impor-data", s.handlePutOpening)))
+	s.mux.HandleFunc("GET /api/v1/onboarding/template", s.guard("impor-data", s.on((*tenant).handleOnboardingTemplate)))
+	s.mux.HandleFunc("POST /api/v1/onboarding/import", s.persisting(s.guard("impor-data", s.on((*tenant).handleOnboardingImport))))
+	s.mux.HandleFunc("GET /api/v1/opening", s.guard("laporan-keuangan", s.on((*tenant).handleGetOpening)))
+	s.mux.HandleFunc("PUT /api/v1/opening", s.persisting(s.guard("impor-data", s.on((*tenant).handlePutOpening))))
 
-	s.mux.HandleFunc("GET /api/v1/karyawan", s.guard("karyawan", s.handleListKaryawan))
-	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.handleCreateKaryawan)))
-	s.mux.HandleFunc("PUT /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.handleUpdateKaryawan)))
-	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.handleDeleteKaryawan)))
+	s.mux.HandleFunc("GET /api/v1/karyawan", s.guard("karyawan", s.on((*tenant).handleListKaryawan)))
+	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.on((*tenant).handleCreateKaryawan))))
+	s.mux.HandleFunc("PUT /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleUpdateKaryawan))))
+	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleDeleteKaryawan))))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
 	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))
@@ -190,6 +212,18 @@ func (s *Server) routes() {
 type ctxKey struct{}
 
 func currentUser(r *http.Request) auth.User { return r.Context().Value(ctxKey{}).(auth.User) }
+
+// tenantOf: usaha milik user yang login; hanya dipanggil di balik guard.
+func (s *Server) tenantOf(r *http.Request) *tenant {
+	s.tenantsMu.RLock()
+	defer s.tenantsMu.RUnlock()
+	return s.tenants[currentUser(r).TenantID]
+}
+
+// on menjalankan handler data terhadap usaha milik user yang login.
+func (s *Server) on(h func(*tenant, http.ResponseWriter, *http.Request)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { h(s.tenantOf(r), w, r) }
+}
 
 // guard menolak request tanpa sesi (401) dan role yang tidak punya akses ke view (403). view "" = cukup login.
 func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
@@ -243,36 +277,91 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := clientIP(r)
-	s.loginMu.Lock()
-	f := s.failures[ip]
-	if time.Since(f.since) > loginWindow {
-		f = loginFailure{}
-	}
-	s.loginMu.Unlock()
-	if f.count >= maxLoginFailures {
+	if s.blocked(ip) {
 		http.Error(w, "terlalu banyak percobaan login, coba lagi dalam 15 menit", http.StatusTooManyRequests)
 		return
 	}
 	token, u, err := s.users.Login(req.Email, req.Password)
-	s.loginMu.Lock()
-	if err != nil {
-		if f.count == 0 {
-			f.since = time.Now()
-		}
-		f.count++
-		s.failures[ip] = f
-	} else {
-		delete(s.failures, ip)
-	}
-	s.loginMu.Unlock()
+	s.recordAttempt(ip, err == nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
+	setSession(w, r, token)
+	writeJSON(w, newMe(u))
+}
+
+// blocked: IP sudah gagal maxLoginFailures kali dalam loginWindow.
+func (s *Server) blocked(ip string) bool {
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	f := s.failures[ip]
+	return time.Since(f.since) <= loginWindow && f.count >= maxLoginFailures
+}
+
+func (s *Server) recordAttempt(ip string, ok bool) {
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	if ok {
+		delete(s.failures, ip)
+		return
+	}
+	f := s.failures[ip]
+	if time.Since(f.since) > loginWindow {
+		f = loginFailure{since: time.Now()}
+	}
+	f.count++
+	s.failures[ip] = f
+}
+
+func setSession(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: token, Path: "/", MaxAge: int(auth.SessionTTL.Seconds()),
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r),
 	})
+}
+
+// handleRegister: daftar mandiri dengan kode undangan (env REGISTER_CODE). Pendaftar menjadi
+// Owner sebuah usaha baru yang kosong, lalu langsung login dan masuk wizard onboarding.
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	code := os.Getenv("REGISTER_CODE")
+	if code == "" {
+		http.Error(w, "pendaftaran belum dibuka", http.StatusNotFound)
+		return
+	}
+	var req struct{ Name, Email, Password, Kode string }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	ip := clientIP(r)
+	if s.blocked(ip) {
+		http.Error(w, "terlalu banyak percobaan, coba lagi dalam 15 menit", http.StatusTooManyRequests)
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(req.Kode), []byte(code)) != 1 {
+		s.recordAttempt(ip, false)
+		http.Error(w, "kode undangan salah", http.StatusForbidden)
+		return
+	}
+	s.tenantsMu.Lock()
+	id := slices.Max(slices.Collect(maps.Keys(s.tenants))) + 1
+	s.tenants[id] = newTenant(id)
+	s.tenantsMu.Unlock()
+	if _, err := s.users.Create(auth.Input{Name: req.Name, Email: req.Email, Password: req.Password, Role: auth.Owner, Active: true, TenantID: id}); err != nil {
+		s.tenantsMu.Lock()
+		delete(s.tenants, id)
+		s.tenantsMu.Unlock()
+		writeAuthErr(w, err)
+		return
+	}
+	token, u, err := s.users.Login(req.Email, req.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	setSession(w, r, token)
+	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, newMe(u))
 }
 
@@ -298,7 +387,7 @@ type usersResp struct {
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, usersResp{Users: s.users.List(), Roles: auth.Roles})
+	writeJSON(w, usersResp{Users: s.users.List(currentUser(r).TenantID), Roles: auth.Roles})
 }
 
 func writeAuthErr(w http.ResponseWriter, err error) {
@@ -320,6 +409,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	in.TenantID = currentUser(r).TenantID
 	u, err := s.users.Create(in)
 	if err != nil {
 		writeAuthErr(w, err)
@@ -336,7 +426,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	u, err := s.users.Update(id, in)
+	u, err := s.users.Update(currentUser(r).TenantID, id, in)
 	if err != nil {
 		writeAuthErr(w, err)
 		return
@@ -350,7 +440,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "tidak bisa menghapus akun sendiri", http.StatusBadRequest)
 		return
 	}
-	if err := s.users.Delete(id); err != nil {
+	if err := s.users.Delete(currentUser(r).TenantID, id); err != nil {
 		writeAuthErr(w, err)
 		return
 	}
@@ -360,9 +450,12 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 // --- Laporan ---
 
 // openingFor: saldo awal periode. Memakai neraca awal onboarding bila sudah diisi, kalau belum
-// memakai saldo data demo. Pemanggil harus memegang s.mu.
-func (s *Server) openingFor(period string) finance.ReportOpening {
+// memakai saldo data demo (usaha baru: nol). Pemanggil harus memegang s.mu.
+func (s *tenant) openingFor(period string) finance.ReportOpening {
 	if s.opening == nil {
+		if !s.demo {
+			return finance.ReportOpening{}
+		}
 		return finance.SeedOpening(period)
 	}
 	return s.opening.At(s.txs, period)
@@ -370,18 +463,18 @@ func (s *Server) openingFor(period string) finance.ReportOpening {
 
 // report menghitung seluruh laporan satu periode dari state saat ini. Semua endpoint laporan
 // memakai fungsi ini supaya laba rugi, arus kas, neraca, dan register aset tidak saling bertentangan.
-func (s *Server) report(period string) finance.PeriodReport {
+func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
 }
 
-func (s *Server) handleFinancial(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleFinancial(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).Income)
 }
 
 // handleSalesReport: granularity day|week untuk satu periode, month untuk tren seluruh periode.
-func (s *Server) handleSalesReport(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleSalesReport(w http.ResponseWriter, r *http.Request) {
 	g := r.URL.Query().Get("granularity")
 	s.mu.RLock()
 	txs := s.txs
@@ -393,15 +486,15 @@ func (s *Server) handleSalesReport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, rep)
 }
 
-func (s *Server) handleCashflow(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCashflow(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).CashFlow)
 }
 
-func (s *Server) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).BalanceSheet)
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	period := periodOrDefault(r)
 	s.mu.RLock()
 	snap, ok := s.snapshots[period]
@@ -443,7 +536,7 @@ type simulateResp struct {
 	BreakEvenError string                   `json:"break_even_error,omitempty"`
 }
 
-func (s *Server) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 	var req simulateReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
@@ -476,14 +569,15 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if period == "" {
 		period = "2026-08"
 	}
-	s.mu.RLock()
-	snap, ok := s.snapshots[period]
+	t := s.tenantOf(r)
+	t.mu.RLock()
+	snap, ok := t.snapshots[period]
 	if !ok {
-		snap = s.snapshots["2026-08"]
+		snap = t.snapshots["2026-08"]
 	}
-	s.mu.RUnlock()
+	t.mu.RUnlock()
 
-	resp := s.aiEngine.Answer(r.Context(), req, snap, s.report(period))
+	resp := s.aiEngine.Answer(r.Context(), req, snap, t.report(period))
 	writeJSON(w, resp)
 }
 
@@ -495,7 +589,7 @@ type txListResp struct {
 	CanEdit      bool                  `json:"can_edit"`
 }
 
-func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleListTransactions(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	txs := slices.Clone(s.txs)
 	s.mu.RUnlock()
@@ -517,7 +611,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 }
 
 // decodeTx + cek akun koreksi terhadap CoA aktif.
-func (s *Server) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
+func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
@@ -533,12 +627,12 @@ type txResp struct {
 }
 
 // withWarnings memanggil CashWarnings untuk periode transaksi; pemanggil memegang s.mu.
-func (s *Server) withWarnings(t finance.Transaction) txResp {
+func (s *tenant) withWarnings(t finance.Transaction) txResp {
 	period := t.Tanggal[:7]
-	return txResp{t, finance.CashWarnings(finance.ForPeriod(s.txs, period), finance.OpeningCash(period))}
+	return txResp{t, finance.CashWarnings(finance.ForPeriod(s.txs, period), s.openingFor(period).Cash)}
 }
 
-func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.decodeTx(w, r)
 	if !ok {
 		return
@@ -554,12 +648,12 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 }
 
 // txIndex harus dipanggil dengan s.mu terkunci.
-func (s *Server) txIndex(r *http.Request) int {
+func (s *tenant) txIndex(r *http.Request) int {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	return slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
 }
 
-func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.decodeTx(w, r)
 	if !ok {
 		return
@@ -576,7 +670,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, s.withWarnings(t))
 }
 
-func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := s.txIndex(r)
@@ -605,7 +699,7 @@ type importResp struct {
 }
 
 // handleImportTransactions: tanpa ?commit=1 hanya pratinjau (tidak ada yang disimpan).
-func (s *Server) handleImportTransactions(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	f, _, err := r.FormFile("file")
 	if err != nil {

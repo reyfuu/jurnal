@@ -52,6 +52,7 @@ type User struct {
 	Role      Role   `json:"role"`
 	Active    bool   `json:"active"`
 	CreatedAt string `json:"created_at"`
+	TenantID  int    `json:"tenant_id"` // usaha pemilik data; 1 = usaha awal (Kedai Kopi Senja)
 }
 
 // Input untuk Create/Update. Password kosong saat Update = tidak diubah.
@@ -61,6 +62,7 @@ type Input struct {
 	Role     Role   `json:"role"`
 	Active   bool   `json:"active"`
 	Password string `json:"password"`
+	TenantID int    `json:"-"` // diisi server, bukan dari body request; 0 = usaha 1
 }
 
 var (
@@ -101,9 +103,9 @@ func NewStore() *Store { return NewStoreWithPassword(DemoPassword) }
 func NewStoreWithPassword(seedPassword string) *Store {
 	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
 	for _, in := range []Input{
-		{"Bu Sari (Pemilik)", "owner@kedaikopisenja.id", Owner, true, seedPassword},
-		{"Dimas (Keuangan)", "admin@kedaikopisenja.id", Admin, true, seedPassword},
-		{"Rani (Kasir)", "kasir@kedaikopisenja.id", Kasir, true, seedPassword},
+		{"Bu Sari (Pemilik)", "owner@kedaikopisenja.id", Owner, true, seedPassword, 1},
+		{"Dimas (Keuangan)", "admin@kedaikopisenja.id", Admin, true, seedPassword, 1},
+		{"Rani (Kasir)", "kasir@kedaikopisenja.id", Kasir, true, seedPassword, 1},
 	} {
 		if _, err := s.Create(in); err != nil {
 			panic(err)
@@ -134,11 +136,11 @@ func validate(in *Input, requirePassword bool) error {
 	return nil
 }
 
-// activeOwners menghitung Owner aktif, mengabaikan user dengan ID except.
-func (s *Store) activeOwners(except int) int {
+// activeOwners menghitung Owner aktif satu usaha, mengabaikan user dengan ID except.
+func (s *Store) activeOwners(tenantID, except int) int {
 	n := 0
 	for id, r := range s.users {
-		if id != except && r.Role == Owner && r.Active {
+		if id != except && r.TenantID == tenantID && r.Role == Owner && r.Active {
 			n++
 		}
 	}
@@ -166,7 +168,7 @@ func (s *Store) Create(in Input) (User, error) {
 	s.nextID++
 	salt := []byte(rand.Text())
 	r := &record{
-		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02")},
+		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02"), TenantID: max(in.TenantID, 1)},
 		salt: salt,
 		hash: hashPassword(in.Password, salt),
 	}
@@ -174,20 +176,21 @@ func (s *Store) Create(in Input) (User, error) {
 	return r.User, nil
 }
 
-func (s *Store) Update(id int, in Input) (User, error) {
+// Update mengubah user milik usaha tenantID; user usaha lain dianggap tidak ada.
+func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if err := validate(&in, false); err != nil {
 		return User{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r, ok := s.users[id]
-	if !ok {
+	if !ok || r.TenantID != tenantID {
 		return User{}, ErrNotFound
 	}
 	if s.emailTaken(in.Email, id) {
 		return User{}, ErrEmailTaken
 	}
-	if (in.Role != Owner || !in.Active) && s.activeOwners(id) == 0 {
+	if (in.Role != Owner || !in.Active) && s.activeOwners(tenantID, id) == 0 {
 		return User{}, ErrLastOwner
 	}
 	r.Name, r.Email, r.Role, r.Active = in.Name, in.Email, in.Role, in.Active
@@ -198,13 +201,13 @@ func (s *Store) Update(id int, in Input) (User, error) {
 	return r.User, nil
 }
 
-func (s *Store) Delete(id int) error {
+func (s *Store) Delete(tenantID, id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.users[id]; !ok {
+	if r, ok := s.users[id]; !ok || r.TenantID != tenantID {
 		return ErrNotFound
 	}
-	if s.activeOwners(id) == 0 {
+	if s.activeOwners(tenantID, id) == 0 {
 		return ErrLastOwner
 	}
 	delete(s.users, id)
@@ -212,12 +215,15 @@ func (s *Store) Delete(id int) error {
 	return nil
 }
 
-func (s *Store) List() []User {
+// List mengembalikan user satu usaha.
+func (s *Store) List(tenantID int) []User {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]User, 0, len(s.users))
 	for _, r := range s.users {
-		out = append(out, r.User)
+		if r.TenantID == tenantID {
+			out = append(out, r.User)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
@@ -312,6 +318,7 @@ func (s *Store) Snapshot() StoreSnapshot {
 func Restore(snap StoreSnapshot) *Store {
 	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
 	for _, u := range snap.Users {
+		u.TenantID = max(u.TenantID, 1) // state.json lama belum menyimpan tenant_id
 		s.users[u.ID] = &record{u.User, u.Salt, u.Hash}
 		s.nextID = max(s.nextID, u.ID)
 	}

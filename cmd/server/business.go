@@ -9,10 +9,7 @@ import (
 	"pajak/internal/tax"
 )
 
-func profilePath() string { return dataPath("business.json") }
-
-func loadProfile() *finance.BusinessProfile {
-	p := profilePath()
+func loadProfile(p string) *finance.BusinessProfile {
 	if p == "" {
 		return nil
 	}
@@ -27,15 +24,14 @@ func loadProfile() *finance.BusinessProfile {
 	return &prof
 }
 
-func saveProfile(prof finance.BusinessProfile) error {
-	p := profilePath()
+func saveProfile(p string, prof finance.BusinessProfile) error {
 	if p == "" {
 		return nil
 	}
 	return writeFileAtomic(p, prof)
 }
 
-func (s *Server) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	prof := s.profile
 	s.mu.RUnlock()
@@ -50,7 +46,7 @@ func (s *Server) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 	var prof finance.BusinessProfile
 	if err := json.NewDecoder(r.Body).Decode(&prof); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
@@ -60,7 +56,7 @@ func (s *Server) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := saveProfile(prof); err != nil {
+	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan profil usaha", http.StatusInternalServerError)
 		return
 	}
@@ -77,7 +73,7 @@ type taxPlanningReq struct {
 }
 
 // annualized: omzet setahun = rata-rata omzet bulanan semua periode x 12, margin = laba bersih / omzet.
-func (s *Server) annualized() (omzet, marginBps int64) {
+func (s *tenant) annualized() (omzet, marginBps int64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var total, laba int64
@@ -95,7 +91,7 @@ func (s *Server) annualized() (omzet, marginBps int64) {
 	return total * 12 / int64(len(periods)), laba * 10_000 / total
 }
 
-func (s *Server) handleTaxPlanning(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleTaxPlanning(w http.ResponseWriter, r *http.Request) {
 	var req taxPlanningReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)

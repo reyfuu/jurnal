@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { login, type Me } from '@/lib/api'
+import { login, register, type Me } from '@/lib/api'
 
 // Akun demo hanya tampil di `npm run dev`; build produksi membuangnya (password prod dari env SEED_PASSWORD).
 const DEMO_PASSWORD = 'senja2026'
@@ -16,6 +16,10 @@ const DEMO_ACCOUNTS = [
 ]
 
 export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
+  // daftar: buat usaha baru (kosong) dengan kode undangan, lalu langsung masuk wizard onboarding.
+  const [daftar, setDaftar] = useState(false)
+  const [name, setName] = useState('')
+  const [kode, setKode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -28,7 +32,7 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
     setBusy(true)
     setError('')
     try {
-      onLogin(await login(email, password))
+      onLogin(await (daftar ? register(name, email, password, kode) : login(email, password)))
     } catch (err) {
       setError((err as Error).message)
       setBusy(false)
@@ -48,19 +52,25 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
 
         <Card className="border-[var(--border-shell)] bg-[var(--bg-shell)]">
           <CardHeader>
-            <CardTitle className="text-xl">Masuk</CardTitle>
-            <CardDescription>Gunakan akun yang dibuat oleh Owner bisnis Anda.</CardDescription>
+            <CardTitle className="text-xl">{daftar ? 'Daftar' : 'Masuk'}</CardTitle>
+            <CardDescription>
+              {daftar ? 'Buat akun Owner untuk usaha baru Anda. Datanya mulai kosong.' : 'Gunakan akun yang dibuat oleh Owner bisnis Anda.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="grid gap-4">
+              {daftar && <div className="grid gap-1.5">
+                <Label htmlFor="name">Nama</Label>
+                <Input id="name" className="h-11" autoComplete="name" required autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+              </div>}
               <div className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" className="h-11" type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input id="email" className="h-11" type="email" autoComplete="username" required autoFocus={!daftar} value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <Input id="password" className="h-11 pr-12" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <Input id="password" className="h-11 pr-12" type={showPassword ? 'text' : 'password'} autoComplete={daftar ? 'new-password' : 'current-password'} required minLength={daftar ? 8 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
                   <Button
                     type="button"
                     variant="ghost"
@@ -75,11 +85,21 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
                   </Button>
                 </div>
               </div>
+              {daftar && <div className="grid gap-1.5">
+                <Label htmlFor="kode">Kode undangan</Label>
+                <Input id="kode" className="h-11" autoComplete="off" required value={kode} onChange={(e) => setKode(e.target.value)} />
+              </div>}
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
               <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy}>
-                {busy ? 'Memeriksa…' : 'Masuk'}
+                {busy ? 'Memeriksa…' : daftar ? 'Daftar' : 'Masuk'}
               </Button>
             </form>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              {daftar ? 'Sudah punya akun?' : 'Belum punya akun?'}{' '}
+              <button type="button" className="font-semibold text-foreground underline-offset-4 hover:underline" onClick={() => { setDaftar(!daftar); setError('') }}>
+                {daftar ? 'Masuk' : 'Daftar'}
+              </button>
+            </p>
           </CardContent>
         </Card>
 

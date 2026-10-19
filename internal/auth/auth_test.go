@@ -45,7 +45,7 @@ func TestCreateUpdateDelete(t *testing.T) {
 	}
 
 	// Update tanpa password: password lama tetap berlaku.
-	u, err = s.Update(u.ID, auth.Input{Name: "Rina S", Email: "rina@kopi.id", Role: auth.Admin, Active: true})
+	u, err = s.Update(1, u.ID, auth.Input{Name: "Rina S", Email: "rina@kopi.id", Role: auth.Admin, Active: true})
 	if err != nil || u.Role != auth.Admin || u.Name != "Rina S" {
 		t.Fatalf("update: %+v %v", u, err)
 	}
@@ -55,7 +55,7 @@ func TestCreateUpdateDelete(t *testing.T) {
 	}
 
 	// Nonaktif: sesi lama mati dan tidak bisa login.
-	if _, err := s.Update(u.ID, auth.Input{Name: "Rina S", Email: "rina@kopi.id", Role: auth.Admin, Active: false}); err != nil {
+	if _, err := s.Update(1, u.ID, auth.Input{Name: "Rina S", Email: "rina@kopi.id", Role: auth.Admin, Active: false}); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := s.UserBySession(token); ok {
@@ -65,10 +65,10 @@ func TestCreateUpdateDelete(t *testing.T) {
 		t.Fatalf("inactive login: want ErrBadCredentials, got %v", err)
 	}
 
-	if err := s.Delete(u.ID); err != nil {
+	if err := s.Delete(1, u.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Delete(u.ID); !errors.Is(err, auth.ErrNotFound) {
+	if err := s.Delete(1, u.ID); !errors.Is(err, auth.ErrNotFound) {
 		t.Fatalf("delete twice: want ErrNotFound, got %v", err)
 	}
 }
@@ -91,10 +91,10 @@ func TestValidation(t *testing.T) {
 func TestLastOwnerProtected(t *testing.T) {
 	s := auth.NewStore()
 	_, owner, _ := s.Login("owner@kedaikopisenja.id", auth.DemoPassword)
-	if err := s.Delete(owner.ID); !errors.Is(err, auth.ErrLastOwner) {
+	if err := s.Delete(1, owner.ID); !errors.Is(err, auth.ErrLastOwner) {
 		t.Fatalf("delete last owner: want ErrLastOwner, got %v", err)
 	}
-	if _, err := s.Update(owner.ID, auth.Input{Name: owner.Name, Email: owner.Email, Role: auth.Kasir, Active: true}); !errors.Is(err, auth.ErrLastOwner) {
+	if _, err := s.Update(1, owner.ID, auth.Input{Name: owner.Name, Email: owner.Email, Role: auth.Kasir, Active: true}); !errors.Is(err, auth.ErrLastOwner) {
 		t.Fatalf("demote last owner: want ErrLastOwner, got %v", err)
 	}
 }
@@ -129,7 +129,7 @@ func TestSession_Expires(t *testing.T) {
 func TestSession_RevokedOnPasswordChange(t *testing.T) {
 	s := auth.NewStore()
 	token, u, _ := s.Login("kasir@kedaikopisenja.id", auth.DemoPassword)
-	if _, err := s.Update(u.ID, auth.Input{Name: u.Name, Email: u.Email, Role: u.Role, Active: true, Password: "passwordbaru1"}); err != nil {
+	if _, err := s.Update(1, u.ID, auth.Input{Name: u.Name, Email: u.Email, Role: u.Role, Active: true, Password: "passwordbaru1"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := s.UserBySession(token); ok {
