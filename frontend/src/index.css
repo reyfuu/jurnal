@@ -574,6 +574,9 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
   }
+  .sim-results-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
 
   /* Ponsel: sidebar jadi strip navigasi horizontal, grid dipadatkan, tabel bisa digulir. */
   @media (max-width: 760px) {
@@ -626,7 +629,8 @@
     }
     .bottom-grid,
     .form-grid,
-    .sim-results {
+    .sim-results,
+    .sim-results-4 {
       grid-template-columns: minmax(0, 1fr);
     }
     .data-table {

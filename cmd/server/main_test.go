@@ -147,3 +147,27 @@ func TestAIChatEndpoint(t *testing.T) {
 		t.Fatalf("expected answer to contain summary, got: %s", ans)
 	}
 }
+
+func TestPriceSimulationBreakEven(t *testing.T) {
+	srv := asOwner(t, NewServer())
+	post := func(body string) map[string]any {
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/pricing/simulate?period=2026-08", strings.NewReader(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d %s", rec.Code, rec.Body)
+		}
+		var m map[string]any
+		_ = json.NewDecoder(rec.Body).Decode(&m)
+		return m
+	}
+	m := post(`{"cogs":6800,"target_profit":7600,"fee_bps":2000,"fixed_cost":38000000,"monthly_volume":1500,"target_net_profit":15200000}`)
+	be, ok := m["break_even"].(map[string]any)
+	if !ok || be["bep_units"].(float64) != 5000 || m["recommended_price"].(float64) != 18000 {
+		t.Fatalf("unexpected response %v", m)
+	}
+	// tanpa fixed_cost: pakai total beban operasional periode berjalan
+	m = post(`{"cogs":6800,"target_profit":7600,"fee_bps":2000}`)
+	if be := m["break_even"].(map[string]any); be["fixed_cost"].(float64) <= 0 {
+		t.Fatalf("default fixed cost should come from period opex, got %v", be)
+	}
+}

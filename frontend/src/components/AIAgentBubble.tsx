@@ -10,10 +10,10 @@ interface Message {
 }
 
 const INITIAL_SUGGESTIONS = [
-  '📊 Ringkas laporan bulan ini',
-  '⚖️ Bagaimana aturan pajak UMKM PP 55/2022?',
-  '💰 Bagaimana kondisi arus kas dan piutang saya?',
-  '💡 Bagaimana cara hitung simulasi harga komisi GoFood?',
+  'Ringkas laporan bulan ini',
+  'Bagaimana aturan pajak UMKM PP 55/2022?',
+  'Bagaimana kondisi arus kas dan piutang saya?',
+  'Bagaimana cara hitung simulasi harga komisi GoFood?',
 ]
 
 export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08' }) => {

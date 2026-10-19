@@ -338,10 +338,19 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 type simulateReq struct {
-	COGS         int64 `json:"cogs"`
-	TargetProfit int64 `json:"target_profit"`
-	FeeBps       int   `json:"fee_bps"`
-	FixedFee     int64 `json:"fixed_fee"`
+	COGS            int64  `json:"cogs"`
+	TargetProfit    int64  `json:"target_profit"`
+	FeeBps          int    `json:"fee_bps"`
+	FixedFee        int64  `json:"fixed_fee"`
+	FixedCost       *int64 `json:"fixed_cost"` // kosong = total beban operasional periode berjalan
+	MonthlyVolume   int64  `json:"monthly_volume"`
+	TargetNetProfit int64  `json:"target_net_profit"`
+}
+
+type simulateResp struct {
+	finance.PriceSimulationResult
+	BreakEven      *finance.BreakEvenResult `json:"break_even,omitempty"`
+	BreakEvenError string                   `json:"break_even_error,omitempty"`
 }
 
 func (s *Server) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
@@ -350,7 +359,19 @@ func (s *Server) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee))
+	sim := finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee)
+	fixed := finance.BuildIncomeStatement(s.ledger(r)).Opex
+	if req.FixedCost != nil {
+		fixed = *req.FixedCost
+	}
+	resp := simulateResp{PriceSimulationResult: sim}
+	be, err := finance.BreakEven(sim.RecommendedPrice, sim.COGS+sim.ChannelFee, fixed, req.MonthlyVolume, req.TargetNetProfit)
+	if err != nil {
+		resp.BreakEvenError = err.Error()
+	} else {
+		resp.BreakEven = &be
+	}
+	writeJSON(w, resp)
 }
 
 func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {

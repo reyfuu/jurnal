@@ -122,7 +122,7 @@ export default function App() {
       case 'invoice':
         return <PiutangUtang d={d} />
       case 'simulasi-harga':
-        return <SimulasiHarga />
+        return <SimulasiHarga period={period} />
       case 'pajak-umkm':
         return <PajakUMKM d={d} />
       case 'pengguna':

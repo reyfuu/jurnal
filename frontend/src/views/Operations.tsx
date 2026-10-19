@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -204,53 +204,83 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
   )
 }
 
-export function SimulasiHarga() {
+export function SimulasiHarga({ period }: { period: string }) {
   const [cogs, setCogs] = useState('6800')
   const [profit, setProfit] = useState('7600')
   const [fee, setFee] = useState('20')
-  const [res, setRes] = useState<PriceSim>({ recommended_price: 18_000, channel_fee: 3_600, net_take_home: 14_400 })
+  const [fixedCost, setFixedCost] = useState('')
+  const [volume, setVolume] = useState('1500')
+  const [targetNet, setTargetNet] = useState('10000000')
+  const [res, setRes] = useState<PriceSim | null>(null)
   const [feeShown, setFeeShown] = useState('20')
   const [busy, setBusy] = useState(false)
 
-  async function run(e: FormEvent) {
-    e.preventDefault()
+  const num = (v: string) => parseFloat(v || '0')
+
+  async function run(e?: FormEvent) {
+    e?.preventDefault()
     setBusy(true)
     try {
-      setRes(await simulatePrice(parseInt(cogs || '0', 10), parseInt(profit || '0', 10), parseFloat(fee || '0')))
+      setRes(await simulatePrice(period, {
+        cogs: num(cogs),
+        targetProfit: num(profit),
+        feePct: num(fee),
+        fixedCost: fixedCost.trim() === '' ? undefined : num(fixedCost),
+        monthlyVolume: num(volume),
+        targetNetProfit: num(targetNet),
+      }))
       setFeeShown(fee || '0')
     } finally {
       setBusy(false)
     }
   }
 
+  // hitung ulang otomatis saat periode (sumber biaya tetap) berganti
+  useEffect(() => { void run() }, [period])
+
   const fields = [
     { id: 'sim-cogs', label: 'HPP Produk per Cup/Pcs (Rp)', value: cogs, set: setCogs },
-    { id: 'sim-profit', label: 'Target Laba Bersih per Pcs (Rp)', value: profit, set: setProfit },
+    { id: 'sim-profit', label: 'Target Laba Kotor per Pcs (Rp)', value: profit, set: setProfit },
     { id: 'sim-fee', label: 'Komisi Aplikasi (%)', value: fee, set: setFee },
+    { id: 'sim-fixed', label: 'Biaya Tetap per Bulan (Rp)', value: fixedCost, set: setFixedCost, placeholder: 'Otomatis dari beban operasional' },
+    { id: 'sim-volume', label: 'Perkiraan Terjual per Bulan (Pcs)', value: volume, set: setVolume },
+    { id: 'sim-target', label: 'Target Laba Bersih per Bulan (Rp)', value: targetNet, set: setTargetNet },
   ]
-  const results = [
-    { label: 'Harga Jual Rekomendasi di Aplikasi', value: res.recommended_price, color: '#facc15' },
-    { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: res.channel_fee, color: '#fb7185' },
-    { label: 'Uang Bersih Diterima (Take Home)', value: res.net_take_home, color: '#10b981' },
-  ]
+  const be = res?.break_even
+  const results = res ? [
+    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: '#facc15' },
+    { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: formatRp(res.channel_fee), color: '#fb7185' },
+    { label: 'Uang Bersih Diterima (Take Home)', value: formatRp(res.net_take_home), color: '#10b981' },
+  ] : []
+  const beCards = be ? [
+    { label: 'Biaya Tetap per Bulan', value: formatRp(be.fixed_cost), meta: fixedCost.trim() === '' ? 'Dari total beban operasional periode ini' : 'Input manual' },
+    { label: 'Titik Impas (BEP)', value: `${be.bep_units.toLocaleString('id-ID')} pcs`, meta: `± ${be.bep_units_per_day.toLocaleString('id-ID')} pcs/hari · omzet ${formatRp(be.bep_revenue)}` },
+    {
+      label: `Laba Bersih pada ${be.monthly_volume.toLocaleString('id-ID')} pcs`,
+      value: formatRp(be.net_profit_at_volume),
+      color: be.net_profit_at_volume < 0 ? '#fb7185' : '#10b981',
+      meta: be.net_profit_at_volume < 0 ? 'Masih rugi, volume di bawah BEP' : 'Sudah di atas BEP',
+    },
+    { label: 'Harus Terjual untuk Target Laba', value: `${be.units_for_target.toLocaleString('id-ID')} pcs`, meta: `Target ${formatRp(be.target_net_profit)} per bulan` },
+  ] : []
 
   return (
     <>
       <PageHeader
         title="Simulasi & Harga Channel"
-        subtitle="Jangan sampai ramai orderan di GoFood/GrabFood tapi laba bersih tergerus potongan komisi aplikasi."
+        subtitle="Jangan sampai ramai orderan di GoFood/GrabFood tapi laba bersih tergerus potongan komisi aplikasi dan biaya tetap."
       />
       <form className="card" style={{ padding: 22 }} onSubmit={run}>
-        <div className="chart-title">Kalkulator Anti-Boncos Komisi Aplikasi</div>
+        <div className="chart-title">Kalkulator Harga, Titik Impas & Laba Bersih</div>
         <div className="form-grid">
           {fields.map((f) => (
             <div key={f.id}>
               <Label htmlFor={f.id} className="kpi-label">{f.label}</Label>
-              <Input id={f.id} type="number" min={0} className={fieldClass + ' mt-1.5'} value={f.value} onChange={(e) => f.set(e.target.value)} />
+              <Input id={f.id} type="number" min={0} placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} value={f.value} onChange={(e) => f.set(e.target.value)} />
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="btn-cta" style={{ width: '100%' }} type="submit" disabled={busy}>Hitung Harga Jual Ideal</button>
+            <button className="btn-cta" style={{ width: '100%' }} type="submit" disabled={busy}>Hitung</button>
           </div>
         </div>
 
@@ -258,10 +288,23 @@ export function SimulasiHarga() {
           {results.map((r) => (
             <div className="card" style={{ background: '#101318' }} key={r.label}>
               <div className="kpi-label">{r.label}</div>
-              <div className="kpi-value tabular" style={{ color: r.color }}>{formatRp(r.value)}</div>
+              <div className="kpi-value tabular" style={{ color: r.color }}>{r.value}</div>
             </div>
           ))}
         </div>
+
+        {res?.break_even_error && <p className="text-sm text-destructive" role="alert" style={{ marginTop: 16 }}>{res.break_even_error}</p>}
+        {be && (
+          <div className="sim-results sim-results-4">
+            {beCards.map((c) => (
+              <div className="card" style={{ background: '#101318' }} key={c.label}>
+                <div className="kpi-label">{c.label}</div>
+                <div className="kpi-value tabular" style={{ color: c.color }}>{c.value}</div>
+                <div className="kpi-meta-row">{c.meta}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </form>
     </>
   )

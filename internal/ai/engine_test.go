@@ -64,3 +64,19 @@ func TestAnswer_ReceivablesAndCashflow(t *testing.T) {
 	}
 }
 
+
+func TestAnswer_NoEmoji(t *testing.T) {
+	engine := NewEngine()
+	snap := finance.SeedKedaiKopiSenja("2026-08")
+	ledger := finance.SeedLedger("2026-08")
+	for _, q := range []string{"Ringkas laporan bulan ini", "aturan pajak UMKM", "arus kas dan piutang", "simulasi harga GoFood", "halo"} {
+		resp := engine.Answer(context.Background(), QueryRequest{Query: q, Period: "2026-08"}, snap, ledger)
+		for _, s := range append([]string{resp.Answer}, resp.ActionSuggestions...) {
+			for _, r := range s {
+				if (r >= 0x1F300 && r <= 0x1FAFF) || (r >= 0x2600 && r <= 0x27BF) {
+					t.Fatalf("query %q: emoji %q in %q", q, r, s)
+				}
+			}
+		}
+	}
+}

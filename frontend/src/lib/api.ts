@@ -173,10 +173,35 @@ export interface Tx {
 
 export type TxInput = Omit<Tx, 'id'>
 
+export interface BreakEven {
+  price: number
+  variable_cost: number
+  contribution_margin: number
+  fixed_cost: number
+  bep_units: number
+  bep_units_per_day: number
+  bep_revenue: number
+  monthly_volume: number
+  net_profit_at_volume: number
+  target_net_profit: number
+  units_for_target: number
+}
+
 export interface PriceSim {
   recommended_price: number
   channel_fee: number
   net_take_home: number
+  break_even?: BreakEven
+  break_even_error?: string
+}
+
+export interface PriceSimInput {
+  cogs: number
+  targetProfit: number
+  feePct: number
+  fixedCost?: number // kosong = beban operasional periode berjalan
+  monthlyVolume: number
+  targetNetProfit: number
 }
 
 export interface AppData {
@@ -233,10 +258,17 @@ export const createTransaction = (t: TxInput) => api<Tx>('/transactions', { meth
 export const updateTransaction = (id: number, t: TxInput) => api<Tx>(`/transactions/${id}`, { method: 'PUT', body: t })
 export const deleteTransaction = (id: number) => api<void>(`/transactions/${id}`, { method: 'DELETE' })
 
-export const simulatePrice = (cogs: number, targetProfit: number, feePct: number) =>
-  api<PriceSim>('/pricing/simulate', {
+export const simulatePrice = (period: string, i: PriceSimInput) =>
+  api<PriceSim>(`/pricing/simulate?period=${period}`, {
     method: 'POST',
-    body: { cogs, target_profit: targetProfit, fee_bps: Math.round(feePct * 100), fixed_fee: 0 },
+    body: {
+      cogs: i.cogs,
+      target_profit: i.targetProfit,
+      fee_bps: Math.round(i.feePct * 100),
+      fixed_cost: i.fixedCost,
+      monthly_volume: i.monthlyVolume,
+      target_net_profit: i.targetNetProfit,
+    },
   })
 
 export const listUsers = () => api<{ users: User[]; roles: Record<Role, RoleInfo> }>('/users')

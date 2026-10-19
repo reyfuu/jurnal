@@ -149,5 +149,6 @@ Seluruh kartu memiliki `border-radius: 14px`, `padding: 15px 16px`, `background:
 - ❌ **Dilarang** menggunakan gradien ungu/indigo/neon cyberpunk yang tidak ada di referensi.
 - ❌ **Dilarang** menggunakan border putih tebal (`> 1px`) atau *drop shadow* berwarna terang pada kartu dalam.
 - ❌ **Dilarang** menampilkan angka panjang tak terformat di KPI utama (`Rp 92.000.000,00` → wajib disingkat `Rp92 jt` untuk KPI utama).
+- ❌ **Dilarang** memakai emoji di UI, jawaban AI Agent, laporan, dan ekspor. Pakai teks atau ikon `lucide-react` (dijaga oleh `TestAnswer_NoEmoji`).
 - ✅ **Wajib** mempertahankan kepadatan informasi (*information density*) tinggi yang tetap lega berkat kontras tipografi dan *negative space* gelap `#0F1115` / `#161920`.
 

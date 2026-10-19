@@ -11,7 +11,7 @@ export function LaporanKeuangan({ r, bs, periodLabel }: { r: IncomeStatement; bs
     <>
       <PageHeader title="Laporan Keuangan" subtitle={`${periodLabel} · Laba Rugi & Neraca Sederhana`}>
         <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
-          {bs.is_balanced ? '✓ Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
+          {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
         </span>
       </PageHeader>
 
