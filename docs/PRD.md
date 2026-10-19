@@ -17,6 +17,8 @@ Laporan Bisnis by Akademi Pajak membantu pemilik UMKM melihat kesehatan bisnis s
 |---|---|---|---|
 | **Raka — Pemilik Kedai Kopi Senja (FnB)** | 4.425 transaksi, jual offline + GoFood/GrabFood | "Omzet Rp92 juta sebulan tapi kok uang di BCA cuma naik dikit? Potongan aplikasi berapa sebenarnya?" | Melihat potongan aplikasi (`Rp4,6 jt`), membandingkan omzet harian dengan target `Rp3 jt/hari`, dan menjaga margin laba `27%`. |
 | **Sinta — Supplier Kue & Catering (B2B/Produksi)** | Jual ke kantor & hotel dengan sistem invoice tempo | "Laba di catatan Rp25 juta, tapi mau belanja bahan baku kasnya kurang." | Memantau kartu **Piutang belum tertagih (`Rp11 jt`)** terutama alert merah **`Rp9,6 jt lewat 30 hari`** dan mengirim invoice pengingat. |
+| **Hendra — Pemilik UMKM Menengah tanpa Staf Keuangan** | Distributor sembako, omzet Rp2 M/tahun, 6 karyawan gudang & sales, pembukuan dikerjakan sendiri malam hari | "Mau rekrut admin keuangan tapi gaji Rp4,5 jt berat, dan saya tidak tahu harus cari yang bisa apa." | Transaksi otomatis masuk CoA perdagangan, laporan laba rugi & neraca siap tiap bulan, peringatan kas minus, dan BEP. Saat akhirnya merekrut, laporan menjadi acuan tugas orang tersebut. |
+| **Client — Pelanggan B2B UMKM** | Hotel / kantor yang membeli dengan invoice tempo | "Tagihan saya ke kedai ini berapa saja yang belum dibayar?" | Login dengan role Client, hanya melihat invoice & sisa tagihan miliknya sendiri. |
 | **Budi — Pedagang Ritel UMKM (WP Orang Pribadi)** | Omzet Rp60–90 juta/bulan | "Takut salah hitung pajak UMKM dan belum tahu kalau omzet di bawah Rp500 juta setahun bebas PPh." | Membuka halaman **Pajak UMKM**, melihat sisa kuota bebas pajak Rp500 juta, dan mengunduh rekap omzet bulanan untuk SPT. |
 
 ---
@@ -102,4 +104,11 @@ Laporan Bisnis by Akademi Pajak membantu pemilik UMKM melihat kesehatan bisnis s
   - CRUD Transaksi, Piutang & Utang, Stok & Gudang, Produksi & Supplier, Laporan Keuangan, dan Arus Kas.
 - **Fase 3 (Alat UMKM & Monetisasi Rp149.000)**:
   - Generator Invoice PDF/WA, Kalkulator Simulasi & Harga, Modul Pajak UMKM PP 55/2022, serta integrasi checkout `Beli Rp149.000`.
+
+### Roadmap "Staf Keuangan Virtual" (pain point UMKM menengah, Okt 2026)
+- **Fase A (selesai)**: tanpa emoji di seluruh UI/AI; Simulasi Harga dengan BEP, biaya tetap & laba bersih; peringatan saldo kas minus (transaksi tetap tersimpan); Laporan Penjualan (tren harian/mingguan/bulanan, produk terlaris, per channel, per pelanggan).
+- **Fase B**: persistensi SQLite (data tidak hilang saat deploy); KPI dashboard dihitung murni dari transaksi.
+- **Fase C**: CoA otomatis dengan template **perdagangan, jasa, manufaktur**; transaksi dipetakan ke akun otomatis dan koreksi user diingat; Laba Rugi & Neraca per template; ekspor PDF/Excel; stok per transaksi dan peringatan stok minus.
+- **Fase D**: role **Client** (pelanggan B2B melihat tagihannya sendiri); upload bukti/nota dengan kompresi otomatis (foto, PDF, Excel).
+- **Fase E**: ekspor XML Coretax: rekap PPh Final 0,5%, e-Bupot PPh 21/23, e-Faktur PPN (format diverifikasi terhadap template resmi DJP).
 

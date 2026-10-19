@@ -7,11 +7,14 @@
 ---
 
 ## 1. Latar Belakang & Masalah Bisnis (Problem Statement)
-Pemilik UMKM di Indonesia (FnB seperti *Kedai Kopi Senja*, ritel, jasa, dan manufaktur kecil) menghadapi 4 masalah utama:
+Pemilik UMKM di Indonesia (FnB seperti *Kedai Kopi Senja*, ritel, jasa, dan manufaktur kecil) menghadapi 5 masalah utama:
 1. **Buta Finansial Harian**: Omzet terlihat besar di aplikasi kasir/marketplace, tetapi kas di bank justru menyusut karena potongan komisi aplikasi (GoFood/Grab/Shopee), biaya bahan baku yang bocor, dan piutang pelanggan yang macet.
 2. **Bingung Bedakan Laba vs Arus Kas**: Banyak pemilik bisnis mengira laba positif berarti uang kas tersedia, padahal tertahan di piutang (>30 hari) atau stok menumpuk.
 3. **Alat Akuntansi Terlalu Rumit & Mahal**: Software ERP/akuntansi konvensional mengharuskan pemilik UMKM memahami jurnal debit-kredit dan berbiaya Rp300.000–Rp1.500.000/bulan.
 4. **Ketakutan & Ketidaktahuan Pajak UMKM**: Pemilik UMKM kesulitan menghitung PPh Final 0,5% (PP 55/2022) dan tidak tahu bahwa Wajib Pajak Orang Pribadi memiliki kuota bebas pajak hingga omzet Rp500 juta/tahun.
+5. **Tidak Mampu atau Bingung Merekrut Staf Keuangan** (UMKM menengah): Sebagian pengusaha belum sanggup menggaji admin keuangan (Rp4–5 juta/bulan), sebagian lagi mau merekrut tapi bingung kriteria orangnya (cukup admin pencatat, akuntan, atau konsultan pajak?). Akibatnya pembukuan dikerjakan pemilik sendiri di sela operasional, atau tidak dikerjakan sama sekali.
+
+**Positioning**: Laporan Bisnis berperan sebagai **staf admin keuangan virtual** seharga Rp149.000/bulan. Pekerjaan rutin dikerjakan otomatis: pencatatan, CoA, laporan keuangan per jenis usaha, peringatan kas minus, BEP, dan rekap pajak. Pemilik baru perlu merekrut orang untuk pekerjaan yang memang butuh manusia (penagihan, negosiasi, audit, perencanaan pajak), dan saat itu laporan yang rapi menjadi spesifikasi kerja yang jelas untuk orang yang direkrut.
 
 ---
 
@@ -29,6 +32,7 @@ Pemilik UMKM di Indonesia (FnB seperti *Kedai Kopi Senja*, ritel, jasa, dan manu
 1. **FnB & Kedai / Resto Kecil** (Contoh: *Kedai Kopi Senja* — ~4.000+ transaksi/tahun, multi-channel offline + GoFood/GrabFood/ShopeeFood, butuh pantau HPP resep & potongan aplikasi).
 2. **Pedagang Online & Ritel** (Toko Shopee/Tokopedia/TikTok Shop + offline yang pusing menghitung potongan admin platform & stok gudang).
 3. **UMKM B2B / Jasa / Produksi Kecil** (Memiliki tagihan invoice ke pelanggan dengan termin pembayaran dan risiko piutang lewat 30 hari).
+4. **UMKM Menengah tanpa Staf Keuangan** (omzet Rp300 juta–Rp4,8 miliar/tahun, usaha perdagangan, jasa, atau manufaktur; belum punya atau ragu merekrut admin keuangan).
 
 ---
 
@@ -44,7 +48,7 @@ Pemilik UMKM di Indonesia (FnB seperti *Kedai Kopi Senja*, ritel, jasa, dan manu
 ### Out-of-Scope (Fase 1 — YAGNI)
 - Integrasi mutasi bank otomatis berbayar mahal (Brick/Ayoconnect) → Cukup input cepat & impor CSV/Excel mutasi.
 - Multi-cabang kompleks / konsolidasi holding perusahaan.
-- Pemotongan pajak korporasi kompleks (PPh 21 karyawan berlapis, PPh 23/26, e-Faktur PPN PKP) → Fokus khusus pada Pajak UMKM.
+- Perhitungan pajak korporasi kompleks (PPh Badan, PPh 26, rekonsiliasi fiskal). Ekspor XML Coretax untuk PPh Final 0,5%, e-Bupot PPh 21/23, dan e-Faktur PPN masuk roadmap Fase E (lihat PRD §5).
 
 ---
 
