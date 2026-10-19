@@ -40,11 +40,12 @@ func formatRp(n int64) string {
 	return string(res)
 }
 
-func (e *Engine) Answer(ctx context.Context, req QueryRequest, snap finance.DashboardSnapshot, ledger []finance.LedgerEntry) QueryResponse {
+// Answer memakai laporan periode yang sudah dihitung server, supaya angka yang dijawab AI
+// selalu sama dengan yang tampil di menu Laporan Keuangan.
+func (e *Engine) Answer(ctx context.Context, req QueryRequest, snap finance.DashboardSnapshot, rep finance.PeriodReport) QueryResponse {
 	q := strings.ToLower(strings.TrimSpace(req.Query))
 
-	is := finance.BuildIncomeStatement(ledger)
-	cf := finance.BuildCashFlow(ledger, 80_000_000)
+	is, cf := rep.Income, rep.CashFlow
 
 	// 1. Ringkasan Laporan Bisnis
 	if strings.Contains(q, "ringkas") || strings.Contains(q, "summary") || strings.Contains(q, "laporan bulan") || strings.Contains(q, "performa") || strings.Contains(q, "ikhtisar") {

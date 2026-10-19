@@ -1,10 +1,12 @@
 // Tipe mengikuti struct JSON di internal/finance dan internal/auth (Go).
 
+// 'arus-kas' dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 export type View =
-  | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'arus-kas' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
-  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'perencanaan-pajak' | 'master-data' | 'panduan' | 'pengguna'
-  | 'profil-usaha'
+  | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
+  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
+  | 'panduan' | 'pengguna' | 'profil-usaha'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
+  | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
 
 export type Role = 'owner' | 'admin' | 'kasir'
 
@@ -133,11 +135,29 @@ export interface IncomeStatement {
   net_sales: number
   cogs: number
   gross_profit: number
+  /** Beban operasional yang mengeluarkan kas (tanpa penyusutan). */
   opex: number
+  depreciation: number
+  amortization: number
+  total_opex: number
   other_income: number
   net_profit: number
   margin_bps: number
   opex_lines: { label: string; amount: number }[] | null
+}
+
+export interface CashFlowLine {
+  label: string
+  /** Bertanda: positif menambah kas, negatif mengurangi. */
+  amount: number
+  detail?: { label: string; amount: number }[] | null
+  /** Baris informasi yang sengaja Rp 0 karena tidak menggerakkan kas. */
+  non_kas?: boolean
+}
+
+export interface CashFlowSection {
+  lines: CashFlowLine[]
+  net: number
 }
 
 export interface CashFlow {
@@ -148,11 +168,29 @@ export interface CashFlow {
   closing_balance: number
   new_receivables: number
   new_payables: number
-  non_operating: number
+  new_payables_other: number
+  new_receivables_other: number
+  depreciation: number
+  amortization: number
+  setor_modal: number
+  prive: number
+  operasi_langsung: CashFlowSection
+  operasi_tidak_langsung: CashFlowSection
+  investasi: CashFlowSection
+  pendanaan: CashFlowSection
 }
 
 export interface BalanceSheet {
-  assets: { cash: number; receivables: number; inventory: number; fixed_assets: number; total: number }
+  assets: {
+    cash: number
+    receivables: number
+    inventory: number
+    fixed_assets_cost: number
+    accum_depreciation: number
+    /** Nilai buku aset tetap & tak berwujud. */
+    fixed_assets: number
+    total: number
+  }
   liabilities: { payables: number; loans: number; total: number }
   equity: { opening_capital: number; added_capital: number; current_profit: number; total: number }
   is_balanced: boolean
@@ -218,6 +256,7 @@ export interface AppData {
   report?: IncomeStatement
   cash?: CashFlow
   balanceSheet?: BalanceSheet
+  assets?: AssetSummary
 }
 
 export class ApiError extends Error {
@@ -251,16 +290,99 @@ export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */
 export async function loadAll(views: View[], period = '2026-08'): Promise<AppData> {
-  const can = (v: View) => views.includes(v)
+  const lk = views.includes('laporan-keuangan')
   const q = `?period=${encodeURIComponent(period)}`
-  const [dash, report, cash, balanceSheet] = await Promise.all([
+  const [dash, report, cash, balanceSheet, assets] = await Promise.all([
     api<Dashboard>('/dashboard' + q),
-    can('laporan-keuangan') || can('arus-kas') ? api<IncomeStatement>('/reports/financial' + q) : undefined,
-    can('arus-kas') ? api<CashFlow>('/reports/cashflow' + q) : undefined,
-    can('laporan-keuangan') ? api<BalanceSheet>('/reports/balance-sheet' + q) : undefined,
+    lk ? api<IncomeStatement>('/reports/financial' + q) : undefined,
+    lk ? api<CashFlow>('/reports/cashflow' + q) : undefined,
+    lk ? api<BalanceSheet>('/reports/balance-sheet' + q) : undefined,
+    lk ? getAssets(period) : undefined,
   ])
-  return { dash, report, cash, balanceSheet }
+  return { dash, report, cash, balanceSheet, assets }
 }
+
+// --- Register aset & penyusutan (PMK 72/2023) ---
+
+export type MetodePenyusutan = 'garis_lurus' | 'saldo_menurun'
+
+export interface KelompokAset {
+  id: string
+  nama: string
+  /** Masa manfaat dalam bulan. */
+  masa_manfaat: number
+  tarif_gl_bps: number
+  /** 0 = saldo menurun tidak boleh (bangunan). */
+  tarif_sm_bps: number
+  bangunan: boolean
+}
+
+export interface JenisHarta {
+  id: string
+  nama: string
+  kelompok: string
+  tak_berwujud: boolean
+  /** Rujukan tempat memeriksa baris ini di Lampiran PMK 72/2023. */
+  lampiran: string
+  /** false = pemetaan ke kelompok belum dicek tim pajak. */
+  terverifikasi: boolean
+}
+
+export interface AssetInput {
+  nama: string
+  jenis_harta: string
+  kelompok: string
+  metode: MetodePenyusutan
+  tanggal_perolehan: string
+  harga_perolehan: number
+  tak_berwujud: boolean
+  /** Diisi saat melengkapi draft, supaya aset tertaut ke transaksi pembeliannya. */
+  transaksi_id?: number
+}
+
+export interface AssetYear {
+  tahun: number
+  bulan: number
+  dasar_awal: number
+  penyusutan: number
+  sisa_akhir: number
+}
+
+export interface Asset extends AssetInput {
+  id: number
+  kelompok_nama: string
+  masa_manfaat: number
+  tarif_bps: number
+  beban_bulan_ini: number
+  akumulasi: number
+  nilai_buku: number
+  nilai_buku_awal: number
+  /** Dibuat otomatis dari transaksi "Beli Alat / Aset", kelompok belum dilengkapi. */
+  draft: boolean
+  jadwal?: AssetYear[] | null
+}
+
+export interface AssetSummary {
+  assets: Asset[] | null
+  kelompok: KelompokAset[]
+  jenis_harta: JenisHarta[]
+  total_harga_perolehan: number
+  total_akumulasi: number
+  total_nilai_buku: number
+  nilai_buku_awal: number
+  beban_penyusutan: number
+  beban_amortisasi: number
+  beban_total: number
+  tambahan_tanpa_kas: number
+  draft_count: number
+  /** Jumlah baris pemetaan jenis harta yang belum diverifikasi ke Lampiran PMK. */
+  pemetaan_belum_dicek: number
+}
+
+export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
+export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
+export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
+export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
 
 export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo[]; can_edit: boolean }>('/transactions')
 export type SavedTx = Tx & { warnings?: CashWarning[] }
@@ -420,3 +542,87 @@ export interface CoAReport {
 
 export const getCoAReport = (period: string) => api<CoAReport>(`/reports/coa?period=${period}`)
 export const coaXlsxUrl = (period: string) => `/api/v1/reports/coa.xlsx?period=${period}`
+
+// --- Onboarding: neraca awal, impor data awal, karyawan ---
+
+export interface OpeningBalance {
+  tanggal: string
+  kas: number
+  piutang: number
+  persediaan: number
+  utang: number
+  pinjaman: number
+  /** Opsional, hanya untuk dicocokkan dengan modal hasil hitung. */
+  modal_disetor: number
+}
+
+export interface OpeningInfo {
+  opening: OpeningBalance | null
+  modal_awal: number
+  /** Bukan 0 = isian neraca awal tidak seimbang, perlu diperiksa. */
+  selisih_modal: number
+  /** false = laporan masih memakai saldo awal data contoh. */
+  aktif: boolean
+}
+
+export interface SheetError {
+  sheet: string
+  /** 0 = masalah header, bukan baris data. */
+  baris: number
+  pesan: string
+}
+
+export interface OnboardingResult {
+  opening: OpeningBalance | null
+  modal_awal: number
+  selisih_modal: number
+  assets: Asset[] | null
+  karyawan: Karyawan[] | null
+  transaksi_count: number
+  transaksi_sample: Tx[] | null
+  errors: SheetError[] | null
+  terbaca: string[] | null
+  imported: boolean
+  replaced_assets: number
+  replaced_karyawan: number
+}
+
+export interface Karyawan {
+  id: number
+  nama: string
+  jabatan: string
+  tanggal_masuk: string
+  gaji_pokok: number
+  tunjangan: number
+  ptkp: string
+  npwp: string
+  aktif: boolean
+}
+
+export type KaryawanInput = Omit<Karyawan, 'id'>
+
+export interface KaryawanSummary {
+  karyawan: Karyawan[] | null
+  ptkp_codes: string[]
+  total_aktif: number
+  beban_gaji_bulanan: number
+}
+
+export const ONBOARDING_TEMPLATE_URL = '/api/v1/onboarding/template'
+
+/** commit=false hanya pratinjau (tidak menyimpan apa pun). */
+export async function importOnboarding(file: File, commit: boolean): Promise<OnboardingResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/v1/onboarding/import' + (commit ? '?commit=1' : ''), { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+export const getOpening = () => api<OpeningInfo>('/opening')
+export const saveOpening = (o: OpeningBalance) => api<OpeningInfo>('/opening', { method: 'PUT', body: o })
+
+export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
+export const createKaryawan = (k: KaryawanInput) => api<Karyawan>('/karyawan', { method: 'POST', body: k })
+export const updateKaryawan = (id: number, k: KaryawanInput) => api<Karyawan>(`/karyawan/${id}`, { method: 'PUT', body: k })
+export const deleteKaryawan = (id: number) => api<void>(`/karyawan/${id}`, { method: 'DELETE' })

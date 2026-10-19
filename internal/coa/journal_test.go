@@ -73,7 +73,10 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 	}
 
 	is := IncomeStatement(tb, p)
-	old := finance.BuildIncomeStatement(finance.ToLedger(txs))
+	// Dibandingkan dengan laporan lama TANPA register aset, karena CoA belum mengenal
+	// penyusutan — supaya perbandingannya apel-ke-apel.
+	rep := finance.BuildPeriodReport(txs, nil, "2026-08", finance.SeedOpening("2026-08"))
+	old := rep.Income
 	if is.LabaBersih != old.NetProfit {
 		t.Fatalf("laba bersih CoA %d != laporan lama %d", is.LabaBersih, old.NetProfit)
 	}
@@ -85,7 +88,7 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 	if !bs.Seimbang || bs.TotalAset != bs.TotalLiabilitas+bs.TotalEkuitas {
 		t.Fatalf("neraca tidak seimbang: %+v", bs)
 	}
-	oldBS := finance.BuildBalanceSheet(finance.ToLedger(txs), finance.OpeningCash("2026-08"), 8_250_000, finance.OpeningCash("2026-08")+8_250_000)
+	oldBS := rep.BalanceSheet
 	if bs.TotalAset != oldBS.Assets.Total {
 		t.Fatalf("total aset CoA %d != neraca lama %d", bs.TotalAset, oldBS.Assets.Total)
 	}

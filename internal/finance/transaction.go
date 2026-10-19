@@ -67,7 +67,7 @@ type Transaction struct {
 	Channel      string `json:"channel"`
 	Pihak        string `json:"pihak"`
 	Lunas        bool   `json:"lunas"`
-	TanggalLunas string `json:"tanggal_lunas"` // kosong = lunas di tanggal transaksi
+	TanggalLunas string `json:"tanggal_lunas"`  // kosong = lunas di tanggal transaksi
 	Akun         string `json:"akun,omitempty"` // kode CoA koreksi user; kosong = otomatis dari jenis
 }
 

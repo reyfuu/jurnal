@@ -29,10 +29,9 @@ func TestAllPeriodsSeed(t *testing.T) {
 			t.Errorf("period %s: ledger must not be empty", p)
 		}
 
-		is := finance.BuildIncomeStatement(ledger)
+		is := finance.BuildIncomeStatement(ledger, 0, 0)
 		if is.Omzet != snap.KPIs.Omzet.Value {
 			t.Errorf("period %s: ledger omzet %d != snapshot omzet %d", p, is.Omzet, snap.KPIs.Omzet.Value)
 		}
 	}
 }
-

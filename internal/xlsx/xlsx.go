@@ -1,5 +1,5 @@
-// Package xlsx membaca sheet pertama dan menulis workbook .xlsx sederhana (hanya teks),
-// cukup untuk template & impor transaksi tanpa dependensi luar.
+// Package xlsx membaca dan menulis workbook .xlsx sederhana (hanya teks), cukup untuk
+// template & impor data tanpa dependensi luar.
 package xlsx
 
 import (
@@ -103,9 +103,22 @@ func Write(w io.Writer, sheets []Sheet) error {
 // ErrNotXLSX: berkas bukan workbook .xlsx yang bisa dibaca.
 var ErrNotXLSX = errors.New("berkas bukan Excel .xlsx")
 
-// Read mengembalikan isi sheet pertama sebagai teks. Baris kosong tetap ada (slice kosong)
-// agar nomor baris cocok dengan Excel; angka dikembalikan apa adanya (tanggal = nomor seri).
+// Read mengembalikan isi sheet pertama sebagai teks.
 func Read(data []byte) ([][]string, error) {
+	sheets, err := ReadAll(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(sheets) == 0 {
+		return nil, ErrNotXLSX
+	}
+	return sheets[0].Rows, nil
+}
+
+// ReadAll mengembalikan seluruh sheet beserta namanya, urut seperti di workbook. Baris kosong
+// tetap ada (slice kosong) agar nomor baris cocok dengan Excel; angka dikembalikan apa adanya
+// (tanggal = nomor seri). Sheet yang gagal dibaca dilewati, bukan menggagalkan seluruh berkas.
+func ReadAll(data []byte) ([]Sheet, error) {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, ErrNotXLSX
@@ -121,7 +134,8 @@ func Read(data []byte) ([][]string, error) {
 
 	var wb struct {
 		Sheets []struct {
-			RID string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+			Name string `xml:"name,attr"`
+			RID  string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
 		} `xml:"sheets>sheet"`
 	}
 	var rels struct {
@@ -134,12 +148,10 @@ func Read(data []byte) ([][]string, error) {
 	if err != nil || xml.Unmarshal(b, &wb) != nil || len(wb.Sheets) == 0 {
 		return nil, ErrNotXLSX
 	}
-	sheetPath := "xl/worksheets/sheet1.xml"
+	target := map[string]string{}
 	if b, err := open("xl/_rels/workbook.xml.rels"); err == nil && xml.Unmarshal(b, &rels) == nil {
 		for _, r := range rels.Rel {
-			if r.ID == wb.Sheets[0].RID {
-				sheetPath = path.Join("xl", strings.TrimPrefix(r.Target, "/xl/"))
-			}
+			target[r.ID] = path.Join("xl", strings.TrimPrefix(r.Target, "/xl/"))
 		}
 	}
 
@@ -168,18 +180,38 @@ func Read(data []byte) ([][]string, error) {
 		}
 	}
 
+	out := make([]Sheet, 0, len(wb.Sheets))
+	for i, sh := range wb.Sheets {
+		sheetPath := target[sh.RID]
+		if sheetPath == "" {
+			sheetPath = fmt.Sprintf("xl/worksheets/sheet%d.xml", i+1)
+		}
+		rows, err := readSheet(open, sheetPath, shared, text)
+		if err != nil {
+			continue // sheet rusak atau bukan worksheet: lewati, sheet lain tetap bisa dipakai
+		}
+		out = append(out, Sheet{Name: sh.Name, Rows: rows})
+	}
+	if len(out) == 0 {
+		return nil, ErrNotXLSX
+	}
+	return out, nil
+}
+
+func readSheet[RT any](open func(string) ([]byte, error), sheetPath string, shared []string, text func(RT) string) ([][]string, error) {
 	var ws struct {
 		Rows []struct {
 			R     int `xml:"r,attr"`
 			Cells []struct {
-				Ref string   `xml:"r,attr"`
-				T   string   `xml:"t,attr"`
-				V   string   `xml:"v"`
-				Is  richText `xml:"is"`
+				Ref string `xml:"r,attr"`
+				T   string `xml:"t,attr"`
+				V   string `xml:"v"`
+				Is  RT     `xml:"is"`
 			} `xml:"c"`
 		} `xml:"sheetData>row"`
 	}
-	if b, err = open(sheetPath); err != nil || xml.Unmarshal(b, &ws) != nil {
+	b, err := open(sheetPath)
+	if err != nil || xml.Unmarshal(b, &ws) != nil {
 		return nil, ErrNotXLSX
 	}
 
