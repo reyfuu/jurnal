@@ -34,6 +34,7 @@
 ---
 
 ## 4. Aturan Implementasi Komponen (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
+- Warna utama brand: **navy `#222852`** (keputusan pengguna, 19 Oktober 2026), dengan aksen emas `#F5C428` / `#EAB308`. Navy tampil pada login, onboarding, sidebar, favicon, dan tema browser; teks tombol emas memakai navy. Teks sekunder sidebar `#BFC5D8` dan muted `#AAB1CA`. Detail penggunaan ada di `DESIGN.md` §2.
 - Gunakan primitif `Card`, `Badge`, `Select`, dan `Tooltip` dari **`shadcn/ui`** yang dikustomisasi ke palet *Dark Obsidian* (`#0F1115` / `#161920`).
 - Gunakan pola kartu finansial dari **`Kokonut UI`** dan transisi halus dari **`21st.dev`**.
 - Pastikan semua nominal dan persentase memakai `font-variant-numeric: tabular-nums`.

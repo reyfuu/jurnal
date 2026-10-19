@@ -49,7 +49,8 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
     - **DILARANG KERAS** membuat UI generik "AI slop" (gradien ungu-biru murahan, bayangan berlebihan, kartu tanpa hierarki, teks placeholder asal-asalan).
     - Ikuti estetika referensi **Laporan Bisnis by Akademi Pajak**:
       - **Dark Obsidian Theme**: Background utama `#0B0C0E`, surface kartu `#121418`, border halus `#1F2229` (`1px solid rgba(255,255,255,0.06)`).
-      - **Brand Accent**: Amber/Gold `#EAB308` / `#F59E0B` untuk metrik utama (Omzet, CTA `Beli Rp149.000`, active nav state).
+      - **Brand Utama**: Navy `#222852` pada login/onboarding, sidebar, favicon, dan tema browser (keputusan pengguna 19 Oktober 2026; lihat `DESIGN.md` §2).
+      - **Brand Accent**: Amber/Gold `#EAB308` / `#F5C428` untuk logo, metrik utama, CTA, dan active nav state; teks tombol emas menggunakan navy `#222852`.
       - **Semantic Financial Colors**: Emerald `#10B981` (Laba Bersih / tren positif), Sky Blue `#38BDF8` (Saldo Kas & Bank), Rose/Coral `#F43F5E` (peringatan piutang lewat 30 hari).
       - **Typography**: Angka finansial wajib menggunakan `font-variant-numeric: tabular-nums` agar sejajar sempurna.
 11. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**

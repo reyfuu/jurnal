@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 **Produk**: Laporan Bisnis by Akademi Pajak  
 **Versi**: 1.0 (MVP Batch 100 User)  
-**Design System**: Dark Obsidian Fintech (`shadcn/ui` + `Kokonut UI` + `21st.dev`, patuh `antislop` & `impeccable`)
+**Design System**: Navy & Gold, laporan pada permukaan netral gelap (`shadcn/ui` + `Kokonut UI` + `21st.dev`, patuh `antislop` & `impeccable`)
 
 ---
 
@@ -26,6 +26,7 @@ Laporan Bisnis by Akademi Pajak membantu pemilik UMKM melihat kesehatan bisnis s
 ## 3. Spesifikasi UI/UX & Design System (Sesuai Referensi Gambar)
 
 ### 3.1 Palet Warna & Tipografi (`antislop` + `taste` + `impeccable`)
+- **Brand Utama**: Navy `#222852` pada login, onboarding, sidebar, favicon, dan tema browser; aksen emas `#F5C428` / `#EAB308` untuk logo dan CTA, dengan teks tombol navy. Keputusan pengguna 19 Oktober 2026; detail di `DESIGN.md` §2.
 - **Canvas Background**: `#090A0C` (Latar belakang utama luar) / `#0F1115` (Shell aplikasi).
 - **Card Surface**: `#14171D` dengan border `1px solid rgba(255, 255, 255, 0.06)` dan radius `14px` (`rounded-xl`).
 - **Active Sidebar Pill**: `rgba(234, 179, 8, 0.14)` dengan teks `#FACC15` (Amber/Emas).

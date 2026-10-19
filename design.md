@@ -1,6 +1,6 @@
 # DESIGN.md — Design Brief & Design System Specification
 **Produk**: Laporan Bisnis by Akademi Pajak  
-**Aesthetic Persona**: *Obsidian Gold Executive Fintech* (High-Contrast Dark Mode, Zero Financial Clutter)  
+**Aesthetic Persona**: *Navy & Gold* (latar brand navy, permukaan laporan netral gelap)
 **Component Stack**: `shadcn/ui` + `Kokonut UI` + `21st.dev` + Tailwind CSS  
 **Guardrails**: `antislop` · `taste` · `impeccable` · `ui ux pro max` · `ponytail`
 
@@ -23,13 +23,15 @@ Desain **Laporan Bisnis by Akademi Pajak** memadukan ketenangan visual *dark-mod
 
 ## 2. Color System & Design Tokens
 
+**Keputusan brand — 19 Oktober 2026:** warna utama adalah **navy `#222852`**, dipilih pengguna untuk membangun asosiasi dengan perpajakan/DJP. Pedoman lengkap ada di `DESIGN.md` §2. Aksen emas (`#F5C428` / `#EAB308`) dipertahankan karena kedua kode warna yang diberikan sama. Navy digunakan pada login/onboarding, sidebar, favicon, warna tema browser, dan teks tombol emas; area laporan tetap netral gelap.
+
 ### 2.1 Surface & Background Hierarchy
 | Token | Hex / Nilai CSS | Penggunaan pada Gambar Referensi |
 |---|---|---|
 | `--bg-canvas` | `#090A0C` | Background paling luar (halaman landing & area di luar frame aplikasi). |
 | `--bg-ambient-glow` | `radial-gradient(ellipse at top, rgba(234,179,8,0.08), transparent 65%)` | Pendar hangat tipis di belakang frame aplikasi bagian atas. |
 | `--bg-app-shell` | `#0F1115` | Kanvas utama area kerja Dashboard di sebelah kanan sidebar. |
-| `--bg-sidebar` | `#121419` | Latar belakang sidebar navigasi kiri. |
+| `--bg-sidebar` | `var(--brand-navy)` / `#222852` | Latar belakang sidebar navigasi kiri. |
 | `--bg-card` | `#161920` | Permukaan seluruh kartu KPI dan kartu grafik. |
 | `--bg-card-elevated` | `#1B1F27` | Permukaan dropdown pemilih bulan (`Agustus 2026`), pill profil tenant (`Kedai Kopi Senja`), dan hover state. |
 | `--border-hairline` | `rgba(255, 255, 255, 0.06)` (`#1F232B`) | Garis tepi `1px` pada seluruh kartu KPI, grafik, dan pemisah sidebar. |
@@ -38,6 +40,7 @@ Desain **Laporan Bisnis by Akademi Pajak** memadukan ketenangan visual *dark-mod
 ### 2.2 Brand & Semantic Financial Colors
 | Token | Hex | Peran Semantik |
 |---|---|---|
+| `--brand-navy` | `#222852` | Warna brand utama: login, onboarding, sidebar, favicon, serta teks tombol emas. |
 | `--brand-gold` | `#F5C428` / `#EAB308` | Logo segitiga **A**, tombol CTA utama `Beli Rp149.000`, kurva & sparkline **Omzet**, bar **Di atas target**. |
 | `--brand-gold-muted` | `#785C12` / `rgba(234, 179, 8, 0.35)` | Bar omzet harian **Di bawah target**, fill area bawah kurva Omzet. |
 | `--brand-gold-pill` | `rgba(234, 179, 8, 0.14)` | Latar belakang menu sidebar aktif (`Dashboard`) dengan teks `#FACC15`. |
@@ -102,7 +105,7 @@ flowchart TD
 - **Kanan**:
   - 4 tautan teks (`Fitur`, `Cara kerja`, `Keamanan data`, `Harga`) — `14px`, `#949BA6`.
   - Tombol `Masuk` — `border-radius: 9999px`, `border: 1px solid rgba(255,255,255,0.14)`, background `#121418`, padding `9px 22px`.
-  - Tombol CTA `Beli Rp149.000` — `border-radius: 9999px`, background `#F5C428`, teks hitam pekat `#090A0C` (`font-weight: 700`), padding `10px 24px`.
+  - Tombol CTA `Beli Rp149.000` — `border-radius: 9999px`, background `#F5C428`, teks navy `#222852` (`font-weight: 700`), padding `10px 24px`.
 
 ### 5.2 Sidebar Navigasi (5 Grup, 12 Menu)
 - **Lebar Tetap**: `232px`, `border-right: 1px solid rgba(255,255,255,0.06)`.
