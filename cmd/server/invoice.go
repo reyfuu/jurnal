@@ -13,7 +13,7 @@ import (
 	"pajak/internal/finance"
 )
 
-func (s *Server) handleListInvoice(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleListInvoice(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	list := slices.Clone(s.invoices)
 	s.mu.RUnlock()
@@ -48,7 +48,7 @@ func profilFakturLengkap(p finance.BusinessProfile) []string {
 	return kurang
 }
 
-func (s *Server) decodeInvoice(w http.ResponseWriter, r *http.Request) (finance.Invoice, bool) {
+func (s *tenant) decodeInvoice(w http.ResponseWriter, r *http.Request) (finance.Invoice, bool) {
 	var inv finance.Invoice
 	if err := json.NewDecoder(r.Body).Decode(&inv); err != nil {
 		http.Error(w, "data faktur tidak valid", http.StatusBadRequest)
@@ -61,7 +61,7 @@ func (s *Server) decodeInvoice(w http.ResponseWriter, r *http.Request) (finance.
 	return inv, true
 }
 
-func (s *Server) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 	inv, ok := s.decodeInvoice(w, r)
 	if !ok {
 		return
@@ -84,12 +84,12 @@ func (s *Server) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // invoiceIndex harus dipanggil dengan s.mu terkunci.
-func (s *Server) invoiceIndex(r *http.Request) int {
+func (s *tenant) invoiceIndex(r *http.Request) int {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	return slices.IndexFunc(s.invoices, func(x finance.Invoice) bool { return x.ID == id })
 }
 
-func (s *Server) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	inv, ok := s.decodeInvoice(w, r)
 	if !ok {
 		return
@@ -117,7 +117,7 @@ func (s *Server) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, inv)
 }
 
-func (s *Server) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := s.invoiceIndex(r)
@@ -131,7 +131,7 @@ func (s *Server) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
 
 // handleInvoicePDF mencetak satu faktur. Nama berkasnya memakai nomor faktur supaya berkas
 // yang diunduh langsung terbaca tanpa dibuka.
-func (s *Server) handleInvoicePDF(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleInvoicePDF(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	i := s.invoiceIndex(r)
 	var inv finance.Invoice

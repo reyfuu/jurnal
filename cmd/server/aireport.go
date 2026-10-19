@@ -12,23 +12,21 @@ import (
 // Fakta dan analisis dikirim bersama, dari satu sumber yang sama, supaya yang dibaca model
 // dan yang dilihat pengguna tidak mungkin berbeda. Tanpa LLM_API_KEY fakta tetap lengkap dan
 // hanya bagian analisis yang kosong.
-func (s *Server) handleAIReport(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAIReport(t *tenant, w http.ResponseWriter, r *http.Request) {
 	period := periodOrDefault(r)
-	rep := s.report(period)
+	rep := t.report(period)
 
-	s.mu.RLock()
-	snap, ok := s.snapshots[period]
+	t.mu.RLock()
+	snap, ok := t.snapshots[period]
 	if !ok {
-		snap = s.snapshots["2026-08"]
+		snap = t.snapshots["2026-08"]
 	}
-	invoices := append([]finance.Invoice(nil), s.invoices...)
-	karyawan := append([]finance.Karyawan(nil), s.karyawan...)
-	txs := append([]finance.Transaction(nil), s.txs...)
-	assets := append([]finance.Asset(nil), s.assets...)
-	s.mu.RUnlock()
+	invoices := append([]finance.Invoice(nil), t.invoices...)
+	karyawan := append([]finance.Karyawan(nil), t.karyawan...)
+	riwayat := finance.TrendHistory(t.txs, t.assets, period, t.openingFor)
+	t.mu.RUnlock()
 
-	riwayat := finance.TrendHistory(txs, assets, period, s.openingFor)
-	facts := finance.CollectFacts(rep, snap, s.currentProfile(), invoices, karyawan, riwayat)
+	facts := finance.CollectFacts(rep, snap, t.currentProfile(), invoices, karyawan, riwayat)
 
 	writeJSON(w, map[string]any{
 		"facts":    facts,
