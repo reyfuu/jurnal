@@ -19,6 +19,11 @@ type BusinessProfile struct {
 	// MetodePersediaan: periodik | perpetual (perdagangan & manufaktur); menentukan akun HPP aktif.
 	MetodePersediaan string `json:"metode_persediaan"`
 
+	// Perkiraan setahun dari onboarding: dipakai cek benchmark DJP & Perencanaan Pajak
+	// selama belum ada data transaksi. Laba sebelum pajak boleh negatif (rugi).
+	OmzetTahunan     int64 `json:"omzet_tahunan,omitempty"`
+	LabaSebelumPajak int64 `json:"laba_sebelum_pajak,omitempty"`
+
 	// Identitas penerbit faktur. Semuanya opsional saat onboarding supaya wizard tidak jadi
 	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
 	// tidak layak dikirim ke pelanggan badan.
@@ -95,6 +100,9 @@ func (p *BusinessProfile) Validate() error {
 	if !hasOption(BentukUsahaOptions, p.BentukUsaha) {
 		return errors.New("pilih bentuk usaha")
 	}
+	if p.OmzetTahunan < 0 {
+		return errors.New("omzet per tahun tidak boleh negatif")
+	}
 	switch {
 	case p.JenisUsaha == "jasa":
 		p.MetodePersediaan = ""
@@ -120,4 +128,12 @@ func (p BusinessProfile) JenisLabel() string {
 		}
 	}
 	return ""
+}
+
+// CekAwal: NPM vs benchmark DJP dan risiko pajak dari perkiraan omzet & laba profil.
+func (p BusinessProfile) CekAwal() tax.CekAwalResult {
+	return tax.CekAwal(tax.CekAwalInput{
+		JenisUsaha: p.JenisUsaha, BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, PKP: p.PKP,
+		Omzet: p.OmzetTahunan, Laba: p.LabaSebelumPajak,
+	})
 }

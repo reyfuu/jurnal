@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { VIEW_LABEL } from '@/lib/nav'
+import { LaporBug } from '@/views/LaporBug'
 import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
@@ -24,6 +25,7 @@ export default function App() {
   const [session, setSession] = useState<Session>({ status: 'checking' })
   const [data, setData] = useState<AppData | null>(null)
   const [view, setView] = useState<View>('dashboard')
+  const [bugFrom, setBugFrom] = useState<View>('dashboard') // halaman asal saat membuka Lapor Bug
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   const [error, setError] = useState('')
@@ -66,7 +68,11 @@ export default function App() {
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
-  const navigate = (v: View) => canSee(v) && setView(v)
+  const navigate = (v: View) => {
+    if (!canSee(v)) return
+    if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
+    setView(v)
+  }
 
   const changePeriod = (newP: string) => {
     setPeriod(newP)
@@ -90,7 +96,7 @@ export default function App() {
   }
 
   return (
-    <main className="frame-wrapper">
+    <main>
       <div className="app-shell">
         <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
         <section className="workspace">
@@ -169,6 +175,8 @@ export default function App() {
         return <ImporDataAwal onChanged={() => reload(me!, period)} />
       case 'karyawan':
         return <KaryawanView />
+      case 'lapor-bug':
+        return <LaporBug halamanAwal={VIEW_LABEL[bugFrom]} />
       case 'pengguna':
         return <Pengguna currentUserId={me!.user.id} />
       default:

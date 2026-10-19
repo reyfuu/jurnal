@@ -203,22 +203,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Main Framed Application Window */
-  .frame-wrapper {
-    max-width: 1380px;
-    margin: 28px auto 48px;
-    padding: 0 24px;
-  }
-
+  /* Layout aplikasi standar: sidebar menempel kiri, konten penuh layar (tanpa bingkai melayang) */
   .app-shell {
     display: grid;
     grid-template-columns: 232px 1fr;
     background: var(--bg-shell);
-    border: 1px solid var(--border-shell);
-    border-radius: 20px;
     overflow: clip; /* bukan hidden: hidden membuat scroll container sehingga sidebar sticky mati */
-    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
-    min-height: 860px;
+    min-height: 100vh;
   }
 
   /* Sidebar */
@@ -690,10 +681,6 @@
 
   /* Ponsel: sidebar jadi strip navigasi horizontal, grid dipadatkan, tabel bisa digulir. */
   @media (max-width: 760px) {
-    .frame-wrapper {
-      margin: 12px auto 24px;
-      padding: 0 12px;
-    }
     .app-shell {
       grid-template-columns: minmax(0, 1fr);
       min-height: 0;

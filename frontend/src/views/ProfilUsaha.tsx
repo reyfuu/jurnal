@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
+import { CekAwalCard } from '@/components/CekAwalCard'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { saveBusiness, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
-import { DEFAULT_ANSWERS, QUESTIONS, answered, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { formatRp } from '@/lib/format'
+import { DEFAULT_ANSWERS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
 
@@ -103,6 +105,17 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <p className="text-xs text-muted-foreground">TK = belum kawin, K = kawin, angka = jumlah tanggungan. K/I = penghasilan suami-istri digabung.</p>
         </div>
       )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="biz-omzet">Omzet per tahun (perkiraan)</Label>
+          <Input id="biz-omzet" className="tabular" inputMode="numeric" value={p.omzet_tahunan ? formatRp(p.omzet_tahunan) : ''} onChange={(e) => set({ omzet_tahunan: parseRp(e.target.value) || 0 })} placeholder="Rp0" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="biz-laba">Laba sebelum pajak per tahun</Label>
+          <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
+        </div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark DJP dan Perencanaan Pajak selama belum ada data transaksi.</p>
+      </div>
       <label className="flex items-center gap-3 text-sm" htmlFor="biz-pkp">
         <Switch id="biz-pkp" checked={p.pkp} onCheckedChange={(v) => set({ pkp: v })} />
         Sudah dikukuhkan sebagai PKP (memungut PPN)
@@ -125,6 +138,14 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
     </form>
   )
 }
+
+// tampilRp: tampilan input rupiah berformat ribuan; "-" sendirian dibiarkan supaya rugi bisa diketik.
+const tampilRp = (s = '') => {
+  const n = parseRp(s)
+  return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : formatRp(n)
+}
+
+const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba sebelum pajak per tahun' } as const
 
 // Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
 function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }) {
@@ -180,17 +201,20 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
         <h2 id="onboarding-question" ref={headingRef} tabIndex={-1} aria-describedby="onboarding-progress-label">
           {isSummary ? `Ini yang kami siapkan untuk ${a.nama?.trim()}` : q!.judul}
         </h2>
-        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : 'Gunakan nama yang ingin Anda tampilkan di laporan.'}</p>
+        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : step === 'nama' ? 'Gunakan nama yang ingin Anda tampilkan di laporan.' : 'Ketik angka dalam rupiah. Perkiraan kasar sudah cukup.'}</p>
       </div>
       {isSummary ? (
-        <dl className="onboarding-summary">
-          {summary(toProfile(a)).map((r) => (
-            <div key={r.judul}>
-              <dt>{r.judul}</dt>
-              <dd>{r.isi}</dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          <dl className="onboarding-summary">
+            {summary(toProfile(a)).map((r) => (
+              <div key={r.judul}>
+                <dt>{r.judul}</dt>
+                <dd>{r.isi}</dd>
+              </div>
+            ))}
+          </dl>
+          <CekAwalCard profile={toProfile(a)} />
+        </>
       ) : (
         <>
           {q!.options ? (
@@ -203,8 +227,12 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
             />
           ) : (
             <div className="grid gap-2">
-              <Label htmlFor="onboarding-name">Nama usaha</Label>
-              <Input id="onboarding-name" className="h-12 px-4 md:text-base" autoComplete="organization" required value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" aria-describedby="onboarding-reason" />
+              <Label htmlFor="onboarding-input">{INPUT_LABEL[step as keyof typeof INPUT_LABEL]}</Label>
+              {step === 'nama' ? (
+                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base" autoComplete="organization" required value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" aria-describedby="onboarding-reason" />
+              ) : (
+                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base tabular" inputMode={step === 'laba' ? 'text' : 'numeric'} autoComplete="off" required value={tampilRp(a[step])} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder={step === 'omzet' ? 'mis. Rp750.000.000' : 'mis. Rp90.000.000'} aria-describedby="onboarding-reason" />
+              )}
             </div>
           )}
           <p className="onboarding-reason" id="onboarding-reason"><strong>Kenapa kami tanya ini?</strong> {q!.alasan}</p>
