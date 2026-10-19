@@ -121,8 +121,45 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - **Batasan**: persediaan akhir periodik = persediaan awal sampai stok opname dicatat; HPP perpetual menunggu kartu stok. Jasa & manufaktur menunggu file CoA dari tim (laporan tetap format ringkas).
 - UI: Pengaturan > Daftar Akun (CoA), kolom & pilihan Akun di Transaksi, Laporan Keuangan per akun + Neraca Saldo + Unduh Excel.
 
+## Fase C+ — Onboarding Bahasa Awam (Okt 2026)
+> Catatan untuk Astra: bagian ini menjelaskan wizard onboarding baru, dari pertanyaan sampai pemetaannya ke profil usaha.
+
+- **Tujuan**: Owner awam bisa mengisi profil usaha tanpa perlu paham istilah akuntansi atau pajak. Wizard menampilkan **satu pertanyaan per layar**. Setiap jawaban dipetakan diam-diam ke `BusinessProfile`. Di akhir ada layar **"Ini yang kami siapkan untuk …"** yang merangkum daftar akun, cara catat stok, skema pajak, dan PPN, lalu tombol "Simpan & mulai".
+- **Kapan muncul**: saat Owner pertama kali login dan `business.json` belum ada (`App.tsx`, `if (!business.profile)`). Admin dan Kasir tetap melihat pesan "hubungi Owner".
+
+| # | Pertanyaan | Jawaban → field | Muncul bila |
+|---|---|---|---|
+| 1 | Apa nama usaha Anda? | teks → `nama_usaha` | selalu |
+| 2 | Usaha Anda paling mirip yang mana? | jual barang beli dari orang lain / jual jasa / membuat barang sendiri → `jenis_usaha` = `perdagangan` / `jasa` / `manufaktur` | selalu |
+| 3 | Bagaimana Anda tahu sisa stok barang? | hitung sesekali / catat setiap keluar-masuk → `metode_persediaan` = `periodik` / `perpetual` | perdagangan & manufaktur |
+| 4 | Usaha Anda terdaftar atas nama siapa? | pribadi / PT Perorangan / CV / PT / **tidak tahu (= `op`)** → `bentuk_usaha` | selalu |
+| 5a | Apakah Anda sudah menikah? | belum → `TK`, sudah → `K` | pribadi |
+| 5b | Berapa orang yang Anda tanggung? | 0–3 (maksimal 3) → angka PTKP | pribadi |
+| 5c | Penghasilan pasangan dilaporkan dalam satu NPWP? | ya → `K/I` | pribadi & sudah menikah |
+| 6 | Menarik PPN dan membuat faktur pajak? | ya → `pkp: true` | selalu |
+
+- **Hasil PTKP**: `ptkp` = `TK/n`, `K/n`, atau `K/I/n`. Field ini dikosongkan untuk badan usaha. Untuk jasa, `metode_persediaan` dikosongkan.
+- **Default bila ragu**: periodik, penghasilan pasangan tidak digabung, dan belum PKP.
+- **Lokasi kode**:
+  - `frontend/src/lib/onboarding.ts` berisi teks pertanyaan, alasan, dan opsi (`QUESTIONS`), urutan langkah dan langkah yang dilewati (`steps`), pemetaan ke profil (`toProfile`), serta teks layar akhir (`summary`). Semuanya fungsi murni.
+  - Tesnya ada di `frontend/src/lib/onboarding.test.ts`.
+  - UI-nya `OnboardingWizard` di `frontend/src/views/ProfilUsaha.tsx`. Komponen ini memakai ulang `ChoiceGrid`. Memilih jawaban langsung pindah ke langkah berikutnya, dan tersedia tombol Kembali serta "Ubah jawaban".
+  - **Backend tidak berubah.** `PUT /api/v1/business` dan `finance.BusinessProfile.Validate()` tetap menjadi penjaga terakhir.
+- **Menambah atau mengubah pertanyaan**:
+  1. Tambah nilai di `Field`.
+  2. Isi entri di `QUESTIONS`.
+  3. Tambah kondisinya di `steps`.
+  4. Petakan jawabannya di `toProfile`.
+  5. Tulis tesnya terlebih dulu.
+  6. Bila butuh field profil baru, tambahkan juga di `internal/finance/profile.go` (struct + `Validate`) dan di tipe `BusinessProfile` pada `frontend/src/lib/api.ts`.
+- **Batasan & catatan**:
+  - Belum ada sign-up publik. Akun masih dibuat lewat seed atau oleh Owner.
+  - Teks pajak di `summary` (PP 0,5%, batas Rp500 juta, Pasal 31E Rp4,8 miliar) ditulis manual. Selaraskan bila `internal/tax/planning.go` berubah.
+  - `pkp` tersimpan tetapi belum dibaca oleh backend.
+  - Halaman Pengaturan > Profil Usaha masih memakai form teknis (`ProfilForm`) untuk perubahan berikutnya.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
-0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database).
+0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
 3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.

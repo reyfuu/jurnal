@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { saveBusiness, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
+import { DEFAULT_ANSWERS, QUESTIONS, answered, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
 
@@ -107,8 +108,85 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
   )
 }
 
+// Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
+function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }) {
+  const [a, setA] = useState<Answers>(DEFAULT_ANSWERS)
+  const [i, setI] = useState(0)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const list = steps(a)
+  const step = list[Math.min(i, list.length - 1)]
+  const total = list.length - 1
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (step !== 'ringkasan') {
+      if (answered(step, a)) setI(i + 1)
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      onSaved(await saveBusiness(toProfile(a)))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const back = i > 0 && <Button type="button" variant="ghost" onClick={() => setI(i - 1)}>Kembali</Button>
+
+  if (step === 'ringkasan') {
+    return (
+      <form onSubmit={submit} className="grid gap-4">
+        <div>
+          <h2 className="text-lg font-bold">Ini yang kami siapkan untuk {a.nama?.trim()}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Semua bisa diubah nanti di menu Profil Usaha.</p>
+        </div>
+        <dl className="grid gap-3">
+          {summary(toProfile(a)).map((r) => (
+            <div key={r.judul} className="card" style={{ padding: 14, background: '#101318' }}>
+              <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{r.judul}</dt>
+              <dd className="mt-1 text-sm leading-relaxed">{r.isi}</dd>
+            </div>
+          ))}
+        </dl>
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        <div className="flex items-center justify-between gap-3">
+          <Button type="button" variant="ghost" onClick={() => setI(0)}>Ubah jawaban</Button>
+          <Button type="submit" size="lg" className="rounded-full font-bold" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan & mulai'}</Button>
+        </div>
+      </form>
+    )
+  }
+
+  const q = QUESTIONS[step]
+  return (
+    <form onSubmit={submit} className="grid gap-4">
+      <p className="text-xs font-semibold text-muted-foreground">Langkah {i + 1} dari {total}</p>
+      <h2 className="text-lg font-bold">{q.judul}</h2>
+      {q.options ? (
+        <ChoiceGrid
+          name={q.judul}
+          options={q.options}
+          value={a[step] ?? ''}
+          onChange={(v) => { setA((x) => ({ ...x, [step]: v })); setI(i + 1) }}
+        />
+      ) : (
+        <Input autoFocus required aria-label={q.judul} value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" />
+      )}
+      <p className="text-xs text-muted-foreground"><span className="font-semibold">Kenapa kami tanya ini?</span> {q.alasan}</p>
+      <div className="flex items-center justify-between gap-3">
+        <span>{back}</span>
+        <Button type="submit" className="rounded-full font-bold" disabled={!answered(step, a)}>Lanjut</Button>
+      </div>
+    </form>
+  )
+}
+
 // Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
-export function Onboarding({ info, onSaved, canEdit, onLogout }: { info: BusinessInfo; onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void }) {
+export function Onboarding({ onSaved, canEdit, onLogout }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void }) {
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-2xl">
@@ -122,10 +200,10 @@ export function Onboarding({ info, onSaved, canEdit, onLogout }: { info: Busines
         <div className="card" style={{ padding: 24 }}>
           <h1 className="text-xl font-bold">Kenalkan usaha Anda dulu</h1>
           <p className="mt-1 mb-5 text-sm text-muted-foreground">
-            Satu kali saja. Jawaban ini dipakai untuk menyusun akun, laporan keuangan, dan perhitungan pajak yang sesuai dengan usaha Anda.
+            Beberapa pertanyaan singkat, sekali saja. Tidak perlu paham akuntansi atau pajak: jawab sesuai keadaan usaha Anda, kami yang menyiapkan sisanya.
           </p>
           {canEdit ? (
-            <ProfilForm info={info} onSaved={onSaved} submitLabel="Simpan & mulai" />
+            <OnboardingWizard onSaved={onSaved} />
           ) : (
             <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
           )}

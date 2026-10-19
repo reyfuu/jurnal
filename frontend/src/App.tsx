@@ -83,7 +83,7 @@ export default function App() {
   }
 
   if (!business.profile) {
-    return <Onboarding info={business} canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} />
+    return <Onboarding canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} />
   }
 
   return (
