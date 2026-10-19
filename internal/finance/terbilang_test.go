@@ -7,7 +7,10 @@ import (
 )
 
 func TestTerbilang(t *testing.T) {
-	for _, c := range []struct{ n int64; want string }{
+	for _, c := range []struct {
+		n    int64
+		want string
+	}{
 		{0, "nol rupiah"},
 		{1, "satu rupiah"},
 		{10, "sepuluh rupiah"},

@@ -47,6 +47,15 @@ type tenant struct {
 	nextKaryawanID int
 	invoices       []finance.Invoice // faktur penjualan; dicetak ke PDF lewat internal/pdf
 	nextInvoiceID  int
+	tagihan        []finance.Tagihan
+	nextTagihanID  int
+	stok           []finance.StokItem
+	nextStokID     int
+	// produk: resep (BOM) per produk; HPP-nya dihitung dari harga pokok bahan di stok.
+	produk         []finance.Produk
+	nextProdukID   int
+	supplier       []finance.Supplier
+	nextSupplierID int
 	seedTx         map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
 	langganan      langganan                // masa coba & pembayaran Midtrans
@@ -64,11 +73,15 @@ type Server struct {
 	mux       *http.ServeMux
 	bugs      *bugStore
 	db        *sql.DB // nil = berkas JSON di DATA_DIR (atau memori saja)
+	// bugHook: penerusan laporan bug ke pengembang; nil-aman, tanpa BUG_WEBHOOK_URL mati.
+	bugHook *bugHook
 }
 
 // newTenant membuat usaha kosong (hasil register).
 func newTenant(id int) *tenant {
-	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1}
+	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{},
+		nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1, nextTagihanID: 1, nextStokID: 1,
+		nextProdukID: 1, nextSupplierID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -78,10 +91,13 @@ func newTenant(id int) *tenant {
 // demoTenant: usaha 1 berisi data contoh Kedai Kopi Senja.
 func demoTenant() *tenant {
 	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
-		invoices:  finance.SeedInvoices(),
+		invoices: finance.SeedInvoices(), tagihan: finance.SeedTagihan(), stok: finance.SeedStok(),
+		produk: finance.SeedProduk(), supplier: finance.SeedSupplier(),
 		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
 	t.nextInvoiceID = len(t.invoices) + 1
+	t.nextTagihanID, t.nextStokID = len(t.tagihan)+1, len(t.stok)+1
+	t.nextProdukID, t.nextSupplierID = len(t.produk)+1, len(t.supplier)+1
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.SeedKedaiKopiSenja(p.ID)
 		t.seedTx[p.ID] = len(finance.ForPeriod(t.txs, p.ID))
@@ -109,6 +125,18 @@ func (t *tenant) restore(st *state) {
 	if st.NextInvoiceID > 0 {
 		t.invoices, t.nextInvoiceID = st.Invoices, st.NextInvoiceID
 	}
+	if st.NextTagihanID > 0 {
+		t.tagihan, t.nextTagihanID = st.Tagihan, st.NextTagihanID
+	}
+	if st.NextStokID > 0 {
+		t.stok, t.nextStokID = st.Stok, st.NextStokID
+	}
+	if st.NextProdukID > 0 {
+		t.produk, t.nextProdukID = st.Produk, st.NextProdukID
+	}
+	if st.NextSupplierID > 0 {
+		t.supplier, t.nextSupplierID = st.Supplier, st.NextSupplierID
+	}
 }
 
 func NewServer() *Server {
@@ -117,6 +145,7 @@ func NewServer() *Server {
 		failures: map[string]loginFailure{},
 		aiEngine: ai.NewEngine(),
 		mux:      http.NewServeMux(),
+		bugHook:  newBugHook(),
 	}
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
@@ -263,6 +292,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
+	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.on((*tenant).handleMutasiPreview)))
+	s.mux.HandleFunc("POST /api/v1/transactions/mutasi/commit", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleMutasiCommit))))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateTransaction))))
 	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteTransaction))))
 
@@ -280,6 +311,29 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.on((*tenant).handleCreateKaryawan))))
 	s.mux.HandleFunc("PUT /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleUpdateKaryawan))))
 	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleDeleteKaryawan))))
+
+	s.mux.HandleFunc("GET /api/v1/tagihan", s.guard("piutang-utang", s.on((*tenant).handleListTagihan)))
+	s.mux.HandleFunc("POST /api/v1/tagihan", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleCreateTagihan))))
+	s.mux.HandleFunc("GET /api/v1/tagihan/template", s.guard("piutang-utang", s.handleTagihanTemplate))
+	s.mux.HandleFunc("POST /api/v1/tagihan/import", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleImportTagihan))))
+	s.mux.HandleFunc("PUT /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleUpdateTagihan))))
+	s.mux.HandleFunc("DELETE /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleDeleteTagihan))))
+
+	s.mux.HandleFunc("GET /api/v1/stok", s.guard("stok-gudang", s.on((*tenant).handleListStok)))
+	s.mux.HandleFunc("POST /api/v1/stok", s.persisting(s.guard("stok-gudang", s.on((*tenant).handleCreateStok))))
+	s.mux.HandleFunc("GET /api/v1/stok/template", s.guard("stok-gudang", s.handleStokTemplate))
+	s.mux.HandleFunc("POST /api/v1/stok/import", s.persisting(s.guard("stok-gudang", s.on((*tenant).handleImportStok))))
+	s.mux.HandleFunc("PUT /api/v1/stok/{id}", s.persisting(s.guard("stok-gudang", s.on((*tenant).handleUpdateStok))))
+	s.mux.HandleFunc("DELETE /api/v1/stok/{id}", s.persisting(s.guard("stok-gudang", s.on((*tenant).handleDeleteStok))))
+
+	s.mux.HandleFunc("GET /api/v1/produksi", s.guard("produksi-supplier", s.on((*tenant).handleListProduksi)))
+	s.mux.HandleFunc("POST /api/v1/produksi/produk", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleCreateProduk))))
+	s.mux.HandleFunc("PUT /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateProduk))))
+	s.mux.HandleFunc("DELETE /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteProduk))))
+	s.mux.HandleFunc("POST /api/v1/produksi/produk/{id}/terapkan-hpp", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleTerapkanHPP))))
+	s.mux.HandleFunc("POST /api/v1/produksi/supplier", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleCreateSupplier))))
+	s.mux.HandleFunc("PUT /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateSupplier))))
+	s.mux.HandleFunc("DELETE /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteSupplier))))
 
 	s.mux.HandleFunc("GET /api/v1/invoice", s.guard("invoice", s.on((*tenant).handleListInvoice)))
 	s.mux.HandleFunc("POST /api/v1/invoice", s.persisting(s.guard("invoice", s.on((*tenant).handleCreateInvoice))))
@@ -300,6 +354,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/bugs", s.guard("lapor-bug", s.handleListBugs))
 	s.mux.HandleFunc("POST /api/v1/bugs", s.guard("lapor-bug", s.handleCreateBug))
+	s.mux.HandleFunc("GET /api/v1/bugs/info", s.guard("lapor-bug", s.handleBugInfo))
 	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
 
 	s.mux.HandleFunc("GET /", s.handleStatic)
@@ -622,6 +677,22 @@ func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	finance.ApplyTrend(&snap, history)
 	snap.CashWarnings = finance.CashWarnings(txs, rep.CashFlow.OpeningBalance)
+
+	// Daftar Piutang & Utang dan Stok di dashboard dirender dari record tenant — termasuk untuk
+	// usaha demo, yang kini memulai dengan SeedTagihan/SeedStok. Tidak ada cabang "pakai seed
+	// tampilan": dua tempat yang menampilkan tagihan yang sama tidak boleh berbeda angkanya,
+	// dan baris contoh di dashboard harus bisa disunting dari halaman daftarnya.
+	s.mu.RLock()
+	tagihan := append([]finance.Tagihan(nil), s.tagihan...)
+	stok := append([]finance.StokItem(nil), s.stok...)
+	s.mu.RUnlock()
+	rekap := finance.SummarizeTagihan(tagihan, time.Now())
+	snap.Obligations = finance.ToObligations(tagihan, time.Now())
+	snap.Inventory = finance.ToInventory(stok)
+	// KPI "Piutang belum tertagih" ikut dari rekap yang sama. Tanpa ini kartunya tetap memakai
+	// angka seed bulanan dengan jumlah faktur dipatok 8, dan dashboard menyebut angka yang
+	// berbeda dari halaman yang ditautkannya.
+	snap.KPIs.Piutang = rekap.ToPiutangCard()
 	writeJSON(w, snap)
 }
 

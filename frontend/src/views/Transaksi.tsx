@@ -1,5 +1,5 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
-import { FileSpreadsheet, Info, Pencil, Plus } from 'lucide-react'
+import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
+import { MutasiDialog } from '@/views/MutasiDialog'
 import { channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, summarize } from '@/lib/transaksi'
 
 const PAGE = 100
@@ -27,6 +28,7 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
 export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
+  const [imporMutasi, setImporMutasi] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [filter, setFilter] = useState({ bulan: '', jenis: '', cari: '', arah: '', channel: '' })
   const [limit, setLimit] = useState(PAGE)
@@ -108,9 +110,14 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
           <Plus size={16} strokeWidth={2.4} /> Catat transaksi
         </button>
         {canEdit && (
-          <Button variant="outline" className="h-10 rounded-full" onClick={() => setImporting(true)}>
-            <FileSpreadsheet /> Impor Excel
-          </Button>
+          <>
+            <Button variant="outline" className="h-10 rounded-full" onClick={() => setImporting(true)}>
+              <FileSpreadsheet /> Impor Excel
+            </Button>
+            <Button variant="outline" className="h-10 rounded-full" onClick={() => setImporMutasi(true)}>
+              <Landmark /> Impor Mutasi Bank
+            </Button>
+          </>
         )}
         <Input
           className="tx-search"
@@ -362,6 +369,10 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
       </Dialog>
 
       <ImportDialog open={importing} onOpenChange={setImporting} onImported={() => Promise.all([refresh(), onChanged()]).then(() => {})} />
+      <MutasiDialog
+        open={imporMutasi} onOpenChange={setImporMutasi} jenis={jenis}
+        onImported={() => { void Promise.all([refresh(), onChanged()]) }}
+      />
     </>
   )
 }

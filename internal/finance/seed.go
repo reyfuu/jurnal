@@ -1,6 +1,9 @@
 package finance
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type MonthSeedData struct {
 	Label        string
@@ -437,20 +440,11 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 		TotalAppFeesLabel:  fmt.Sprintf("Potongan aplikasi bulan ini %s", FormatJt(m.FeeApp)),
 		Channels:           m.Channels,
 		RecentTransactions: m.RecentTxs,
-		Obligations: []ObligationItem{
-			{InvoiceNo: "INV-2026-061", Counterparty: "PT Karya Digital Mandiri (Kopi Rapat Bulanan)", Kind: "RECEIVABLE", DueDate: "10 Jul 2026", DaysOverdue: 52, Amount: 5_400_000},
-			{InvoiceNo: "INV-2026-068", Counterparty: "Event Organizer Senayan Fest", Kind: "RECEIVABLE", DueDate: "22 Jul 2026", DaysOverdue: 40, Amount: 4_200_000},
-			{InvoiceNo: "INV-2026-089", Counterparty: "Coworking Space Kemang", Kind: "RECEIVABLE", DueDate: "05 Sep 2026", DaysOverdue: 0, Amount: 1_400_000},
-			{InvoiceNo: "PO-SUP-112", Counterparty: "Roastery Biji Kopi Gayo Lestari", Kind: "PAYABLE", DueDate: "08 Sep 2026", DaysOverdue: 0, Amount: 4_800_000},
-			{InvoiceNo: "PO-SUP-118", Counterparty: "Kemasan Cup & Sablon Senja", Kind: "PAYABLE", DueDate: "12 Sep 2026", DaysOverdue: 0, Amount: 2_600_000},
-		},
-		Inventory: []InventoryItem{
-			{SKU: "RM-001", Name: "Biji Kopi Arabica Gayo (Roasted)", Type: "Bahan Baku", Stock: "42,5 kg", COGS: 185_000, SellPrice: 0, Status: "Aman"},
-			{SKU: "RM-002", Name: "Fresh Milk Full Cream 1L", Type: "Bahan Baku", Stock: "18 liter", COGS: 21_500, SellPrice: 0, Status: "Stok Menipis"},
-			{SKU: "FG-001", Name: "Es Kopi Susu Senja (12oz)", Type: "Produk Jadi", Stock: "Resep BOM Aktif", COGS: 6_800, SellPrice: 18_000, Status: "Margin 62%"},
-			{SKU: "FG-002", Name: "Matcha Oat Latte (12oz)", Type: "Produk Jadi", Stock: "Resep BOM Aktif", COGS: 9_500, SellPrice: 25_000, Status: "Margin 62%"},
-		},
-		TaxReport: CalculateUMKMTax("OP", omzet2026),
+		// Dirender dari record contoh yang sama dengan halaman Piutang & Utang dan Stok &
+		// Gudang (SeedTagihan/SeedStok), bukan daftar tampilan terpisah.
+		Obligations: ToObligations(SeedTagihan(), time.Now()),
+		Inventory:   ToInventory(SeedStok()),
+		TaxReport:   CalculateUMKMTax("OP", omzet2026),
 	}
 }
 

@@ -530,8 +530,26 @@ export interface CekAwal {
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
 
-export interface BugReport { id: number; judul: string; deskripsi: string; halaman: string; user_email: string; waktu: string; screenshot?: string }
+export interface BugReport {
+  id: number; judul: string; deskripsi: string; halaman: string; user_email: string; waktu: string
+  screenshot?: string
+  /** true = sudah sampai ke webhook pengembang; false dengan gagal_kirim = baru tersimpan di server. */
+  diteruskan: boolean
+  gagal_kirim?: string
+  /** Hanya terisi untuk ID Master, yang melihat laporan lintas usaha. */
+  tenant_id?: number
+}
+
+/** Ke mana laporan dikirim, dan apakah yang login ID Master (pengembang). */
+export interface BugInfo {
+  master: boolean
+  penerusan_aktif: boolean
+  /** Host tujuan penerusan, tanpa token di path-nya. */
+  penerusan_ke: string
+}
+
 export const listBugs = () => api<BugReport[]>('/bugs')
+export const getBugInfo = () => api<BugInfo>('/bugs/info')
 export const bugScreenshotUrl = (id: number) => `/api/v1/bugs/${id}/screenshot`
 /** Kirim laporan sebagai multipart supaya screenshot (opsional) ikut terunggah. */
 export async function createBug(b: { judul: string; deskripsi: string; halaman: string; screenshot: File | null }): Promise<BugReport> {
@@ -697,6 +715,278 @@ export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
 export const createKaryawan = (k: KaryawanInput) => api<Karyawan>('/karyawan', { method: 'POST', body: k })
 export const updateKaryawan = (id: number, k: KaryawanInput) => api<Karyawan>(`/karyawan/${id}`, { method: 'PUT', body: k })
 export const deleteKaryawan = (id: number) => api<void>(`/karyawan/${id}`, { method: 'DELETE' })
+
+// --- Piutang & Utang, Stok & Gudang: data usaha yang bisa diimpor lalu disunting ---
+
+export type JenisTagihan = 'RECEIVABLE' | 'PAYABLE'
+
+export interface Tagihan {
+  id: number
+  nomor: string
+  pihak: string
+  jenis: JenisTagihan
+  /** YYYY-MM-DD */
+  jatuh_tempo: string
+  nominal: number
+  lunas: boolean
+  keterangan?: string
+}
+
+/** hari_terlambat dihitung server saat dibaca, bukan disimpan — supaya tidak basi. */
+export interface TagihanRow extends Tagihan {
+  hari_terlambat: number
+}
+
+export type TagihanInput = Omit<Tagihan, 'id'>
+
+export interface TagihanSummary {
+  items: TagihanRow[] | null
+  total_piutang: number
+  total_utang: number
+  piutang_terlambat: number
+  jumlah_terlambat: number
+}
+
+export interface StokItem {
+  id: number
+  sku: string
+  nama: string
+  kategori: string
+  jumlah: number
+  satuan: string
+  stok_min: number
+  harga_pokok: number
+  harga_jual: number
+}
+
+export type StokInput = Omit<StokItem, 'id'>
+
+/** Turunan (status, margin, nilai) datang dari server supaya rumusnya satu tempat. */
+export interface StokRow extends StokItem {
+  status: 'Habis' | 'Stok Menipis' | 'Aman'
+  margin_bps: number
+  nilai: number
+}
+
+export interface StokSummary {
+  items: StokRow[] | null
+  total_item: number
+  nilai_persediaan: number
+  menipis: number
+  habis: number
+}
+
+export const getTagihan = () => api<TagihanSummary>('/tagihan')
+export const createTagihan = (t: TagihanInput) => api<Tagihan>('/tagihan', { method: 'POST', body: t })
+export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
+export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
+
+export const getStok = () => api<StokSummary>('/stok')
+export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'POST', body: s })
+export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
+export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })
+
+export const TAGIHAN_TEMPLATE_URL = '/api/v1/tagihan/template'
+export const STOK_TEMPLATE_URL = '/api/v1/stok/template'
+
+/** 'tambah' menambah ke daftar; 'ganti' mengosongkan daftar lama lebih dulu. */
+export type ImportMode = 'tambah' | 'ganti'
+
+export interface MenuImportResult {
+  /** nama sheet yang terbaca; kosong bila tidak ada yang dikenali */
+  sheet: string
+  valid: number
+  errors: SheetError[] | null
+  imported: boolean
+  /** baris lama yang ditimpa (mode 'ganti') */
+  diganti: number
+  tagihan?: Tagihan[] | null
+  stok?: StokItem[] | null
+}
+
+/** commit=false hanya pratinjau (tidak menyimpan apa pun). */
+async function importMenu(path: string, file: File, commit: boolean, mode: ImportMode): Promise<MenuImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const q = commit ? `?commit=1&mode=${mode}` : ''
+  const res = await fetch(`/api/v1${path}/import${q}`, { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+export const importTagihan = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/tagihan', f, commit, mode)
+export const importStok = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/stok', f, commit, mode)
+
+// --- Impor mutasi bank: tebak jenis transaksi, periksa, baru simpan ---
+
+/** Kesalahan per baris berkas impor. baris 0 = masalah berkas, bukan baris data. */
+export interface ImportError {
+  baris: number
+  pesan: string
+}
+
+/** Tingkat keyakinan tebakan jenis. 'rendah' = hanya arah uangnya yang pasti. */
+export type Keyakinan = 'tinggi' | 'sedang' | 'rendah'
+
+export interface MutasiRow {
+  /** Nomor baris di berkas aslinya, supaya baris yang keliru bisa ditunjuk. */
+  baris: number
+  tanggal: string
+  keterangan: string
+  nominal: number
+  arah: 'masuk' | 'keluar'
+  jenis: string
+  alasan: string
+  keyakinan: Keyakinan
+  /** Sudah ada transaksi dengan tanggal & nominal sama — dugaan, bukan kepastian. */
+  duplikat: boolean
+  pilih: boolean
+}
+
+export interface MutasiGrup {
+  jenis: string
+  arah: 'masuk' | 'keluar'
+  jumlah: number
+  total: number
+}
+
+export interface MutasiHasil {
+  rows: MutasiRow[] | null
+  errors: ImportError[] | null
+  ringkasan: MutasiGrup[] | null
+  total_masuk: number
+  total_keluar: number
+  perlu_diperiksa: number
+  duplikat: number
+  format: string
+}
+
+export interface MutasiCommitResult {
+  disimpan: number
+  errors: ImportError[] | null
+  contoh: Tx[] | null
+}
+
+/** Langkah 1: baca berkas & tebak jenisnya. Tidak menyimpan apa pun. */
+export async function previewMutasi(file: File, tahun?: number): Promise<MutasiHasil> {
+  const form = new FormData()
+  form.append('file', file)
+  if (tahun) form.append('tahun', String(tahun))
+  const res = await fetch('/api/v1/transactions/mutasi', { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+/** Langkah 2: simpan baris yang sudah diperiksa — termasuk koreksi jenisnya. */
+export const commitMutasi = (rows: MutasiRow[]) =>
+  api<MutasiCommitResult>('/transactions/mutasi/commit', { method: 'POST', body: { rows } })
+
+// --- Produksi & Supplier: resep (BOM) dan HPP per produk ---
+
+/**
+ * Takaran bahan disimpan sebagai bilangan bulat per seribu satuan: 1500 = 1,5 satuan.
+ * Pecahan dibutuhkan karena resep nyata memakai 0,18 kg biji atau 0,15 liter susu, sementara
+ * nominal rupiah tetap bilangan bulat.
+ */
+export const TAKARAN_SKALA = 1000
+
+export interface ResepBahan {
+  /** 0 = bahan di luar daftar stok; nama & harga_manual diisi sendiri. */
+  stok_id: number
+  nama: string
+  satuan: string
+  takaran: number
+  harga_manual: number
+}
+
+export interface Produk {
+  id: number
+  sku: string
+  nama: string
+  satuan: string
+  kategori: string
+  /** Berapa unit produk jadi dari satu kali resep. */
+  hasil_per_batch: number
+  bahan: ResepBahan[] | null
+  biaya_tenaga_kerja: number
+  biaya_overhead: number
+  harga_jual: number
+  catatan?: string
+}
+
+export type ProdukInput = Omit<Produk, 'id'>
+
+export interface HPPBahan {
+  nama: string
+  satuan: string
+  takaran: number
+  harga_satuan: number
+  subtotal: number
+  sumber: 'stok' | 'manual'
+  peringatan?: string
+}
+
+export interface HPP {
+  bahan: HPPBahan[] | null
+  total_bahan: number
+  tenaga_kerja: number
+  overhead: number
+  total_batch: number
+  hasil_per_batch: number
+  per_unit: number
+  harga_jual: number
+  laba_per_unit: number
+  margin_bps: number
+  peringatan: string[] | null
+}
+
+export interface ProdukRow extends Produk {
+  hpp: HPP
+  /** Harga pokok yang tercatat di Stok & Gudang, dicocokkan lewat SKU. */
+  hpp_stok: number
+  ada_di_stok: boolean
+  /** HPP resep − HPP di stok. Bukan 0 = angka di stok sudah basi. */
+  selisih: number
+}
+
+export interface Supplier {
+  id: number
+  nama: string
+  kontak: string
+  telepon: string
+  email: string
+  alamat: string
+  /** Termin pembayaran dalam hari; 0 = tunai. */
+  tempo_hari: number
+  catatan?: string
+}
+
+export type SupplierInput = Omit<Supplier, 'id'>
+
+export interface SupplierRow extends Supplier {
+  /** Perkiraan, dicocokkan dari nama pihak di Piutang & Utang. */
+  utang_belum_dibayar: number
+  jumlah_tagihan: number
+}
+
+export interface ProduksiSummary {
+  produk: ProdukRow[] | null
+  supplier: SupplierRow[] | null
+  total_produk: number
+  total_supplier: number
+  produk_rugi: number
+  produk_tanpa_hpp: number
+  utang_supplier: number
+}
+
+export const getProduksi = () => api<ProduksiSummary>('/produksi')
+export const createProduk = (p: ProdukInput) => api<Produk>('/produksi/produk', { method: 'POST', body: p })
+export const updateProduk = (id: number, p: ProdukInput) => api<Produk>(`/produksi/produk/${id}`, { method: 'PUT', body: p })
+export const deleteProduk = (id: number) => api<void>(`/produksi/produk/${id}`, { method: 'DELETE' })
+export const terapkanHPP = (id: number) => api<{ sku: string; harga_pokok: number }>(`/produksi/produk/${id}/terapkan-hpp`, { method: 'POST' })
+export const createSupplier = (s: SupplierInput) => api<Supplier>('/produksi/supplier', { method: 'POST', body: s })
+export const updateSupplier = (id: number, s: SupplierInput) => api<Supplier>(`/produksi/supplier/${id}`, { method: 'PUT', body: s })
+export const deleteSupplier = (id: number) => api<void>(`/produksi/supplier/${id}`, { method: 'DELETE' })
 
 // --- Invoice: faktur penjualan + cetak PDF ---
 

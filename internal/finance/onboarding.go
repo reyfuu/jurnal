@@ -32,6 +32,8 @@ type OnboardingData struct {
 	Assets    []Asset         `json:"assets"`
 	Karyawan  []Karyawan      `json:"karyawan"`
 	Transaksi []Transaction   `json:"transaksi"`
+	Tagihan   []Tagihan       `json:"tagihan"`
+	Stok      []StokItem      `json:"stok"`
 	Errors    []SheetError    `json:"errors"`
 	// Terbaca mencatat sheet mana yang dikenali, supaya user tahu kalau ada sheet terlewat.
 	Terbaca []string `json:"terbaca"`
@@ -42,6 +44,8 @@ const (
 	sheetAset      = "Aset"
 	sheetKaryawan  = "Karyawan"
 	sheetTransaksi = "Transaksi"
+	sheetTagihan   = "Piutang & Utang"
+	sheetStok      = "Stok"
 	sheetPanduan   = "Panduan"
 )
 
@@ -97,12 +101,18 @@ func OnboardingTemplate() []ImportSheet {
 		{"Sari Andini", "Kasir", "2026-02-15", "4000000", "400000", "TK/0", "", "Aktif"},
 	}
 
+	// Barisnya dipakai juga oleh template per-menu (lihat import_menu.go), jadi satu sumber saja.
+	tagihan := tagihanTemplateRows()
+	stok := stokTemplateRows()
+
 	panduan := [][]string{
 		{"Sheet", "Wajib?", "Catatan"},
 		{sheetSaldoAwal, "Disarankan", "Posisi keuangan di hari pertama pakai aplikasi. Neraca & arus kas dihitung dari sini + transaksi."},
 		{sheetAset, "Opsional", "Isi Jenis Harta saja; Kelompok PMK & tarif terisi otomatis. Bangunan hanya boleh Garis Lurus."},
 		{sheetKaryawan, "Opsional", "Status PTKP memakai kode seperti TK/0, K/1, K/3."},
 		{sheetTransaksi, "Opsional", "Format sama dengan template transaksi biasa."},
+		{sheetTagihan, "Opsional", "Jenis diisi Piutang atau Utang. Tanpa kolom Jenis, nomor berawalan PO dianggap utang."},
+		{sheetStok, "Opsional", "Stok Minimum menentukan peringatan stok menipis; kosongkan bila tidak dipakai."},
 		{"", "", ""},
 		{"Daftar Jenis Harta", "Kelompok", "Masa Manfaat", "Rujukan Lampiran PMK", "Status Pemetaan"},
 	}
@@ -127,6 +137,8 @@ func OnboardingTemplate() []ImportSheet {
 		{sheetSaldoAwal, saldo},
 		{sheetAset, aset},
 		{sheetKaryawan, karyawan},
+		{sheetTagihan, tagihan},
+		{sheetStok, stok},
 		{sheetTransaksi, TemplateRows()},
 		{sheetPanduan, panduan},
 	}
@@ -144,6 +156,10 @@ func kindOfSheet(nama string) string {
 		return sheetKaryawan
 	case strings.Contains(n, "transaksi") || strings.Contains(n, "mutasi") || strings.Contains(n, "jurnal"):
 		return sheetTransaksi
+	case strings.Contains(n, "piutang") || strings.Contains(n, "utang") || strings.Contains(n, "hutang") || strings.Contains(n, "tagihan"):
+		return sheetTagihan
+	case strings.Contains(n, "stok") || strings.Contains(n, "gudang") || strings.Contains(n, "persediaan") || strings.Contains(n, "inventory") || strings.Contains(n, "barang"):
+		return sheetStok
 	}
 	return ""
 }
@@ -175,10 +191,18 @@ func ParseOnboarding(sheets []ImportSheet) OnboardingData {
 			txs, errs := ParseImport(sh.Rows)
 			d.Transaksi = append(d.Transaksi, txs...)
 			d.Errors = append(d.Errors, tag(sh.Nama, errs)...)
+		case sheetTagihan:
+			ts, errs := parseTagihanRows(sh.Rows)
+			d.Tagihan = append(d.Tagihan, ts...)
+			d.Errors = append(d.Errors, tag(sh.Nama, errs)...)
+		case sheetStok:
+			st, errs := parseStokRows(sh.Rows)
+			d.Stok = append(d.Stok, st...)
+			d.Errors = append(d.Errors, tag(sh.Nama, errs)...)
 		}
 	}
 	if len(d.Terbaca) == 0 {
-		d.Errors = append(d.Errors, SheetError{Pesan: "tidak ada sheet yang dikenali; pakai template (Saldo Awal, Aset, Karyawan, Transaksi)"})
+		d.Errors = append(d.Errors, SheetError{Pesan: "tidak ada sheet yang dikenali; pakai template (Saldo Awal, Aset, Karyawan, Piutang & Utang, Stok, Transaksi)"})
 	}
 	return d
 }
@@ -482,6 +506,177 @@ func parseKaryawanRows(rows [][]string) ([]Karyawan, []ImportError) {
 			continue
 		}
 		out = append(out, k)
+	}
+	return out, errs
+}
+
+// --- Piutang & Utang ---
+
+var tagihanHeaders = []string{"Jenis", "Nomor", "Pelanggan / Supplier", "Jatuh Tempo", "Nominal", "Status", "Keterangan"}
+
+func tagihanColumn(h string) string {
+	n := norm(h)
+	switch {
+	case strings.Contains(n, "jenis") || strings.Contains(n, "tipe"):
+		return "jenis"
+	case strings.Contains(n, "nomor") || strings.Contains(n, "no ") || n == "no" || strings.Contains(n, "invoice") || strings.Contains(n, "faktur"):
+		return "nomor"
+	case strings.Contains(n, "pelanggan") || strings.Contains(n, "supplier") || strings.Contains(n, "pihak") || strings.Contains(n, "nama"):
+		return "pihak"
+	case strings.Contains(n, "jatuh") || strings.Contains(n, "tempo") || strings.Contains(n, "tanggal"):
+		return "jatuh_tempo"
+	case strings.Contains(n, "nominal") || strings.Contains(n, "jumlah") || strings.Contains(n, "nilai"):
+		return "nominal"
+	case strings.Contains(n, "status") || strings.Contains(n, "lunas"):
+		return "status"
+	case strings.Contains(n, "keterangan") || strings.Contains(n, "catatan"):
+		return "keterangan"
+	}
+	return ""
+}
+
+// jenisTagihanDari menebak arah tagihan dari teks bebas. Dibuat longgar karena istilahnya
+// beragam di lapangan: "Piutang", "Receivable", "Tagihan Masuk", "Utang", "Hutang".
+//
+// Piutang WAJIB diperiksa lebih dulu: kata "piutang" memuat "utang", sehingga urutan terbalik
+// membuat seluruh piutang salah dibaca sebagai utang.
+func jenisTagihanDari(s string) string {
+	n := norm(s)
+	switch {
+	case strings.Contains(n, "piutang") || strings.Contains(n, "receivable") || strings.Contains(n, "pelanggan") || strings.Contains(n, "masuk"):
+		return TagihanPiutang
+	case strings.Contains(n, "utang") || strings.Contains(n, "hutang") || strings.Contains(n, "payable") || strings.Contains(n, "supplier") || strings.Contains(n, "keluar"):
+		return TagihanUtang
+	}
+	return ""
+}
+
+func parseTagihanRows(rows [][]string) ([]Tagihan, []ImportError) {
+	headerAt, cols, ok := rowReader(rows, tagihanColumn, []string{"pihak", "jatuh_tempo", "nominal"})
+	if !ok {
+		return nil, []ImportError{{0, "header tidak ditemukan: butuh kolom Pelanggan/Supplier, Jatuh Tempo, dan Nominal"}}
+	}
+	var out []Tagihan
+	var errs []ImportError
+	for i := headerAt + 1; i < len(rows); i++ {
+		row := rows[i]
+		if strings.TrimSpace(strings.Join(row, "")) == "" {
+			continue
+		}
+		get := func(k string) string {
+			if c, okc := cols[k]; okc && c < len(row) {
+				return strings.TrimSpace(row[c])
+			}
+			return ""
+		}
+		fail := func(format string, a ...any) { errs = append(errs, ImportError{i + 1, fmt.Sprintf(format, a...)}) }
+
+		t := Tagihan{Nomor: get("nomor"), Pihak: get("pihak"), Keterangan: get("keterangan")}
+		t.Jenis = jenisTagihanDari(get("jenis"))
+		if t.Jenis == "" {
+			// Tanpa kolom Jenis, nomor berawalan PO menandakan utang ke supplier.
+			if strings.HasPrefix(strings.ToUpper(t.Nomor), "PO") {
+				t.Jenis = TagihanUtang
+			} else {
+				t.Jenis = TagihanPiutang
+			}
+		}
+		jt, okt := parseTanggal(get("jatuh_tempo"))
+		if !okt {
+			fail("jatuh tempo %q tidak dikenali (pakai YYYY-MM-DD atau DD/MM/YYYY)", get("jatuh_tempo"))
+			continue
+		}
+		t.JatuhTempo = jt
+		n, okn := parseRupiah(get("nominal"))
+		if !okn {
+			fail("nominal %q bukan angka", get("nominal"))
+			continue
+		}
+		t.Nominal = n
+		t.Lunas = strings.Contains(norm(get("status")), "lunas") && !strings.Contains(norm(get("status")), "belum")
+		if err := ValidateTagihan(&t); err != nil {
+			fail("%s", err)
+			continue
+		}
+		out = append(out, t)
+	}
+	return out, errs
+}
+
+// --- Stok & Gudang ---
+
+var stokHeaders = []string{"SKU", "Nama Barang", "Kategori", "Jumlah", "Satuan", "Stok Minimum", "Harga Pokok", "Harga Jual"}
+
+func stokColumn(h string) string {
+	n := norm(h)
+	switch {
+	case strings.Contains(n, "sku") || strings.Contains(n, "kode"):
+		return "sku"
+	case strings.Contains(n, "nama") || strings.Contains(n, "barang") || strings.Contains(n, "produk"):
+		return "nama"
+	case strings.Contains(n, "kategori") || strings.Contains(n, "jenis") || strings.Contains(n, "tipe"):
+		return "kategori"
+	// Stok minimum diperiksa lebih dulu: "Stok Minimum" juga mengandung kata "stok".
+	case strings.Contains(n, "minimum") || strings.Contains(n, "min"):
+		return "stok_min"
+	case strings.Contains(n, "jumlah") || strings.Contains(n, "stok") || strings.Contains(n, "qty") || strings.Contains(n, "kuantitas"):
+		return "jumlah"
+	case strings.Contains(n, "satuan") || strings.Contains(n, "unit"):
+		return "satuan"
+	case strings.Contains(n, "pokok") || strings.Contains(n, "hpp") || strings.Contains(n, "modal") || strings.Contains(n, "beli"):
+		return "harga_pokok"
+	case strings.Contains(n, "jual"):
+		return "harga_jual"
+	}
+	return ""
+}
+
+func parseStokRows(rows [][]string) ([]StokItem, []ImportError) {
+	headerAt, cols, ok := rowReader(rows, stokColumn, []string{"nama", "jumlah"})
+	if !ok {
+		return nil, []ImportError{{0, "header tidak ditemukan: butuh kolom Nama Barang dan Jumlah"}}
+	}
+	var out []StokItem
+	var errs []ImportError
+	for i := headerAt + 1; i < len(rows); i++ {
+		row := rows[i]
+		if strings.TrimSpace(strings.Join(row, "")) == "" {
+			continue
+		}
+		get := func(k string) string {
+			if c, okc := cols[k]; okc && c < len(row) {
+				return strings.TrimSpace(row[c])
+			}
+			return ""
+		}
+		fail := func(format string, a ...any) { errs = append(errs, ImportError{i + 1, fmt.Sprintf(format, a...)}) }
+
+		s := StokItem{SKU: get("sku"), Nama: get("nama"), Kategori: get("kategori"), Satuan: get("satuan")}
+		j, okj := parseRupiah(get("jumlah"))
+		if !okj {
+			fail("jumlah %q bukan angka", get("jumlah"))
+			continue
+		}
+		s.Jumlah = j
+		// Kolom berikut opsional: kosong berarti 0, bukan baris yang gagal.
+		for _, f := range []struct {
+			kolom string
+			ke    *int64
+		}{{"stok_min", &s.StokMin}, {"harga_pokok", &s.HargaPokok}, {"harga_jual", &s.HargaJual}} {
+			if v := get(f.kolom); v != "" {
+				n, okn := parseRupiah(v)
+				if !okn {
+					fail("%s %q bukan angka", strings.ReplaceAll(f.kolom, "_", " "), v)
+					continue
+				}
+				*f.ke = n
+			}
+		}
+		if err := ValidateStok(&s); err != nil {
+			fail("%s", err)
+			continue
+		}
+		out = append(out, s)
 	}
 	return out, errs
 }

@@ -45,7 +45,7 @@ func TestConfig_DefaultDanOverride(t *testing.T) {
 // kompatibel OpenAI bisa dipakai tanpa ubah kode.
 func TestComplete_BentukPermintaanStandar(t *testing.T) {
 	var got struct {
-		Model          string `json:"model"`
+		Model          string  `json:"model"`
 		Temperature    float64 `json:"temperature"`
 		ResponseFormat *struct {
 			Type string `json:"type"`
