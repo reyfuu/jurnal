@@ -16,6 +16,8 @@ type BusinessProfile struct {
 	BentukUsaha string `json:"bentuk_usaha"` // op | pt_perorangan | cv | pt
 	PTKP        string `json:"ptkp"`         // hanya untuk op, mis. "K/1"
 	PKP         bool   `json:"pkp"`          // Pengusaha Kena Pajak (wajib pungut PPN)
+	// MetodePersediaan: periodik | perpetual (perdagangan & manufaktur); menentukan akun HPP aktif.
+	MetodePersediaan string `json:"metode_persediaan"`
 }
 
 type Option struct {
@@ -28,6 +30,11 @@ var JenisUsahaOptions = []Option{
 	{"perdagangan", "Perdagangan", "Beli lalu jual kembali: toko, distributor, reseller, minimarket"},
 	{"jasa", "Jasa", "Menjual keahlian atau layanan: salon, bengkel, konsultan, laundry, agensi"},
 	{"manufaktur", "Manufaktur / Produksi", "Mengolah bahan baku jadi produk: konveksi, catering, roastery, furnitur"},
+}
+
+var MetodePersediaanOptions = []Option{
+	{"periodik", "Periodik", "HPP dihitung di akhir periode dari stok opname; cocok bila belum ada kartu stok per barang"},
+	{"perpetual", "Perpetual", "Stok dan HPP tercatat setiap transaksi; butuh kartu stok per barang"},
 }
 
 var BentukUsahaOptions = []Option{
@@ -51,6 +58,14 @@ func (p *BusinessProfile) Validate() error {
 	}
 	if !hasOption(BentukUsahaOptions, p.BentukUsaha) {
 		return errors.New("pilih bentuk usaha")
+	}
+	switch {
+	case p.JenisUsaha == "jasa":
+		p.MetodePersediaan = ""
+	case p.MetodePersediaan == "":
+		p.MetodePersediaan = "periodik" // profil lama (sebelum Fase C) & default UMKM
+	case !hasOption(MetodePersediaanOptions, p.MetodePersediaan):
+		return errors.New("metode persediaan harus periodik atau perpetual")
 	}
 	if p.BentukUsaha != "op" {
 		p.PTKP = "" // PTKP hanya berlaku untuk wajib pajak orang pribadi

@@ -126,6 +126,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.handleGetBusiness))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.handlePutBusiness))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.handleTaxPlanning))
+	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.handleCoA))
+	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.handleReportCoA))
+	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.handleReportCoAXlsx))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.handleSalesReport))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
@@ -462,6 +465,16 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 	return t, true
 }
 
+// decodeTx + cek akun koreksi terhadap CoA aktif.
+func (s *Server) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
+	t, ok := decodeTx(w, r)
+	if ok && !s.validAkun(t) {
+		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
+		return t, false
+	}
+	return t, ok
+}
+
 // txResp: transaksi tersimpan + peringatan kas minus di bulan transaksi (tidak memblokir simpan).
 type txResp struct {
 	finance.Transaction
@@ -475,7 +488,7 @@ func (s *Server) withWarnings(t finance.Transaction) txResp {
 }
 
 func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
-	t, ok := decodeTx(w, r)
+	t, ok := s.decodeTx(w, r)
 	if !ok {
 		return
 	}
@@ -496,7 +509,7 @@ func (s *Server) txIndex(r *http.Request) int {
 }
 
 func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request) {
-	t, ok := decodeTx(w, r)
+	t, ok := s.decodeTx(w, r)
 	if !ok {
 		return
 	}

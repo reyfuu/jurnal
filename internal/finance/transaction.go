@@ -39,6 +39,9 @@ var JenisList = []Jenis{
 	{"Ambil Uang Pribadi", "keluar", "prive"},
 }
 
+// LookupJenis: info arah & pos untuk nama jenis transaksi.
+func LookupJenis(nama string) (Jenis, bool) { return jenisOf(nama) }
+
 func jenisOf(nama string) (Jenis, bool) {
 	i := slices.IndexFunc(JenisList, func(j Jenis) bool { return j.Nama == nama })
 	if i < 0 {
@@ -65,11 +68,12 @@ type Transaction struct {
 	Pihak        string `json:"pihak"`
 	Lunas        bool   `json:"lunas"`
 	TanggalLunas string `json:"tanggal_lunas"` // kosong = lunas di tanggal transaksi
+	Akun         string `json:"akun,omitempty"` // kode CoA koreksi user; kosong = otomatis dari jenis
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.
 func Validate(t *Transaction) error {
-	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas} {
+	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas, &t.Akun} {
 		*s = strings.TrimSpace(*s)
 	}
 	if _, err := time.Parse(time.DateOnly, t.Tanggal); err != nil {
