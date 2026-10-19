@@ -32,12 +32,12 @@ type RoleInfo struct {
 
 var financeViews = []string{
 	"dashboard", "laporan-keuangan", "laporan-penjualan", "arus-kas", "transaksi", "piutang-utang", "stok-gudang",
-	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "master-data", "panduan",
+	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "master-data", "panduan",
 }
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.
 var Roles = map[Role]RoleInfo{
-	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "pengguna")},
+	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "pengguna", "profil-usaha")},
 	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola")},
 	Kasir: {"Kasir", "Dashboard dan catat transaksi (tanpa ubah/hapus).", []string{"dashboard", "transaksi"}},
 }

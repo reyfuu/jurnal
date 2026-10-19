@@ -33,6 +33,7 @@ type Server struct {
 	nextTxID  int
 	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
 	users     *auth.Store
+	profile   *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine
@@ -55,6 +56,7 @@ func NewServer() *Server {
 		seedTx:    seedTx,
 		users:     auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword)),
 		failures:  map[string]loginFailure{},
+		profile:   loadProfile(),
 		aiEngine:  ai.NewEngine(),
 		mux:       http.NewServeMux(),
 	}
@@ -107,6 +109,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.handleDashboard))
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.handleFinancial))
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("arus-kas", s.handleCashflow))
+	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.handleGetBusiness))
+	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.handlePutBusiness))
+	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.handleTaxPlanning))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.handleSalesReport))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
@@ -344,6 +349,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	txs := finance.ForPeriod(s.txs, period)
 	seedN := s.seedTx[period]
+	if s.profile != nil {
+		snap.Tenant.Name, snap.Tenant.Category = s.profile.NamaUsaha, s.profile.JenisLabel()
+	}
 	s.mu.RUnlock()
 
 	entries := finance.ToLedger(txs)
