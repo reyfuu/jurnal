@@ -18,12 +18,15 @@ echo "=== [2/4] Building Docker container ==="
 docker build -t "$IMAGE_NAME" .
 
 echo "=== [3/4] Restarting container on port $APP_PORT ==="
+mkdir -p data # profil usaha (business.json); bertahan antar deploy
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   -p "127.0.0.1:${APP_PORT}:8080" \
   -e SEED_PASSWORD="$SEED_PASSWORD" \
+  -e DATA_DIR=/data \
+  -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"
 
 echo "=== [4/4] Verifying deployment ==="

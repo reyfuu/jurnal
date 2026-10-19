@@ -96,6 +96,16 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
 - `deploy.sh` wajib `SEED_PASSWORD`, port container hanya 127.0.0.1.
 - **Wajib di nginx** `jurnal-pajak`: `proxy_set_header X-Forwarded-Proto $scheme;` dan `proxy_set_header X-Real-IP $remote_addr;` (tanpa X-Real-IP semua klien terlihat sebagai 1 IP dan header bisa dipalsukan).
 
+## Fase A & A+ — "Staf Keuangan Virtual" untuk UMKM Menengah (Okt 2026)
+Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung merekrut staf keuangan. Roadmap A–E ada di PRD §5.
+- **Tanpa emoji** di UI, jawaban AI, dan laporan (`TestAnswer_NoEmoji`, aturan di DESIGN.md §6).
+- **Simulasi Harga + BEP**: `finance.BreakEven` (BEP unit/hari/Rp, laba bersih pada volume, unit untuk target laba). Biaya tetap default = beban operasional periode berjalan.
+- **Peringatan kas minus**: `finance.CashWarnings` (saldo harian dari transaksi lunas). Tampil di Dashboard dan setelah simpan transaksi; transaksi tetap tersimpan.
+- **Laporan Penjualan** (pola skinku-b2b-portal): `GET /api/v1/reports/sales?granularity=day|week|month`. Seed penjualan dipecah per item menu (total tetap).
+- **Sidebar sticky** setinggi layar, menu scroll sendiri (pola skinku / AIpreneur).
+- **Profil usaha** (onboarding saat Owner pertama login): jenis usaha perdagangan/jasa/manufaktur, bentuk usaha OP/PT Perorangan/CV/PT, PTKP, PKP. `GET|PUT /api/v1/business`, disimpan di `$DATA_DIR/business.json` (VPS: `/var/www/laporan-bisnis/data`, volume Docker). Menu Pengaturan > Profil Usaha.
+- **Perencanaan Pajak** (`internal/tax`, port inti *Tax_Planning_Calculator_V2.1.xlsm* BSV Consulting): 6 skema (PP 20/2026 OP & Badan, Pasal 17, NPPN 50%, Badan 22%, Pasal 31E) + perbandingan bentuk badan dengan PPh dividen 10%. `POST /api/v1/tax/planning`, default dari transaksi + profil. Backlog dari template: gross-up PPh 21/23/sewa, PPN dibebankan vs ditanggung, beli vs sewa aset, NPPN per KLU (tabel 1.435 norma).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 0. **Prioritas**: persistensi SQLite (data masih in-memory, hilang tiap deploy) → multi-tenant per UMKM → KPI dihitung murni dari transaksi.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
