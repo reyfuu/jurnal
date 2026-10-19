@@ -106,8 +106,15 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - **Profil usaha** (onboarding saat Owner pertama login): jenis usaha perdagangan/jasa/manufaktur, bentuk usaha OP/PT Perorangan/CV/PT, PTKP, PKP. `GET|PUT /api/v1/business`, disimpan di `$DATA_DIR/business.json` (VPS: `/var/www/laporan-bisnis/data`, volume Docker). Menu Pengaturan > Profil Usaha.
 - **Perencanaan Pajak** (`internal/tax`, port inti *Tax_Planning_Calculator_V2.1.xlsm* BSV Consulting): 6 skema (PP 20/2026 OP & Badan, Pasal 17, NPPN 50%, Badan 22%, Pasal 31E) + perbandingan bentuk badan dengan PPh dividen 10%. `POST /api/v1/tax/planning`, default dari transaksi + profil. Backlog dari template: gross-up PPh 21/23/sewa, PPN dibebankan vs ditanggung, beli vs sewa aset, NPPN per KLU (tabel 1.435 norma).
 
+## Fase B — Persistensi Data (Okt 2026)
+- **Keputusan**: snapshot JSON atomik `$DATA_DIR/state.json` (transaksi, user dengan hash password, sesi aktif), bukan SQLite. Alasan: `modernc.org/sqlite` terbaru butuh Go 1.26 + dependensi besar, sementara data 1 usaha muat di memori. Ganti ke database saat multi-tenant.
+- Ditulis ulang setelah setiap request pengubah data yang sukses (middleware `persisting` di `cmd/server/persist.go`): login/logout, CRUD user, CRUD + impor transaksi. Penulisan diserialisasi (`saveMu`), file 0600.
+- Boot pertama tanpa `state.json`: seed dibuat dengan `SEED_PASSWORD` lalu langsung disimpan. Setelah itu **`SEED_PASSWORD` tidak berpengaruh lagi**: ganti password lewat menu Pengguna.
+- `state.json` rusak → server menolak start (log fatal) agar data tidak tertimpa seed. Backup: salin `/var/www/laporan-bisnis/data/`.
+- Tanpa `DATA_DIR` (test, dev lokal) tetap in-memory.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
-0. **Prioritas**: persistensi SQLite (data masih in-memory, hilang tiap deploy) → multi-tenant per UMKM → KPI dihitung murni dari transaksi.
+0. **Prioritas**: CoA otomatis per jenis usaha (Fase C) → KPI & pajak dihitung murni dari transaksi → multi-tenant (database) → backup otomatis `data/`.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
 3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.

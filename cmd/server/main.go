@@ -34,6 +34,7 @@ type Server struct {
 	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
 	users     *auth.Store
 	profile   *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
+	saveMu    sync.Mutex // serialisasi penulisan state.json
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine
@@ -49,18 +50,31 @@ func NewServer() *Server {
 		seedTx[p.ID] = len(finance.ForPeriod(txs, p.ID))
 	}
 
+	users := auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword))
+	nextTxID := len(txs) + 1
+	st, err := loadState()
+	if err != nil {
+		log.Fatalf("state.json rusak, perbaiki atau pindahkan dulu: %v", err) // jangan timpa data user dengan seed
+	}
+	if st != nil {
+		txs, nextTxID, users = st.Transactions, st.NextTxID, auth.Restore(st.Auth)
+	}
+
 	s := &Server{
 		snapshots: snapshots,
 		txs:       txs,
-		nextTxID:  len(txs) + 1,
+		nextTxID:  nextTxID,
 		seedTx:    seedTx,
-		users:     auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword)),
+		users:     users,
 		failures:  map[string]loginFailure{},
 		profile:   loadProfile(),
 		aiEngine:  ai.NewEngine(),
 		mux:       http.NewServeMux(),
 	}
 	s.routes()
+	if st == nil {
+		s.save() // data awal (seed) langsung tersimpan; SEED_PASSWORD hanya dipakai saat ini
+	}
 	return s
 }
 
@@ -101,8 +115,8 @@ func isHTTPS(r *http.Request) bool {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
-	s.mux.HandleFunc("POST /api/v1/auth/logout", s.handleLogout)
+	s.mux.HandleFunc("POST /api/v1/auth/login", s.persisting(s.handleLogin))
+	s.mux.HandleFunc("POST /api/v1/auth/logout", s.persisting(s.handleLogout))
 	s.mux.HandleFunc("GET /api/v1/auth/me", s.guard("", s.handleMe))
 	s.mux.HandleFunc("GET /api/v1/periods", s.guard("", s.handlePeriods))
 
@@ -117,16 +131,16 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.handleListTransactions))
-	s.mux.HandleFunc("POST /api/v1/transactions", s.guard("transaksi", s.handleCreateTransaction))
+	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.handleCreateTransaction)))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
-	s.mux.HandleFunc("POST /api/v1/transactions/import", s.guard("transaksi-kelola", s.handleImportTransactions))
-	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleUpdateTransaction))
-	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.guard("transaksi-kelola", s.handleDeleteTransaction))
+	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.handleImportTransactions)))
+	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleUpdateTransaction)))
+	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleDeleteTransaction)))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
-	s.mux.HandleFunc("POST /api/v1/users", s.guard("pengguna", s.handleCreateUser))
-	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.guard("pengguna", s.handleUpdateUser))
-	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.guard("pengguna", s.handleDeleteUser))
+	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))
+	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleUpdateUser)))
+	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleDeleteUser)))
 
 	s.mux.HandleFunc("GET /", s.handleStatic)
 }

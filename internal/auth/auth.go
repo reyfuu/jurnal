@@ -270,3 +270,52 @@ func (s *Store) revoke(userID int) {
 		}
 	}
 }
+
+// StoreSnapshot: bentuk serial Store untuk disimpan ke disk (hash password, bukan password).
+type StoreSnapshot struct {
+	Users []SnapshotUser `json:"users"`
+	// Sessions: token → sesi; ikut disimpan agar user tidak logout setiap deploy.
+	Sessions []SnapshotSession `json:"sessions"`
+}
+
+type SnapshotUser struct {
+	User
+	Salt []byte `json:"salt"`
+	Hash []byte `json:"hash"`
+}
+
+type SnapshotSession struct {
+	Token   string    `json:"token"`
+	UserID  int       `json:"user_id"`
+	Expires time.Time `json:"expires"`
+}
+
+func (s *Store) Snapshot() StoreSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	snap := StoreSnapshot{}
+	for _, r := range s.users {
+		snap.Users = append(snap.Users, SnapshotUser{r.User, r.salt, r.hash})
+	}
+	sort.Slice(snap.Users, func(i, j int) bool { return snap.Users[i].ID < snap.Users[j].ID })
+	now := s.Now()
+	for t, sess := range s.sessions {
+		if now.Before(sess.expires) {
+			snap.Sessions = append(snap.Sessions, SnapshotSession{t, sess.userID, sess.expires})
+		}
+	}
+	return snap
+}
+
+// Restore membangun Store dari snapshot; akun seed tidak dibuat ulang.
+func Restore(snap StoreSnapshot) *Store {
+	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
+	for _, u := range snap.Users {
+		s.users[u.ID] = &record{u.User, u.Salt, u.Hash}
+		s.nextID = max(s.nextID, u.ID)
+	}
+	for _, sess := range snap.Sessions {
+		s.sessions[sess.Token] = session{sess.UserID, sess.Expires}
+	}
+	return s
+}

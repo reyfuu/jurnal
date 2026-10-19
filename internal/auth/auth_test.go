@@ -146,3 +146,25 @@ func TestNewStoreWithPassword(t *testing.T) {
 		t.Fatalf("seed password login: %v", err)
 	}
 }
+
+func TestSnapshotRestore(t *testing.T) {
+	s := auth.NewStore()
+	token, _, _ := s.Login("owner@kedaikopisenja.id", auth.DemoPassword)
+	u, err := s.Create(auth.Input{Name: "Tono", Email: "tono@x.id", Role: auth.Kasir, Active: true, Password: "rahasia123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restored := auth.Restore(s.Snapshot())
+	if _, _, err := restored.Login("tono@x.id", "rahasia123"); err != nil {
+		t.Fatalf("password hash must survive restore: %v", err)
+	}
+	if got, ok := restored.UserBySession(token); !ok || got.Email != "owner@kedaikopisenja.id" {
+		t.Fatal("session must survive restore")
+	}
+	// ID baru tidak boleh bentrok dengan user yang dipulihkan
+	next, err := restored.Create(auth.Input{Name: "Ani", Email: "ani@x.id", Role: auth.Kasir, Active: true, Password: "rahasia123"})
+	if err != nil || next.ID <= u.ID {
+		t.Fatalf("next ID %d must be > %d (%v)", next.ID, u.ID, err)
+	}
+}

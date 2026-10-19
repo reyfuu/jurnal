@@ -66,7 +66,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
             <LogOut className="nav-icon" />
           </button>
         </div>
-        <div className="demo-caption">Data contoh tidak disimpan</div>
+        <div className="demo-caption">Data awal berisi contoh; perubahan Anda tersimpan</div>
       </div>
     </aside>
   )

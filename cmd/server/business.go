@@ -4,19 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"pajak/internal/finance"
 	"pajak/internal/tax"
 )
 
-// ponytail: profil disimpan sebagai satu file JSON di $DATA_DIR sampai SQLite (Fase B) hadir.
-func profilePath() string {
-	if dir := os.Getenv("DATA_DIR"); dir != "" {
-		return filepath.Join(dir, "business.json")
-	}
-	return ""
-}
+func profilePath() string { return dataPath("business.json") }
 
 func loadProfile() *finance.BusinessProfile {
 	p := profilePath()
@@ -39,12 +32,7 @@ func saveProfile(prof finance.BusinessProfile) error {
 	if p == "" {
 		return nil
 	}
-	b, _ := json.MarshalIndent(prof, "", "  ")
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, p)
+	return writeFileAtomic(p, prof)
 }
 
 func (s *Server) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
