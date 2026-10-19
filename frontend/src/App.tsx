@@ -17,7 +17,7 @@ import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Oper
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
-import { Onboarding, ProfilUsaha } from '@/views/ProfilUsaha'
+import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
@@ -104,14 +104,29 @@ export default function App() {
     return <Onboarding canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} provinsi={business.options.provinsi} />
   }
 
+  const onPaid = () => getMe().then((m) => { setSession({ status: 'in', me: m }); void reload(m) }, fail)
+
+  // Bayar dulu: setelah onboarding, usaha tanpa langganan aktif hanya melihat layar Langganan.
+  if (me.langganan.status === 'habis') {
+    return (
+      <OnboardingShell onLogout={onLogout}>
+        {canSee('langganan') ? (
+          <Langganan onPaid={onPaid} />
+        ) : (
+          <p className="text-sm">Langganan usaha belum aktif. Hubungi Owner Anda untuk memilih paket, lalu muat ulang halaman ini.</p>
+        )}
+      </OnboardingShell>
+    )
+  }
+
   return (
     <main>
       <div className="app-shell">
         <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
-          {me.langganan.status !== 'aktif' && view !== 'langganan' && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: me.langganan.status === 'habis' ? 'var(--accent-red)' : 'var(--border-shell)', background: me.langganan.status === 'habis' ? 'var(--accent-red-soft)' : 'transparent' }} role="status">
+          {me.langganan.status === 'trial' && view !== 'langganan' && ( // usaha lama yang masih masa coba
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--border-shell)' }} role="status">
               <span>{statusText(me.langganan)}</span>
               {canSee('langganan') && <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
             </div>
@@ -197,7 +212,7 @@ export default function App() {
       case 'karyawan':
         return <KaryawanView />
       case 'langganan':
-        return <Langganan onPaid={() => { getMe().then((m) => setSession({ status: 'in', me: m }), fail) }} />
+        return <Langganan onPaid={onPaid} />
       case 'lapor-bug':
         return <LaporBug halamanAwal={VIEW_LABEL[bugFrom]} />
       case 'pengguna':

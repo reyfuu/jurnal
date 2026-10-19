@@ -65,8 +65,7 @@ type Server struct {
 
 // newTenant membuat usaha kosong (hasil register).
 func newTenant(id int) *tenant {
-	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1,
-		langganan: langganan{TrialSampai: time.Now().Add(trialDurasi)}}
+	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -285,7 +284,7 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if s.lockedWrite(r, u.TenantID) {
-			http.Error(w, "Masa coba habis. Aktifkan langganan di menu Langganan untuk kembali mencatat.", http.StatusPaymentRequired)
+			http.Error(w, "Langganan belum aktif. Pilih paket di menu Langganan untuk mulai memakai aplikasi.", http.StatusPaymentRequired)
 			return
 		}
 		h(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))

@@ -8,11 +8,11 @@ import { formatRp } from '@/lib/format'
 // Landing untuk pengunjung yang belum login. Satu tema (navy aplikasi), satu aksen (amber),
 // radius kartu 16px dan tombol pill. Visual memakai screenshot asli aplikasi di public/landing.
 
-const CTA_DAFTAR = 'Coba gratis 3 hari'
+const CTA_DAFTAR = 'Daftar sekarang'
 
 const FAQ = [
   ['Apakah saya perlu paham akuntansi?', 'Tidak. Anda cukup menjawab beberapa pertanyaan tentang usaha Anda. Daftar akun, laporan laba rugi, dan neraca disiapkan otomatis dari transaksi yang Anda catat.'],
-  ['Bagaimana masa coba gratis?', 'Setelah daftar, semua fitur bisa dipakai gratis selama 3 hari tanpa kartu kredit. Setelah itu data Anda tetap aman dan bisa dilihat; untuk kembali mencatat, aktifkan langganan.'],
+  ['Bagaimana cara berlangganan?', 'Setelah daftar dan mengisi profil usaha, pilih paket bulanan atau tahunan lalu bayar lewat Midtrans. Semua fitur langsung aktif begitu pembayaran berhasil.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans. Anda bisa memilih metode yang tersedia di halaman pembayaran, seperti virtual account bank, QRIS, e-wallet, atau kartu.'],
   ['Apakah hasil cek benchmark DJP itu resmi?', 'Bukan. Cek awal membandingkan margin usaha Anda dengan rentang indikatif usaha sejenis, untuk membantu Anda bersiap. Untuk keputusan pajak, tetap konsultasikan dengan konsultan pajak.'],
   ['Siapa saja yang bisa memakai akun saya?', 'Owner bisa menambah Admin Keuangan dan Kasir. Tiap peran hanya melihat menu yang sesuai, dan data tiap usaha terpisah dari usaha lain.'],
@@ -167,8 +167,9 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Mulai dalam 10 menit.</h2>
             <ol className="grid gap-8">
               {[
-                ['Daftar akun', 'Cukup nama, email, dan password. Tanpa kartu kredit.'],
+                ['Daftar akun', 'Cukup nama, email, dan password.'],
                 ['Kenalkan usaha Anda', 'Jawab pertanyaan sederhana: jenis usaha, lokasi, omzet, dan bentuk usaha. Kami siapkan daftar akun dan cek awal pajaknya.'],
+                ['Pilih paket & bayar', 'Bulanan atau tahunan, bayar lewat Midtrans: virtual account, QRIS, e-wallet, atau kartu.'],
                 ['Catat atau impor transaksi', 'Ketik langsung atau unggah Excel. Laporan dan dashboard langsung terisi.'],
               ].map(([judul, isi], i) => (
                 <li key={judul} className="grid grid-cols-[3rem_1fr] gap-4">
@@ -185,7 +186,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
 
         <section id="harga" className="mx-auto max-w-4xl scroll-mt-20 px-4 py-20 md:px-6">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Harga sederhana.</h2>
-          <p className="mt-3 text-[var(--text-secondary)]">Gratis 3 hari untuk semua fitur. Setelah itu pilih bulanan atau tahunan.</p>
+          <p className="mt-3 text-[var(--text-secondary)]">Semua fitur dalam satu paket. Pilih bulanan atau tahunan.</p>
           <div className="mt-10"><Pricing onDaftar={onDaftar} /></div>
         </section>
 
@@ -208,7 +209,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
           <div className="flex flex-col items-start justify-between gap-6 rounded-2xl bg-[var(--accent-amber)] px-8 py-10 text-[#1a1a1a] md:flex-row md:items-center">
             <div>
               <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Rapikan pembukuan usaha mulai hari ini.</h2>
-              <p className="mt-2 text-[#3a3320]">Gratis 3 hari, tanpa kartu kredit.</p>
+              <p className="mt-2 text-[#3a3320]">Isi profil usaha, pilih paket, langsung pakai.</p>
             </div>
             <Button size="lg" className="h-12 rounded-full bg-[#1a1d3a] px-6 text-base font-bold text-white hover:bg-[#262b55] active:scale-[0.98]" onClick={onDaftar}>
               {CTA_DAFTAR} <ArrowRight aria-hidden="true" />

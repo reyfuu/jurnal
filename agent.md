@@ -1,7 +1,7 @@
 # AGENT.md — Laporan Bisnis (by Akademi Pajak)
 
 > **Project**: Laporan Bisnis by Akademi Pajak — SaaS Pembukuan, Operasional & Pajak UMKM ("Gambaran seluruh bisnis dalam satu layar")  
-> **Target Scale**: 100 Active UMKM Tenants (~4.000–10.000 transaksi/tenant/tahun)  
+> **Target Scale**: 1.000 Active UMKM Tenants (~4.000–10.000 transaksi/tenant/tahun), di-host di server lokal (on-premise)  
 > **Core Stack**: **Go (Golang)** atau **ElysiaJS (Bun)** + PostgreSQL + Next.js/React (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
 ---
@@ -29,7 +29,7 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 ### B. Engineering Discipline & Code Quality
 7. **`ponytail` (Lazy Senior Dev / YAGNI Mode — Active Every Response)**
    - Terapkan *The Ponytail Ladder*:
-     1. *Does this need to exist at all?* (YAGNI — kapasitas target adalah **100 user**, jangan bangun infrastruktur sekelas 1 juta user seperti Kafka/Kubernetes/Microservices).
+     1. *Does this need to exist at all?* (YAGNI — kapasitas target adalah **1.000 user**, jangan bangun infrastruktur sekelas 1 juta user seperti Kafka/Kubernetes/Microservices).
      2. *Already in this codebase?* Gunakan ulang helper/tipe yang ada.
      3. *Stdlib / Native platform first* (`net/http` / `database/sql` di Go, atau native `Bun.serve` / `Elysia` di Bun, constraint PostgreSQL di DB).
      4. Tandai kompromi kapasitas yang disengaja dengan komentar `// ponytail: <alasan & batas upgrade>`.
@@ -94,15 +94,17 @@ Sesuai referensi desain produk **Laporan Bisnis by Akademi Pajak**, sistem terdi
 
 ---
 
-## 3. Aturan Teknis Skala 100 User (ElysiaJS vs Go)
+## 3. Aturan Teknis Skala 1.000 User — Server Lokal (ElysiaJS vs Go)
 
-- **Target Beban**: 100 tenant UMKM aktif (~500 ribu baris transaksi/tahun total seluruh sistem, ~5–20 request/detik saat jam sibuk).
-- **Kapasitas Server**: Cukup **1 VPS (2 vCPU, 2–4 GB RAM)** dengan **Single-Node PostgreSQL 16/17** + **Single Binary Backend (Go atau Bun/Elysia)**.
+- **Target Beban**: 1.000 tenant UMKM aktif (~5 juta baris transaksi/tahun total seluruh sistem, ~50–200 request/detik saat jam sibuk).
+- **Kapasitas Server**: Cukup **1 server lokal (4 vCPU, 8 GB RAM, SSD)** dengan **Single-Node PostgreSQL 16/17** + **Single Binary Backend (Go atau Bun/Elysia)**.
 - **Dilarang Over-Engineering (`ponytail`)**:
   - ❌ Jangan gunakan microservices, Kafka, RabbitMQ, atau Kubernetes.
   - ❌ Jangan gunakan Redis terpisah kecuali dibutuhkan nanti; gunakan in-memory cache (`sync.Map`/LRU di Go atau `Map` di Bun) untuk data agregasi dashboard yang di-invalidate saat tenant menambah transaksi.
   - ✅ Gunakan **Multi-tenancy via `tenant_id` + PostgreSQL Row-Level Security (RLS)** atau *strict tenant middleware*.
   - ✅ Semua nilai uang disimpan sebagai `BIGINT` (Rupiah utuh, tanpa desimal pecahan sen kecuali kurs asing diperlukan).
+  - ✅ Backup PostgreSQL harian (`pg_dump`) ke disk/lokasi terpisah — server lokal tidak punya snapshot otomatis seperti VPS.
+  - ✅ Akses publik (webhook Midtrans, landing) lewat reverse proxy/tunnel (mis. Cloudflare Tunnel), bukan port-forward langsung.
 
 ---
 

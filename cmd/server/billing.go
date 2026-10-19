@@ -15,10 +15,9 @@ import (
 	"pajak/internal/midtrans"
 )
 
-// Langganan aplikasi per usaha, dibayar lewat Midtrans Snap. Usaha baru dapat masa coba
-// trialDurasi; setelah habis hanya bisa melihat data dan membayar (lihat lockedWrite).
-
-const trialDurasi = 3 * 24 * time.Hour
+// Langganan aplikasi per usaha, dibayar lewat Midtrans Snap. Usaha baru wajib bayar dulu
+// setelah onboarding: tanpa langganan aktif hanya bisa mengisi profil, melihat data, dan
+// membayar (lihat lockedWrite). TrialSampai tetap dibaca untuk usaha lama yang masih masa coba.
 
 type paket struct {
 	ID    string `json:"id"`
@@ -78,12 +77,14 @@ func (t *tenant) langgananStatus(now time.Time) langgananStatus {
 	return langgananStatus{"habis", cmp.Or(l.AktifSampai, l.TrialSampai)}
 }
 
-// lockedWrite: masa coba/langganan habis → hanya baca. Pembayaran, sesi, dan lapor bug tetap jalan.
+// lockedWrite: langganan belum/tidak aktif → hanya baca. Pembayaran, sesi, lapor bug, dan
+// profil usaha (onboarding + cek awal) tetap jalan.
+// ponytail: baca (GET) tidak dikunci di server; layar bayar dipaksa di frontend (App.tsx).
 func (s *Server) lockedWrite(r *http.Request, tenantID int) bool {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		return false
 	}
-	for _, p := range []string{"/api/v1/billing", "/api/v1/auth/", "/api/v1/bugs"} {
+	for _, p := range []string{"/api/v1/billing", "/api/v1/auth/", "/api/v1/bugs", "/api/v1/business"} {
 		if strings.HasPrefix(r.URL.Path, p) {
 			return false
 		}
@@ -103,7 +104,7 @@ func (s *Server) midtransClient() *midtrans.Client {
 }
 
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]any{"paket": paketList, "trial_hari": int(trialDurasi.Hours() / 24)})
+	writeJSON(w, map[string]any{"paket": paketList})
 }
 
 func (s *Server) handleBilling(w http.ResponseWriter, r *http.Request) {
