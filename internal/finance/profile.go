@@ -18,6 +18,42 @@ type BusinessProfile struct {
 	PKP         bool   `json:"pkp"`          // Pengusaha Kena Pajak (wajib pungut PPN)
 	// MetodePersediaan: periodik | perpetual (perdagangan & manufaktur); menentukan akun HPP aktif.
 	MetodePersediaan string `json:"metode_persediaan"`
+
+	// Identitas penerbit faktur. Semuanya opsional saat onboarding supaya wizard tidak jadi
+	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
+	// tidak layak dikirim ke pelanggan badan.
+	Alamat  string `json:"alamat,omitempty"`
+	NPWP    string `json:"npwp,omitempty"`
+	Telepon string `json:"telepon,omitempty"`
+	Email   string `json:"email,omitempty"`
+
+	// Rekening tujuan pembayaran, dicetak di kaki faktur.
+	BankNama     string `json:"bank_nama,omitempty"`
+	BankRekening string `json:"bank_rekening,omitempty"`
+	BankAtasNama string `json:"bank_atas_nama,omitempty"`
+
+	// PPNBps: tarif PPN dalam basis poin (1100 = 11%). Dibuat field, bukan konstanta, supaya
+	// perubahan tarif tidak perlu ubah kode. Hanya dipakai bila PKP.
+	PPNBps int `json:"ppn_bps,omitempty"`
+
+	// PenandatanganNama & PenandatanganJabatan: dicetak di atas garis tanda tangan faktur.
+	PenandatanganNama    string `json:"penandatangan_nama,omitempty"`
+	PenandatanganJabatan string `json:"penandatangan_jabatan,omitempty"`
+}
+
+// DefaultPPNBps dipakai bila profil PKP belum menyetel tarif sendiri.
+const DefaultPPNBps = 1100
+
+// TarifPPNBps: tarif yang berlaku untuk faktur baru. Non-PKP selalu 0 — mereka memang tidak
+// boleh memungut PPN, jadi ini dijaga di satu tempat, bukan diserahkan ke pemanggil.
+func (p BusinessProfile) TarifPPNBps() int {
+	if !p.PKP {
+		return 0
+	}
+	if p.PPNBps > 0 {
+		return p.PPNBps
+	}
+	return DefaultPPNBps
 }
 
 type Option struct {
