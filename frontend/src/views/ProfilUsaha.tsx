@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -17,23 +18,27 @@ function ChoiceGrid({ name, options, value, onChange }: {
   value: string
   onChange: (v: string) => void
 }) {
+  const groupId = useId()
   return (
-    <div role="radiogroup" aria-label={name} style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+    <div role="radiogroup" aria-label={name} className="profile-choices">
       {options.map((o) => {
         const on = o.value === value
         return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onChange(o.value)}
-            className="card"
-            style={{ textAlign: 'left', padding: 14, cursor: 'pointer', borderColor: on ? '#eab308' : undefined, background: on ? 'rgba(234,179,8,0.08)' : '#101318' }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{o.label}</div>
-            {o.hint && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>{o.hint}</div>}
-          </button>
+          <label key={o.value} className="profile-choice" data-selected={on}>
+            <input
+              type="radio"
+              name={groupId}
+              value={o.value}
+              checked={on}
+              onChange={() => onChange(o.value)}
+              aria-labelledby={`${groupId}-${o.value}-label`}
+              aria-describedby={o.hint ? `${groupId}-${o.value}-hint` : undefined}
+            />
+            <span>
+              <span id={`${groupId}-${o.value}-label`} className="profile-choice-label">{o.label}</span>
+              {o.hint && <span id={`${groupId}-${o.value}-hint`} className="profile-choice-hint">{o.hint}</span>}
+            </span>
+          </label>
         )
       })}
     </div>
@@ -114,14 +119,27 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
   const [i, setI] = useState(0)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const list = steps(a)
   const step = list[Math.min(i, list.length - 1)]
   const total = list.length - 1
+  const isSummary = step === 'ringkasan'
+  const q = isSummary ? null : QUESTIONS[step]
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [step])
+
+  function move(next: number) {
+    setError('')
+    setI(next)
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (busy) return
     if (step !== 'ringkasan') {
-      if (answered(step, a)) setI(i + 1)
+      if (answered(step, a)) move(i + 1)
       return
     }
     setBusy(true)
@@ -135,51 +153,57 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
     }
   }
 
-  const back = i > 0 && <Button type="button" variant="ghost" onClick={() => setI(i - 1)}>Kembali</Button>
-
-  if (step === 'ringkasan') {
-    return (
-      <form onSubmit={submit} className="grid gap-4">
-        <div>
-          <h2 className="text-lg font-bold">Ini yang kami siapkan untuk {a.nama?.trim()}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Semua bisa diubah nanti di menu Profil Usaha.</p>
+  return (
+    <form onSubmit={submit} className="onboarding-wizard" aria-labelledby="onboarding-question" aria-busy={busy}>
+      <div className="onboarding-progress">
+        <div className="onboarding-progress-label" id="onboarding-progress-label">
+          <span>{isSummary ? 'Tinjau profil usaha' : `Pertanyaan ${i + 1} dari ${total}`}</span>
+          {isSummary ? <Check size={16} aria-hidden="true" /> : <span>Profil usaha</span>}
         </div>
-        <dl className="grid gap-3">
+        <progress aria-label="Pertanyaan yang selesai" max={total} value={isSummary ? total : i} />
+        {!isSummary && <p>Jumlah pertanyaan menyesuaikan jawaban Anda.</p>}
+      </div>
+      <div className="onboarding-question">
+        <h2 id="onboarding-question" ref={headingRef} tabIndex={-1} aria-describedby="onboarding-progress-label">
+          {isSummary ? `Ini yang kami siapkan untuk ${a.nama?.trim()}` : q!.judul}
+        </h2>
+        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : 'Gunakan nama yang ingin Anda tampilkan di laporan.'}</p>
+      </div>
+      {isSummary ? (
+        <dl className="onboarding-summary">
           {summary(toProfile(a)).map((r) => (
-            <div key={r.judul} className="card" style={{ padding: 14, background: '#101318' }}>
-              <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{r.judul}</dt>
-              <dd className="mt-1 text-sm leading-relaxed">{r.isi}</dd>
+            <div key={r.judul}>
+              <dt>{r.judul}</dt>
+              <dd>{r.isi}</dd>
             </div>
           ))}
         </dl>
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <div className="flex items-center justify-between gap-3">
-          <Button type="button" variant="ghost" onClick={() => setI(0)}>Ubah jawaban</Button>
-          <Button type="submit" size="lg" className="rounded-full font-bold" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan & mulai'}</Button>
-        </div>
-      </form>
-    )
-  }
-
-  const q = QUESTIONS[step]
-  return (
-    <form onSubmit={submit} className="grid gap-4">
-      <p className="text-xs font-semibold text-muted-foreground">Langkah {i + 1} dari {total}</p>
-      <h2 className="text-lg font-bold">{q.judul}</h2>
-      {q.options ? (
-        <ChoiceGrid
-          name={q.judul}
-          options={q.options}
-          value={a[step] ?? ''}
-          onChange={(v) => { setA((x) => ({ ...x, [step]: v })); setI(i + 1) }}
-        />
       ) : (
-        <Input autoFocus required aria-label={q.judul} value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" />
+        <>
+          {q!.options ? (
+            <ChoiceGrid
+              key={step}
+              name={q!.judul}
+              options={q!.options}
+              value={a[step] ?? ''}
+              onChange={(v) => setA((x) => ({ ...x, [step]: v }))}
+            />
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor="onboarding-name">Nama usaha</Label>
+              <Input id="onboarding-name" className="h-12 px-4 md:text-base" autoComplete="organization" required value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" aria-describedby="onboarding-reason" />
+            </div>
+          )}
+          <p className="onboarding-reason" id="onboarding-reason"><strong>Kenapa kami tanya ini?</strong> {q!.alasan}</p>
+        </>
       )}
-      <p className="text-xs text-muted-foreground"><span className="font-semibold">Kenapa kami tanya ini?</span> {q.alasan}</p>
-      <div className="flex items-center justify-between gap-3">
-        <span>{back}</span>
-        <Button type="submit" className="rounded-full font-bold" disabled={!answered(step, a)}>Lanjut</Button>
+      {error && <p className="onboarding-error" role="alert">{error}</p>}
+      <div className="onboarding-actions">
+        {i > 0 && <Button type="button" variant="ghost" className="min-h-11 px-3" disabled={busy} onClick={() => move(isSummary ? 0 : i - 1)}><ArrowLeft aria-hidden="true" />{isSummary ? 'Ubah jawaban' : 'Kembali'}</Button>}
+        <Button type="submit" className="onboarding-primary min-h-11 px-5 font-bold" disabled={busy || !answered(step, a)}>
+          {busy ? 'Menyimpan…' : isSummary ? 'Simpan & mulai' : 'Lanjut'}
+          {!busy && <ArrowRight aria-hidden="true" />}
+        </Button>
       </div>
     </form>
   )
@@ -188,27 +212,29 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
 // Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
 export function Onboarding({ onSaved, canEdit, onLogout }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-2xl">
-        <div className="mb-6 flex items-center gap-2.5">
-          <BrandMark size={28} />
-          <div>
-            <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-            <div className="brand-sub">by Akademi Pajak</div>
+    <main className="onboarding-page">
+      <div className="onboarding-shell">
+        <header className="onboarding-brand">
+          <div className="flex items-center gap-2.5">
+            <BrandMark size={28} />
+            <div>
+              <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
+              <div className="brand-sub">by Akademi Pajak</div>
+            </div>
           </div>
-        </div>
-        <div className="card" style={{ padding: 24 }}>
-          <h1 className="text-xl font-bold">Kenalkan usaha Anda dulu</h1>
-          <p className="mt-1 mb-5 text-sm text-muted-foreground">
-            Beberapa pertanyaan singkat, sekali saja. Tidak perlu paham akuntansi atau pajak: jawab sesuai keadaan usaha Anda, kami yang menyiapkan sisanya.
-          </p>
+          <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
+        </header>
+        <section className="onboarding-panel" aria-labelledby="onboarding-title">
+          <div className="onboarding-intro">
+            <h1 id="onboarding-title">Kenalkan usaha Anda dulu</h1>
+            <p>Tidak perlu paham akuntansi atau pajak. Cukup jawab sesuai keadaan usaha Anda.</p>
+          </div>
           {canEdit ? (
             <OnboardingWizard onSaved={onSaved} />
           ) : (
             <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
           )}
-        </div>
-        <button type="button" onClick={onLogout} className="mt-4 text-xs text-muted-foreground underline">Keluar</button>
+        </section>
       </div>
     </main>
   )
