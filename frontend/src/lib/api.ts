@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
 
@@ -464,6 +464,9 @@ export interface BusinessProfile {
   ptkp: string
   pkp: boolean
   metode_persediaan: '' | 'periodik' | 'perpetual'
+  /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
+  omzet_tahunan?: number
+  laba_sebelum_pajak?: number
   /** Identitas penerbit & rekening: opsional, tapi dicetak di invoice begitu diisi. */
   alamat?: string
   npwp?: string
@@ -487,6 +490,20 @@ export interface BusinessInfo {
 
 export const getBusiness = () => api<BusinessInfo>('/business')
 export const saveBusiness = (p: BusinessProfile) => api<BusinessProfile>('/business', { method: 'PUT', body: p })
+
+/** Hasil tax.CekAwal: NPM vs benchmark DJP dan risiko pajak. */
+export interface CekAwal {
+  npm_bps: number
+  benchmark: { min_bps: number; max_bps: number }
+  status: 'kurang_data' | 'di_bawah' | 'wajar' | 'di_atas'
+  pesan: string
+  risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
+}
+export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
+
+export interface BugReport { id: number; judul: string; deskripsi: string; halaman: string; user_email: string; waktu: string }
+export const listBugs = () => api<BugReport[]>('/bugs')
+export const createBug = (b: { judul: string; deskripsi: string; halaman: string }) => api<BugReport>('/bugs', { method: 'POST', body: b })
 
 export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
 export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { CekAwalCard } from '@/components/CekAwalCard'
 import { PageHeader } from '@/components/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +55,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
   return (
     <>
       <PageHeader title="Perencanaan Pajak" subtitle="Bandingkan skema pajak dan bentuk usaha untuk mencari beban pajak paling efisien secara legal" />
+      {profile && <div style={{ marginBottom: 16 }}><CekAwalCard profile={profile} /></div>}
 
       <form className="card" style={{ padding: 22 }} onSubmit={submit}>
         <div className="chart-title">Asumsi setahun (terisi otomatis dari transaksi, bisa diubah)</div>

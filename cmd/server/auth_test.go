@@ -69,7 +69,7 @@ func TestMeAndLogout(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&me); err != nil {
 		t.Fatal(err)
 	}
-	if me.User.Role != auth.Kasir || len(me.Views) != 2 {
+	if me.User.Role != auth.Kasir || len(me.Views) != 3 {
 		t.Fatalf("me: %+v", me)
 	}
 	do(srv, c, http.MethodPost, "/api/v1/auth/logout", "")

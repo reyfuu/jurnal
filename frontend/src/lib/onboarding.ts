@@ -1,9 +1,10 @@
 import type { BentukUsaha, BusinessProfile, JenisUsaha, Option } from './api'
+import { formatRp } from './format'
 
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'jenis' | 'stok' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
+export type Field = 'nama' | 'jenis' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
 export type StepId = Field | 'ringkasan'
 export type Answers = Partial<Record<Field, string>>
 
@@ -11,6 +12,12 @@ export type Answers = Partial<Record<Field, string>>
 export const DEFAULT_ANSWERS: Answers = { stok: 'periodik', gabung: 'tidak', pkp: 'tidak' }
 
 export interface Question { judul: string; alasan: string; options?: Option[] }
+
+// parseRp: "Rp1.250.000" → 1250000; tanda minus di depan = rugi. Kosong = NaN.
+export const parseRp = (s = '') => {
+  const digits = s.replace(/\D/g, '')
+  return digits ? Number(digits) * (s.trim().startsWith('-') ? -1 : 1) : NaN
+}
 
 export const QUESTIONS: Record<Field, Question> = {
   nama: {
@@ -33,6 +40,14 @@ export const QUESTIONS: Record<Field, Question> = {
       { value: 'periodik', label: 'Saya hitung stok sesekali, misalnya tiap akhir bulan', hint: 'Paling umum. Pilih ini kalau ragu.' },
       { value: 'perpetual', label: 'Setiap barang masuk dan keluar langsung saya catat', hint: 'Sisa stok selalu ketahuan tanpa menghitung ulang' },
     ],
+  },
+  omzet: {
+    judul: 'Kira-kira berapa omzet usaha Anda per tahun?',
+    alasan: 'Omzet adalah total penjualan sebelum dikurangi biaya. Angka ini menentukan batas bebas pajak (Rp500 juta untuk usaha pribadi) dan batas PPh Final UMKM (Rp4,8 miliar). Perkiraan kasar sudah cukup.',
+  },
+  laba: {
+    judul: 'Kira-kira berapa laba bersih usaha per tahun, sebelum dipotong pajak?',
+    alasan: 'Omzet dikurangi semua biaya usaha. Kami bandingkan dengan rasio benchmark DJP untuk usaha sejenis. Isi 0 bila impas, atau beri tanda minus bila rugi.',
   },
   bentuk: {
     judul: 'Usaha Anda terdaftar atas nama siapa?',
@@ -89,6 +104,8 @@ export function steps(a: Answers): StepId[] {
     'nama',
     'jenis',
     ...(jualBarang(a) ? ['stok' as const] : []),
+    'omzet',
+    'laba',
     'bentuk',
     ...(pribadi(a) ? ['menikah' as const, 'tanggungan' as const] : []),
     ...(pribadi(a) && a.menikah === 'sudah' ? ['gabung' as const] : []),
@@ -97,7 +114,8 @@ export function steps(a: Answers): StepId[] {
   ]
 }
 
-export const answered = (s: StepId, a: Answers) => s === 'ringkasan' || Boolean(a[s]?.trim())
+export const answered = (s: StepId, a: Answers) =>
+  s === 'ringkasan' || (s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) : Boolean(a[s]?.trim()))
 
 export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
@@ -111,6 +129,8 @@ export function toProfile(a: Answers): BusinessProfile {
     ptkp: bentuk === 'op' ? `${status}/${n}` : '',
     pkp: a.pkp === 'ya',
     metode_persediaan: jenis === 'jasa' ? '' : ((a.stok as BusinessProfile['metode_persediaan']) || 'periodik'),
+    omzet_tahunan: parseRp(a.omzet) || 0,
+    laba_sebelum_pajak: parseRp(a.laba) || 0,
   }
 }
 
@@ -129,6 +149,9 @@ export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
         ? 'Daftar akun usaha dagang kami siapkan otomatis. Setiap transaksi langsung masuk ke akun yang tepat.'
         : 'Laporan laba rugi dan neraca dasar siap dipakai. Daftar akun khusus untuk jenis usaha ini sedang kami siapkan.',
     },
+    ...(p.omzet_tahunan
+      ? [{ judul: 'Omzet & laba per tahun', isi: `Omzet ${formatRp(p.omzet_tahunan)}, laba sebelum pajak ${formatRp(p.laba_sebelum_pajak ?? 0)}.` }]
+      : []),
     ...(p.metode_persediaan
       ? [{
           judul: 'Pencatatan stok',

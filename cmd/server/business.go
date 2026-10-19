@@ -46,6 +46,16 @@ func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleCekAwal: cek benchmark & risiko untuk profil yang belum disimpan (ringkasan onboarding).
+func (s *tenant) handleCekAwal(w http.ResponseWriter, r *http.Request) {
+	var prof finance.BusinessProfile
+	if err := json.NewDecoder(r.Body).Decode(&prof); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, prof.CekAwal())
+}
+
 func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 	var prof finance.BusinessProfile
 	if err := json.NewDecoder(r.Body).Decode(&prof); err != nil {
@@ -98,6 +108,12 @@ func (s *tenant) handleTaxPlanning(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	omzet, margin := s.annualized()
+	s.mu.RLock()
+	if p := s.profile; omzet == 0 && p != nil && p.OmzetTahunan > 0 {
+		// belum ada transaksi: pakai perkiraan dari onboarding
+		omzet, margin = p.OmzetTahunan, p.LabaSebelumPajak*10_000/p.OmzetTahunan
+	}
+	s.mu.RUnlock()
 	if req.Omzet <= 0 {
 		req.Omzet = omzet
 	}

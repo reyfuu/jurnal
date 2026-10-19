@@ -58,6 +58,7 @@ type Server struct {
 	aiEngine  *ai.Engine
 	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
 	mux       *http.ServeMux
+	bugs      *bugStore
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -126,6 +127,7 @@ func NewServer() *Server {
 		failures: map[string]loginFailure{},
 		aiEngine: ai.NewEngine(),
 		mux:      http.NewServeMux(),
+		bugs:     loadBugs(),
 	}
 	s.routes()
 	if st == nil {
@@ -181,6 +183,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.on((*tenant).handleFinancial)))
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("laporan-keuangan", s.on((*tenant).handleCashflow)))
 	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.on((*tenant).handleGetBusiness)))
+	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.on((*tenant).handlePutBusiness)))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
@@ -227,6 +230,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))
 	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleUpdateUser)))
 	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleDeleteUser)))
+
+	s.mux.HandleFunc("GET /api/v1/bugs", s.guard("lapor-bug", s.handleListBugs))
+	s.mux.HandleFunc("POST /api/v1/bugs", s.guard("lapor-bug", s.handleCreateBug))
 
 	s.mux.HandleFunc("GET /", s.handleStatic)
 }

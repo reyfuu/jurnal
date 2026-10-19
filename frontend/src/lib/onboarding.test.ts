@@ -6,7 +6,7 @@ const a = (x: Answers): Answers => ({ ...DEFAULT_ANSWERS, ...x })
 describe('toProfile', () => {
   it('warung pribadi, menikah, 2 tanggungan', () => {
     expect(toProfile(a({ nama: '  Warung Bu Siti ', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' }))).toEqual({
-      nama_usaha: 'Warung Bu Siti', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, metode_persediaan: 'periodik',
+      nama_usaha: 'Warung Bu Siti', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
     })
   })
 
@@ -31,15 +31,23 @@ describe('toProfile', () => {
   })
 })
 
+describe('omzet & laba', () => {
+  it('parse rupiah berformat, minus = rugi', () => {
+    const p = toProfile(a({ jenis: 'jasa', bentuk: 'pt', omzet: 'Rp1.250.000.000', laba: '-25.000.000' }))
+    expect(p.omzet_tahunan).toBe(1_250_000_000)
+    expect(p.laba_sebelum_pajak).toBe(-25_000_000)
+  })
+})
+
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'jenis', 'stok', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
+      ['nama', 'jenis', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
-    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'jenis', 'bentuk', 'pkp', 'ringkasan'])
+    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'jenis', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
   })
 
   it('belum menikah melewati pertanyaan penghasilan pasangan', () => {
@@ -53,6 +61,10 @@ describe('answered', () => {
     expect(answered('nama', a({ nama: 'Toko A' }))).toBe(true)
     expect(answered('jenis', a({}))).toBe(false)
     expect(answered('stok', a({}))).toBe(true) // default periodik
+    expect(answered('omzet', a({ omzet: '0' }))).toBe(false)
+    expect(answered('omzet', a({ omzet: 'Rp750.000.000' }))).toBe(true)
+    expect(answered('laba', a({ laba: '0' }))).toBe(true) // impas boleh
+    expect(answered('laba', a({}))).toBe(false)
   })
 })
 
