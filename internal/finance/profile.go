@@ -18,6 +18,8 @@ type BusinessProfile struct {
 	PKP         bool   `json:"pkp"`          // Pengusaha Kena Pajak (wajib pungut PPN)
 	// MetodePersediaan: periodik | perpetual (perdagangan & manufaktur); menentukan akun HPP aktif.
 	MetodePersediaan string `json:"metode_persediaan"`
+	// KLU: kelompok KLU 3 digit (tax.KLUBenchmarks); dasar pembanding NPM & CTTOR DJP.
+	KLU string `json:"klu,omitempty"`
 
 	// Perkiraan setahun dari onboarding: dipakai cek benchmark DJP & Perencanaan Pajak
 	// selama belum ada data transaksi. Laba sebelum pajak boleh negatif (rugi).
@@ -27,14 +29,14 @@ type BusinessProfile struct {
 	// Identitas penerbit faktur. Semuanya opsional saat onboarding supaya wizard tidak jadi
 	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
 	// tidak layak dikirim ke pelanggan badan.
-	Alamat  string `json:"alamat,omitempty"`
+	Alamat string `json:"alamat,omitempty"`
 	// Lokasi usaha dari onboarding; dicetak di invoice bersama alamat.
 	Kecamatan string `json:"kecamatan,omitempty"`
 	Kota      string `json:"kota,omitempty"`
 	Provinsi  string `json:"provinsi,omitempty"`
-	NPWP    string `json:"npwp,omitempty"`
-	Telepon string `json:"telepon,omitempty"`
-	Email   string `json:"email,omitempty"`
+	NPWP      string `json:"npwp,omitempty"`
+	Telepon   string `json:"telepon,omitempty"`
+	Email     string `json:"email,omitempty"`
 
 	// Rekening tujuan pembayaran, dicetak di kaki faktur.
 	BankNama     string `json:"bank_nama,omitempty"`
@@ -114,6 +116,9 @@ func (p *BusinessProfile) Validate() error {
 	if !hasOption(BentukUsahaOptions, p.BentukUsaha) {
 		return errors.New("pilih bentuk usaha")
 	}
+	if _, ok := tax.FindKLU(p.KLU); p.KLU != "" && !ok {
+		return errors.New("bidang usaha (KLU) tidak dikenal")
+	}
 	if p.Provinsi != "" && !slices.Contains(ProvinsiOptions, p.Provinsi) {
 		return errors.New("pilih provinsi dari daftar")
 	}
@@ -150,7 +155,7 @@ func (p BusinessProfile) JenisLabel() string {
 // CekAwal: NPM vs benchmark DJP dan risiko pajak dari perkiraan omzet & laba profil.
 func (p BusinessProfile) CekAwal() tax.CekAwalResult {
 	return tax.CekAwal(tax.CekAwalInput{
-		JenisUsaha: p.JenisUsaha, BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, PKP: p.PKP,
+		BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, KLU: p.KLU, PKP: p.PKP,
 		Omzet: p.OmzetTahunan, Laba: p.LabaSebelumPajak,
 	})
 }

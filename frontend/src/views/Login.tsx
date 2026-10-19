@@ -50,7 +50,7 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
           <BrandMark size={28} />
           <div>
             <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-            <div className="brand-sub">by Akademi Pajak</div>
+            <div className="brand-sub">by Master Pajak</div>
           </div>
         </div>
 

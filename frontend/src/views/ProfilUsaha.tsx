@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { saveBusiness, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
+import { saveBusiness, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
@@ -85,6 +85,35 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   )
 }
 
+// KLUPicker: cari bidang usaha (KLU 3 digit DJP); daftar disaring sesuai jenis usaha.
+function KLUPicker({ value, onChange, options, jenis }: { value: string; onChange: (kode: string) => void; options: KLUOption[]; jenis?: string }) {
+  const [q, setQ] = useState('')
+  const [semua, setSemua] = useState(false)
+  const name = useId()
+  const cari = q.trim().toLowerCase()
+  const list = options.filter((o) =>
+    (semua || cari !== '' || !jenis || o.jenis === jenis) && (cari === '' || o.nama.toLowerCase().includes(cari) || o.kode.startsWith(cari)))
+  const dipilih = options.find((o) => o.kode === value)
+  return (
+    <div className="grid gap-2">
+      {dipilih && <p className="text-sm">Dipilih: <strong>KLU {dipilih.kode}</strong> {dipilih.nama}</p>}
+      <Input type="search" placeholder="Cari, mis. restoran, toko, binatu, konveksi" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari bidang usaha" />
+      <div role="radiogroup" aria-label="Bidang usaha (KLU)" className="max-h-72 overflow-y-auto rounded-lg border border-border">
+        {list.length === 0 && <p className="p-3 text-sm text-muted-foreground">Tidak ada bidang yang cocok. Coba kata lain.</p>}
+        {list.map((o) => (
+          <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-white/5" data-selected={o.kode === value}>
+            <input type="radio" name={name} className="mt-1" checked={o.kode === value} onChange={() => onChange(o.kode)} />
+            <span><span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}</span>
+          </label>
+        ))}
+      </div>
+      {jenis && !semua && cari === '' && (
+        <button type="button" className="justify-self-start text-xs text-muted-foreground underline underline-offset-4" onClick={() => setSemua(true)}>Tidak ketemu? Tampilkan semua bidang</button>
+      )}
+    </div>
+  )
+}
+
 export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo; onSaved: (p: BusinessProfile) => void; submitLabel: string }) {
   const [p, setP] = useState<BusinessProfile>(info.profile ?? EMPTY)
   const [error, setError] = useState('')
@@ -115,6 +144,11 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         <Label>Jenis usaha</Label>
         <ChoiceGrid name="Jenis usaha" options={info.options.jenis_usaha} value={p.jenis_usaha} onChange={(v) => set({ jenis_usaha: v as JenisUsaha })} />
         <p className="text-xs text-muted-foreground">Menentukan susunan akun (CoA) dan format laporan keuangan Anda.</p>
+      </div>
+      <div className="grid gap-1.5">
+        <Label>Bidang usaha (KLU)</Label>
+        <KLUPicker value={p.klu ?? ''} onChange={(klu) => set({ klu })} options={info.options.klu} jenis={p.jenis_usaha} />
+        <p className="text-xs text-muted-foreground">Pembanding NPM & CTTOR dengan rata-rata nasional DJP.</p>
       </div>
       {(p.jenis_usaha === 'perdagangan' || p.jenis_usaha === 'manufaktur') && (
         <div className="grid gap-1.5">
@@ -187,7 +221,7 @@ const tampilRp = (s = '') => {
 const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba sebelum pajak per tahun' } as const
 
 // Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
-function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile) => void; provinsi: string[] }) {
+function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessProfile) => void; provinsi: string[]; klu: KLUOption[] }) {
   const [a, setA] = useState<Answers>(DEFAULT_ANSWERS)
   const [i, setI] = useState(0)
   const [error, setError] = useState('')
@@ -240,7 +274,7 @@ function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile)
         <h2 id="onboarding-question" ref={headingRef} tabIndex={-1} aria-describedby="onboarding-progress-label">
           {isSummary ? `Ini yang kami siapkan untuk ${a.nama?.trim()}` : q!.judul}
         </h2>
-        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : step === 'lokasi' ? 'Isi sesuai alamat tempat usaha berjalan.' : step === 'nama' ? 'Gunakan nama yang ingin Anda tampilkan di laporan.' : 'Ketik angka dalam rupiah. Perkiraan kasar sudah cukup.'}</p>
+        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : step === 'lokasi' ? 'Isi sesuai alamat tempat usaha berjalan.' : step === 'klu' ? 'Cari dengan kata kunci, lalu pilih satu bidang.' : step === 'nama' ? 'Gunakan nama yang ingin Anda tampilkan di laporan.' : 'Ketik angka dalam rupiah. Perkiraan kasar sudah cukup.'}</p>
       </div>
       {isSummary ? (
         <>
@@ -258,6 +292,8 @@ function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile)
         <>
           {step === 'lokasi' ? (
             <LokasiFields v={a} set={(patch) => setA((x) => ({ ...x, ...patch }))} provinsi={provinsi} required big />
+          ) : step === 'klu' ? (
+            <KLUPicker value={a.klu ?? ''} onChange={(v) => setA((x) => ({ ...x, klu: v }))} options={klu} jenis={a.jenis} />
           ) : q!.options ? (
             <ChoiceGrid
               key={step}
@@ -291,7 +327,6 @@ function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile)
   )
 }
 
-// Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
 // OnboardingShell: layar penuh tanpa sidebar (onboarding & layar bayar langganan).
 export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: () => void; labelledBy?: string; children: React.ReactNode }) {
   return (
@@ -302,7 +337,7 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
             <BrandMark size={28} />
             <div>
               <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-              <div className="brand-sub">by Akademi Pajak</div>
+              <div className="brand-sub">by Master Pajak</div>
             </div>
           </div>
           <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
@@ -313,7 +348,8 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
   )
 }
 
-export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void; provinsi: string[] }) {
+// Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
+export function Onboarding({ onSaved, canEdit, onLogout, provinsi, klu }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void; provinsi: string[]; klu: KLUOption[] }) {
   return (
     <OnboardingShell onLogout={onLogout} labelledBy="onboarding-title">
       <div className="onboarding-intro">
@@ -321,7 +357,7 @@ export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: 
         <p>Tidak perlu paham akuntansi atau pajak. Cukup jawab sesuai keadaan usaha Anda.</p>
       </div>
       {canEdit ? (
-        <OnboardingWizard onSaved={onSaved} provinsi={provinsi} />
+        <OnboardingWizard onSaved={onSaved} provinsi={provinsi} klu={klu} />
       ) : (
         <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
       )}

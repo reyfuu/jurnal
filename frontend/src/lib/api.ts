@@ -482,6 +482,8 @@ export interface BusinessProfile {
   ptkp: string
   pkp: boolean
   metode_persediaan: '' | 'periodik' | 'perpetual'
+  /** Kelompok KLU 3 digit; pembanding NPM & CTTOR DJP. */
+  klu?: string
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
   omzet_tahunan?: number
   laba_sebelum_pajak?: number
@@ -504,10 +506,11 @@ export interface BusinessProfile {
 }
 
 export interface Option { value: string; label: string; hint?: string }
+export interface KLUOption { kode: string; nama: string; jenis: JenisUsaha }
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
-  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; provinsi: string[] }
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; provinsi: string[]; klu: KLUOption[] }
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
@@ -515,10 +518,14 @@ export const saveBusiness = (p: BusinessProfile) => api<BusinessProfile>('/busin
 
 /** Hasil tax.CekAwal: NPM vs benchmark DJP dan risiko pajak. */
 export interface CekAwal {
+  /** Rata-rata nasional DJP untuk KLU usaha; null bila KLU belum dipilih. */
+  klu: { kode: string; nama: string; cttor_bps: number; npm_bps: number } | null
   npm_bps: number
-  benchmark: { min_bps: number; max_bps: number }
-  status: 'kurang_data' | 'di_bawah' | 'wajar' | 'di_atas'
+  cttor_bps: number
+  status: 'kurang_data' | 'di_bawah' | 'wajar'
   pesan: string
+  cttor_pesan?: string
+  sumber: string
   risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })

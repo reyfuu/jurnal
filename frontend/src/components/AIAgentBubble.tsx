@@ -24,7 +24,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Akademi Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.',
+      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Master Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.',
       suggestions: INITIAL_SUGGESTIONS,
     },
   ])
@@ -129,7 +129,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
                     Live
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-mono">by Akademi Pajak</p>
+                <p className="text-[11px] text-slate-400 font-mono">by Master Pajak</p>
               </div>
             </div>
             <div className="flex items-center gap-1">

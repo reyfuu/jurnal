@@ -27,7 +27,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
           <BrandMark />
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 700 }}>Laporan Bisnis</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>by Akademi Pajak</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>by Master Pajak</div>
           </div>
         </div>
 
