@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,11 +18,13 @@ const DEMO_ACCOUNTS = [
 export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    setShowPassword(false)
     setBusy(true)
     setError('')
     try {
@@ -52,11 +55,25 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
             <form onSubmit={submit} className="grid gap-4">
               <div className="grid gap-1.5">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input id="email" className="h-11" type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <div className="relative">
+                  <Input id="password" className="h-11 pr-12" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 size-11 text-muted-foreground"
+                    aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    aria-controls="password"
+                    disabled={busy}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                  >
+                    {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                  </Button>
+                </div>
               </div>
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
               <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy}>

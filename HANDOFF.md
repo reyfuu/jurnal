@@ -176,7 +176,13 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - Pedoman diperbarui di `DESIGN.md`, salinannya `design.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`.
 - Build frontend berhasil. Chromium: login, onboarding mobile, dan dashboard diperiksa; warna terhitung sidebar/login `rgb(34, 40, 82)`. Kontras emas/navy 8,58:1; teks sekunder sidebar/navy 8,16:1; label sidebar/navy 6,60:1. Screenshot di `/tmp/pajak-brand-*.png`. Revisi masuk branch/PR onboarding yang sama; belum deploy.
 
+## Tambahan UX login — 19 Oktober 2026
+
+- Kolom password login memiliki tombol mata untuk tampil/sembunyi, dengan label aksesibel dan area sentuh 44 px. Password tersembunyi saat awal dan ketika form dikirim; tombol mata tidak melakukan submit.
+- Build frontend dan pemeriksaan browser klik/keyboard lulus; nilai input tetap sama saat toggle. Screenshot: `/tmp/pajak-password-toggle-mobile.png`.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
+
 
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
