@@ -38,7 +38,7 @@ export interface Billing {
   snap_js: string
   aktif: boolean
 }
-export const getPlans = () => api<{ paket: Paket[]; trial_hari: number }>('/billing/plans')
+export const getPlans = () => api<{ paket: Paket[] }>('/billing/plans')
 export const getBilling = () => api<Billing>('/billing')
 export const refreshBilling = () => api<Billing>('/billing/refresh', { method: 'POST' })
 export const checkout = (paket: string) => api<{ order_id: string; token: string; redirect_url: string }>('/billing/checkout', { method: 'POST', body: { paket } })

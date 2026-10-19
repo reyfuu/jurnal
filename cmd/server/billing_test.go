@@ -18,32 +18,49 @@ func tenantByEmail(t *testing.T, srv *Server, c *http.Cookie) *tenant {
 	return srv.tenants[me.User.TenantID]
 }
 
-func TestTrialLaluTerkunci(t *testing.T) {
+// aktifkan: anggap usaha milik sesi c sudah membayar langganan 30 hari.
+func aktifkan(t *testing.T, srv *Server, c *http.Cookie) {
+	t.Helper()
+	tenantByEmail(t, srv, c).langganan.AktifSampai = time.Now().Add(30 * 24 * time.Hour)
+}
+
+func TestBayarDuluSetelahOnboarding(t *testing.T) {
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
 	var me meResp
 	_ = json.NewDecoder(do(srv, qa, http.MethodGet, "/api/v1/auth/me", "").Body).Decode(&me)
-	if me.Langganan.Status != "trial" || time.Until(me.Langganan.Sampai) < 71*time.Hour {
-		t.Fatalf("usaha baru harus trial 3 hari: %+v", me.Langganan)
+	if me.Langganan.Status != "habis" {
+		t.Fatalf("usaha baru harus bayar dulu (habis), got %+v", me.Langganan)
+	}
+	// onboarding tetap jalan sebelum bayar
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", profileBody); rec.Code != http.StatusOK {
+		t.Fatalf("belum bayar: simpan profil (onboarding) harus boleh, got %d %s", rec.Code, rec.Body)
+	}
+	cek := `{"jenis_usaha":"perdagangan","bentuk_usaha":"op","ptkp":"TK/0","omzet_tahunan":6000000000,"laba_sebelum_pajak":60000000}`
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/business/cek-awal", cek); rec.Code != http.StatusOK {
+		t.Fatalf("belum bayar: cek awal di wizard harus boleh, got %d", rec.Code)
 	}
 	tx := `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"x","lunas":true}`
-	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusCreated {
-		t.Fatalf("trial boleh mencatat: %d", rec.Code)
-	}
-
-	tenantByEmail(t, srv, qa).langganan.TrialSampai = time.Now().Add(-time.Minute)
 	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusPaymentRequired {
-		t.Fatalf("habis: tulis harus 402, got %d", rec.Code)
+		t.Fatalf("belum bayar: tulis harus 402, got %d", rec.Code)
 	}
 	if rec := do(srv, qa, http.MethodGet, "/api/v1/transactions", ""); rec.Code != http.StatusOK {
-		t.Fatalf("habis: baca tetap boleh, got %d", rec.Code)
+		t.Fatalf("belum bayar: baca tetap boleh, got %d", rec.Code)
 	}
-	if rec := do(srv, qa, http.MethodPost, "/api/v1/auth/logout", ""); rec.Code != http.StatusNoContent {
-		t.Fatalf("habis: logout tetap boleh, got %d", rec.Code)
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/bugs", `{}`); rec.Code == http.StatusPaymentRequired {
+		t.Fatal("belum bayar: lapor bug tetap boleh")
+	}
+
+	aktifkan(t, srv, qa)
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusCreated {
+		t.Fatalf("sudah bayar: boleh mencatat, got %d", rec.Code)
 	}
 	owner := login(t, srv, "owner@kedaikopisenja.id")
 	if rec := do(srv, owner, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusCreated {
 		t.Fatalf("usaha 1 tidak pernah terkunci: %d", rec.Code)
+	}
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/auth/logout", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("logout: %d", rec.Code)
 	}
 }
 
@@ -95,21 +112,20 @@ func TestCheckoutDanNotifikasi(t *testing.T) {
 		t.Fatalf("checkout: %d %+v", rec.Code, co)
 	}
 	tn := tenantByEmail(t, srv, qa)
-	trialSampai := tn.langganan.TrialSampai
 
 	if code := notify(srv, co.OrderID, "palsu"); code != http.StatusForbidden {
 		t.Fatalf("signature palsu: want 403, got %d", code)
 	}
 	status[co.OrderID] = "pending"
-	if notify(srv, co.OrderID, ""); tn.langgananStatus(time.Now()).Status != "trial" {
+	if notify(srv, co.OrderID, ""); tn.langgananStatus(time.Now()).Status != "habis" {
 		t.Fatal("pending tidak boleh mengaktifkan")
 	}
 	status[co.OrderID] = "settlement"
 	notify(srv, co.OrderID, "")
 	notify(srv, co.OrderID, "") // notifikasi ulang: tidak boleh memperpanjang dua kali
-	want := trialSampai.Add(30 * 24 * time.Hour)
+	want := time.Now().Add(30 * 24 * time.Hour)
 	if got := tn.langganan.AktifSampai; got.Sub(want).Abs() > time.Second {
-		t.Fatalf("aktif sampai %v, want %v (trial + 30 hari, sekali)", got, want)
+		t.Fatalf("aktif sampai %v, want %v (sekarang + 30 hari, sekali)", got, want)
 	}
 	var b struct {
 		Langganan langgananStatus `json:"langganan"`

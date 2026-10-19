@@ -292,7 +292,8 @@ function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile)
 }
 
 // Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
-export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void; provinsi: string[] }) {
+// OnboardingShell: layar penuh tanpa sidebar (onboarding & layar bayar langganan).
+export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: () => void; labelledBy?: string; children: React.ReactNode }) {
   return (
     <main className="onboarding-page">
       <div className="onboarding-shell">
@@ -306,19 +307,25 @@ export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: 
           </div>
           <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
         </header>
-        <section className="onboarding-panel" aria-labelledby="onboarding-title">
-          <div className="onboarding-intro">
-            <h1 id="onboarding-title">Kenalkan usaha Anda dulu</h1>
-            <p>Tidak perlu paham akuntansi atau pajak. Cukup jawab sesuai keadaan usaha Anda.</p>
-          </div>
-          {canEdit ? (
-            <OnboardingWizard onSaved={onSaved} provinsi={provinsi} />
-          ) : (
-            <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
-          )}
-        </section>
+        <section className="onboarding-panel" aria-labelledby={labelledBy}>{children}</section>
       </div>
     </main>
+  )
+}
+
+export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void; provinsi: string[] }) {
+  return (
+    <OnboardingShell onLogout={onLogout} labelledBy="onboarding-title">
+      <div className="onboarding-intro">
+        <h1 id="onboarding-title">Kenalkan usaha Anda dulu</h1>
+        <p>Tidak perlu paham akuntansi atau pajak. Cukup jawab sesuai keadaan usaha Anda.</p>
+      </div>
+      {canEdit ? (
+        <OnboardingWizard onSaved={onSaved} provinsi={provinsi} />
+      ) : (
+        <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
+      )}
+    </OnboardingShell>
   )
 }
 

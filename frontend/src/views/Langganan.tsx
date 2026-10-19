@@ -29,7 +29,7 @@ const tanggal = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('id-ID
 export function statusText(l: LanggananStatus) {
   if (l.status === 'aktif') return l.sampai ? `Langganan aktif sampai ${tanggal(l.sampai)}.` : 'Langganan aktif.'
   if (l.status === 'trial') return `Masa coba gratis sampai ${tanggal(l.sampai)}.`
-  return 'Masa coba habis. Data Anda aman dan tetap bisa dilihat; aktifkan langganan untuk kembali mencatat.'
+  return 'Langganan belum aktif. Pilih paket untuk mulai memakai Laporan Bisnis.'
 }
 
 export function Langganan({ onPaid }: { onPaid: () => void }) {
@@ -81,7 +81,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
     <>
       <PageHeader title="Langganan" subtitle="Kelola paket Laporan Bisnis untuk usaha Anda" />
       <div className="card" style={{ padding: 22, maxWidth: 880, marginBottom: 16, borderColor: habis ? 'var(--accent-red)' : undefined }}>
-        <div className="text-sm font-semibold">Status: {b.langganan.status === 'trial' ? 'Masa coba' : b.langganan.status === 'aktif' ? 'Aktif' : 'Habis'}</div>
+        <div className="text-sm font-semibold">Status: {b.langganan.status === 'trial' ? 'Masa coba' : b.langganan.status === 'aktif' ? 'Aktif' : 'Belum aktif'}</div>
         <p className="mt-1 text-sm text-muted-foreground">{statusText(b.langganan)}</p>
       </div>
 

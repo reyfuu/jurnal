@@ -47,6 +47,7 @@ func TestRegisterCreatesEmptyIsolatedBusiness(t *testing.T) {
 		t.Fatalf("dashboard usaha baru tidak boleh berisi data contoh: %d", rec.Code)
 	}
 
+	aktifkan(t, srv, qa)
 	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"Punya QA","lunas":true}`); rec.Code != http.StatusCreated {
 		t.Fatalf("create tx: %d %s", rec.Code, rec.Body)
 	}
@@ -71,6 +72,7 @@ func TestRegisteredBusinessSurvivesRestart(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
+	aktifkan(t, srv, qa)
 	do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"Punya QA","lunas":true}`)
 	nDemo := len(demoTenant().txs)
 
