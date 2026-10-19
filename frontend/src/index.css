@@ -48,11 +48,12 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Dark Obsidian Fintech (DESIGN.md). Hanya mode gelap: token shadcn dipetakan ke palet aplikasi. */
+/* Navy & Gold (DESIGN.md), dengan permukaan netral untuk data keuangan. */
 :root {
+  --brand-navy: #222852;
   --bg-outer: #090a0c;
   --bg-shell: #0f1115;
-  --bg-sidebar: #111318;
+  --bg-sidebar: var(--brand-navy);
   --bg-card: #15181e;
   --bg-card-hover: #191d24;
   --border-subtle: rgba(255, 255, 255, 0.06);
@@ -77,7 +78,7 @@
   --popover: var(--bg-card);
   --popover-foreground: var(--text-primary);
   --primary: var(--accent-amber-bright);
-  --primary-foreground: var(--bg-outer);
+  --primary-foreground: var(--brand-navy);
   --secondary: var(--bg-card-hover);
   --secondary-foreground: var(--text-primary);
   --muted: var(--bg-card-hover);
@@ -109,6 +110,8 @@
 
 /* Kelas tata letak dari web/index.html lama, dipertahankan agar tampilan identik. */
 @layer components {
+  .login-page, .onboarding-page { background: var(--brand-navy); }
+
   .profile-choices {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
@@ -220,6 +223,8 @@
 
   /* Sidebar */
   .sidebar {
+    --text-secondary: #bfc5d8;
+    --text-muted: #aab1ca;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border-subtle);
     padding: 22px 14px 16px;
@@ -634,7 +639,7 @@
     border-radius: 999px;
     border: none;
     background: var(--accent-amber-bright);
-    color: #090a0c;
+    color: var(--primary-foreground);
     font-weight: 700;
     font-size: 14px;
     cursor: pointer;

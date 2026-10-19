@@ -169,6 +169,18 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - Verifikasi: build frontend berhasil; 29 tes Vitest lulus; lint tanpa error (10 warning di file lain). Browser Chromium lokal pada 1280×900, 375×812, dan 320×740: keyboard, fokus, jasa melewati stok, manufaktur/perdagangan, OP menikah & penghasilan gabung, kembali/edit jawaban, perpindahan ke PT tanpa PTKP, kegagalan simpan/retry, status sibuk, payload profil, dan masuk dashboard lulus. Radio pada halaman Profil Usaha juga diperiksa. Review kode terpisah tidak menemukan bug.
 - Bukti sesi lokal: `/tmp/pajak-onboarding-check.py`, `/tmp/pajak-onboarding-name-desktop.png`, `/tmp/pajak-onboarding-summary-mobile.png`, `/tmp/pajak-onboarding-options-mobile.png`. Tidak memeriksa pembaca layar fisik atau browser selain Chromium. Belum deploy produksi.
 
+## Revisi brand — 19 Oktober 2026
+
+- Pengguna menetapkan navy **`#222852`** sebagai warna utama agar mengingatkan pada perpajakan/DJP. Kedua kode yang dikirim sama; aksen emas yang sudah ada dipertahankan.
+- Token `--brand-navy` menjadi sumber warna login, onboarding, sidebar, dan teks CTA emas. Favicon dan meta tema browser memakai nilai yang sama. Warna teks sidebar disesuaikan agar terbaca di atas navy; permukaan laporan tetap netral.
+- Pedoman diperbarui di `DESIGN.md`, salinannya `design.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`.
+- Build frontend berhasil. Chromium: login, onboarding mobile, dan dashboard diperiksa; warna terhitung sidebar/login `rgb(34, 40, 82)`. Kontras emas/navy 8,58:1; teks sekunder sidebar/navy 8,16:1; label sidebar/navy 6,60:1. Screenshot di `/tmp/pajak-brand-*.png`. Commit `c82fad5` terkirim setelah PR #1 digabung, sehingga dibawa ke branch lanjutan `feat/login-password-visibility`; belum deploy.
+
+## Tambahan UX login — 19 Oktober 2026
+
+- Kolom password login memiliki tombol mata untuk tampil/sembunyi, dengan label aksesibel dan area sentuh 44 px. Password tersembunyi saat awal dan ketika form dikirim; tombol mata tidak melakukan submit.
+- Build frontend dan pemeriksaan browser klik/keyboard lulus; nilai input tetap sama saat toggle. Screenshot: `/tmp/pajak-password-toggle-mobile.png`.
+
 ## Fase C1 — Laporan Keuangan Satu Menu & Register Aset (Okt 2026)
 **Perubahan navigasi**: menu `Arus Kas` dihapus; seluruh laporan keuangan jadi **satu menu dengan 4 tab** —
 Laba Rugi, Neraca, Arus Kas (2 metode), dan Aset & Penyusutan. Permission `arus-kas` dihapus dari
@@ -321,6 +333,8 @@ arus kas langsung == tidak langsung == **17.000.000**. Profil **jasa** → CoA `
 `Aset` tidak lagi menerima prop `periodLabel`.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
+
+
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
