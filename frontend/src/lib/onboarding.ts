@@ -4,8 +4,10 @@ import { formatRp } from './format'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'jenis' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
-export type StepId = Field | 'ringkasan'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
+// lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
+export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
+export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
 export type Answers = Partial<Record<Field, string>>
 
 // jawaban aman bila pengguna ragu
@@ -19,10 +21,14 @@ export const parseRp = (s = '') => {
   return digits ? Number(digits) * (s.trim().startsWith('-') ? -1 : 1) : NaN
 }
 
-export const QUESTIONS: Record<Field, Question> = {
+export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   nama: {
     judul: 'Apa nama usaha Anda?',
     alasan: 'Nama ini muncul di laporan keuangan dan file Excel yang Anda unduh.',
+  },
+  lokasi: {
+    judul: 'Di mana lokasi usaha Anda?',
+    alasan: 'Lokasi dicetak di invoice dan laporan, dan menentukan kantor pajak (KPP) tempat usaha Anda terdaftar.',
   },
   jenis: {
     judul: 'Usaha Anda paling mirip yang mana?',
@@ -102,6 +108,7 @@ const jualBarang = (a: Answers) => a.jenis === 'perdagangan' || a.jenis === 'man
 export function steps(a: Answers): StepId[] {
   return [
     'nama',
+    'lokasi',
     'jenis',
     ...(jualBarang(a) ? ['stok' as const] : []),
     'omzet',
@@ -115,7 +122,7 @@ export function steps(a: Answers): StepId[] {
 }
 
 export const answered = (s: StepId, a: Answers) =>
-  s === 'ringkasan' || (s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) : Boolean(a[s]?.trim()))
+  s === 'ringkasan' || (s === 'lokasi' ? LOKASI_FIELDS.every((f) => Boolean(a[f]?.trim())) : s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) : Boolean(a[s]?.trim()))
 
 export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
@@ -124,6 +131,10 @@ export function toProfile(a: Answers): BusinessProfile {
   const status = a.menikah !== 'sudah' ? 'TK' : a.gabung === 'ya' ? 'K/I' : 'K'
   return {
     nama_usaha: (a.nama ?? '').trim(),
+    alamat: (a.alamat ?? '').trim(),
+    kecamatan: (a.kecamatan ?? '').trim(),
+    kota: (a.kota ?? '').trim(),
+    provinsi: a.provinsi ?? '',
     jenis_usaha: jenis,
     bentuk_usaha: bentuk,
     ptkp: bentuk === 'op' ? `${status}/${n}` : '',
@@ -143,6 +154,9 @@ const PAJAK: Record<BentukUsaha, string> = {
 
 export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
   return [
+    ...(p.kota
+      ? [{ judul: 'Lokasi usaha', isi: [p.alamat, p.kecamatan && `Kec. ${p.kecamatan}`, p.kota, p.provinsi].filter(Boolean).join(', ') + '.' }]
+      : []),
     {
       judul: 'Daftar akun',
       isi: p.jenis_usaha === 'perdagangan'

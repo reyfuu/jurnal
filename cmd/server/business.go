@@ -42,6 +42,7 @@ func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 			"bentuk_usaha":      finance.BentukUsahaOptions,
 			"ptkp":              tax.PTKPCodes,
 			"metode_persediaan": finance.MetodePersediaanOptions,
+			"provinsi":          finance.ProvinsiOptions,
 		},
 	})
 }

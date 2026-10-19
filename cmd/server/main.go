@@ -233,6 +233,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/bugs", s.guard("lapor-bug", s.handleListBugs))
 	s.mux.HandleFunc("POST /api/v1/bugs", s.guard("lapor-bug", s.handleCreateBug))
+	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
 
 	s.mux.HandleFunc("GET /", s.handleStatic)
 }

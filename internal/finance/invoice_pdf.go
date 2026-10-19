@@ -94,8 +94,8 @@ func kop(d *pdf.Doc, inv Invoice, p BusinessProfile) float64 {
 
 func identitasPenerbit(p BusinessProfile) []string {
 	var out []string
-	if p.Alamat != "" {
-		out = append(out, p.Alamat)
+	if lokasi := gabungTakKosong(", ", p.Alamat, p.Kecamatan, p.Kota, p.Provinsi); lokasi != "" {
+		out = append(out, lokasi)
 	}
 	if kontak := gabungTakKosong(" · ", p.Telepon, p.Email); kontak != "" {
 		out = append(out, kontak)
@@ -290,6 +290,9 @@ func tandaTangan(d *pdf.Doc, inv Invoice, p BusinessProfile) {
 // kosong, tanggalnya saja — lebih baik tanpa kota daripada menebak yang salah.
 func kotaTanggal(p BusinessProfile, tanggal string) string {
 	tgl := tanggalID(tanggal)
+	if p.Kota != "" {
+		return p.Kota + ", " + tgl
+	}
 	if p.Alamat == "" {
 		return tgl
 	}
