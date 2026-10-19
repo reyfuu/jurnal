@@ -31,7 +31,7 @@ type RoleInfo struct {
 }
 
 var financeViews = []string{
-	"dashboard", "laporan-keuangan", "arus-kas", "transaksi", "piutang-utang", "stok-gudang",
+	"dashboard", "laporan-keuangan", "laporan-penjualan", "arus-kas", "transaksi", "piutang-utang", "stok-gudang",
 	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "master-data", "panduan",
 }
 

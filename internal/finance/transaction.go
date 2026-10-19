@@ -125,6 +125,44 @@ func ToLedger(txs []Transaction) []LedgerEntry {
 
 // SeedTransactions mengurai ringkasan ledger tiap periode seed (seed.go) menjadi transaksi bertanggal,
 // sehingga total laporan per bulan sama persis dengan angka dashboard seed.
+// seedMenu: komposisi penjualan Kedai Kopi Senja per item (bobot %, harga per pcs).
+var seedMenu = []struct {
+	Item  string
+	Pct   int64
+	Harga int64
+}{
+	{"Kopi Susu Gula Aren", 32, 18_000},
+	{"Americano", 18, 15_000},
+	{"Cappuccino", 16, 22_000},
+	{"Croissant Butter", 14, 20_000},
+	{"Matcha Latte", 12, 24_000},
+	{"Roti Bakar Cokelat", 8, 17_000},
+}
+
+var seedB2B = []string{"Hotel Santika Bandung", "PT Kreatif Digital", "Kantor Notaris Wijaya"}
+
+// seedSalesLines memecah satu baris omzet seed menjadi baris per item menu; total nominal tetap sama.
+func seedSalesLines(e LedgerEntry, n int) []Transaction {
+	pihak := ""
+	if e.Channel == "B2B Tempo" {
+		pihak = seedB2B[n%len(seedB2B)]
+	}
+	var out []Transaction
+	sisa := e.Gross
+	for i, m := range seedMenu {
+		nominal := e.Gross * m.Pct / 100
+		if i == len(seedMenu)-1 {
+			nominal = sisa
+		}
+		sisa -= nominal
+		out = append(out, Transaction{
+			Jenis: "Penjualan", Nominal: nominal, Keterangan: e.Title, Item: m.Item, Qty: int(nominal / m.Harga),
+			Channel: e.Channel, Pihak: pihak, Lunas: e.Settled,
+		})
+	}
+	return out
+}
+
 func SeedTransactions() []Transaction {
 	periods := AvailablePeriods()
 	slices.SortFunc(periods, func(a, b struct {
@@ -139,7 +177,14 @@ func SeedTransactions() []Transaction {
 		entries := periodsData[p.ID].Ledger
 		for i, e := range entries {
 			date := fmt.Sprintf("%s-%02d", p.ID, 1+i*27/max(1, len(entries)-1))
-			add(Transaction{Tanggal: date, Jenis: seedJenis(e), Nominal: e.Gross, Keterangan: e.Title, Channel: e.Channel, Lunas: e.Settled})
+			if e.Category == CatSales {
+				for _, t := range seedSalesLines(e, len(out)) {
+					t.Tanggal = date
+					add(t)
+				}
+			} else {
+				add(Transaction{Tanggal: date, Jenis: seedJenis(e), Nominal: e.Gross, Keterangan: e.Title, Channel: e.Channel, Lunas: e.Settled})
+			}
 			if e.Fee > 0 {
 				add(Transaction{Tanggal: date, Jenis: "Potongan Aplikasi", Nominal: e.Fee, Keterangan: "Komisi " + e.Channel, Channel: e.Channel, Lunas: e.Settled})
 			}

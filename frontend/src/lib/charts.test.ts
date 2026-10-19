@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cashChart, dailyBars, mainChart, sparklinePoints } from './charts'
+import { cashChart, dailyBars, mainChart, sparklinePoints, trendBars } from './charts'
 
 describe('sparklinePoints', () => {
   it('memetakan min ke bawah dan max ke atas dengan padding 4px', () => {
@@ -40,5 +40,18 @@ describe('cashChart', () => {
     expect(c.line).toBe('M 28.0 50.0 L 330.0 10.0')
     expect(c.area.endsWith('L 330.0 90.0 L 28 90.0 Z')).toBe(true)
     expect(c.last).toEqual({ x: 330, y: 10 })
+  })
+})
+
+describe('trendBars', () => {
+  it('nilai terbesar setinggi area plot, sisanya proporsional', () => {
+    const [a, b] = trendBars([50, 100])
+    expect(b.h).toBe(164)
+    expect(a.h).toBe(82)
+    expect(a.y + a.h).toBe(176)
+  })
+  it('aman untuk data kosong / nol', () => {
+    expect(trendBars([])).toEqual([])
+    expect(trendBars([0])[0].h).toBe(0)
   })
 })

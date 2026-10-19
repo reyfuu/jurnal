@@ -5,6 +5,7 @@ import { ApiError, getMe, getPeriods, loadAll, logout, type AppData, type Me, ty
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { ArusKas, LaporanKeuangan } from '@/views/Reports'
+import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
@@ -114,6 +115,8 @@ export default function App() {
         return <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
       case 'laporan-keuangan':
         return data!.report && data!.balanceSheet && <LaporanKeuangan r={data!.report} bs={data!.balanceSheet} periodLabel={d.period_label} />
+      case 'laporan-penjualan':
+        return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'arus-kas':
         return data!.report && data!.cash && <ArusKas c={data!.cash} netProfit={data!.report.net_profit} />
       case 'transaksi':

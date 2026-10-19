@@ -107,6 +107,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.handleDashboard))
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.handleFinancial))
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("arus-kas", s.handleCashflow))
+	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.handleSalesReport))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.handleBalanceSheet))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.handleSimulatePrice))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
@@ -308,6 +309,19 @@ const inventoryValue int64 = 8_250_000
 
 func (s *Server) handleFinancial(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, finance.BuildIncomeStatement(s.ledger(r)))
+}
+
+// handleSalesReport: granularity day|week untuk satu periode, month untuk tren seluruh periode.
+func (s *Server) handleSalesReport(w http.ResponseWriter, r *http.Request) {
+	g := r.URL.Query().Get("granularity")
+	s.mu.RLock()
+	txs := s.txs
+	if g != "month" {
+		txs = finance.ForPeriod(s.txs, periodOrDefault(r))
+	}
+	rep := finance.SalesReport(txs, g)
+	s.mu.RUnlock()
+	writeJSON(w, rep)
 }
 
 func (s *Server) handleCashflow(w http.ResponseWriter, r *http.Request) {

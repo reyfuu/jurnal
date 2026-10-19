@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, CreditCard, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, ChartColumn, CreditCard, Database, Factory, FileText, Files, LayoutGrid, Package,
   Receipt, Shield, SlidersVertical, UserCog, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
@@ -10,6 +10,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
     group: 'Laporan',
     items: [
       { view: 'laporan-keuangan', label: 'Laporan Keuangan', icon: FileText },
+      { view: 'laporan-penjualan', label: 'Laporan Penjualan', icon: ChartColumn },
       { view: 'arus-kas', label: 'Arus Kas', icon: CreditCard },
     ],
   },

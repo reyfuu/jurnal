@@ -1,7 +1,7 @@
 // Tipe mengikuti struct JSON di internal/finance dan internal/auth (Go).
 
 export type View =
-  | 'dashboard' | 'laporan-keuangan' | 'arus-kas' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
+  | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'arus-kas' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'master-data' | 'panduan' | 'pengguna'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
 
@@ -311,3 +311,19 @@ export async function importTransactions(file: File, commit: boolean): Promise<I
 }
 
 export const TEMPLATE_URL = '/api/v1/transactions/template'
+
+export type Granularity = 'day' | 'week' | 'month'
+
+export interface SalesGroup { name: string; omzet: number; count: number; piutang: number }
+
+export interface SalesReport {
+  granularity: Granularity
+  summary: { omzet: number; transaksi: number; rata_rata: number; qty: number; piutang: number }
+  trend: { label: string; omzet: number; count: number }[]
+  top_items: { item: string; qty: number; omzet: number }[]
+  by_channel: SalesGroup[]
+  by_customer: SalesGroup[]
+}
+
+export const getSalesReport = (period: string, granularity: Granularity) =>
+  api<SalesReport>(`/reports/sales?period=${period}&granularity=${granularity}`)

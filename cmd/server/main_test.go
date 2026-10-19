@@ -171,3 +171,26 @@ func TestPriceSimulationBreakEven(t *testing.T) {
 		t.Fatalf("default fixed cost should come from period opex, got %v", be)
 	}
 }
+
+func TestSalesReportEndpoint(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	rec := do(srv, owner, http.MethodGet, "/api/v1/reports/sales?period=2026-08&granularity=week", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d %s", rec.Code, rec.Body)
+	}
+	var r finance.SalesReportResult
+	_ = json.NewDecoder(rec.Body).Decode(&r)
+	if r.Summary.Omzet <= 0 || len(r.Trend) == 0 || len(r.TopItems) == 0 || r.Granularity != "week" {
+		t.Fatalf("unexpected report %+v", r.Summary)
+	}
+	// month = tren seluruh periode
+	rec = do(srv, owner, http.MethodGet, "/api/v1/reports/sales?granularity=month", "")
+	_ = json.NewDecoder(rec.Body).Decode(&r)
+	if len(r.Trend) != len(finance.AvailablePeriods()) {
+		t.Fatalf("month trend should cover all periods, got %d", len(r.Trend))
+	}
+	if rec := do(srv, login(t, srv, "kasir@kedaikopisenja.id"), http.MethodGet, "/api/v1/reports/sales", ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("kasir must not see sales report, got %d", rec.Code)
+	}
+}

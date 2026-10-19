@@ -82,3 +82,17 @@ export function cashChart(points: MonthPoint[]) {
     baseY: padT + plotH,
   }
 }
+
+export const TREND = { w: 640, h: 200, padL: 8, padR: 8, padT: 12, padB: 24 }
+
+// trendBars: batang tren penjualan dengan skala otomatis (nilai terbesar = tinggi penuh).
+export function trendBars(values: number[]) {
+  const { w, h, padL, padR, padT, padB } = TREND
+  const plotH = h - padT - padB
+  const slot = (w - padL - padR) / Math.max(1, values.length)
+  const max = Math.max(1, ...values)
+  return values.map((v, i) => {
+    const bh = (v / max) * plotH
+    return { x: padL + i * slot + slot * 0.15, y: padT + plotH - bh, w: slot * 0.7, h: bh, cx: padL + i * slot + slot / 2 }
+  })
+}
