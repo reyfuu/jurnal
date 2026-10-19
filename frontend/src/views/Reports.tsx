@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { Aset } from '@/views/Aset'
+import { LaporanAI } from '@/views/LaporanAI'
 import type { AssetSummary, BalanceSheet, CashFlow, CashFlowSection, IncomeStatement } from '@/lib/api'
 import { formatJt, formatPct, formatRp, formatSignedJt } from '@/lib/format'
 
@@ -8,13 +9,14 @@ const RED = '#fb7185'
 const GREEN = '#10b981'
 const BLUE = '#38bdf8'
 
-type Tab = 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
+type Tab = 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset' | 'ai'
 
 const TABS: { id: Tab; label: string; badge?: string }[] = [
   { id: 'laba-rugi', label: 'Laba Rugi' },
   { id: 'neraca', label: 'Neraca' },
   { id: 'arus-kas', label: 'Arus Kas', badge: '2 METODE' },
   { id: 'aset', label: 'Aset & Penyusutan' },
+  { id: 'ai', label: 'Laporan AI', badge: 'ANALISIS' },
 ]
 
 const SUBTITLE: Record<Tab, string> = {
@@ -22,6 +24,7 @@ const SUBTITLE: Record<Tab, string> = {
   neraca: 'Posisi keuangan per akhir periode',
   'arus-kas': 'Dua metode penyajian: Langsung & Tidak Langsung',
   aset: 'Register aset, penyusutan & amortisasi',
+  ai: 'Seluruh laporan dalam satu halaman, dibaca & dianalisis AI',
 }
 
 interface Props {
@@ -29,12 +32,13 @@ interface Props {
   bs: BalanceSheet
   cf: CashFlow
   assets: AssetSummary
+  period: string
   periodLabel: string
   onAssetsChanged: () => void
 }
 
 /** Satu menu untuk seluruh laporan keuangan; tiap laporan jadi tab. */
-export function LaporanKeuangan({ r, bs, cf, assets, periodLabel, onAssetsChanged }: Props) {
+export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, onAssetsChanged }: Props) {
   const [tab, setTab] = useState<Tab>('laba-rugi')
 
   return (
@@ -66,6 +70,7 @@ export function LaporanKeuangan({ r, bs, cf, assets, periodLabel, onAssetsChange
       {tab === 'neraca' && <Neraca bs={bs} />}
       {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} />}
       {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
+      {tab === 'ai' && <LaporanAI key={period} period={period} />}
     </>
   )
 }

@@ -28,6 +28,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'invoice', label: 'Invoice', icon: Receipt },
       { view: 'simulasi-harga', label: 'Simulasi & Harga', icon: SlidersVertical },
       { view: 'pajak-umkm', label: 'Pajak UMKM', icon: Shield },
+      { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: Calculator },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Calculator },
     ],
   },

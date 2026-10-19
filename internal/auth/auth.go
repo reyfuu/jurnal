@@ -33,7 +33,7 @@ type RoleInfo struct {
 var financeViews = []string{
 	// "arus-kas" dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 	"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
-	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "karyawan", "master-data", "panduan",
+	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "kalkulator-pajak", "karyawan", "master-data", "panduan",
 }
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.

@@ -7,6 +7,8 @@ import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { LaporanKeuangan } from '@/views/Reports'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
+import { InvoiceView } from '@/views/Invoice'
+import { KalkulatorPajak } from '@/views/KalkulatorPajak'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
@@ -138,6 +140,7 @@ export default function App() {
             bs={data!.balanceSheet}
             cf={data!.cash}
             assets={data!.assets}
+            period={period}
             periodLabel={d.period_label}
             onAssetsChanged={() => reload(me!, period)}
           />
@@ -147,12 +150,15 @@ export default function App() {
       case 'transaksi':
         return <Transaksi onChanged={() => reload(me!, period)} />
       case 'piutang-utang':
-      case 'invoice':
         return <PiutangUtang d={d} />
+      case 'invoice':
+        return <InvoiceView />
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':
         return <PajakUMKM d={d} />
+      case 'kalkulator-pajak':
+        return <KalkulatorPajak />
       case 'perencanaan-pajak':
         return <PerencanaanPajak profile={business!.profile} ptkpCodes={business!.options.ptkp} />
       case 'profil-usaha':

@@ -26,6 +26,8 @@ type state struct {
 	Opening        *finance.OpeningBalance `json:"opening"`
 	Karyawan       []finance.Karyawan      `json:"karyawan"`
 	NextKaryawanID int                     `json:"next_karyawan_id"`
+	Invoices       []finance.Invoice       `json:"invoices"`
+	NextInvoiceID  int                     `json:"next_invoice_id"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
 }
 
@@ -105,6 +107,7 @@ func (t *tenant) snapshot() state {
 		Transactions: t.txs, NextTxID: t.nextTxID,
 		Assets: t.assets, NextAssetID: t.nextAssetID,
 		Opening: t.opening, Karyawan: t.karyawan, NextKaryawanID: t.nextKaryawanID,
+		Invoices: t.invoices, NextInvoiceID: t.nextInvoiceID,
 	}
 }
 

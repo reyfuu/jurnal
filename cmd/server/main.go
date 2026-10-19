@@ -21,6 +21,7 @@ import (
 	"pajak/internal/ai"
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/llm"
 	"pajak/internal/xlsx"
 )
 
@@ -42,6 +43,8 @@ type tenant struct {
 	opening        *finance.OpeningBalance
 	karyawan       []finance.Karyawan
 	nextKaryawanID int
+	invoices       []finance.Invoice // faktur penjualan; dicetak ke PDF lewat internal/pdf
+	nextInvoiceID  int
 	seedTx         map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
 }
@@ -54,12 +57,13 @@ type Server struct {
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine
+	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
 	mux       *http.ServeMux
 }
 
 // newTenant membuat usaha kosong (hasil register).
 func newTenant(id int) *tenant {
-	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1}
+	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -69,8 +73,10 @@ func newTenant(id int) *tenant {
 // demoTenant: usaha 1 berisi data contoh Kedai Kopi Senja.
 func demoTenant() *tenant {
 	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
+		invoices:  finance.SeedInvoices(),
 		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
+	t.nextInvoiceID = len(t.invoices) + 1
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.SeedKedaiKopiSenja(p.ID)
 		t.seedTx[p.ID] = len(finance.ForPeriod(t.txs, p.ID))
@@ -88,6 +94,11 @@ func (t *tenant) restore(st *state) {
 	t.opening = st.Opening
 	if st.NextKaryawanID > 0 {
 		t.karyawan, t.nextKaryawanID = st.Karyawan, st.NextKaryawanID
+	}
+	// state dari versi sebelum modul faktur tidak punya daftar invoice: biarkan apa adanya
+	// (usaha demo tetap memakai seed, usaha hasil register tetap kosong).
+	if st.NextInvoiceID > 0 {
+		t.invoices, t.nextInvoiceID = st.Invoices, st.NextInvoiceID
 	}
 }
 
@@ -112,6 +123,7 @@ func NewServer() *Server {
 	s := &Server{
 		tenants:  tenants,
 		users:    users,
+		llm:      llm.New(llm.ConfigFromEnv()),
 		failures: map[string]loginFailure{},
 		aiEngine: ai.NewEngine(),
 		mux:      http.NewServeMux(),
@@ -173,6 +185,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.on((*tenant).handlePutBusiness)))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
+	s.mux.HandleFunc("GET /api/v1/kalkulator", s.guard("kalkulator-pajak", s.handleKalkulatorMaster))
+	s.mux.HandleFunc("POST /api/v1/kalkulator/pph21", s.guard("kalkulator-pajak", s.handleHitungPPh21))
+	s.mux.HandleFunc("POST /api/v1/kalkulator/potong", s.guard("kalkulator-pajak", s.handleHitungPotong))
+	s.mux.HandleFunc("POST /api/v1/kalkulator/pph-badan", s.guard("kalkulator-pajak", s.handleHitungPPhBadan))
+	s.mux.HandleFunc("GET /api/v1/reports/ai", s.guard("laporan-keuangan", s.on(s.handleAIReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoA)))
 	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoAXlsx)))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
@@ -200,6 +217,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.on((*tenant).handleCreateKaryawan))))
 	s.mux.HandleFunc("PUT /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleUpdateKaryawan))))
 	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleDeleteKaryawan))))
+
+	s.mux.HandleFunc("GET /api/v1/invoice", s.guard("invoice", s.on((*tenant).handleListInvoice)))
+	s.mux.HandleFunc("POST /api/v1/invoice", s.persisting(s.guard("invoice", s.on((*tenant).handleCreateInvoice))))
+	s.mux.HandleFunc("PUT /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdateInvoice))))
+	s.mux.HandleFunc("DELETE /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeleteInvoice))))
+	s.mux.HandleFunc("GET /api/v1/invoice/{id}/pdf", s.guard("invoice", s.on((*tenant).handleInvoicePDF)))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
 	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))

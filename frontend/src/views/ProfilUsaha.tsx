@@ -107,6 +107,19 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         <Switch id="biz-pkp" checked={p.pkp} onCheckedChange={(v) => set({ pkp: v })} />
         Sudah dikukuhkan sebagai PKP (memungut PPN)
       </label>
+      {p.pkp && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="biz-ppn">Tarif PPN (%)</Label>
+          <Input
+            id="biz-ppn" type="number" step="0.5" min="0" max="100" className="w-32"
+            value={((p.ppn_bps ?? 1100) / 100).toString()}
+            onChange={(e) => set({ ppn_bps: Math.round(Number(e.target.value) * 100) })}
+          />
+          <p className="text-xs text-muted-foreground">Dipakai untuk faktur baru. Faktur yang sudah terbit menyimpan tarifnya sendiri, jadi tidak ikut berubah.</p>
+        </div>
+      )}
+
+      <FakturFields p={p} set={set} />
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       <Button type="submit" size="lg" className="rounded-full font-bold" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
     </form>
@@ -250,5 +263,47 @@ export function ProfilUsaha({ info, onSaved }: { info: BusinessInfo; onSaved: (p
         {saved && <p className="mt-3 text-sm" style={{ color: '#10b981' }} role="status">Profil usaha tersimpan.</p>}
       </div>
     </>
+  )
+}
+
+
+// FakturFields: identitas penerbit yang dicetak di invoice. Dipisah dari pertanyaan pajak
+// supaya form utama tetap pendek, dan semuanya opsional — usaha yang belum pernah menerbitkan
+// faktur tidak perlu mengisinya untuk bisa memakai aplikasi.
+function FakturFields({ p, set }: { p: BusinessProfile; set: (patch: Partial<BusinessProfile>) => void }) {
+  const [buka, setBuka] = useState(false)
+  const terisi = [p.alamat, p.npwp, p.bank_rekening, p.penandatangan_nama].filter(Boolean).length
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <button type="button" className="flex w-full items-center justify-between text-left" onClick={() => setBuka((v) => !v)} aria-expanded={buka}>
+        <span className="text-sm font-semibold">Data untuk invoice</span>
+        <span className="text-xs text-muted-foreground">{terisi}/4 terisi — {buka ? 'sembunyikan' : 'tampilkan'}</span>
+      </button>
+      <p className="mt-1 text-xs text-muted-foreground">Alamat, NPWP, rekening, dan penandatangan yang dicetak di PDF faktur.</p>
+      {buka && (
+        <div className="mt-4 grid gap-3">
+          {([
+            ['alamat', 'Alamat usaha', 'Jl. Senopati Raya No. 45, Kebayoran Baru, Jakarta Selatan 12190'],
+            ['npwp', 'NPWP', '01.234.567.8-012.000'],
+            ['telepon', 'Telepon', '021-7123456'],
+            ['email', 'Email', 'halo@usahaku.id'],
+            ['bank_nama', 'Nama bank', 'BCA'],
+            ['bank_rekening', 'Nomor rekening', '123-456-7890'],
+            ['bank_atas_nama', 'Rekening atas nama', 'CV Kedai Kopi Senja'],
+            ['penandatangan_nama', 'Nama penandatangan', 'Sari Wulandari'],
+            ['penandatangan_jabatan', 'Jabatan penandatangan', 'Pemilik'],
+          ] as const).map(([key, label, placeholder]) => (
+            <div className="grid gap-1.5" key={key}>
+              <Label htmlFor={`biz-${key}`}>{label}</Label>
+              <Input
+                id={`biz-${key}`} placeholder={placeholder} value={p[key] ?? ''}
+                onChange={(e) => set({ [key]: e.target.value } as Partial<BusinessProfile>)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
