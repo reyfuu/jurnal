@@ -151,7 +151,9 @@ var Master = []Account{
 // Supported: CoA baru tersedia untuk perdagangan; jasa & manufaktur menunggu file dari tim.
 func Supported(p finance.BusinessProfile) bool { return p.JenisUsaha == "perdagangan" }
 
-func isPT(p finance.BusinessProfile) bool { return p.BentukUsaha == "pt" || p.BentukUsaha == "pt_perorangan" }
+func isPT(p finance.BusinessProfile) bool {
+	return p.BentukUsaha == "pt" || p.BentukUsaha == "pt_perorangan"
+}
 
 func perpetual(p finance.BusinessProfile) bool { return p.MetodePersediaan == "perpetual" }
 

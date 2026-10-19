@@ -453,3 +453,23 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 		TaxReport: CalculateUMKMTax("OP", omzet2026),
 	}
 }
+
+// SeedAssets: register aset contoh Kedai Kopi Senja. Dipakai agar demo menunjukkan kedua
+// metode PMK 72/2023 — mesin espresso saldo menurun, sisanya garis lurus, renovasi bangunan
+// tidak permanen (wajib garis lurus), dan satu harta tak berwujud (amortisasi).
+func SeedAssets() []Asset {
+	return []Asset{
+		{ID: 1, Nama: "Mesin Espresso La Marzocco Linea", JenisHarta: "mesin_makanan", Kelompok: "k1",
+			Metode: MetodeSaldoMenurun, TanggalPerolehan: "2026-02-01", HargaPerolehan: 90_000_000},
+		{ID: 2, Nama: "Grinder Mazzer Super Jolly (2 unit)", JenisHarta: "mesin_makanan", Kelompok: "k1",
+			Metode: MetodeGarisLurus, TanggalPerolehan: "2026-02-01", HargaPerolehan: 24_000_000},
+		{ID: 3, Nama: "Kulkas & Chiller Display", JenisHarta: "peralatan_restoran", Kelompok: "k1",
+			Metode: MetodeGarisLurus, TanggalPerolehan: "2026-03-01", HargaPerolehan: 18_000_000},
+		{ID: 4, Nama: "Furnitur & Interior Kedai", JenisHarta: "mebel_kayu", Kelompok: "k1",
+			Metode: MetodeGarisLurus, TanggalPerolehan: "2026-02-01", HargaPerolehan: 60_000_000},
+		{ID: 5, Nama: "Renovasi & Instalasi Listrik", JenisHarta: "bangunan_tidak_permanen", Kelompok: "bangunan_tidak_permanen",
+			Metode: MetodeGarisLurus, TanggalPerolehan: "2026-02-01", HargaPerolehan: 36_000_000},
+		{ID: 6, Nama: "Software POS & Lisensi 3 Tahun", JenisHarta: "software", Kelompok: "k1", TakBerwujud: true,
+			Metode: MetodeGarisLurus, TanggalPerolehan: "2026-02-01", HargaPerolehan: 18_000_000},
+	}
+}

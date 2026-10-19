@@ -144,11 +144,11 @@ export function Dashboard({
               <div className="chart-title">Saldo kas per bulan</div>
               <div className="chart-subtitle">
                 Kas bisa turun walau laba positif
-                {canSee('arus-kas') && (
+                {canSee('laporan-keuangan') && (
                   <>
                     :{' '}
-                    <button onClick={() => onNavigate('arus-kas')} style={{ color: '#94a3b8', textDecoration: 'underline' }}>
-                      cek halaman Arus Kas.
+                    <button onClick={() => onNavigate('laporan-keuangan')} style={{ color: '#94a3b8', textDecoration: 'underline' }}>
+                      cek tab Arus Kas di Laporan Keuangan.
                     </button>
                   </>
                 )}

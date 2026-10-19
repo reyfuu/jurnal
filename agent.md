@@ -70,8 +70,11 @@ Sesuai referensi desain produk **Laporan Bisnis by Akademi Pajak**, sistem terdi
 1. **RINGKASAN**
    - `Dashboard`: Ringkasan 6 KPI utama, grafik tren 11 bulan (`Omzet, biaya, dan laba`), grafik bar `Omzet harian` vs target harian, grafik area `Saldo kas per bulan`, `Omzet per produk` (Top 5), dan `Omzet per channel` (termasuk potongan aplikasi).
 2. **LAPORAN**
-   - `Laporan Keuangan`: Laba Rugi (Income Statement), Neraca (Balance Sheet), Perubahan Modal.
-   - `Arus Kas`: Arus kas operasional, investasi, pendanaan, serta rekonsiliasi selisih Laba vs Kas.
+   - `Laporan Keuangan` (satu menu, 4 tab): **Laba Rugi** (Income Statement) · **Neraca** (Balance Sheet) ·
+     **Arus Kas** (operasi/investasi/pendanaan, disajikan dua metode — langsung & tidak langsung — plus
+     rekonsiliasi selisih Laba vs Kas) · **Aset & Penyusutan** (register aset, penyusutan garis lurus &
+     saldo menurun serta amortisasi menurut PMK 72/2023).
+   - `Laporan Penjualan`: tren omzet per hari/minggu/bulan, per item, per channel, per pelanggan.
 3. **OPERASIONAL**
    - `Transaksi`: Pencatatan pemasukan, pengeluaran, potongan marketplace/aplikasi, impor CSV/mutasi.
    - `Piutang & Utang`: Pelacakan tagihan pelanggan & supplier, reminder jatuh tempo (>30 hari).
@@ -82,7 +85,10 @@ Sesuai referensi desain produk **Laporan Bisnis by Akademi Pajak**, sistem terdi
    - `Simulasi & Harga`: Kalkulator HPP, simulasi kenaikan harga bahan baku, simulasi diskon & komisi aplikasi (GoFood/GrabFood/ShopeeFood/Tokopedia/Shopee).
    - `Pajak UMKM`: Kalkulator & rekap omzet bulanan untuk PPh Final 0,5% (PP 55/2022), pemantauan kuota omzet bebas pajak Rp500 juta/tahun (WP OP), ekspor kertas kerja pelaporan SPT.
 5. **PENGATURAN**
-   - `Master Data`: Produk, Kategori Biaya, Channel Penjualan & % Komisi, Akun Kas/Bank, Target Bulanan/Harian, Profil Usaha.
+   - `Profil Usaha`: jenis & bentuk usaha, PTKP, status PKP.
+   - `Impor Data Awal`: satu workbook .xlsx untuk onboarding — Neraca Awal (posisi kas/piutang/persediaan/utang/pinjaman di hari pertama pakai aplikasi), Aset, Karyawan, dan Transaksi. Pratinjau dulu, baru commit.
+   - `Karyawan`: master data karyawan & rekap beban gaji bulanan (PPh 21 belum).
+   - `Master Data`: Produk, Kategori Biaya, Channel Penjualan & % Komisi, Akun Kas/Bank, Target Bulanan/Harian.
    - `Panduan`: Dokumentasi interaktif & *demo mode* (`Kedai Kopi Senja — Data contoh tidak disimpan`).
 
 ---

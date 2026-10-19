@@ -1,6 +1,6 @@
 import {
-  ArrowLeftRight, BookOpen, Building2, Calculator, ChartColumn, CreditCard, Database, Factory, FileText, Files, LayoutGrid, Package,
-  Receipt, Shield, SlidersVertical, UserCog, type LucideIcon,
+  ArrowLeftRight, BookOpen, Building2, Calculator, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  Receipt, Shield, SlidersVertical, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
 
@@ -11,7 +11,6 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
     items: [
       { view: 'laporan-keuangan', label: 'Laporan Keuangan', icon: FileText },
       { view: 'laporan-penjualan', label: 'Laporan Penjualan', icon: ChartColumn },
-      { view: 'arus-kas', label: 'Arus Kas', icon: CreditCard },
     ],
   },
   {
@@ -36,6 +35,8 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
     group: 'Pengaturan',
     items: [
       { view: 'profil-usaha', label: 'Profil Usaha', icon: Building2 },
+      { view: 'impor-data', label: 'Impor Data Awal', icon: Upload },
+      { view: 'karyawan', label: 'Karyawan', icon: Users },
       { view: 'pengguna', label: 'Pengguna & Akses', icon: UserCog },
       { view: 'master-data', label: 'Daftar Akun (CoA)', icon: Database },
       { view: 'panduan', label: 'Panduan', icon: BookOpen },

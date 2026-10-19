@@ -169,6 +169,121 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - Verifikasi: build frontend berhasil; 29 tes Vitest lulus; lint tanpa error (10 warning di file lain). Browser Chromium lokal pada 1280×900, 375×812, dan 320×740: keyboard, fokus, jasa melewati stok, manufaktur/perdagangan, OP menikah & penghasilan gabung, kembali/edit jawaban, perpindahan ke PT tanpa PTKP, kegagalan simpan/retry, status sibuk, payload profil, dan masuk dashboard lulus. Radio pada halaman Profil Usaha juga diperiksa. Review kode terpisah tidak menemukan bug.
 - Bukti sesi lokal: `/tmp/pajak-onboarding-check.py`, `/tmp/pajak-onboarding-name-desktop.png`, `/tmp/pajak-onboarding-summary-mobile.png`, `/tmp/pajak-onboarding-options-mobile.png`. Tidak memeriksa pembaca layar fisik atau browser selain Chromium. Belum deploy produksi.
 
+## Fase C1 — Laporan Keuangan Satu Menu & Register Aset (Okt 2026)
+**Perubahan navigasi**: menu `Arus Kas` dihapus; seluruh laporan keuangan jadi **satu menu dengan 4 tab** —
+Laba Rugi, Neraca, Arus Kas (2 metode), dan Aset & Penyusutan. Permission `arus-kas` dihapus dari
+`auth.financeViews`; semua tab ikut hak akses `laporan-keuangan`, jadi Kasir tetap tidak bisa melihatnya.
+Ini menggantikan pembagian menu di agent.md §2 nomor 2.
+
+**Arus kas dua metode** (`finance.CashFlow`, [ledger.go](file:///home/reyfuu/pajak/internal/finance/ledger.go)):
+- Dipecah per aktivitas PSAK 2: `operasi_langsung`, `operasi_tidak_langsung`, `investasi`, `pendanaan`.
+  Masing-masing `CashFlowSection{lines, net}`; baris penerimaan pelanggan & beban operasional punya `detail`
+  (rincian per channel / per jenis biaya). Baris `non_kas: true` adalah baris informasi yang sengaja Rp 0.
+- **Invarian yang dites**: `operasi_langsung.net == operasi_tidak_langsung.net`, dan
+  `operasi + investasi + pendanaan == net_cash`.
+- `NewReceivables`/`NewPayables` sekarang **hanya akrual operasional**, supaya penyesuaian modal kerja di
+  metode tidak langsung tepat sama dengan kas operasi. Akrual investasi/pendanaan (mis. aset dibeli kredit)
+  pindah ke `NewPayablesOther`/`NewReceivablesOther` — tetap jadi utang/piutang di neraca.
+  `CashFlow.NonOperating` dihapus, diganti `Investasi.Net` + `Pendanaan.Net`.
+
+**Penyusutan fiskal PMK 72/2023** ([asset.go](file:///home/reyfuu/pajak/internal/finance/asset.go)):
+- Keputusan: **satu angka penyusutan, basis fiskal** — tanpa nilai residu, kelompok & tarif wajib ikut PMK.
+  Angka komersial PSAK (masa manfaat sendiri + residu) dan koreksi fiskalnya belum disimpan (ditandai `ponytail:`).
+- `KelompokAsetList` = tabel Pasal 2 ayat (3): Kelompok 1–4 (4/8/16/20 th; GL 25/12,5/6,25/5%; SM 50/25/12,5/10%),
+  Bangunan Permanen 20 th 5%, Bangunan Tidak Permanen 10 th 10%. Bangunan **hanya garis lurus**.
+  Amortisasi harta tak berwujud memakai kelompok & tarif yang sama (Pasal 9 ayat 3).
+- `JenisHartaList` = subset Lampiran PMK untuk UMKM dagang/jasa/F&B; user pilih jenis harta → kelompok terisi
+  otomatis, ada opsi "Lainnya" untuk pilih kelompok manual. **Belum diverifikasi baris per baris ke Lampiran
+  resmi** (ditandai `ponytail:`) — wajib dicek tim pajak sebelum dipakai untuk SPT.
+- `AssetSchedule` menghasilkan jadwal beban **per bulan** sepanjang masa manfaat: penyusutan dimulai bulan
+  pengeluaran (Pasal 5 ayat 1), dan pada saldo menurun **akhir masa manfaat sisa nilai buku disusutkan
+  sekaligus** (Pasal 2 ayat 2) sehingga nilai buku berakhir nol. Sisa pembulatan jatuh di bulan terakhir,
+  jadi total jadwal selalu sama dengan harga perolehan.
+- Endpoint: `GET /api/v1/assets?period=`, `POST /api/v1/assets`, `PUT|DELETE /api/v1/assets/{id}`.
+  Register ikut tersimpan di `state.json` (`assets`, `next_asset_id`); `state.json` lama tanpa kunci itu
+  tetap dibaca dan memakai seed aset.
+
+**Draft aset dari transaksi**: transaksi jenis `Beli Alat / Aset` yang belum terdaftar muncul otomatis sebagai
+draft (diturunkan saat hitung, tidak ditulis ke state). Draft masuk neraca sebesar harga perolehan supaya
+neraca tetap seimbang, tapi belum menghasilkan beban sampai kelompok & metodenya dilengkapi.
+
+**Satu sumber angka**: `finance.BuildPeriodReport(txs, assets, period, openingCash, inventory)` menghitung
+laba rugi + arus kas + neraca + register aset sekaligus. Semua endpoint laporan, KPI dashboard, Perencanaan
+Pajak, dan AI chat (`Engine.Answer` sekarang menerima `PeriodReport`) memakai fungsi ini, jadi tidak mungkin
+lagi saling bertentangan.
+
+**Dampak angka seed (Agustus 2026)** — penyusutan Rp6,55 jt masuk laba rugi:
+laba bersih **Rp25,0 jt → Rp18,45 jt**, margin **27,17% → 20,05%**, total aset **Rp116,25 jt → Rp316,775 jt**,
+kenaikan kas **tetap Rp17,0 jt** (penyusutan non-kas). Modal awal neraca sekarang
+`kas awal + persediaan + nilai buku aset awal periode` (Rp295,325 jt) — rumus lama `kas awal + persediaan`
+membuat neraca njomplang sebesar nilai buku aset.
+
+**Belum dikerjakan (sengaja)**: baris Pajak Penghasilan di laba rugi; perubahan persediaan per periode
+(nilai stok masih tetap Rp8,25 jt); `new_receivables` masih piutang yang terbit periode ini, bukan selisih
+saldo awal–akhir (benar untuk satu bulan, salah untuk laporan antar-periode); penjualan/pelepasan aset;
+`SparkLaba` & `monthly_trend_11m` di seed masih angka lama sehingga grafik tren belum mencerminkan penyusutan.
+
+## Fase C2 — Impor Data Awal (Onboarding), Karyawan & Konsistensi Grafik (Okt 2026)
+
+**Keputusan desain penting**: laporan neraca & arus kas **tidak bisa diimpor sebagai angka jadi** —
+keduanya diturunkan dari transaksi + register aset, jadi angka jadi akan langsung bertabrakan dengan
+hasil hitung begitu ada satu transaksi baru. Yang diimpor adalah **posisi awalnya** (neraca awal /
+`OpeningBalance`), dan dari situ neraca & arus kas tiap periode terbentuk sendiri.
+
+**Neraca awal** ([opening.go](file:///home/reyfuu/pajak/internal/finance/opening.go)):
+- `OpeningBalance{Tanggal, Kas, Piutang, Persediaan, Utang, Pinjaman, ModalDisetor}`.
+- Modal awal **dihitung** dari komposisinya (aktiva awal − kewajiban awal), bukan dari isian user;
+  `ModalDisetor` hanya dicocokkan dan selisihnya dilaporkan, supaya salah input ketahuan tapi neraca
+  tetap seimbang.
+- `At(txs, period)` menurunkan `ReportOpening` per periode: **saldo kas berjalan** (saldo awal + kas
+  bersih semua transaksi sebelum periode itu). Ini carry-over antar periode yang sebelumnya tidak ada.
+- `BuildPeriodReport` & `BuildBalanceSheet` sekarang menerima `ReportOpening`, bukan `openingCash, inventory`.
+  Konstanta `inventoryValue` di main.go dihapus, diganti `finance.SeedInventory`.
+- ponytail: piutang/utang/pinjaman awal hanya dipakai di **periode onboarding**; pelunasannya lintas
+  periode belum ditelusuri (butuh umur piutang per periode). Neraca tetap seimbang karena modal awal
+  dihitung dari komposisi yang sama.
+- `SeedOpening` (data demo) **sengaja tidak berantai**: seed menulis saldo awal tiap periode
+  sendiri-sendiri untuk memperagakan kas turun walau laba positif. Kalau dirantai, kas Agustus jadi
+  Rp172,5 jt (bukan Rp97 jt) dan narasi demo rusak. Tenant nyata memakai `OpeningBalance.At` yang benar.
+
+**Impor data awal** ([onboarding.go](file:///home/reyfuu/pajak/internal/finance/onboarding.go)):
+- Satu workbook, 5 sheet: `Saldo Awal`, `Aset`, `Karyawan`, `Transaksi`, `Panduan`.
+  `GET /api/v1/onboarding/template` menghasilkannya; isinya lolos parsernya sendiri (ada test).
+- `POST /api/v1/onboarding/import` — tanpa `?commit=1` hanya **pratinjau**, tidak menyimpan apa pun.
+  Nama sheet & nama kolom bebas selama memuat kata kuncinya; tanggal `DD/MM/YYYY` dan angka
+  `Rp 45.000.000` diterima (memakai `parseTanggal`/`parseRupiah` yang sudah ada).
+- Baris bermasalah dilaporkan dengan **nama sheet + nomor baris Excel** (`SheetError`) dan dilewati;
+  baris lain tetap masuk.
+- Commit: aset & karyawan **mengganti** register lama (ini onboarding, bukan tambah data — jumlah yang
+  diganti dilaporkan); transaksi **ditambahkan** karena bisa diimpor bertahap per periode.
+- `xlsx.ReadAll` baru (baca semua sheet + namanya); `xlsx.Read` lama tetap ada sebagai sheet pertama.
+
+**Karyawan** ([karyawan.go](file:///home/reyfuu/pajak/internal/finance/karyawan.go)): master data
+(nama, jabatan, tanggal masuk, gaji pokok, tunjangan, PTKP, NPWP, aktif) + rekap beban gaji bulanan.
+CRUD `/api/v1/karyawan`, menu Pengaturan → Karyawan (permission `karyawan`, di `financeViews`).
+ponytail: **belum** menghitung PPh 21 dan belum membuat transaksi gaji otomatis; PTKP sudah disimpan
+supaya kalkulator PPh 21 tinggal membacanya.
+
+**Permission baru** `impor-data` (Owner & Admin): menu Impor Data Awal + izin mengubah neraca awal.
+Kasir tertutup. `GET /api/v1/opening` ikut `laporan-keuangan`, `PUT` ikut `impor-data`.
+
+**Grafik tren jadi konsisten dengan KPI** ([trend.go](file:///home/reyfuu/pajak/internal/finance/trend.go)):
+- Dulu `monthly_trend_11m`, `SparkOmzet/SparkLaba/SparkCash`, dan badge seperti "▲ Stabil" semuanya
+  angka seed, sementara KPI dihitung ulang dari transaksi — jadi penyusutan hanya muncul di KPI.
+- Sekarang `TrendHistory` menghitung laporan tiap periode sampai periode yang dilihat, lalu `ApplyTrend`
+  menimpa grafik, keempat sparkline, dan badge (delta % vs bulan lalu; margin dalam poin persen).
+  Dijamin test: titik terakhir grafik == KPI, dan `omzet − total biaya == laba bersih`.
+- Grafik demo kini 8 titik (Jan–Agu 2026, sesuai periode yang punya transaksi), bukan 11 titik seed
+  yang 3 di antaranya tidak punya data.
+- ponytail: menghitung ulang semua periode setiap request dashboard; pasang cache bila periode sudah
+  bertahun-tahun.
+
+**Pemetaan jenis harta disiapkan untuk dikoreksi**: `JenisHarta` dapat kolom `Lampiran` (rujukan tempat
+memeriksa) dan `Terverifikasi`. Semua baris bukan-bangunan masih `false`; UI menampilkan peringatan
+"N jenis harta belum diverifikasi", dropdown menandai per baris, dan sheet Panduan di template punya
+kolom Status Pemetaan. Cara mengoreksi ditulis sebagai komentar langkah-demi-langkah di atas
+`JenisHartaList` — satu tabel, satu tempat; jangan ubah `ID` karena dipakai aset yang sudah tersimpan.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.

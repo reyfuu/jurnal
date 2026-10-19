@@ -60,7 +60,7 @@ func TestSeedTransactions_PerPeriod(t *testing.T) {
 }
 
 func TestIncomeStatement_OpexGroupedByJenis(t *testing.T) {
-	is := finance.BuildIncomeStatement(finance.SeedLedger("2026-08"))
+	is := finance.BuildIncomeStatement(finance.SeedLedger("2026-08"), 0, 0)
 	for _, l := range is.OpexLines {
 		if l.Label == "Listrik, Air, Internet" {
 			if l.Amount != 15_900_000 { // utilitas 12,9 jt + tagihan listrik belum dibayar 3 jt
@@ -84,22 +84,30 @@ func TestNonOperating_KeepsBooksBalanced(t *testing.T) {
 		tx("2026-08-07", "Ambil Uang Pribadi", 3_000_000, true),
 		tx("2026-08-08", "Pendapatan Lain", 1_000_000, false),
 	)
-	entries := finance.ToLedger(txs)
-	is := finance.BuildIncomeStatement(entries)
-	cf := finance.BuildCashFlow(entries, 80_000_000)
-	bs := finance.BuildBalanceSheet(entries, 80_000_000, 8_250_000, 88_250_000)
+	// Tanpa register aset: pembelian "Beli Alat / Aset" muncul sebagai draft sebesar harga perolehan.
+	rep := finance.BuildPeriodReport(txs, nil, "2026-08", finance.SeedOpening("2026-08"))
+	is, cf, bs := rep.Income, rep.CashFlow, rep.BalanceSheet
 
 	if is.OtherIncome != 1_000_000 || is.NetProfit != 26_000_000 {
 		t.Fatalf("other income must count in profit: other=%d net=%d", is.OtherIncome, is.NetProfit)
 	}
-	if got := is.NetProfit - cf.NewReceivables + cf.NewPayables + cf.NonOperating; got != cf.NetCash {
-		t.Fatalf("reconciliation broken: %d != NetCash %d (%+v)", got, cf.NetCash, cf)
+	// Rekonsiliasi laba → kas operasi hanya memakai akrual operasional.
+	bridge := is.NetProfit + is.Depreciation + is.Amortization - cf.NewReceivables + cf.NewPayables
+	if bridge != cf.OperasiTidakLangsung.Net || cf.OperasiLangsung.Net != bridge {
+		t.Fatalf("reconciliation broken: bridge=%d langsung=%d tidak langsung=%d", bridge, cf.OperasiLangsung.Net, cf.OperasiTidakLangsung.Net)
+	}
+	if got := cf.OperasiLangsung.Net + cf.Investasi.Net + cf.Pendanaan.Net; got != cf.NetCash {
+		t.Fatalf("tiga aktivitas %d != NetCash %d", got, cf.NetCash)
 	}
 	if !bs.IsBalanced {
 		t.Fatalf("balance sheet not balanced: %+v", bs)
 	}
 	if bs.Assets.FixedAssets != 19_000_000 || bs.Liabilities.Loans != 18_000_000 || bs.Equity.AddedCapital != 7_000_000 {
 		t.Fatalf("non-operating lines wrong: %+v", bs)
+	}
+	// Aset yang dibeli kredit tetap jadi utang, tapi tidak menambah kas operasi.
+	if cf.NewPayablesOther != 4_000_000 || bs.Liabilities.Payables != 7_000_000 {
+		t.Fatalf("utang pembelian aset: other=%d payables=%d", cf.NewPayablesOther, bs.Liabilities.Payables)
 	}
 }
 
@@ -109,7 +117,8 @@ func TestApplyKPIs(t *testing.T) {
 	snap := finance.SeedKedaiKopiSenja("2026-08")
 	want := snap.KPIs
 
-	finance.ApplyKPIs(&snap, finance.BuildIncomeStatement(entries), finance.BuildCashFlow(entries, 80_000_000), txs, len(txs))
+	is := finance.BuildIncomeStatement(entries, 0, 0)
+	finance.ApplyKPIs(&snap, is, finance.BuildCashFlow(entries, is, 80_000_000), txs, len(txs))
 	k := snap.KPIs
 	if k.Omzet.Display != want.Omzet.Display || k.LabaBersih.Display != want.LabaBersih.Display ||
 		k.MarginLaba.Display != want.MarginLaba.Display || k.SaldoKas.Display != want.SaldoKas.Display ||
@@ -122,7 +131,8 @@ func TestApplyKPIs(t *testing.T) {
 
 	// Omzet turun di bawah target → "Kurang".
 	low := finance.ToLedger([]finance.Transaction{tx("2026-08-01", "Penjualan", 50_000_000, true)})
-	finance.ApplyKPIs(&snap, finance.BuildIncomeStatement(low), finance.BuildCashFlow(low, 80_000_000), nil, 1)
+	lowIS := finance.BuildIncomeStatement(low, 0, 0)
+	finance.ApplyKPIs(&snap, lowIS, finance.BuildCashFlow(low, lowIS, 80_000_000), nil, 1)
 	if snap.KPIs.Omzet.Display != "Rp50 jt" || snap.KPIs.TargetOmzet.SurplusDisplay[:6] != "Kurang" {
 		t.Fatalf("low omzet KPIs: %+v", snap.KPIs)
 	}

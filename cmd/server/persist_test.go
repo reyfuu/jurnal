@@ -20,6 +20,9 @@ func TestStateSurvivesRestart(t *testing.T) {
 	if rec := do(srv, owner, http.MethodPost, "/api/v1/users", `{"name":"Tono","email":"tono@x.id","role":"kasir","active":true,"password":"rahasia123"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("create user: %d %s", rec.Code, rec.Body)
 	}
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/assets", `{"nama":"Oven Persist","kelompok":"k1","metode":"garis_lurus","tanggal_perolehan":"2026-02-01","harga_perolehan":24000000}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create asset: %d %s", rec.Code, rec.Body)
+	}
 	if info, err := os.Stat(filepath.Join(dir, "state.json")); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("state.json must exist with 0600: %v %v", err, info)
 	}
@@ -31,6 +34,10 @@ func TestStateSurvivesRestart(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "Tes persist") {
 		t.Fatal("transaction lost after restart")
+	}
+	rec = do(srv2, owner, http.MethodGet, "/api/v1/assets?period=2026-08", "")
+	if !strings.Contains(rec.Body.String(), "Oven Persist") {
+		t.Fatal("register aset hilang setelah restart")
 	}
 	login(t, srv2, "owner@kedaikopisenja.id")
 	if rec := do(srv2, nil, http.MethodPost, "/api/v1/auth/login", `{"email":"tono@x.id","password":"rahasia123"}`); rec.Code != http.StatusOK {

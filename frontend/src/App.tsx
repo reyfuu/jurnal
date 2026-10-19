@@ -5,7 +5,7 @@ import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
-import { ArusKas, LaporanKeuangan } from '@/views/Reports'
+import { LaporanKeuangan } from '@/views/Reports'
 import { LaporanKeuanganCoA } from '@/views/LaporanCoA'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
@@ -13,6 +13,8 @@ import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
 import { Onboarding, ProfilUsaha } from '@/views/ProfilUsaha'
+import { ImporDataAwal } from '@/views/ImporDataAwal'
+import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
@@ -131,17 +133,24 @@ export default function App() {
       case 'dashboard':
         return <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
       case 'laporan-keuangan':
-        return data!.report && data!.balanceSheet && (
+        return data!.report && data!.balanceSheet && data!.cash && data!.assets && (
           <LaporanKeuanganCoA
             period={period}
             periodLabel={d.period_label}
-            fallback={<LaporanKeuangan r={data!.report} bs={data!.balanceSheet} periodLabel={d.period_label} />}
+            fallback={
+              <LaporanKeuangan
+                r={data!.report}
+                bs={data!.balanceSheet}
+                cf={data!.cash}
+                assets={data!.assets}
+                periodLabel={d.period_label}
+                onAssetsChanged={() => reload(me!, period)}
+              />
+            }
           />
         )
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
-      case 'arus-kas':
-        return data!.report && data!.cash && <ArusKas c={data!.cash} netProfit={data!.report.net_profit} />
       case 'transaksi':
         return <Transaksi onChanged={() => reload(me!, period)} />
       case 'piutang-utang':
@@ -157,6 +166,10 @@ export default function App() {
         return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
       case 'master-data':
         return <DaftarAkun />
+      case 'impor-data':
+        return <ImporDataAwal onChanged={() => reload(me!, period)} />
+      case 'karyawan':
+        return <KaryawanView />
       case 'pengguna':
         return <Pengguna currentUserId={me!.user.id} />
       default:
