@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
+import { Button } from '@/components/ui/button'
 import { VIEW_LABEL } from '@/lib/nav'
 import { LaporBug } from '@/views/LaporBug'
 import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
@@ -101,6 +102,12 @@ export default function App() {
         <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
+          {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan) && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'rgba(234, 179, 8, 0.08)' }} role="status">
+              <span><strong>Lengkapi profil usaha.</strong> Isi lokasi usaha serta perkiraan omzet &amp; laba per tahun supaya cek benchmark DJP dan risiko pajak bisa dihitung.</span>
+              <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
+            </div>
+          )}
           {data && (
             <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: '#101318', padding: '10px 16px', borderRadius: 10, border: '1px solid #1c222c' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

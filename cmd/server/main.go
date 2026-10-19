@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -760,6 +761,13 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		p := filepath.Join(dir, filepath.Clean("/"+r.URL.Path))
 		if fi, err := os.Stat(p); err != nil || fi.IsDir() {
 			p = filepath.Join(dir, "index.html")
+		}
+		// index.html selalu divalidasi ulang supaya deploy baru langsung terpakai (tanpa ini browser
+		// & Cloudflare menahan versi lama); asset Vite ber-hash aman di-cache selamanya.
+		if strings.HasPrefix(r.URL.Path, "/assets/") && p != filepath.Join(dir, "index.html") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		http.ServeFile(w, r, p)
 		return
