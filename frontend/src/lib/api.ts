@@ -2,7 +2,8 @@
 
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'arus-kas' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
-  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'master-data' | 'panduan' | 'pengguna'
+  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'perencanaan-pajak' | 'master-data' | 'panduan' | 'pengguna'
+  | 'profil-usaha'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
 
 export type Role = 'owner' | 'admin' | 'kasir'
@@ -327,3 +328,36 @@ export interface SalesReport {
 
 export const getSalesReport = (period: string, granularity: Granularity) =>
   api<SalesReport>(`/reports/sales?period=${period}&granularity=${granularity}`)
+
+export type JenisUsaha = 'perdagangan' | 'jasa' | 'manufaktur'
+export type BentukUsaha = 'op' | 'pt_perorangan' | 'cv' | 'pt'
+
+export interface BusinessProfile {
+  nama_usaha: string
+  jenis_usaha: JenisUsaha
+  bentuk_usaha: BentukUsaha
+  ptkp: string
+  pkp: boolean
+}
+
+export interface Option { value: string; label: string; hint?: string }
+
+export interface BusinessInfo {
+  profile: BusinessProfile | null
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[] }
+}
+
+export const getBusiness = () => api<BusinessInfo>('/business')
+export const saveBusiness = (p: BusinessProfile) => api<BusinessProfile>('/business', { method: 'PUT', body: p })
+
+export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
+export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }
+
+export interface TaxPlanning {
+  input: { omzet: number; net_margin_bps: number; ptkp: string }
+  bentuk_usaha: { omzet: number; laba: number; ptkp: number; skema: TaxSkema[]; termurah: string }
+  entitas: TaxEntitas[]
+}
+
+export const getTaxPlanning = (i: { omzet?: number; net_margin_bps?: number; ptkp?: string } = {}) =>
+  api<TaxPlanning>('/tax/planning', { method: 'POST', body: i })

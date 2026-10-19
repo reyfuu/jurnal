@@ -34,7 +34,7 @@ function TrendChart({ points }: { points: SalesReport['trend'] }) {
 function BarList({ title, rows }: { title: string; rows: { name: string; value: number; meta: string }[] }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   return (
-    <div className="card">
+    <div className="card" style={{ justifyContent: 'flex-start' }}>
       <div className="chart-title">{title}</div>
       {rows.length === 0 && <p className="workspace-subtitle">Belum ada penjualan.</p>}
       <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>

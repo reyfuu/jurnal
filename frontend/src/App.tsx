@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { VIEW_LABEL } from '@/lib/nav'
-import { ApiError, getMe, getPeriods, loadAll, logout, type AppData, type Me, type PeriodOption, type View } from '@/lib/api'
+import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { ArusKas, LaporanKeuangan } from '@/views/Reports'
@@ -9,6 +9,8 @@ import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
+import { PerencanaanPajak } from '@/views/PerencanaanPajak'
+import { Onboarding, ProfilUsaha } from '@/views/ProfilUsaha'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
@@ -20,6 +22,7 @@ export default function App() {
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   const [error, setError] = useState('')
+  const [business, setBusiness] = useState<BusinessInfo | null>(null)
 
   const me = session.status === 'in' ? session.me : null
 
@@ -44,16 +47,18 @@ export default function App() {
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
     setView(m.views[0])
+    getBusiness().then(setBusiness, fail)
+    getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
     void reload(m)
-  }, [reload])
+  }, [reload, fail])
 
   useEffect(() => {
     getMe().then(signIn, () => setSession({ status: 'anon' }))
-    getPeriods().then(setPeriods).catch(() => {})
   }, [signIn])
 
   if (session.status === 'checking') return null
   if (!me) return <Login onLogin={signIn} />
+  if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
   const navigate = (v: View) => canSee(v) && setView(v)
@@ -67,6 +72,16 @@ export default function App() {
     await logout().catch(() => {})
     setSession({ status: 'anon' })
     setData(null)
+    setBusiness(null)
+  }
+
+  const onProfileSaved = (p: NonNullable<BusinessInfo['profile']>) => {
+    setBusiness({ ...business!, profile: p })
+    void reload(me!, period) // nama & kategori tenant ikut berubah
+  }
+
+  if (!business.profile) {
+    return <Onboarding info={business} canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} />
   }
 
   return (
@@ -128,6 +143,10 @@ export default function App() {
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':
         return <PajakUMKM d={d} />
+      case 'perencanaan-pajak':
+        return <PerencanaanPajak profile={business!.profile} ptkpCodes={business!.options.ptkp} />
+      case 'profil-usaha':
+        return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
       case 'pengguna':
         return <Pengguna currentUserId={me!.user.id} />
       default:
