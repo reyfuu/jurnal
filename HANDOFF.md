@@ -113,8 +113,16 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - `state.json` rusak → server menolak start (log fatal) agar data tidak tertimpa seed. Backup: salin `/var/www/laporan-bisnis/data/`.
 - Tanpa `DATA_DIR` (test, dev lokal) tetap in-memory.
 
+## Fase C — CoA Otomatis Perdagangan (Okt 2026)
+- **Sumber**: `Daftar COA.xlsx` (sheet "COA Baru", review akuntan, 72 akun) → `internal/coa/coa.go` (`Master`). Perubahan disengaja: 2113 Utang Karyawan diganti **1407 Piutang Karyawan** (substansi kasusnya tagihan ke karyawan).
+- Kondisi aktif mengikuti profil: 2115 Utang Dividen hanya PT/PT Perorangan; 3102 Prive hanya OP/CV; 5101 HPP untuk perpetual; 5102/5103/5105 untuk periodik; Gedung & Kendaraan opsional. Metode persediaan ditanyakan di onboarding (default periodik; profil lama terbaca periodik).
+- **Akun otomatis**: `coa.AutoAccount` (jenis → akun) + `coa.CounterAccount` (lunas: Kas 1101 / Bank 1102 untuk BCA Bisnis & B2B / Saldo Marketplace 1104 untuk GoFood, GrabFood, ShopeeFood; belum lunas: Piutang 1201 / Hutang 2101). Koreksi per transaksi lewat field `akun` (divalidasi terhadap CoA aktif).
+- **Laporan**: `coa.Journal` (double entry) → `TrialBalance` → `IncomeStatement` (format perdagangan) & `BalanceSheet`. `GET /api/v1/reports/coa`, ekspor `GET /api/v1/reports/coa.xlsx` (Laba Rugi, Neraca, Neraca Saldo). Saldo awal = kas awal periode + persediaan Rp8,25 jt, modal = jumlahnya (sama dengan neraca ringkas). Laba bersih & total aset terbukti sama dengan laporan lama (test).
+- **Batasan**: persediaan akhir periodik = persediaan awal sampai stok opname dicatat; HPP perpetual menunggu kartu stok. Jasa & manufaktur menunggu file CoA dari tim (laporan tetap format ringkas).
+- UI: Pengaturan > Daftar Akun (CoA), kolom & pilihan Akun di Transaksi, Laporan Keuangan per akun + Neraca Saldo + Unduh Excel.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
-0. **Prioritas**: CoA otomatis per jenis usaha (Fase C) → KPI & pajak dihitung murni dari transaksi → multi-tenant (database) → backup otomatis `data/`.
+0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database).
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
 3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.

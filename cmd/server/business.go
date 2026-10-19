@@ -42,9 +42,10 @@ func (s *Server) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"profile": prof,
 		"options": map[string]any{
-			"jenis_usaha":  finance.JenisUsahaOptions,
-			"bentuk_usaha": finance.BentukUsahaOptions,
-			"ptkp":         tax.PTKPCodes,
+			"jenis_usaha":       finance.JenisUsahaOptions,
+			"bentuk_usaha":      finance.BentukUsahaOptions,
+			"ptkp":              tax.PTKPCodes,
+			"metode_persediaan": finance.MetodePersediaanOptions,
 		},
 	})
 }

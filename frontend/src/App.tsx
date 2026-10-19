@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { VIEW_LABEL } from '@/lib/nav'
 import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
+import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { ArusKas, LaporanKeuangan } from '@/views/Reports'
+import { LaporanKeuanganCoA } from '@/views/LaporanCoA'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
 import { Transaksi } from '@/views/Transaksi'
@@ -129,7 +131,13 @@ export default function App() {
       case 'dashboard':
         return <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
       case 'laporan-keuangan':
-        return data!.report && data!.balanceSheet && <LaporanKeuangan r={data!.report} bs={data!.balanceSheet} periodLabel={d.period_label} />
+        return data!.report && data!.balanceSheet && (
+          <LaporanKeuanganCoA
+            period={period}
+            periodLabel={d.period_label}
+            fallback={<LaporanKeuangan r={data!.report} bs={data!.balanceSheet} periodLabel={d.period_label} />}
+          />
+        )
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'arus-kas':
@@ -147,6 +155,8 @@ export default function App() {
         return <PerencanaanPajak profile={business!.profile} ptkpCodes={business!.options.ptkp} />
       case 'profil-usaha':
         return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
+      case 'master-data':
+        return <DaftarAkun />
       case 'pengguna':
         return <Pengguna currentUserId={me!.user.id} />
       default:

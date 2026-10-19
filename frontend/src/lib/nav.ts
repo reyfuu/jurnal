@@ -37,7 +37,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
     items: [
       { view: 'profil-usaha', label: 'Profil Usaha', icon: Building2 },
       { view: 'pengguna', label: 'Pengguna & Akses', icon: UserCog },
-      { view: 'master-data', label: 'Master Data', icon: Database },
+      { view: 'master-data', label: 'Daftar Akun (CoA)', icon: Database },
       { view: 'panduan', label: 'Panduan', icon: BookOpen },
     ],
   },

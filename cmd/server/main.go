@@ -34,7 +34,7 @@ type Server struct {
 	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
 	users     *auth.Store
 	profile   *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
-	saveMu    sync.Mutex // serialisasi penulisan state.json
+	saveMu    sync.Mutex               // serialisasi penulisan state.json
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine

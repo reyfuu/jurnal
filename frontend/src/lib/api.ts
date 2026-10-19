@@ -177,6 +177,7 @@ export interface Tx {
   pihak: string
   lunas: boolean
   tanggal_lunas: string
+  akun?: string // kode CoA koreksi; kosong = otomatis dari jenis
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -338,13 +339,14 @@ export interface BusinessProfile {
   bentuk_usaha: BentukUsaha
   ptkp: string
   pkp: boolean
+  metode_persediaan: '' | 'periodik' | 'perpetual'
 }
 
 export interface Option { value: string; label: string; hint?: string }
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
-  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[] }
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[] }
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
@@ -361,3 +363,60 @@ export interface TaxPlanning {
 
 export const getTaxPlanning = (i: { omzet?: number; net_margin_bps?: number; ptkp?: string } = {}) =>
   api<TaxPlanning>('/tax/planning', { method: 'POST', body: i })
+
+export interface Account {
+  kode: string
+  nama: string
+  subtype: string
+  normal: 'debit' | 'kredit'
+  kelompok: string
+  kondisi: 'selalu' | 'jika_ada' | 'jika_pt' | 'jika_non_pt' | 'jika_perpetual' | 'jika_periodik'
+  catatan?: string
+  opsional?: boolean
+}
+
+export interface CoAInfo {
+  supported: boolean
+  accounts: Account[] | null
+  mapping: { jenis: string; kode: string; nama: string }[] | null
+  kelompok: string[]
+}
+
+export const getCoA = () => api<CoAInfo>('/coa')
+
+export interface ReportLine { kode: string; nama: string; jumlah: number }
+export interface Balance extends Account { debit: number; kredit: number; saldo: number }
+
+export interface CoAReport {
+  supported: boolean
+  trial_balance: Balance[] | null
+  income_statement?: {
+    pendapatan: ReportLine[] | null
+    penjualan_bersih: number
+    metode: 'periodik' | 'perpetual'
+    persediaan_awal: number
+    hpp_lines: ReportLine[] | null
+    persediaan_akhir: number
+    hpp: number
+    laba_kotor: number
+    beban_operasional: ReportLine[] | null
+    total_beban_operasional: number
+    laba_usaha: number
+    pendapatan_lain: ReportLine[] | null
+    beban_lain: ReportLine[] | null
+    laba_bersih: number
+    catatan: string[] | null
+  }
+  balance_sheet?: {
+    aset: { kelompok: string; lines: ReportLine[] | null; total: number }[]
+    liabilitas: { kelompok: string; lines: ReportLine[] | null; total: number }[]
+    ekuitas: { kelompok: string; lines: ReportLine[] | null; total: number }
+    total_aset: number
+    total_liabilitas: number
+    total_ekuitas: number
+    seimbang: boolean
+  }
+}
+
+export const getCoAReport = (period: string) => api<CoAReport>(`/reports/coa?period=${period}`)
+export const coaXlsxUrl = (period: string) => `/api/v1/reports/coa.xlsx?period=${period}`

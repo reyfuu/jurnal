@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  createTransaction, deleteTransaction, listTransactions, updateTransaction, type CashWarning, type JenisInfo, type SavedTx, type Tx, type TxInput,
+  createTransaction, deleteTransaction, getCoA, listTransactions, updateTransaction, type CashWarning, type CoAInfo, type JenisInfo, type SavedTx, type Tx, type TxInput,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
@@ -16,6 +16,7 @@ import { channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, sum
 
 const PAGE = 100
 const ALL = '__all__' // Radix Select tidak menerima value kosong
+const AUTO = '__auto__' // akun otomatis dari jenis
 const today = () => new Date().toISOString().slice(0, 10)
 const EMPTY: TxInput = {
   tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
@@ -34,6 +35,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
   const [warnings, setWarnings] = useState<CashWarning[] | undefined>()
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [coa, setCoa] = useState<CoAInfo | null>(null)
 
   const refresh = useCallback(async () => {
     const res = await listTransactions()
@@ -41,6 +43,11 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     setJenis(res.jenis)
     setCanEdit(res.can_edit)
   }, [])
+
+  useEffect(() => { getCoA().then(setCoa, () => {}) }, [])
+  const autoKode = (j: string) => coa?.mapping?.find((m) => m.jenis === j)?.kode ?? ''
+  const akunNama = (kode: string) => coa?.accounts?.find((a) => a.kode === kode)?.nama ?? ''
+  const akunOf = (t: Pick<Tx, 'jenis' | 'akun'>) => t.akun || autoKode(t.jenis)
 
   useEffect(() => {
     refresh().catch((e: Error) => setError(e.message))
@@ -189,7 +196,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Pihak</th><th style={{ textAlign: 'right' }}>Nominal</th><th>Status</th>
+                <th>Tanggal</th><th>Jenis</th>{coa?.supported && <th>Akun</th>}<th>Keterangan</th><th>Pihak</th><th style={{ textAlign: 'right' }}>Nominal</th><th>Status</th>
                 {canEdit && <th />}
               </tr>
             </thead>
@@ -201,6 +208,9 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                   <tr key={t.id} className={canEdit ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
+                    {coa?.supported && (
+                      <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? '#facc15' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
+                    )}
                     <td>
                       <div style={{ fontWeight: 500 }}>{t.keterangan || '-'}</div>
                       {sub && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{sub}</div>}
@@ -264,6 +274,25 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                     </SelectContent>
                   </Select>
                 </Field>
+                {coa?.supported && (
+                  <Field id="tx-akun" label="Akun (CoA)">
+                    <Select value={editing.input.akun || AUTO} onValueChange={(v) => set({ akun: v === AUTO ? '' : v })}>
+                      <SelectTrigger id="tx-akun" className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={AUTO}>Otomatis: {autoKode(editing.input.jenis)} {akunNama(autoKode(editing.input.jenis))}</SelectItem>
+                        {coa.kelompok.map((k) => {
+                          const accs = coa.accounts!.filter((a) => a.kelompok === k)
+                          return accs.length ? (
+                            <SelectGroup key={k}>
+                              <SelectLabel>{k}</SelectLabel>
+                              {accs.map((a) => <SelectItem key={a.kode} value={a.kode}>{a.kode} {a.nama}</SelectItem>)}
+                            </SelectGroup>
+                          ) : null
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
                 <Field id="tx-nominal" label="Nominal (Rp)">
                   <Input
                     id="tx-nominal" type="number" inputMode="numeric" min={1} required className="tabular"

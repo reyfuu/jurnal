@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { saveBusiness, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 
-const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false }
+const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
 
 function ChoiceGrid({ name, options, value, onChange }: {
   name: string
@@ -69,6 +69,18 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         <ChoiceGrid name="Jenis usaha" options={info.options.jenis_usaha} value={p.jenis_usaha} onChange={(v) => set({ jenis_usaha: v as JenisUsaha })} />
         <p className="text-xs text-muted-foreground">Menentukan susunan akun (CoA) dan format laporan keuangan Anda.</p>
       </div>
+      {(p.jenis_usaha === 'perdagangan' || p.jenis_usaha === 'manufaktur') && (
+        <div className="grid gap-1.5">
+          <Label>Metode pencatatan persediaan</Label>
+          <ChoiceGrid
+            name="Metode persediaan"
+            options={info.options.metode_persediaan}
+            value={p.metode_persediaan || 'periodik'}
+            onChange={(v) => set({ metode_persediaan: v as BusinessProfile['metode_persediaan'] })}
+          />
+          <p className="text-xs text-muted-foreground">Belum yakin? Pilih Periodik, yang paling umum dipakai UMKM.</p>
+        </div>
+      )}
       <div className="grid gap-1.5">
         <Label>Bentuk usaha</Label>
         <ChoiceGrid name="Bentuk usaha" options={info.options.bentuk_usaha} value={p.bentuk_usaha} onChange={(v) => set({ bentuk_usaha: v as BentukUsaha })} />
