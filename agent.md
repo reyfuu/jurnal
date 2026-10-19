@@ -23,29 +23,34 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
    - Setiap ada ambiguitas bisnis/teknis/visual, lakukan interogasi desain singkat & tajam (*grill me*) yang mengacu langsung pada dokumen [BRD](file:///home/reyfuu/pajak/docs/BRD.md), [FRD](file:///home/reyfuu/pajak/docs/FRD.md), [TRD](file:///home/reyfuu/pajak/docs/TRD.md), [PRD](file:///home/reyfuu/pajak/docs/PRD.md), [DESIGN_BRIEF](file:///home/reyfuu/pajak/docs/DESIGN_BRIEF.md), dan [DESIGN.md](file:///home/reyfuu/pajak/DESIGN.md).
 5. **`skillspector`**
    - Audit kesiapan skill di awal sesi; pastikan tidak ada regresi aturan dari skill yang terpasang.
-6. **`handoff`**
+6. **`security-audit` (Cloudflare — [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill))**
+   - Pakai dalam *guidance mode* setiap kali menyentuh batas keamanan: auth & sesi, isolasi data antar usaha (multi-tenant), upload file (impor Excel, screenshot bug), webhook pembayaran Midtrans, dan input publik (daftar, landing).
+   - Audit penuh 6 fase (recon → hunting → validasi → output → verifikasi → laporan) hanya bila diminta eksplisit; hasil ditulis di luar repo (`~/security-audit-skill/pajak/run-N`).
+   - Kode target hanya dijalankan di sandbox yang memenuhi syarat skill; tanpa sandbox, temuan ditandai `needs_validation`, bukan `confirmed`.
+   - Sumber: `.claude/skills/security-audit`, versi terkunci di `skills-lock.json` (perbarui dengan `npx skills update`).
+7. **`handoff`**
    - Setiap akhir sesi atau sebelum pergantian konteks, perbarui status progres, keputusan arsitektur, dan *next steps* agar sesi berikutnya bisa langsung melanjutkan tanpa kehilangan konteks.
 
 ### B. Engineering Discipline & Code Quality
-7. **`ponytail` (Lazy Senior Dev / YAGNI Mode — Active Every Response)**
+8. **`ponytail` (Lazy Senior Dev / YAGNI Mode — Active Every Response)**
    - Terapkan *The Ponytail Ladder*:
      1. *Does this need to exist at all?* (YAGNI — kapasitas target adalah **100 user**, jangan bangun infrastruktur sekelas 1 juta user seperti Kafka/Kubernetes/Microservices).
      2. *Already in this codebase?* Gunakan ulang helper/tipe yang ada.
      3. *Stdlib / Native platform first* (`net/http` / `database/sql` di Go, atau native `Bun.serve` / `Elysia` di Bun, constraint PostgreSQL di DB).
      4. Tandai kompromi kapasitas yang disengaja dengan komentar `// ponytail: <alasan & batas upgrade>`.
-8. **`tdd` (Test-Driven Development)**
+9. **`tdd` (Test-Driven Development)**
    - **Wajib Red-Green-Refactor** terutama pada domain kritikal finansial:
      - Kalkulasi Omzet, HPP (COGS), Laba Kotor, Laba Bersih, dan Margin Laba.
      - Kalkulasi Arus Kas vs Laba Akrual ("Kas bisa turun walau laba positif").
      - Kalkulasi Pajak UMKM (PPh Final 0,5% PP 55/2022, batas bebas pajak Rp500 juta/tahun untuk WP OP, potongan aplikasi/channel).
      - Penuaan Piutang & Utang (*aging schedule* > 30 hari).
    - Jangan pernah menggunakan `float64` / `number` floating-point biasa untuk uang; gunakan `int64` (Rupiah penuh / sen) atau `decimal`.
-9. **`improve-codebase-architecture` & `setup-matt-pocock-skills`**
+10. **`improve-codebase-architecture` & `setup-matt-pocock-skills`**
    - Struktur modular berbasis **Vertical Slices / Domain Modules** (`dashboard`, `ledger`, `cashflow`, `transactions`, `receivables`, `inventory`, `production`, `invoicing`, `pricing_sim`, `tax_umkm`, `master_data`).
    - *Make illegal states unrepresentable*: gunakan strict schema validation (TypeBox di Elysia / strict structs & sqlc di Go), branded types untuk ID & nominal Rupiah, dan eksplisit error handling.
 
 ### C. UI/UX, Visual Craft & Verification
-10. **`antislop`, `taste`, & `impeccable`**
+11. **`antislop`, `taste`, & `impeccable`**
     - **DILARANG KERAS** membuat UI generik "AI slop" (gradien ungu-biru murahan, bayangan berlebihan, kartu tanpa hierarki, teks placeholder asal-asalan).
     - Ikuti estetika referensi **Laporan Bisnis by Akademi Pajak**:
       - **Dark Obsidian Theme**: Background utama `#0B0C0E`, surface kartu `#121418`, border halus `#1F2229` (`1px solid rgba(255,255,255,0.06)`).
@@ -53,13 +58,13 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
       - **Brand Accent**: Amber/Gold `#EAB308` / `#F5C428` untuk logo, metrik utama, CTA, dan active nav state; teks tombol emas menggunakan navy `#222852`.
       - **Semantic Financial Colors**: Emerald `#10B981` (Laba Bersih / tren positif), Sky Blue `#38BDF8` (Saldo Kas & Bank), Rose/Coral `#F43F5E` (peringatan piutang lewat 30 hari).
       - **Typography**: Angka finansial wajib menggunakan `font-variant-numeric: tabular-nums` agar sejajar sempurna.
-11. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
+12. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
     - Gunakan primitif `shadcn/ui` (Radix + Tailwind) yang diperkaya dengan komponen finansial dari `Kokonut UI` dan micro-interactions dari `21st.dev`.
     - Setiap KPI card di Dashboard wajib menampilkan:
       1. Label metrik yang jelas (`Omzet`, `Laba bersih`, `Margin laba`, `Saldo kas & bank`, `Target omzet`, `Piutang belum tertagih`).
       2. Nilai utama singkat & mudah dibaca (`Rp92 jt`, `Rp25 jt`, `27%`, `108%`).
       3. Badge perbandingan periode (`▲ 4% vs bulan lalu`, `+1,7 poin vs bulan lalu`) + mini sparkline / progress bar.
-12. **`agent browser`**
+13. **`agent browser`**
     - Setiap perubahan frontend wajib diverifikasi secara visual menggunakan browser agent untuk memastikan tata letak 6 KPI card atas, 3 grafik tengah, 2 kartu bawah, dan sidebar navigasi presisi di desktop & mobile.
 
 ---
@@ -111,6 +116,7 @@ Sesuai referensi desain produk **Laporan Bisnis by Akademi Pajak**, sistem terdi
 - [ ] Apakah semua perubahan sudah mengikuti `ponytail` (kode paling simpel, tanpa abstraksi spekulatif)?
 - [ ] Apakah logika finansial & pajak sudah memiliki unit test (`tdd`) yang lulus 100%?
 - [ ] Apakah dokumen (`BRD.md`, `FRD.md`, `TRD.md`, `PRD.md`) dan `graphify` tetap sinkron?
+- [ ] Apakah perubahan yang menyentuh batas keamanan (auth, tenant, upload, webhook) sudah ditinjau dengan `security-audit`?
 - [ ] Apakah UI sudah bebas dari *AI slop* (`antislop`, `taste`, `impeccable`) dan terverifikasi lewat `agent browser`?
 - [ ] Apakah ringkasan `handoff` sudah ditulis untuk sesi berikutnya?
 
