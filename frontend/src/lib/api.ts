@@ -69,7 +69,14 @@ export interface Transaction {
   net: number
 }
 
+export interface CashWarning {
+  tanggal: string
+  saldo: number
+  penyebab: number[] | null
+}
+
 export interface Dashboard {
+  cash_warnings: CashWarning[] | null
   tenant: { name: string; initials: string; category: string; total_transactions: number }
   period?: string
   period_label: string
@@ -254,8 +261,9 @@ export async function loadAll(views: View[], period = '2026-08'): Promise<AppDat
 }
 
 export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo[]; can_edit: boolean }>('/transactions')
-export const createTransaction = (t: TxInput) => api<Tx>('/transactions', { method: 'POST', body: t })
-export const updateTransaction = (id: number, t: TxInput) => api<Tx>(`/transactions/${id}`, { method: 'PUT', body: t })
+export type SavedTx = Tx & { warnings?: CashWarning[] }
+export const createTransaction = (t: TxInput) => api<SavedTx>('/transactions', { method: 'POST', body: t })
+export const updateTransaction = (id: number, t: TxInput) => api<SavedTx>(`/transactions/${id}`, { method: 'PUT', body: t })
 export const deleteTransaction = (id: number) => api<void>(`/transactions/${id}`, { method: 'DELETE' })
 
 export const simulatePrice = (period: string, i: PriceSimInput) =>

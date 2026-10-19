@@ -1,3 +1,4 @@
+import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { FileSpreadsheet, Info, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  createTransaction, deleteTransaction, listTransactions, updateTransaction, type JenisInfo, type Tx, type TxInput,
+  createTransaction, deleteTransaction, listTransactions, updateTransaction, type CashWarning, type JenisInfo, type SavedTx, type Tx, type TxInput,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
@@ -30,6 +31,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
   const [limit, setLimit] = useState(PAGE)
   const [editing, setEditing] = useState<Editing>(null)
   const [error, setError] = useState('')
+  const [warnings, setWarnings] = useState<CashWarning[] | undefined>()
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
 
@@ -68,7 +70,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     setBusy(true)
     setError('')
     try {
-      await fn()
+      const res = await fn()
+      setWarnings((res as SavedTx | undefined)?.warnings)
       setEditing(null)
       await Promise.all([refresh(), onChanged()])
     } catch (err) {
@@ -140,6 +143,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
         </Select>
       </div>
 
+      <CashWarningBanner warnings={warnings} />
       {error && !editing && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>

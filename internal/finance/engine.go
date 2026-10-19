@@ -111,6 +111,7 @@ type InventoryItem struct {
 }
 
 type DashboardSnapshot struct {
+	CashWarnings       []CashWarning       `json:"cash_warnings"`
 	Tenant             TenantInfo          `json:"tenant"`
 	Period             string              `json:"period"`
 	PeriodLabel        string              `json:"period_label"`

@@ -334,6 +334,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	entries := finance.ToLedger(txs)
 	finance.ApplyKPIs(&snap, finance.BuildIncomeStatement(entries), finance.BuildCashFlow(entries, finance.OpeningCash(period)), txs, seedN)
+	snap.CashWarnings = finance.CashWarnings(txs, finance.OpeningCash(period))
 	writeJSON(w, snap)
 }
 
@@ -425,6 +426,18 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 	return t, true
 }
 
+// txResp: transaksi tersimpan + peringatan kas minus di bulan transaksi (tidak memblokir simpan).
+type txResp struct {
+	finance.Transaction
+	Warnings []finance.CashWarning `json:"warnings,omitempty"`
+}
+
+// withWarnings memanggil CashWarnings untuk periode transaksi; pemanggil memegang s.mu.
+func (s *Server) withWarnings(t finance.Transaction) txResp {
+	period := t.Tanggal[:7]
+	return txResp{t, finance.CashWarnings(finance.ForPeriod(s.txs, period), finance.OpeningCash(period))}
+}
+
 func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
 	t, ok := decodeTx(w, r)
 	if !ok {
@@ -434,9 +447,10 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
+	resp := s.withWarnings(t)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, t)
+	writeJSON(w, resp)
 }
 
 // txIndex harus dipanggil dengan s.mu terkunci.
@@ -459,7 +473,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	t.ID = s.txs[i].ID
 	s.txs[i] = t
-	writeJSON(w, t)
+	writeJSON(w, s.withWarnings(t))
 }
 
 func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {

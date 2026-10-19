@@ -199,3 +199,29 @@ func TestTransactionsImport_RejectsBadFileAndKasir(t *testing.T) {
 		t.Fatalf("kasir import: want 403, got %d", rec.Code)
 	}
 }
+
+func TestCashWarningOnBigExpense(t *testing.T) {
+	srv := asOwner(t, NewServer())
+	body := `{"tanggal":"2026-08-01","jenis":"Beli Alat / Aset","nominal":9000000000,"keterangan":"Mesin roasting","lunas":true}`
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status %d %s", rec.Code, rec.Body)
+	}
+	var created struct {
+		ID       int                   `json:"id"`
+		Warnings []finance.CashWarning `json:"warnings"`
+	}
+	_ = json.NewDecoder(rec.Body).Decode(&created)
+	if created.ID == 0 || len(created.Warnings) == 0 || created.Warnings[0].Tanggal != "2026-08-01" {
+		t.Fatalf("transaction must be saved with cash warning, got %+v", created)
+	}
+
+	rec = httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/dashboard?period=2026-08", nil))
+	var snap finance.DashboardSnapshot
+	_ = json.NewDecoder(rec.Body).Decode(&snap)
+	if len(snap.CashWarnings) == 0 {
+		t.Fatal("dashboard must expose cash warnings")
+	}
+}

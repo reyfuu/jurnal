@@ -1,3 +1,4 @@
+import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { CalendarDays, ChevronDown } from 'lucide-react'
 import { CashChart, DailyChart, MainChart, Sparkline } from '@/components/charts'
 import { PageHeader } from '@/components/PageHeader'
@@ -31,6 +32,7 @@ export function Dashboard({
 
   return (
     <>
+      <CashWarningBanner warnings={d.cash_warnings} />
       <PageHeader title="Dashboard" subtitle="Gambaran seluruh bisnis dalam satu layar">
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           <CalendarDays size={14} style={{ position: 'absolute', left: 10, pointerEvents: 'none', color: '#9ba3af' }} />
