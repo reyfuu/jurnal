@@ -454,6 +454,26 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 	}
 }
 
+// EmptySnapshot: kerangka dashboard tanpa data contoh untuk usaha baru (hasil register).
+// KPI, tren, dan transaksi terbaru diisi dari transaksi usaha itu oleh ApplyKPIs/ApplyTrend.
+func EmptySnapshot(period string) DashboardSnapshot {
+	seed := SeedKedaiKopiSenja(period)
+	return DashboardSnapshot{
+		Tenant:             TenantInfo{Name: "Usaha Baru", Initials: "UB"},
+		Period:             seed.Period,
+		PeriodLabel:        seed.PeriodLabel,
+		CashWarnings:       []CashWarning{},
+		MonthlyTrend11M:    []MonthlyTrendPoint{},
+		DailyOmzet:         []DailyOmzetPoint{},
+		TopProducts:        []ProductPerf{},
+		Channels:           []ChannelPerf{},
+		RecentTransactions: []TransactionItem{},
+		Obligations:        []ObligationItem{},
+		Inventory:          []InventoryItem{},
+		TaxReport:          CalculateUMKMTax("OP", nil),
+	}
+}
+
 // SeedAssets: register aset contoh Kedai Kopi Senja. Dipakai agar demo menunjukkan kedua
 // metode PMK 72/2023 — mesin espresso saldo menurun, sisanya garis lurus, renovasi bangunan
 // tidak permanen (wajib garis lurus), dan satu harta tak berwujud (amortisasi).

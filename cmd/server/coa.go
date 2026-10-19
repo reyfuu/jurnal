@@ -10,7 +10,7 @@ import (
 	"pajak/internal/xlsx"
 )
 
-func (s *Server) currentProfile() finance.BusinessProfile {
+func (s *tenant) currentProfile() finance.BusinessProfile {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.profile == nil {
@@ -25,7 +25,7 @@ type mappingRow struct {
 	Nama  string `json:"nama"`
 }
 
-func (s *Server) handleCoA(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCoA(w http.ResponseWriter, r *http.Request) {
 	p := s.currentProfile()
 	active := coa.Active(p)
 	var mapping []mappingRow
@@ -46,7 +46,7 @@ type coaReport struct {
 	BalanceSheet    *coa.BalanceSheetResult    `json:"balance_sheet,omitempty"`
 }
 
-func (s *Server) buildCoAReport(r *http.Request) coaReport {
+func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	p := s.currentProfile()
 	active := coa.Active(p)
 	if active == nil {
@@ -67,13 +67,13 @@ func (s *Server) buildCoAReport(r *http.Request) coaReport {
 	return coaReport{true, tb, &is, &bs}
 }
 
-func (s *Server) handleReportCoA(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleReportCoA(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.buildCoAReport(r))
 }
 
 func rp(n int64) string { return strconv.FormatInt(n, 10) }
 
-func (s *Server) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	rep := s.buildCoAReport(r)
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)
@@ -127,7 +127,7 @@ func (s *Server) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 }
 
 // validAkun: koreksi akun harus ada di CoA aktif; tanpa CoA (jasa/manufaktur) tidak boleh diisi.
-func (s *Server) validAkun(t finance.Transaction) bool {
+func (s *tenant) validAkun(t finance.Transaction) bool {
 	if t.Akun == "" {
 		return true
 	}

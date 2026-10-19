@@ -260,7 +260,7 @@ func ApplyKPIs(snap *DashboardSnapshot, is IncomeStatement, cf CashFlow, periodT
 		}
 		return b.ID - a.ID
 	})
-	snap.RecentTransactions = nil
+	snap.RecentTransactions = []TransactionItem{}
 	for _, t := range recent[:min(5, len(recent))] {
 		j, _ := jenisOf(t.Jenis)
 		item := TransactionItem{ID: fmt.Sprintf("TX-%d", t.ID), Date: formatTanggal(t.Tanggal), Type: KindExpense, Category: t.Jenis,

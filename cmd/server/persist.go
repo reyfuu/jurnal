@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"maps"
+	"slices"
 	"log"
 	"net/http"
 	"os"
@@ -46,8 +49,40 @@ func writeFileAtomic(path string, v any) error {
 	return os.Rename(tmp, path)
 }
 
-func loadState() (*state, error) {
-	p := dataPath("state.json")
+// file: berkas data usaha. Usaha 1 memakai nama lama (state.json, business.json) supaya data
+// produksi tetap terbaca; usaha lain state-<id>.json, business-<id>.json.
+func (t *tenant) file(name string) string {
+	if t.id == 1 {
+		return dataPath(name + ".json")
+	}
+	return dataPath(fmt.Sprintf("%s-%d.json", name, t.id))
+}
+
+// loadTenants memuat semua usaha hasil register (state-<id>.json).
+func loadTenants() (map[int]*tenant, error) {
+	out := map[int]*tenant{}
+	if dataPath("") == "" {
+		return out, nil
+	}
+	paths, _ := filepath.Glob(dataPath("state-*.json"))
+	for _, p := range paths {
+		var id int
+		if _, err := fmt.Sscanf(filepath.Base(p), "state-%d.json", &id); err != nil || id < 2 {
+			continue
+		}
+		st, err := loadState(p)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		t := newTenant(id)
+		t.restore(st)
+		t.profile = loadProfile(t.file("business"))
+		out[id] = t
+	}
+	return out, nil
+}
+
+func loadState(p string) (*state, error) {
 	if p == "" {
 		return nil, nil
 	}
@@ -62,25 +97,39 @@ func loadState() (*state, error) {
 	return &st, json.Unmarshal(b, &st)
 }
 
-// save menulis seluruh state; dipanggil setelah setiap perubahan yang berhasil.
+// snapshot menyalin data usaha ke bentuk berkas; Auth diisi pemanggil (hanya usaha 1).
+func (t *tenant) snapshot() state {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return state{
+		Transactions: t.txs, NextTxID: t.nextTxID,
+		Assets: t.assets, NextAssetID: t.nextAssetID,
+		Opening: t.opening, Karyawan: t.karyawan, NextKaryawanID: t.nextKaryawanID,
+	}
+}
+
+// save menulis semua usaha (user & sesi ikut state.json usaha 1); dipanggil setelah setiap
+// perubahan yang berhasil.
+//
+// ponytail: tulis ulang semua berkas usaha tiap perubahan; cukup untuk puluhan usaha QA/pilot,
+// ganti ke database (roadmap multi-tenant) sebelum ratusan usaha.
 func (s *Server) save() {
-	p := dataPath("state.json")
-	if p == "" {
+	if dataPath("") == "" {
 		return
 	}
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
-	s.mu.RLock()
-	st := state{
-		Transactions: s.txs, NextTxID: s.nextTxID,
-		Assets: s.assets, NextAssetID: s.nextAssetID,
-		Opening: s.opening, Karyawan: s.karyawan, NextKaryawanID: s.nextKaryawanID,
-		Auth: s.users.Snapshot(),
-	}
-	err := writeFileAtomic(p, st)
-	s.mu.RUnlock()
-	if err != nil {
-		log.Printf("GAGAL menyimpan state ke %s: %v", p, err)
+	s.tenantsMu.RLock()
+	tenants := slices.Collect(maps.Values(s.tenants))
+	s.tenantsMu.RUnlock()
+	for _, t := range tenants {
+		st := t.snapshot()
+		if t.id == 1 {
+			st.Auth = s.users.Snapshot()
+		}
+		if err := writeFileAtomic(t.file("state"), st); err != nil {
+			log.Printf("GAGAL menyimpan state ke %s: %v", t.file("state"), err)
+		}
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 // Impor data awal onboarding: satu workbook .xlsx berisi sheet Saldo Awal, Aset, Karyawan,
 // dan Transaksi. Tanpa ?commit=1 hanya pratinjau — tidak ada yang disimpan.
 
-func (s *Server) handleOnboardingTemplate(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleOnboardingTemplate(w http.ResponseWriter, r *http.Request) {
 	sheets := make([]xlsx.Sheet, 0, 5)
 	for _, sh := range finance.OnboardingTemplate() {
 		sheets = append(sheets, xlsx.Sheet{Name: sh.Nama, Rows: sh.Rows})
@@ -41,7 +41,7 @@ type onboardingResp struct {
 	ReplacedKaryawan int `json:"replaced_karyawan"`
 }
 
-func (s *Server) handleOnboardingImport(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	f, _, err := r.FormFile("file")
 	if err != nil {
@@ -128,7 +128,7 @@ type openingResp struct {
 	Aktif bool `json:"aktif"`
 }
 
-func (s *Server) openingSummary() openingResp {
+func (s *tenant) openingSummary() openingResp {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.opening == nil {
@@ -139,11 +139,11 @@ func (s *Server) openingSummary() openingResp {
 	return openingResp{Opening: &o, ModalAwal: o.ModalAwal(nbv), SelisihModal: o.SelisihModal(nbv), Aktif: true}
 }
 
-func (s *Server) handleGetOpening(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleGetOpening(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.openingSummary())
 }
 
-func (s *Server) handlePutOpening(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 	var o finance.OpeningBalance
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		http.Error(w, "data neraca awal tidak valid", http.StatusBadRequest)
@@ -161,7 +161,7 @@ func (s *Server) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 
 // --- Karyawan ---
 
-func (s *Server) handleListKaryawan(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleListKaryawan(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	list := slices.Clone(s.karyawan)
 	s.mu.RUnlock()
@@ -181,7 +181,7 @@ func decodeKaryawan(w http.ResponseWriter, r *http.Request) (finance.Karyawan, b
 	return k, true
 }
 
-func (s *Server) handleCreateKaryawan(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCreateKaryawan(w http.ResponseWriter, r *http.Request) {
 	k, ok := decodeKaryawan(w, r)
 	if !ok {
 		return
@@ -196,12 +196,12 @@ func (s *Server) handleCreateKaryawan(w http.ResponseWriter, r *http.Request) {
 }
 
 // karyawanIndex harus dipanggil dengan s.mu terkunci.
-func (s *Server) karyawanIndex(r *http.Request) int {
+func (s *tenant) karyawanIndex(r *http.Request) int {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	return slices.IndexFunc(s.karyawan, func(k finance.Karyawan) bool { return k.ID == id })
 }
 
-func (s *Server) handleUpdateKaryawan(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleUpdateKaryawan(w http.ResponseWriter, r *http.Request) {
 	k, ok := decodeKaryawan(w, r)
 	if !ok {
 		return
@@ -218,7 +218,7 @@ func (s *Server) handleUpdateKaryawan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, k)
 }
 
-func (s *Server) handleDeleteKaryawan(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleDeleteKaryawan(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := s.karyawanIndex(r)

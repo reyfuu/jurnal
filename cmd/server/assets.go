@@ -12,7 +12,7 @@ import (
 // Register aset: sumber tunggal penyusutan & amortisasi untuk Laba Rugi, Neraca, dan Arus Kas.
 // Hak akses mengikuti "laporan-keuangan" karena tab Aset ada di dalam menu itu.
 
-func (s *Server) handleListAssets(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).Assets)
 }
 
@@ -30,7 +30,7 @@ func decodeAsset(w http.ResponseWriter, r *http.Request) (finance.Asset, bool) {
 	return a, true
 }
 
-func (s *Server) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
 	a, ok := decodeAsset(w, r)
 	if !ok {
 		return
@@ -45,12 +45,12 @@ func (s *Server) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 // assetIndex harus dipanggil dengan s.mu terkunci.
-func (s *Server) assetIndex(r *http.Request) int {
+func (s *tenant) assetIndex(r *http.Request) int {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	return slices.IndexFunc(s.assets, func(a finance.Asset) bool { return a.ID == id })
 }
 
-func (s *Server) handleUpdateAsset(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleUpdateAsset(w http.ResponseWriter, r *http.Request) {
 	a, ok := decodeAsset(w, r)
 	if !ok {
 		return
@@ -67,7 +67,7 @@ func (s *Server) handleUpdateAsset(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, a)
 }
 
-func (s *Server) handleDeleteAsset(w http.ResponseWriter, r *http.Request) {
+func (s *tenant) handleDeleteAsset(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := s.assetIndex(r)
