@@ -3,7 +3,7 @@
 // 'arus-kas' dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
-  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
+  | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
   | 'panduan' | 'pengguna' | 'profil-usaha'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
@@ -464,6 +464,18 @@ export interface BusinessProfile {
   ptkp: string
   pkp: boolean
   metode_persediaan: '' | 'periodik' | 'perpetual'
+  /** Identitas penerbit & rekening: opsional, tapi dicetak di invoice begitu diisi. */
+  alamat?: string
+  npwp?: string
+  telepon?: string
+  email?: string
+  bank_nama?: string
+  bank_rekening?: string
+  bank_atas_nama?: string
+  /** Tarif PPN dalam basis poin (1100 = 11%); hanya dipakai bila pkp. */
+  ppn_bps?: number
+  penandatangan_nama?: string
+  penandatangan_jabatan?: string
 }
 
 export interface Option { value: string; label: string; hint?: string }
@@ -628,3 +640,191 @@ export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
 export const createKaryawan = (k: KaryawanInput) => api<Karyawan>('/karyawan', { method: 'POST', body: k })
 export const updateKaryawan = (id: number, k: KaryawanInput) => api<Karyawan>(`/karyawan/${id}`, { method: 'PUT', body: k })
 export const deleteKaryawan = (id: number) => api<void>(`/karyawan/${id}`, { method: 'DELETE' })
+
+// --- Invoice: faktur penjualan + cetak PDF ---
+
+export interface InvoiceItem {
+  deskripsi: string
+  qty: number
+  satuan?: string
+  harga_satuan: number
+}
+
+export interface InvoiceTotals {
+  subtotal: number
+  diskon: number
+  dpp: number
+  ppn: number
+  total: number
+}
+
+export interface InvoiceInput {
+  nomor?: string
+  no_po?: string
+  status: string
+  tanggal: string
+  jatuh_tempo: string
+  pelanggan_nama: string
+  pelanggan_alamat?: string
+  pelanggan_npwp?: string
+  items: InvoiceItem[]
+  diskon_rp: number
+  ppn_bps: number
+  catatan?: string
+}
+
+export interface Invoice extends InvoiceInput {
+  id: number
+  nomor: string
+}
+
+export interface InvoiceRow extends Invoice {
+  totals: InvoiceTotals
+  hari_terlambat: number
+}
+
+export interface InvoiceSummary {
+  invoices: InvoiceRow[] | null
+  total_tagihan: number
+  belum_dibayar: number
+  terlambat: number
+  jumlah_terlambat: number
+}
+
+export interface InvoiceInfo {
+  summary: InvoiceSummary
+  status: string[]
+  nomor_berikutnya: string
+  ppn_bps: number
+  /** Data penerbit yang masih kosong di Profil Usaha; faktur tetap bisa dicetak tanpanya. */
+  profil_lengkap: string[] | null
+}
+
+export const getInvoices = () => api<InvoiceInfo>('/invoice')
+export const createInvoice = (inv: InvoiceInput) => api<Invoice>('/invoice', { method: 'POST', body: inv })
+export const updateInvoice = (id: number, inv: InvoiceInput) => api<Invoice>(`/invoice/${id}`, { method: 'PUT', body: inv })
+export const deleteInvoice = (id: number) => api<void>(`/invoice/${id}`, { method: 'DELETE' })
+
+/** URL unduhan PDF; dipakai langsung sebagai href agar browser yang mengunduh. */
+export const invoicePdfUrl = (id: number) => `/api/v1/invoice/${id}/pdf`
+
+// --- Laporan AI: rincian seluruh laporan + analisis model ---
+
+export interface FactsLangkah { label: string; nilai: number; keterangan?: string }
+
+export interface BusinessFacts {
+  periode: string
+  periode_label: string
+  nama_usaha: string
+  laba_rugi: {
+    omzet: number; hpp: number; laba_kotor: number; beban_operasional: number
+    penyusutan: number; amortisasi: number; total_biaya: number
+    laba_bersih: number; margin_bps: number
+    omzet_sebelumnya?: number; laba_sebelumnya?: number
+  }
+  arus_kas: {
+    saldo_awal: number; kas_masuk: number; kas_keluar: number; kas_bersih: number
+    saldo_akhir: number; operasi_langsung: number; operasi_tidak_langsung: number
+    investasi: number; pendanaan: number
+  }
+  neraca: {
+    total_aktiva: number; total_pasiva: number; kas: number; piutang: number
+    persediaan: number; utang: number; ekuitas: number; seimbang: boolean
+  }
+  aset: {
+    jumlah: number; harga_perolehan: number; akumulasi: number; nilai_buku: number
+    beban_bulan_ini: number; draft: number; pemetaan_belum_dicek: number
+  }
+  pajak: {
+    bentuk_badan: string; omzet_kumulatif: number; batas_bebas_pajak: number
+    dasar_kena_pajak: number; pajak_terutang: number; sisa_batas_bebas: number
+  }
+  tagihan: {
+    piutang_total: number; utang_total: number; piutang_lewat_tempo: number
+    jumlah_faktur_telat: number; invoice_belum_dibayar: number
+  }
+  operasi: {
+    jumlah_transaksi: number; biaya_aplikasi: number
+    channel?: { name: string; gross: number; fee: number; net: number; pct: number }[]
+    produk_teratas?: { name: string; qty: number; omzet: number; pct: number }[]
+    stok_menipis?: string[]
+    jumlah_karyawan: number; beban_gaji_bulanan: number
+  }
+  tren: { bulan: string; omzet: number; laba_bersih: number; saldo_kas: number }[]
+  peringatan?: string[]
+}
+
+export interface AIAnalysis {
+  tersedia: boolean
+  alasan?: string
+  model?: string
+  ringkasan?: string
+  sorotan_positif?: string[]
+  perlu_diperhatikan?: string[]
+  rekomendasi?: { judul: string; dampak: string; detail: string }[]
+}
+
+export interface AIReport {
+  facts: BusinessFacts
+  analysis: AIAnalysis
+  llm: { aktif: boolean; model?: string; base_url?: string; petunjuk?: string }
+}
+
+export const getAIReport = (period: string) => api<AIReport>(`/reports/ai?period=${period}`)
+
+// --- Kalkulator Pajak ---
+
+export interface ObjekPajak {
+  kode: string; nama: string; tarif_bps: number; dasar_bps: number
+  final: boolean; dasar: string; catatan?: string
+}
+
+export interface JenisPajak {
+  id: string; nama: string; keterangan: string
+  objek: ObjekPajak[]; tanpa_npwp_bps?: number
+}
+
+export interface KalkulatorMaster {
+  jenis: JenisPajak[]
+  ptkp_codes: string[]
+  ptkp: Record<string, number>
+  ter: {
+    kategori: Record<string, string>
+    lapisan: Record<string, { batas_bawah: number; batas_atas: number; tarif_bps: number }[]>
+    belum_lengkap: string[] | null
+  }
+  tarif_badan_bps: number
+}
+
+export interface Langkah { label: string; nilai: number; keterangan?: string }
+
+export interface PPh21Result {
+  bruto_setahun: number; biaya_jabatan: number; iuran_pensiun_setahun: number
+  neto_setahun: number; ptkp: number; pkp: number
+  pph_setahun: number; pph_sebulan: number; tambahan_tanpa_npwp: number
+  tunjangan_pajak: number; take_home_sebulan: number; langkah: Langkah[]
+}
+
+export interface PPh21Response {
+  hasil: PPh21Result
+  ter: { tersedia: boolean; tarif_bps?: number; pph_sebulan?: number; alasan?: string }
+}
+
+export interface PotongResult {
+  jenis_nama: string; objek_nama: string; nilai_bruto: number; dpp: number
+  tarif_bps: number; pajak: number; diterima: number; final: boolean
+  dasar: string; catatan?: string; tambahan_tanpa_npwp: number; langkah: Langkah[]
+}
+
+export interface PPhBadanResult {
+  peredaran_bruto: number; pkp: number; tarif_bps: number
+  dapat_fasilitas: boolean; pph_terutang: number; langkah: Langkah[]; catatan: string
+}
+
+export const getKalkulator = () => api<KalkulatorMaster>('/kalkulator')
+export const hitungPPh21 = (b: { penghasilan_bruto: number; ptkp_status: string; iuran_pensiun: number; gross_up: boolean; punya_npwp: boolean }) =>
+  api<PPh21Response>('/kalkulator/pph21', { method: 'POST', body: b })
+export const hitungPotong = (b: { jenis: string; objek: string; nilai_bruto: number; punya_npwp: boolean }) =>
+  api<PotongResult>('/kalkulator/potong', { method: 'POST', body: b })
+export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pajak: number }) =>
+  api<PPhBadanResult>('/kalkulator/pph-badan', { method: 'POST', body: b })

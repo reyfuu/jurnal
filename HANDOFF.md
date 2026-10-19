@@ -332,6 +332,108 @@ arus kas langsung == tidak langsung == **17.000.000**. Profil **jasa** → CoA `
 `PageHeader` ganda di `Aset.tsx` dihapus dan tombol **+ Tambah Aset** pindah ke kartu Register Aset.
 `Aset` tidak lagi menerima prop `periodLabel`.
 
+## Fase C4 — Invoice & Cetak PDF (Okt 2026)
+
+**Menu Invoice sebelumnya hanya menumpang ke `PiutangUtang`** — tidak ada entitas faktur sama
+sekali, yang ada cuma `ObligationItem` dari seed (nomor, lawan transaksi, satu angka total).
+Sekarang ada modul faktur penjualan penuh dengan rincian baris dan cetak PDF.
+
+**`internal/pdf` — penulis PDF tanpa dependensi**, sejalan dengan `internal/xlsx` dan menjaga
+`go.mod` tetap nol dependensi. PDF 1.4, font bawaan Helvetica (WinAnsi, jadi tidak ada font yang
+perlu disertakan), API-nya `Text`/`Rect`/`HLine` dengan sumbu y dari atas halaman. `metrics.go`
+memuat tabel lebar karakter AFM supaya rata kanan dan `Truncate`/`WrapText` akurat.
+Yang paling mudah salah saat menulis PDF sendiri — offset tabel xref dan `/Length` tiap stream —
+dikunci test tersendiri.
+
+**`finance.Invoice`**: nomor, `NoPO` (nomor PO pelanggan), status (draft/terkirim/lunas), tanggal
+terbit & jatuh tempo, identitas pelanggan, baris rincian, diskon, `PPNBps`, catatan.
+Total **tidak pernah disimpan** — selalu dari `Totals()`, sehingga angka di layar, di PDF, dan di
+API tidak mungkin berbeda. Yang disimpan hanya `PPNBps` saat terbit, supaya faktur lama tidak ikut
+berubah ketika tarif di profil diganti. **PPN dihitung dari DPP (setelah diskon), bukan subtotal.**
+
+**`BusinessProfile` dapat identitas penerbit**: alamat, NPWP, telepon, email, bank (nama/rekening/
+atas nama), penandatangan, dan `PPNBps`. Semuanya opsional supaya wizard onboarding tidak memanjang;
+`profilFakturLengkap` melaporkan yang masih kosong dan UI mengingatkan sebelum faktur dikirim.
+`BusinessProfile.TarifPPNBps()` menjaga satu aturan di satu tempat: **non-PKP selalu 0** — mereka
+memang tidak boleh memungut PPN.
+
+**`finance.Terbilang`** mengeja Rupiah jadi kata untuk kaki faktur, mengikuti kaidah "seribu",
+"sebelas", "sepuluh", "seratus".
+
+**Penomoran** `NextInvoiceNumber` meneruskan deret yang ada (INV-2026-089 → INV-2026-090) dan
+dimulai ulang tiap tahun terbit. Nomor kembar ditolak 409, bukan diam-diam dibuat ganda.
+
+**Endpoint**: `GET/POST /api/v1/invoice`, `PUT/DELETE /api/v1/invoice/{id}`, dan
+`GET /api/v1/invoice/{id}/pdf`. Catatan: pola `{id}.pdf` **tidak sah** di `http.ServeMux`
+(wildcard harus mengisi satu segmen penuh), jadi PDF memakai segmen terpisah; nama berkas
+unduhan tetap `INV-2026-090.pdf` lewat `Content-Disposition`.
+
+**Faktur seed** (`SeedInvoices`) sengaja dibuat cocok dengan `Obligations` di seed dashboard —
+nomor dan totalnya sama, dikunci test, supaya Piutang & Utang dan Invoice tidak bercerita berbeda
+tentang tagihan yang sama. Totalnya Rp 11.000.000, sama dengan Piutang Usaha di neraca.
+
+**ponytail**: belum ada pelunasan parsial, nota kredit, mata uang selain Rupiah, faktur pajak
+e-Faktur, maupun pengiriman faktur lewat email. Nomor halaman hanya tercetak di halaman terakhir
+karena `pdf.Doc` belum bisa menggambar ulang ke halaman sebelumnya — cukup untuk faktur yang
+hampir selalu satu halaman.
+
+## Fase C5 — Laporan AI & Kalkulator Pajak (Okt 2026)
+
+### Laporan AI — tab ke-5 di Laporan Keuangan
+
+`internal/llm` adalah klien **chat completions kompatibel OpenAI**, stdlib saja. Antarmuka itu
+dipilih karena sudah jadi standar de facto: satu kode jalan untuk OpenAI, Groq, OpenRouter,
+DeepSeek, Together, xAI, Anthropic (endpoint kompatibelnya), sampai model lokal lewat Ollama
+atau LM Studio. Pindah penyedia cukup ganti env, tanpa ubah kode.
+
+```
+LLM_API_KEY   kosong = fitur AI mati, aplikasi tetap jalan
+LLM_BASE_URL  default https://api.openai.com/v1
+LLM_MODEL     default gpt-4o-mini
+LLM_TIMEOUT   detik, default 45
+```
+
+**Model tidak pernah berhitung.** `finance.CollectFacts` merangkum SELURUH laporan satu periode
+(laba rugi, arus kas, neraca, aset, pajak, tagihan, operasional, tren) jadi `BusinessFacts`.
+Struktur yang sama dipakai dua pihak: halaman menampilkannya sebagai rincian, model menerimanya
+sebagai bahan. Jadi mustahil model menilai angka yang berbeda dari yang dilihat pengguna.
+Prompt melarang keras berhitung — di aplikasi pembukuan, angka karangan lebih berbahaya daripada
+tidak ada analisis.
+
+**Tanpa kunci, halaman tetap berguna**: rincian lengkap dan daftar `Peringatan` (fakta objektif
+seperti neraca tidak seimbang, faktur lewat tempo, pemetaan PMK belum diverifikasi) tetap tampil;
+hanya blok rekomendasi yang kosong, dengan petunjuk apa yang perlu diisi. Dikunci test.
+
+Endpoint `GET /api/v1/reports/ai`. `ai.Analyze` tahan terhadap balasan model yang dibungkus
+pagar kode (`llm.ExtractJSON`) dan membatasi panjang daftar supaya tata letak tidak rusak kalau
+model mengabaikan prompt.
+
+### Kalkulator Pajak — menu baru
+
+Delapan jenis: PPh 21, PPh 22, PPh 23, PPh 4 ayat (2), PPh 15, PPh Badan, PPN, PPnBM.
+Permission baru `kalkulator-pajak`. Setiap hasil menampilkan **langkah perhitungannya**, supaya
+angkanya bisa ditelusuri dan tidak tampak muncul begitu saja.
+
+- `tax.JenisPajakList` — satu tabel objek pajak, tiap baris memuat tarif (bps), DPP, status final,
+  dan **rujukan aturan** supaya bisa dicek ulang. Satu-satunya tempat mengoreksi tarif.
+- `tax.HitungPPh21` — metode tahunan Pasal 17: biaya jabatan 5% (maks Rp 6 juta/tahun), iuran
+  pensiun, PTKP, tarif progresif. Gross dan Gross Up; tanpa NPWP +20%. Gross up diselesaikan
+  dengan **iterasi sampai konvergen**, bukan rumus per lapisan — lebih tahan saat tarif berubah.
+- `tax.HitungPPhBadan` — tarif 22% memakai `Pasal31E` yang sudah ada.
+- PPN tarif umum dimodelkan sebagai **12% atas DPP nilai lain 11/12**, sehingga bebannya setara
+  11% dari harga jual (PMK 131/2024).
+
+**TER (PMK 168/2023) sengaja belum lengkap.** Lampiran tarifnya berupa gambar di dokumen resmi
+dan sumber sekunder hanya memuat lapisan terpisah-pisah; menebak 125 baris tarif pajak tidak
+dapat dipertanggungjawabkan. `tax.TERLapisan` memuat baris yang sudah terverifikasi saja, dan
+`HitungTER` **menolak menghitung** di luar itu (`ErrTERBelumLengkap`) alih-alih mengembalikan
+angka yang keliru. Cara melengkapi ditulis langkah-demi-langkah di atas `TERLapisan` — satu
+tabel, satu tempat. UI menampilkan TER berdampingan sebagai pembanding bila sudah terisi.
+
+**ponytail**: tarif disusun dari ketentuan yang berlaku umum dan harus diverifikasi tim pajak
+sebelum dipakai untuk SPT. PPnBM bergantung klasifikasi barang yang tidak bisa diturunkan dari
+nominal, jadi lapisannya dipilih manual.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
