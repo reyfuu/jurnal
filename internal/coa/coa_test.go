@@ -19,10 +19,16 @@ func codes(accs []Account) map[string]Account {
 }
 
 func TestMasterFromFile(t *testing.T) {
-	if len(Master) != 72 {
-		t.Fatalf("Daftar COA.xlsx berisi 72 akun, got %d", len(Master))
+	// 72 akun dari file + akun tambahan yang sengaja di luar file (lihat TambahanDiLuarFile).
+	if len(Master)-len(TambahanDiLuarFile) != 72 {
+		t.Fatalf("Daftar COA.xlsx berisi 72 akun, got %d", len(Master)-len(TambahanDiLuarFile))
 	}
 	m := codes(Master)
+	for _, kode := range TambahanDiLuarFile {
+		if a, ok := m[kode]; !ok || a.Kondisi != JikaAda {
+			t.Errorf("akun tambahan %s harus ada dan berkondisi JikaAda, got %+v", kode, a)
+		}
+	}
 	if len(m) != len(Master) {
 		t.Fatal("kode akun harus unik")
 	}
@@ -32,7 +38,7 @@ func TestMasterFromFile(t *testing.T) {
 	if a := m["1407"]; a.Normal != Debit || a.Kelompok != AsetLancar {
 		t.Fatalf("1407 Piutang Karyawan harus aset lancar debit, got %+v", a)
 	}
-	kontra := map[string]bool{"1502": true, "1504": true, "1506": true, "4103": true, "4104": true, "5105": true, "3102": true}
+	kontra := map[string]bool{"1502": true, "1504": true, "1506": true, "1508": true, "4103": true, "4104": true, "5105": true, "3102": true}
 	for _, a := range Master {
 		want := a.Kelompok.Normal()
 		if kontra[a.Kode] {

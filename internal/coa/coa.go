@@ -71,8 +71,9 @@ func a(kode, nama, subtype string, n Normal, k Kelompok, kon Kondisi, catatan st
 	return Account{Kode: kode, Nama: nama, Subtype: subtype, Normal: n, Kelompok: k, Kondisi: kon, Catatan: catatan}
 }
 
-// Master: 72 akun "COA Baru". Perubahan dari file: 2113 Utang Karyawan → 1407 Piutang Karyawan
-// (keputusan user; substansi kasusnya tagihan perusahaan ke karyawan).
+// Master: 72 akun "COA Baru" + 3 akun di luar file (lihat TambahanDiLuarFile).
+// Perubahan dari file: 2113 Utang Karyawan → 1407 Piutang Karyawan (keputusan user;
+// substansi kasusnya tagihan perusahaan ke karyawan).
 var Master = []Account{
 	a("1101", "Kas", "cash", Debit, AsetLancar, Selalu, ""),
 	a("1102", "Bank", "bank", Debit, AsetLancar, Selalu, ""),
@@ -95,6 +96,8 @@ var Master = []Account{
 	a("1504", "Akumulasi Penyusutan Gedung", "contra_asset", Kredit, AsetTidakLancar, JikaAda, ""),
 	a("1505", "Kendaraan", "fixed_asset", Debit, AsetTidakLancar, JikaAda, ""),
 	a("1506", "Akumulasi Penyusutan Kendaraan", "contra_asset", Kredit, AsetTidakLancar, JikaAda, ""),
+	a("1507", "Harta Tak Berwujud", "intangible", Debit, AsetTidakLancar, JikaAda, "Software, lisensi, merek, goodwill; disusutkan sebagai amortisasi"),
+	a("1508", "Akumulasi Amortisasi", "contra_asset", Kredit, AsetTidakLancar, JikaAda, ""),
 	a("1601", "Aset Pajak Tangguhan", "deferred_tax_asset", Debit, AsetTidakLancar, Selalu, "Beda temporer PSAK vs ketentuan pajak yang menimbulkan manfaat pajak di masa depan"),
 	a("2101", "Hutang Usaha", "payable", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2102", "Hutang Bank", "loan", Kredit, LiabilitasPendek, Selalu, ""),
@@ -139,6 +142,7 @@ var Master = []Account{
 	a("6114", "Beban Langganan Software & AI", "opex", Debit, BebanOperasional, Selalu, ""),
 	a("6115", "Beban Pelatihan & Pengembangan", "opex", Debit, BebanOperasional, Selalu, ""),
 	a("6116", "Beban Produksi Konten", "opex", Debit, BebanOperasional, Selalu, ""),
+	a("6118", "Beban Amortisasi", "opex", Debit, BebanOperasional, JikaAda, "Amortisasi harta tak berwujud; dipisah dari 6113 agar terbaca terpisah di laba rugi"),
 	a("6190", "Beban Operasional Lain-lain", "opex", Debit, BebanOperasional, Selalu, ""),
 	a("8101", "Pendapatan Lain-lain", "other_income", Kredit, PendapatanLain, Selalu, "Dipisah dari pendapatan usaha"),
 	a("9101", "Beban Bunga", "non_operating", Debit, BebanLain, Selalu, ""),
@@ -147,6 +151,12 @@ var Master = []Account{
 	a("9104", "Beban (Manfaat) Pajak Tangguhan", "deferred_tax_expense", Debit, BebanLain, Selalu, "Pasangan jurnal Aset/Liabilitas Pajak Tangguhan"),
 	a("9901", "Beban Lain-lain", "non_operating", Debit, BebanLain, Selalu, ""),
 }
+
+// TambahanDiLuarFile: akun yang tidak ada di "Daftar COA.xlsx", ditambahkan supaya register
+// aset bisa dijurnal ke CoA. Tanpa ini laporan per akun tidak mengenal penyusutan, sehingga
+// laba bersihnya berbeda dengan laba rugi ringkas. Semuanya JikaAda, jadi usaha yang tidak
+// punya harta tak berwujud tidak melihatnya. Hapus dari sini bila kelak masuk ke file resmi.
+var TambahanDiLuarFile = []string{"1507", "1508", "6118"}
 
 // Supported: CoA baru tersedia untuk perdagangan; jasa & manufaktur menunggu file dari tim.
 func Supported(p finance.BusinessProfile) bool { return p.JenisUsaha == "perdagangan" }

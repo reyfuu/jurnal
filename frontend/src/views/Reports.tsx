@@ -39,15 +39,13 @@ export function LaporanKeuangan({ r, bs, cf, assets, periodLabel, onAssetsChange
 
   return (
     <>
-      {tab !== 'aset' && (
-        <PageHeader title="Laporan Keuangan" subtitle={`${periodLabel} · ${SUBTITLE[tab]}`}>
-          {(tab === 'laba-rugi' || tab === 'neraca') && (
-            <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
-              {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
-            </span>
-          )}
-        </PageHeader>
-      )}
+      <PageHeader title="Laporan Keuangan" subtitle={`${periodLabel} · ${SUBTITLE[tab]}`}>
+        {(tab === 'laba-rugi' || tab === 'neraca') && (
+          <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
+            {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
+          </span>
+        )}
+      </PageHeader>
 
       <div className="tabbar" role="tablist" aria-label="Bagian laporan keuangan">
         {TABS.map((t) => (
@@ -67,7 +65,7 @@ export function LaporanKeuangan({ r, bs, cf, assets, periodLabel, onAssetsChange
       {tab === 'laba-rugi' && <LabaRugi r={r} cf={cf} />}
       {tab === 'neraca' && <Neraca bs={bs} />}
       {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} />}
-      {tab === 'aset' && <Aset data={assets} periodLabel={periodLabel} onChanged={onAssetsChanged} />}
+      {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
     </>
   )
 }

@@ -82,10 +82,82 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile) []Line {
 	return out
 }
 
-// Opening: saldo awal periode (posisi debit positif). Modal awal = kas awal + persediaan awal,
-// sama dengan neraca ringkas yang lama.
-func Opening(cash, inventory int64) map[string]int64 {
-	return map[string]int64{"1101": cash, "1301": inventory, "3101": -(cash + inventory)}
+// akunAset: akun harta, akumulasi, dan beban untuk satu aset. Dipilih dari jenis hartanya
+// supaya peralatan, gedung, kendaraan, dan harta tak berwujud tidak menumpuk di satu akun.
+func akunAset(a finance.Asset) (harta, akumulasi, beban string) {
+	switch a.JenisHarta {
+	case "kendaraan", "sepeda_motor":
+		return "1505", "1506", "6113"
+	case "bangunan_permanen", "bangunan_tidak_permanen":
+		return "1503", "1504", "6113"
+	}
+	if a.TakBerwujud {
+		return "1507", "1508", "6118"
+	}
+	return "1501", "1502", "6113"
+}
+
+// diperolehPadaPeriode: aset baru masuk periode ini, jadi belum punya nilai buku awal.
+func diperolehPadaPeriode(r finance.AssetReport, period string) bool {
+	return len(r.TanggalPerolehan) >= 7 && r.TanggalPerolehan[:7] == period
+}
+
+// DepreciationJournal: beban penyusutan & amortisasi periode ini dari register aset, plus aset
+// yang masuk tanpa transaksi kas (mis. hasil impor data awal).
+//
+// Tanpa jurnal ini laporan per akun tidak mengenal penyusutan sama sekali, sehingga laba
+// bersihnya berbeda dengan tab Laba Rugi untuk periode yang sama.
+func DepreciationJournal(as finance.AssetSummary, period string) []Line {
+	tanggal := period + "-01"
+	out := make([]Line, 0, 2*len(as.Assets))
+	for _, r := range as.Assets {
+		harta, akumulasi, beban := akunAset(r.Asset)
+		if r.BebanBulanIni != 0 {
+			out = append(out,
+				Line{0, tanggal, beban, r.BebanBulanIni, 0},
+				Line{0, tanggal, akumulasi, 0, r.BebanBulanIni},
+			)
+		}
+		// Aset tanpa transaksi kas belum punya sisi debit di jurnal transaksi; dibukukan
+		// sebagai setoran modal berupa aset, sama dengan perlakuannya di neraca ringkas.
+		if r.TransaksiID == 0 && !r.Draft && diperolehPadaPeriode(r, period) {
+			out = append(out,
+				Line{0, tanggal, harta, r.HargaPerolehan, 0},
+				Line{0, tanggal, "3101", 0, r.HargaPerolehan},
+			)
+		}
+	}
+	return out
+}
+
+// OpeningAssets: posisi aset awal periode per akun — harga perolehan di akun harta, penyusutan
+// periode sebelumnya di akun akumulasi (negatif karena peta ini berposisi debit). Dipisah,
+// bukan diringkas jadi nilai buku, supaya neraca per akun menyajikan kontra seperti biasa.
+// Tanpa ini aset yang sudah dimiliki sebelum periode hilang dari neraca per akun.
+func OpeningAssets(as finance.AssetSummary, period string) map[string]int64 {
+	out := map[string]int64{}
+	for _, r := range as.Assets {
+		if diperolehPadaPeriode(r, period) {
+			continue // perolehan periode ini masuk lewat jurnal, bukan saldo awal
+		}
+		harta, akumulasi, _ := akunAset(r.Asset)
+		out[harta] += r.HargaPerolehan
+		out[akumulasi] -= r.HargaPerolehan - r.NilaiBukuAwal
+	}
+	return out
+}
+
+// Opening: saldo awal periode (posisi debit positif). Modal awal = kas + persediaan + nilai
+// buku aset awal, sama dengan neraca ringkas. assetAwal dari OpeningAssets; nil bila tanpa aset.
+func Opening(cash, inventory int64, assetAwal map[string]int64) map[string]int64 {
+	out := map[string]int64{"1101": cash, "1301": inventory}
+	total := cash + inventory
+	for kode, v := range assetAwal {
+		out[kode] += v
+		total += v
+	}
+	out["3101"] = -total
+	return out
 }
 
 type Balance struct {
