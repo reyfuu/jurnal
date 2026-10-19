@@ -3,6 +3,8 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { VIEW_LABEL } from '@/lib/nav'
 import { LaporBug } from '@/views/LaporBug'
+import { Landing } from '@/views/Landing'
+import { Langganan, statusText } from '@/views/Langganan'
 import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
@@ -27,6 +29,7 @@ export default function App() {
   const [data, setData] = useState<AppData | null>(null)
   const [view, setView] = useState<View>('dashboard')
   const [bugFrom, setBugFrom] = useState<View>('dashboard') // halaman asal saat membuka Lapor Bug
+  const [auth, setAuth] = useState<'masuk' | 'daftar' | null>(null) // null = landing page
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   const [error, setError] = useState('')
@@ -65,7 +68,11 @@ export default function App() {
   }, [signIn])
 
   if (session.status === 'checking') return null
-  if (!me) return <Login onLogin={signIn} />
+  if (!me) {
+    return auth
+      ? <Login key={auth} onLogin={signIn} initialDaftar={auth === 'daftar'} onBack={() => setAuth(null)} />
+      : <Landing onMasuk={() => setAuth('masuk')} onDaftar={() => setAuth('daftar')} />
+  }
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
@@ -85,6 +92,7 @@ export default function App() {
     setSession({ status: 'anon' })
     setData(null)
     setBusiness(null)
+    setAuth(null)
   }
 
   const onProfileSaved = (p: NonNullable<BusinessInfo['profile']>) => {
@@ -102,6 +110,12 @@ export default function App() {
         <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
+          {me.langganan.status !== 'aktif' && view !== 'langganan' && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: me.langganan.status === 'habis' ? 'var(--accent-red)' : 'var(--border-shell)', background: me.langganan.status === 'habis' ? 'var(--accent-red-soft)' : 'transparent' }} role="status">
+              <span>{statusText(me.langganan)}</span>
+              {canSee('langganan') && <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
+            </div>
+          )}
           {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan) && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'rgba(234, 179, 8, 0.08)' }} role="status">
               <span><strong>Lengkapi profil usaha.</strong> Isi lokasi usaha serta perkiraan omzet &amp; laba per tahun supaya cek benchmark DJP dan risiko pajak bisa dihitung.</span>
@@ -182,6 +196,8 @@ export default function App() {
         return <ImporDataAwal onChanged={() => reload(me!, period)} />
       case 'karyawan':
         return <KaryawanView />
+      case 'langganan':
+        return <Langganan onPaid={() => { getMe().then((m) => setSession({ status: 'in', me: m }), fail) }} />
       case 'lapor-bug':
         return <LaporBug halamanAwal={VIEW_LABEL[bugFrom]} />
       case 'pengguna':

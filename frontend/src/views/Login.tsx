@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,9 +15,9 @@ const DEMO_ACCOUNTS = [
   { email: 'kasir@kedaikopisenja.id', role: 'Kasir' },
 ]
 
-export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
+export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me: Me) => void; initialDaftar?: boolean; onBack?: () => void }) {
   // daftar: buat usaha baru (kosong), lalu langsung masuk wizard onboarding.
-  const [daftar, setDaftar] = useState(false)
+  const [daftar, setDaftar] = useState(initialDaftar)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,6 +41,11 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   return (
     <main className="login-page flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
+        {onBack && (
+          <Button type="button" variant="ghost" className="mb-4 -ml-2 text-muted-foreground" onClick={onBack}>
+            <ArrowLeft aria-hidden="true" /> Kembali ke beranda
+          </Button>
+        )}
         <div className="mb-6 flex items-center justify-center gap-2.5">
           <BrandMark size={28} />
           <div>

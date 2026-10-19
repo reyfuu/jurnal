@@ -47,6 +47,7 @@ type tenant struct {
 	nextInvoiceID  int
 	seedTx         map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
+	langganan      langganan                // masa coba & pembayaran Midtrans
 }
 
 type Server struct {
@@ -64,7 +65,8 @@ type Server struct {
 
 // newTenant membuat usaha kosong (hasil register).
 func newTenant(id int) *tenant {
-	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1}
+	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1,
+		langganan: langganan{TrialSampai: time.Now().Add(trialDurasi)}}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -93,6 +95,10 @@ func (t *tenant) restore(st *state) {
 		t.assets, t.nextAssetID = st.Assets, st.NextAssetID
 	}
 	t.opening = st.Opening
+	// state sebelum fitur langganan: masa coba dihitung sejak versi ini berjalan (nilai newTenant).
+	if st.Langganan != nil {
+		t.langganan = *st.Langganan
+	}
 	if st.NextKaryawanID > 0 {
 		t.karyawan, t.nextKaryawanID = st.Karyawan, st.NextKaryawanID
 	}
@@ -232,6 +238,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleUpdateUser)))
 	s.mux.HandleFunc("DELETE /api/v1/users/{id}", s.persisting(s.guard("pengguna", s.handleDeleteUser)))
 
+	s.mux.HandleFunc("GET /api/v1/billing/plans", s.handlePlans)
+	s.mux.HandleFunc("GET /api/v1/billing", s.guard("", s.handleBilling))
+	s.mux.HandleFunc("POST /api/v1/billing/checkout", s.persisting(s.guard("langganan", s.handleCheckout)))
+	s.mux.HandleFunc("POST /api/v1/billing/refresh", s.guard("langganan", s.handleBillingRefresh))
+	s.mux.HandleFunc("POST /api/v1/billing/midtrans/notify", s.handleMidtransNotify)
+
 	s.mux.HandleFunc("GET /api/v1/bugs", s.guard("lapor-bug", s.handleListBugs))
 	s.mux.HandleFunc("POST /api/v1/bugs", s.guard("lapor-bug", s.handleCreateBug))
 	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
@@ -272,6 +284,10 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "akses ditolak untuk role ini", http.StatusForbidden)
 			return
 		}
+		if s.lockedWrite(r, u.TenantID) {
+			http.Error(w, "Masa coba habis. Aktifkan langganan di menu Langganan untuk kembali mencatat.", http.StatusPaymentRequired)
+			return
+		}
 		h(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
 	}
 }
@@ -291,13 +307,21 @@ func writeJSON(w http.ResponseWriter, v any) {
 // --- Auth & pengguna ---
 
 type meResp struct {
-	User      auth.User `json:"user"`
-	RoleLabel string    `json:"role_label"`
-	Views     []string  `json:"views"`
+	User      auth.User       `json:"user"`
+	RoleLabel string          `json:"role_label"`
+	Views     []string        `json:"views"`
+	Langganan langgananStatus `json:"langganan"`
 }
 
-func newMe(u auth.User) meResp {
-	return meResp{User: u, RoleLabel: auth.Roles[u.Role].Label, Views: auth.Roles[u.Role].Views}
+func (s *Server) newMe(u auth.User) meResp {
+	me := meResp{User: u, RoleLabel: auth.Roles[u.Role].Label, Views: auth.Roles[u.Role].Views}
+	s.tenantsMu.RLock()
+	t := s.tenants[u.TenantID]
+	s.tenantsMu.RUnlock()
+	if t != nil {
+		me.Langganan = t.langgananStatus(time.Now())
+	}
+	return me
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -318,7 +342,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSession(w, r, token)
-	writeJSON(w, newMe(u))
+	writeJSON(w, s.newMe(u))
 }
 
 // blocked: IP sudah gagal maxLoginFailures kali dalam loginWindow.
@@ -382,7 +406,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	setSession(w, r, token)
 	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, newMe(u))
+	writeJSON(w, s.newMe(u))
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -394,7 +418,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, newMe(currentUser(r)))
+	writeJSON(w, s.newMe(currentUser(r)))
 }
 
 func (s *Server) handlePeriods(w http.ResponseWriter, r *http.Request) {
