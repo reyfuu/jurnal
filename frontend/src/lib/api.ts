@@ -467,8 +467,12 @@ export interface BusinessProfile {
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
   omzet_tahunan?: number
   laba_sebelum_pajak?: number
-  /** Identitas penerbit & rekening: opsional, tapi dicetak di invoice begitu diisi. */
+  /** Lokasi usaha (onboarding); alamat juga dicetak di invoice. */
   alamat?: string
+  kecamatan?: string
+  kota?: string
+  provinsi?: string
+  /** Identitas penerbit & rekening: opsional, tapi dicetak di invoice begitu diisi. */
   npwp?: string
   telepon?: string
   email?: string
@@ -485,7 +489,7 @@ export interface Option { value: string; label: string; hint?: string }
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
-  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[] }
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; provinsi: string[] }
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
@@ -501,9 +505,20 @@ export interface CekAwal {
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
 
-export interface BugReport { id: number; judul: string; deskripsi: string; halaman: string; user_email: string; waktu: string }
+export interface BugReport { id: number; judul: string; deskripsi: string; halaman: string; user_email: string; waktu: string; screenshot?: string }
 export const listBugs = () => api<BugReport[]>('/bugs')
-export const createBug = (b: { judul: string; deskripsi: string; halaman: string }) => api<BugReport>('/bugs', { method: 'POST', body: b })
+export const bugScreenshotUrl = (id: number) => `/api/v1/bugs/${id}/screenshot`
+/** Kirim laporan sebagai multipart supaya screenshot (opsional) ikut terunggah. */
+export async function createBug(b: { judul: string; deskripsi: string; halaman: string; screenshot: File | null }): Promise<BugReport> {
+  const form = new FormData()
+  form.append('judul', b.judul)
+  form.append('deskripsi', b.deskripsi)
+  form.append('halaman', b.halaman)
+  if (b.screenshot) form.append('screenshot', b.screenshot)
+  const res = await fetch('/api/v1/bugs', { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
 
 export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
 export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }

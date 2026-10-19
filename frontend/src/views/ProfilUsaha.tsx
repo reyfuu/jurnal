@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { saveBusiness, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
-import { DEFAULT_ANSWERS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
 
@@ -47,6 +47,44 @@ function ChoiceGrid({ name, options, value, onChange }: {
   )
 }
 
+type Lokasi = Partial<Record<(typeof LOKASI_FIELDS)[number], string>>
+
+// LokasiFields: alamat, kecamatan, kota, provinsi — dipakai wizard onboarding dan Profil Usaha.
+function LokasiFields({ v, set, provinsi, required = false, big = false }: {
+  v: Lokasi
+  set: (patch: Lokasi) => void
+  provinsi: string[]
+  required?: boolean
+  big?: boolean
+}) {
+  const cls = big ? 'h-12 px-4 md:text-base' : ''
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-1.5 sm:col-span-2">
+        <Label htmlFor="lok-alamat">Alamat usaha</Label>
+        <Input id="lok-alamat" className={cls} autoComplete="street-address" required={required} value={v.alamat ?? ''} onChange={(e) => set({ alamat: e.target.value })} placeholder="mis. Jl. Senopati Raya No. 45" />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="lok-kecamatan">Kecamatan</Label>
+        <Input id="lok-kecamatan" className={cls} required={required} value={v.kecamatan ?? ''} onChange={(e) => set({ kecamatan: e.target.value })} placeholder="mis. Kebayoran Baru" />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="lok-kota">Kota / kabupaten</Label>
+        <Input id="lok-kota" className={cls} autoComplete="address-level2" required={required} value={v.kota ?? ''} onChange={(e) => set({ kota: e.target.value })} placeholder="mis. Jakarta Selatan" />
+      </div>
+      <div className="grid gap-1.5 sm:col-span-2">
+        <Label htmlFor="lok-provinsi">Provinsi</Label>
+        <Select value={v.provinsi ?? ''} onValueChange={(x) => set({ provinsi: x })}>
+          <SelectTrigger id="lok-provinsi" className={big ? 'h-12 w-full md:text-base' : 'w-full'}><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
+          <SelectContent>
+            {provinsi.map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  )
+}
+
 export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo; onSaved: (p: BusinessProfile) => void; submitLabel: string }) {
   const [p, setP] = useState<BusinessProfile>(info.profile ?? EMPTY)
   const [error, setError] = useState('')
@@ -72,6 +110,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         <Label htmlFor="biz-nama">Nama usaha</Label>
         <Input id="biz-nama" required value={p.nama_usaha} onChange={(e) => set({ nama_usaha: e.target.value })} placeholder="mis. Kedai Kopi Senja" />
       </div>
+      <LokasiFields v={p} set={set} provinsi={info.options.provinsi} />
       <div className="grid gap-1.5">
         <Label>Jenis usaha</Label>
         <ChoiceGrid name="Jenis usaha" options={info.options.jenis_usaha} value={p.jenis_usaha} onChange={(v) => set({ jenis_usaha: v as JenisUsaha })} />
@@ -148,7 +187,7 @@ const tampilRp = (s = '') => {
 const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba sebelum pajak per tahun' } as const
 
 // Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
-function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }) {
+function OnboardingWizard({ onSaved, provinsi }: { onSaved: (p: BusinessProfile) => void; provinsi: string[] }) {
   const [a, setA] = useState<Answers>(DEFAULT_ANSWERS)
   const [i, setI] = useState(0)
   const [error, setError] = useState('')
@@ -201,7 +240,7 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
         <h2 id="onboarding-question" ref={headingRef} tabIndex={-1} aria-describedby="onboarding-progress-label">
           {isSummary ? `Ini yang kami siapkan untuk ${a.nama?.trim()}` : q!.judul}
         </h2>
-        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : step === 'nama' ? 'Gunakan nama yang ingin Anda tampilkan di laporan.' : 'Ketik angka dalam rupiah. Perkiraan kasar sudah cukup.'}</p>
+        <p>{isSummary ? 'Periksa ringkasan ini sebelum mulai. Semua bisa diubah nanti di menu Profil Usaha.' : q!.options ? 'Pilih satu jawaban, lalu tekan Lanjut.' : step === 'lokasi' ? 'Isi sesuai alamat tempat usaha berjalan.' : step === 'nama' ? 'Gunakan nama yang ingin Anda tampilkan di laporan.' : 'Ketik angka dalam rupiah. Perkiraan kasar sudah cukup.'}</p>
       </div>
       {isSummary ? (
         <>
@@ -217,7 +256,9 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
         </>
       ) : (
         <>
-          {q!.options ? (
+          {step === 'lokasi' ? (
+            <LokasiFields v={a} set={(patch) => setA((x) => ({ ...x, ...patch }))} provinsi={provinsi} required big />
+          ) : q!.options ? (
             <ChoiceGrid
               key={step}
               name={q!.judul}
@@ -251,7 +292,7 @@ function OnboardingWizard({ onSaved }: { onSaved: (p: BusinessProfile) => void }
 }
 
 // Onboarding: layar pertama Owner sebelum workspace bila profil usaha belum diisi.
-export function Onboarding({ onSaved, canEdit, onLogout }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void }) {
+export function Onboarding({ onSaved, canEdit, onLogout, provinsi }: { onSaved: (p: BusinessProfile) => void; canEdit: boolean; onLogout: () => void; provinsi: string[] }) {
   return (
     <main className="onboarding-page">
       <div className="onboarding-shell">
@@ -271,7 +312,7 @@ export function Onboarding({ onSaved, canEdit, onLogout }: { onSaved: (p: Busine
             <p>Tidak perlu paham akuntansi atau pajak. Cukup jawab sesuai keadaan usaha Anda.</p>
           </div>
           {canEdit ? (
-            <OnboardingWizard onSaved={onSaved} />
+            <OnboardingWizard onSaved={onSaved} provinsi={provinsi} />
           ) : (
             <p className="text-sm">Owner usaha perlu melengkapi profil usaha terlebih dahulu. Hubungi Owner Anda, lalu muat ulang halaman ini.</p>
           )}
@@ -300,7 +341,7 @@ export function ProfilUsaha({ info, onSaved }: { info: BusinessInfo; onSaved: (p
 // faktur tidak perlu mengisinya untuk bisa memakai aplikasi.
 function FakturFields({ p, set }: { p: BusinessProfile; set: (patch: Partial<BusinessProfile>) => void }) {
   const [buka, setBuka] = useState(false)
-  const terisi = [p.alamat, p.npwp, p.bank_rekening, p.penandatangan_nama].filter(Boolean).length
+  const terisi = [p.npwp, p.telepon, p.bank_rekening, p.penandatangan_nama].filter(Boolean).length
 
   return (
     <div className="rounded-lg border border-border p-4">
@@ -308,11 +349,10 @@ function FakturFields({ p, set }: { p: BusinessProfile; set: (patch: Partial<Bus
         <span className="text-sm font-semibold">Data untuk invoice</span>
         <span className="text-xs text-muted-foreground">{terisi}/4 terisi — {buka ? 'sembunyikan' : 'tampilkan'}</span>
       </button>
-      <p className="mt-1 text-xs text-muted-foreground">Alamat, NPWP, rekening, dan penandatangan yang dicetak di PDF faktur.</p>
+      <p className="mt-1 text-xs text-muted-foreground">NPWP, kontak, rekening, dan penandatangan yang dicetak di PDF faktur.</p>
       {buka && (
         <div className="mt-4 grid gap-3">
           {([
-            ['alamat', 'Alamat usaha', 'Jl. Senopati Raya No. 45, Kebayoran Baru, Jakarta Selatan 12190'],
             ['npwp', 'NPWP', '01.234.567.8-012.000'],
             ['telepon', 'Telepon', '021-7123456'],
             ['email', 'Email', 'halo@usahaku.id'],

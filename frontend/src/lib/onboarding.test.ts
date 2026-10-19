@@ -6,7 +6,7 @@ const a = (x: Answers): Answers => ({ ...DEFAULT_ANSWERS, ...x })
 describe('toProfile', () => {
   it('warung pribadi, menikah, 2 tanggungan', () => {
     expect(toProfile(a({ nama: '  Warung Bu Siti ', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' }))).toEqual({
-      nama_usaha: 'Warung Bu Siti', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
+      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
     })
   })
 
@@ -31,6 +31,14 @@ describe('toProfile', () => {
   })
 })
 
+describe('lokasi', () => {
+  it('dipetakan ke profil dan tampil di ringkasan', () => {
+    const p = toProfile(a({ nama: 'X', alamat: ' Jl. Merdeka 1 ', kecamatan: 'Sukajadi', kota: 'Kota Bandung', provinsi: 'Jawa Barat', jenis: 'jasa', bentuk: 'pt' }))
+    expect([p.alamat, p.kecamatan, p.kota, p.provinsi]).toEqual(['Jl. Merdeka 1', 'Sukajadi', 'Kota Bandung', 'Jawa Barat'])
+    expect(summary(p)[0]).toEqual({ judul: 'Lokasi usaha', isi: 'Jl. Merdeka 1, Kec. Sukajadi, Kota Bandung, Jawa Barat.' })
+  })
+})
+
 describe('omzet & laba', () => {
   it('parse rupiah berformat, minus = rugi', () => {
     const p = toProfile(a({ jenis: 'jasa', bentuk: 'pt', omzet: 'Rp1.250.000.000', laba: '-25.000.000' }))
@@ -42,12 +50,12 @@ describe('omzet & laba', () => {
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'jenis', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
+      ['nama', 'lokasi', 'jenis', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
-    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'jenis', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
+    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
   })
 
   it('belum menikah melewati pertanyaan penghasilan pasangan', () => {
@@ -61,6 +69,8 @@ describe('answered', () => {
     expect(answered('nama', a({ nama: 'Toko A' }))).toBe(true)
     expect(answered('jenis', a({}))).toBe(false)
     expect(answered('stok', a({}))).toBe(true) // default periodik
+    expect(answered('lokasi', a({ alamat: 'Jl. A', kecamatan: 'B', kota: 'C' }))).toBe(false) // provinsi belum
+    expect(answered('lokasi', a({ alamat: 'Jl. A', kecamatan: 'B', kota: 'C', provinsi: 'Bali' }))).toBe(true)
     expect(answered('omzet', a({ omzet: '0' }))).toBe(false)
     expect(answered('omzet', a({ omzet: 'Rp750.000.000' }))).toBe(true)
     expect(answered('laba', a({ laba: '0' }))).toBe(true) // impas boleh

@@ -28,6 +28,10 @@ type BusinessProfile struct {
 	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
 	// tidak layak dikirim ke pelanggan badan.
 	Alamat  string `json:"alamat,omitempty"`
+	// Lokasi usaha dari onboarding; dicetak di invoice bersama alamat.
+	Kecamatan string `json:"kecamatan,omitempty"`
+	Kota      string `json:"kota,omitempty"`
+	Provinsi  string `json:"provinsi,omitempty"`
 	NPWP    string `json:"npwp,omitempty"`
 	Telepon string `json:"telepon,omitempty"`
 	Email   string `json:"email,omitempty"`
@@ -78,6 +82,16 @@ var MetodePersediaanOptions = []Option{
 	{"perpetual", "Perpetual", "Stok dan HPP tercatat setiap transaksi; butuh kartu stok per barang"},
 }
 
+// ProvinsiOptions: 38 provinsi Indonesia.
+var ProvinsiOptions = []string{
+	"Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau", "Jambi", "Bengkulu", "Sumatera Selatan",
+	"Kepulauan Bangka Belitung", "Lampung", "Banten", "DKI Jakarta", "Jawa Barat", "Jawa Tengah", "DI Yogyakarta",
+	"Jawa Timur", "Bali", "Nusa Tenggara Barat", "Nusa Tenggara Timur", "Kalimantan Barat", "Kalimantan Tengah",
+	"Kalimantan Selatan", "Kalimantan Timur", "Kalimantan Utara", "Sulawesi Utara", "Gorontalo", "Sulawesi Tengah",
+	"Sulawesi Barat", "Sulawesi Selatan", "Sulawesi Tenggara", "Maluku", "Maluku Utara", "Papua", "Papua Barat",
+	"Papua Barat Daya", "Papua Tengah", "Papua Pegunungan", "Papua Selatan",
+}
+
 var BentukUsahaOptions = []Option{
 	{"op", "Orang Pribadi", "Usaha atas nama pribadi (NPWP pemilik)"},
 	{"pt_perorangan", "PT Perorangan", "Badan hukum satu pemilik"},
@@ -99,6 +113,9 @@ func (p *BusinessProfile) Validate() error {
 	}
 	if !hasOption(BentukUsahaOptions, p.BentukUsaha) {
 		return errors.New("pilih bentuk usaha")
+	}
+	if p.Provinsi != "" && !slices.Contains(ProvinsiOptions, p.Provinsi) {
+		return errors.New("pilih provinsi dari daftar")
 	}
 	if p.OmzetTahunan < 0 {
 		return errors.New("omzet per tahun tidak boleh negatif")
