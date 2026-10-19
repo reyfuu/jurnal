@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { PageHeader } from '@/components/PageHeader'
 import { createAsset, deleteAsset, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
@@ -26,7 +25,8 @@ function toInput(a: Asset): AssetInput {
   }
 }
 
-export function Aset({ data, periodLabel, onChanged }: { data: AssetSummary; periodLabel: string; onChanged: () => void }) {
+// periodLabel tidak lagi dipakai di sini: judul & periode dipegang header Laporan Keuangan.
+export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () => void }) {
   const [form, setForm] = useState<AssetInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -76,15 +76,6 @@ export function Aset({ data, periodLabel, onChanged }: { data: AssetSummary; per
 
   return (
     <>
-      <PageHeader
-        title="Aset & Penyusutan"
-        subtitle={`${periodLabel} · penyusutan fiskal PMK 72/2023, tanpa nilai residu`}
-      >
-        <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => buka()}>
-          + Tambah Aset
-        </button>
-      </PageHeader>
-
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
 
       <div className="note-box law" style={{ marginTop: 0, marginBottom: 14 }}>
@@ -235,8 +226,15 @@ export function Aset({ data, periodLabel, onChanged }: { data: AssetSummary; per
       )}
 
       <div className="card" style={{ padding: 20 }}>
-        <div className="chart-title">Register Aset</div>
-        <div className="chart-subtitle">Metode dipilih per aset: garis lurus atau saldo menurun</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="chart-title">Register Aset</div>
+            <div className="chart-subtitle">Metode dipilih per aset: garis lurus atau saldo menurun</div>
+          </div>
+          <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => buka()}>
+            + Tambah Aset
+          </button>
+        </div>
         <div className="table-scroll">
           <table className="data-table tabular" style={{ minWidth: 980 }}>
             <thead>

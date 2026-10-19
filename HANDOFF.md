@@ -284,6 +284,42 @@ memeriksa) dan `Terverifikasi`. Semua baris bukan-bangunan masih `false`; UI men
 kolom Status Pemetaan. Cara mengoreksi ditulis sebagai komentar langkah-demi-langkah di atas
 `JenisHartaList` — satu tabel, satu tempat; jangan ubah `ID` karena dipakai aset yang sudah tersimpan.
 
+## Fase C3 — Menu Laporan Keuangan Dipegang 4 Tab, CoA Disinkronkan (Okt 2026)
+
+**Masalah yang diperbaiki.** Saat Fase C1 di-rebase ke `main`, menu `laporan-keuangan` dipegang
+`LaporanKeuanganCoA` (Fase C) yang hanya menampilkan `fallback` bila CoA tidak didukung. Karena 4 tab
+Fase C1 dipasang sebagai `fallback` itu, untuk usaha **perdagangan** tab **Arus Kas** dan
+**Aset & Penyusutan** tidak pernah terjangkau sama sekali.
+
+**Keputusan.** Menu `laporan-keuangan` dipegang penuh oleh `LaporanKeuangan` (4 tab), untuk semua jenis
+usaha. `LaporanCoA.tsx` **sengaja tidak terpasang di menu mana pun** — bukan kode mati yang terlupa;
+alasannya ditulis di komentar atas komponennya. Endpoint `GET /api/v1/reports/coa` dan `coa.xlsx` tetap
+hidup, tinggal dipasang begitu tempatnya di navigasi diputuskan.
+
+**Register aset ikut dijurnal ke CoA** supaya laporan per akun tidak bertentangan dengan 4 tab:
+- `coa.DepreciationJournal(assets, period)` — debit akun beban, kredit akun akumulasi, per aset. Aset
+  tanpa transaksi kas (mis. hasil impor) dibukukan debit akun harta / kredit 3101, sama seperti neraca ringkas.
+- `coa.OpeningAssets(assets, period)` — posisi aset awal periode per akun: harga perolehan di akun harta,
+  penyusutan periode sebelumnya di akun akumulasi (dipisah, bukan diringkas jadi nilai buku).
+- `coa.Opening(cash, inventory, assetAwal)` — tanda tangan berubah, modal awal kini termasuk nilai buku aset.
+- Pemetaan akun di `akunAset`: kendaraan/sepeda motor → 1505/1506, bangunan → 1503/1504,
+  harta tak berwujud → 1507/1508/6118, selain itu → 1501/1502/6113.
+
+**Tiga akun di luar `Daftar COA.xlsx`** (`coa.TambahanDiLuarFile`): `1507 Harta Tak Berwujud`,
+`1508 Akumulasi Amortisasi`, `6118 Beban Amortisasi`. Semuanya `JikaAda`, jadi tidak muncul bagi usaha
+yang tidak punya; tidak ada baris CoA lama yang diubah. Kode **6118**, bukan 6115 — 6115 sudah dipakai
+Beban Pelatihan & Pengembangan. `TestMasterFromFile` tetap menjaga jumlah 72 akun dari file dengan
+mengurangi tambahan ini.
+
+**Terbukti konsisten** (Agustus 2026, profil perdagangan/CV/periodik): laba bersih CoA **18.450.000** ==
+laba rugi 4 tab; total aset CoA **316.775.000** == neraca 4 tab; neraca saldo seimbang;
+arus kas langsung == tidak langsung == **17.000.000**. Profil **jasa** → CoA `supported: false`,
+4 tab tetap jalan.
+
+**Header disatukan**: judul "Laporan Keuangan" kini tetap di keempat tab (hanya subtitle berganti);
+`PageHeader` ganda di `Aset.tsx` dihapus dan tombol **+ Tambah Aset** pindah ke kartu Register Aset.
+`Aset` tidak lagi menerima prop `periodLabel`.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.

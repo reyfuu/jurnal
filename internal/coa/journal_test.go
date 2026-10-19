@@ -61,7 +61,11 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 	if len(lines) != 2*len(txs) {
 		t.Fatalf("setiap transaksi 2 baris jurnal, got %d for %d tx", len(lines), len(txs))
 	}
-	opening := Opening(finance.OpeningCash("2026-08"), 8_250_000)
+	// Register aset ikut dijurnal: laporan per akun kini satu tab dengan laba rugi & neraca,
+	// jadi angkanya harus sama persis, bukan sekadar mirip.
+	rep := finance.BuildPeriodReport(txs, finance.SeedAssets(), "2026-08", finance.SeedOpening("2026-08"))
+	lines = append(lines, DepreciationJournal(rep.Assets, "2026-08")...)
+	opening := Opening(finance.OpeningCash("2026-08"), 8_250_000, OpeningAssets(rep.Assets, "2026-08"))
 	tb := TrialBalance(Active(p), opening, lines)
 	var d, k int64
 	for _, b := range tb {
@@ -73,12 +77,12 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 	}
 
 	is := IncomeStatement(tb, p)
-	// Dibandingkan dengan laporan lama TANPA register aset, karena CoA belum mengenal
-	// penyusutan — supaya perbandingannya apel-ke-apel.
-	rep := finance.BuildPeriodReport(txs, nil, "2026-08", finance.SeedOpening("2026-08"))
 	old := rep.Income
 	if is.LabaBersih != old.NetProfit {
 		t.Fatalf("laba bersih CoA %d != laporan lama %d", is.LabaBersih, old.NetProfit)
+	}
+	if is.LabaBersih != 18_450_000 {
+		t.Errorf("laba bersih Agustus setelah penyusutan: want 18_450_000, got %d", is.LabaBersih)
 	}
 	if is.PenjualanBersih != old.Omzet {
 		t.Fatalf("penjualan bersih %d != omzet %d", is.PenjualanBersih, old.Omzet)

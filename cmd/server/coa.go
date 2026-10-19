@@ -57,7 +57,11 @@ func (s *Server) buildCoAReport(r *http.Request) coaReport {
 	lines := coa.Journal(finance.ForPeriod(s.txs, period), p)
 	opening := s.openingFor(period) // ikut neraca awal onboarding bila sudah diisi
 	s.mu.RUnlock()
-	tb := coa.TrialBalance(active, coa.Opening(opening.Cash, opening.Inventory), lines)
+	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
+	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
+	as := s.report(period).Assets
+	lines = append(lines, coa.DepreciationJournal(as, period)...)
+	tb := coa.TrialBalance(active, coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period)), lines)
 	is := coa.IncomeStatement(tb, p)
 	bs := coa.BalanceSheet(tb, is.LabaBersih)
 	return coaReport{true, tb, &is, &bs}

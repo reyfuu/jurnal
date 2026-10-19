@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { coaXlsxUrl, getCoAReport, type CoAReport, type ReportLine } from '@/lib/api'
 import { formatRp } from '@/lib/format'
@@ -14,22 +14,25 @@ function Lines({ lines, negate = false }: { lines: ReportLine[] | null | undefin
   return <>{(lines ?? []).map((l) => <AmountRow key={l.kode + l.nama} label={label(l)} value={formatRp(negate ? -l.jumlah : l.jumlah)} />)}</>
 }
 
-/** Laporan Keuangan per akun (CoA). Bila jenis usaha belum punya CoA, tampilkan laporan ringkas (fallback). */
-export function LaporanKeuanganCoA({ period, periodLabel, fallback }: { period: string; periodLabel: string; fallback: ReactNode }) {
+/**
+ * Laporan Keuangan per akun (CoA).
+ *
+ * BELUM TERPASANG DI MENU MANA PUN — dan itu disengaja, bukan kode mati yang terlupa.
+ * Menu `laporan-keuangan` dipegang penuh oleh LaporanKeuangan (4 tab: Laba Rugi, Neraca,
+ * Arus Kas, Aset & Penyusutan); sebelumnya komponen ini membungkusnya sebagai `fallback`,
+ * sehingga tab Arus Kas & Aset tidak pernah terjangkau untuk usaha perdagangan.
+ *
+ * Backend-nya tetap hidup dan sudah disinkronkan: /api/v1/laporan/coa dan unduh Excel-nya
+ * kini ikut menjurnal penyusutan dari register aset, jadi laba bersih & total asetnya sama
+ * persis dengan 4 tab. Tinggal dipasang begitu tempatnya di navigasi diputuskan.
+ */
+export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; periodLabel: string }) {
   const [r, setR] = useState<CoAReport | null>(null)
   const [showTB, setShowTB] = useState(false)
 
   useEffect(() => { getCoAReport(period).then(setR, () => setR({ supported: false, trial_balance: null })) }, [period])
 
-  if (!r) return null
-  if (!r.supported || !r.income_statement || !r.balance_sheet) {
-    return (
-      <>
-        {fallback}
-        <p className="text-xs text-muted-foreground">Format ringkas. Laporan per akun (CoA) saat ini tersedia untuk usaha perdagangan; jasa & manufaktur menyusul.</p>
-      </>
-    )
-  }
+  if (!r || !r.supported || !r.income_statement || !r.balance_sheet) return null
   const is = r.income_statement
   const bs = r.balance_sheet
   const tb = r.trial_balance ?? []
