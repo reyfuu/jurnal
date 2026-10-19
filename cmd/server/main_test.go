@@ -66,8 +66,9 @@ func TestReportsEndpoints(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&is); err != nil {
 		t.Fatal(err)
 	}
-	if is.NetProfit != 25_000_000 {
-		t.Fatalf("NetProfit: want 25_000_000, got %d", is.NetProfit)
+	// Laba bersih sudah dikurangi penyusutan & amortisasi register aset seed (Rp6,55 jt).
+	if is.NetProfit != 18_450_000 || is.Depreciation != 6_175_000 || is.Amortization != 375_000 {
+		t.Fatalf("laba rugi: net=%d penyusutan=%d amortisasi=%d", is.NetProfit, is.Depreciation, is.Amortization)
 	}
 
 	rec = httptest.NewRecorder()
@@ -81,6 +82,10 @@ func TestReportsEndpoints(t *testing.T) {
 	}
 	if cf.ClosingBalance != 97_000_000 {
 		t.Fatalf("ClosingBalance: want 97_000_000, got %d", cf.ClosingBalance)
+	}
+	if cf.OperasiLangsung.Net != cf.OperasiTidakLangsung.Net {
+		t.Fatalf("kas operasi dua metode beda: langsung %d, tidak langsung %d",
+			cf.OperasiLangsung.Net, cf.OperasiTidakLangsung.Net)
 	}
 }
 

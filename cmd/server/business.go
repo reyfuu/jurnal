@@ -83,7 +83,9 @@ func (s *Server) annualized() (omzet, marginBps int64) {
 	var total, laba int64
 	periods := finance.AvailablePeriods()
 	for _, p := range periods {
-		is := finance.BuildIncomeStatement(finance.ToLedger(finance.ForPeriod(s.txs, p.ID)))
+		// Laba bersih sudah dikurangi penyusutan & amortisasi, jadi margin yang dipakai
+		// Perencanaan Pajak sama dengan yang tampil di Laporan Keuangan.
+		is := finance.BuildPeriodReport(s.txs, s.assets, p.ID, s.openingFor(p.ID)).Income
 		total += is.Omzet
 		laba += is.NetProfit
 	}

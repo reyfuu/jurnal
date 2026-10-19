@@ -27,18 +27,24 @@ import (
 const sessionCookie = "sid"
 
 type Server struct {
-	mu        sync.RWMutex
-	snapshots map[string]finance.DashboardSnapshot // seed per periode; KPI dihitung ulang dari txs
-	txs       []finance.Transaction
-	nextTxID  int
-	seedTx    map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
-	users     *auth.Store
-	profile   *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
-	saveMu    sync.Mutex               // serialisasi penulisan state.json
-	loginMu   sync.Mutex
-	failures  map[string]loginFailure // per IP
-	aiEngine  *ai.Engine
-	mux       *http.ServeMux
+	mu          sync.RWMutex
+	snapshots   map[string]finance.DashboardSnapshot // seed per periode; KPI dihitung ulang dari txs
+	txs         []finance.Transaction
+	nextTxID    int
+	assets      []finance.Asset // register aset: dasar penyusutan & amortisasi
+	nextAssetID int
+	// opening: neraca awal onboarding; nil = belum diisi, laporan memakai saldo awal seed.
+	opening        *finance.OpeningBalance
+	karyawan       []finance.Karyawan
+	nextKaryawanID int
+	seedTx         map[string]int // jumlah transaksi seed per periode, untuk total transaksi tenant
+	users          *auth.Store
+	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
+	saveMu         sync.Mutex               // serialisasi penulisan state.json
+	loginMu        sync.Mutex
+	failures       map[string]loginFailure // per IP
+	aiEngine       *ai.Engine
+	mux            *http.ServeMux
 }
 
 func NewServer() *Server {
@@ -52,24 +58,42 @@ func NewServer() *Server {
 
 	users := auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword))
 	nextTxID := len(txs) + 1
+	assets := finance.SeedAssets()
+	nextAssetID := len(assets) + 1
 	st, err := loadState()
 	if err != nil {
 		log.Fatalf("state.json rusak, perbaiki atau pindahkan dulu: %v", err) // jangan timpa data user dengan seed
 	}
+	karyawan := []finance.Karyawan(nil)
+	nextKaryawanID := 1
+	var opening *finance.OpeningBalance
 	if st != nil {
 		txs, nextTxID, users = st.Transactions, st.NextTxID, auth.Restore(st.Auth)
+		// state.json dari versi sebelum register aset tidak punya daftar aset: pakai seed.
+		if st.NextAssetID > 0 {
+			assets, nextAssetID = st.Assets, st.NextAssetID
+		}
+		opening = st.Opening
+		if st.NextKaryawanID > 0 {
+			karyawan, nextKaryawanID = st.Karyawan, st.NextKaryawanID
+		}
 	}
 
 	s := &Server{
-		snapshots: snapshots,
-		txs:       txs,
-		nextTxID:  nextTxID,
-		seedTx:    seedTx,
-		users:     users,
-		failures:  map[string]loginFailure{},
-		profile:   loadProfile(),
-		aiEngine:  ai.NewEngine(),
-		mux:       http.NewServeMux(),
+		snapshots:      snapshots,
+		txs:            txs,
+		nextTxID:       nextTxID,
+		assets:         assets,
+		nextAssetID:    nextAssetID,
+		opening:        opening,
+		karyawan:       karyawan,
+		nextKaryawanID: nextKaryawanID,
+		seedTx:         seedTx,
+		users:          users,
+		failures:       map[string]loginFailure{},
+		profile:        loadProfile(),
+		aiEngine:       ai.NewEngine(),
+		mux:            http.NewServeMux(),
 	}
 	s.routes()
 	if st == nil {
@@ -122,7 +146,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/dashboard", s.guard("dashboard", s.handleDashboard))
 	s.mux.HandleFunc("GET /api/v1/reports/financial", s.guard("laporan-keuangan", s.handleFinancial))
-	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("arus-kas", s.handleCashflow))
+	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("laporan-keuangan", s.handleCashflow))
 	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.handleGetBusiness))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.handlePutBusiness))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.handleTaxPlanning))
@@ -139,6 +163,21 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.handleImportTransactions)))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleUpdateTransaction)))
 	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.handleDeleteTransaction)))
+
+	s.mux.HandleFunc("GET /api/v1/assets", s.guard("laporan-keuangan", s.handleListAssets))
+	s.mux.HandleFunc("POST /api/v1/assets", s.persisting(s.guard("laporan-keuangan", s.handleCreateAsset)))
+	s.mux.HandleFunc("PUT /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.handleUpdateAsset)))
+	s.mux.HandleFunc("DELETE /api/v1/assets/{id}", s.persisting(s.guard("laporan-keuangan", s.handleDeleteAsset)))
+
+	s.mux.HandleFunc("GET /api/v1/onboarding/template", s.guard("impor-data", s.handleOnboardingTemplate))
+	s.mux.HandleFunc("POST /api/v1/onboarding/import", s.persisting(s.guard("impor-data", s.handleOnboardingImport)))
+	s.mux.HandleFunc("GET /api/v1/opening", s.guard("laporan-keuangan", s.handleGetOpening))
+	s.mux.HandleFunc("PUT /api/v1/opening", s.persisting(s.guard("impor-data", s.handlePutOpening)))
+
+	s.mux.HandleFunc("GET /api/v1/karyawan", s.guard("karyawan", s.handleListKaryawan))
+	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.handleCreateKaryawan)))
+	s.mux.HandleFunc("PUT /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.handleUpdateKaryawan)))
+	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.handleDeleteKaryawan)))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
 	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))
@@ -320,17 +359,25 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // --- Laporan ---
 
-func (s *Server) ledger(r *http.Request) []finance.LedgerEntry {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return finance.ToLedger(finance.ForPeriod(s.txs, periodOrDefault(r)))
+// openingFor: saldo awal periode. Memakai neraca awal onboarding bila sudah diisi, kalau belum
+// memakai saldo data demo. Pemanggil harus memegang s.mu.
+func (s *Server) openingFor(period string) finance.ReportOpening {
+	if s.opening == nil {
+		return finance.SeedOpening(period)
+	}
+	return s.opening.At(s.txs, period)
 }
 
-// ponytail: nilai stok tetap seed (Rp8,25 jt) sampai modul stok menghitung persediaan dari transaksi.
-const inventoryValue int64 = 8_250_000
+// report menghitung seluruh laporan satu periode dari state saat ini. Semua endpoint laporan
+// memakai fungsi ini supaya laba rugi, arus kas, neraca, dan register aset tidak saling bertentangan.
+func (s *Server) report(period string) finance.PeriodReport {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+}
 
 func (s *Server) handleFinancial(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.BuildIncomeStatement(s.ledger(r)))
+	writeJSON(w, s.report(periodOrDefault(r)).Income)
 }
 
 // handleSalesReport: granularity day|week untuk satu periode, month untuk tren seluruh periode.
@@ -347,13 +394,11 @@ func (s *Server) handleSalesReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCashflow(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.BuildCashFlow(s.ledger(r), finance.OpeningCash(periodOrDefault(r))))
+	writeJSON(w, s.report(periodOrDefault(r)).CashFlow)
 }
 
 func (s *Server) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
-	opening := finance.OpeningCash(periodOrDefault(r))
-	// Modal awal = kas awal + stok awal (tanpa utang awal).
-	writeJSON(w, finance.BuildBalanceSheet(s.ledger(r), opening, inventoryValue, opening+inventoryValue))
+	writeJSON(w, s.report(periodOrDefault(r)).BalanceSheet)
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -371,9 +416,14 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.RUnlock()
 
-	entries := finance.ToLedger(txs)
-	finance.ApplyKPIs(&snap, finance.BuildIncomeStatement(entries), finance.BuildCashFlow(entries, finance.OpeningCash(period)), txs, seedN)
-	snap.CashWarnings = finance.CashWarnings(txs, finance.OpeningCash(period))
+	rep := s.report(period)
+	finance.ApplyKPIs(&snap, rep.Income, rep.CashFlow, txs, seedN)
+	// Grafik tren & sparkline ikut dihitung ulang supaya tidak bertentangan dengan KPI.
+	s.mu.RLock()
+	history := finance.TrendHistory(s.txs, s.assets, period, s.openingFor)
+	s.mu.RUnlock()
+	finance.ApplyTrend(&snap, history)
+	snap.CashWarnings = finance.CashWarnings(txs, rep.CashFlow.OpeningBalance)
 	writeJSON(w, snap)
 }
 
@@ -400,7 +450,9 @@ func (s *Server) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sim := finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee)
-	fixed := finance.BuildIncomeStatement(s.ledger(r)).Opex
+	// Beban tetap break-even memakai beban operasional kas; penyusutan tidak ikut karena
+	// tidak memengaruhi kas yang harus ditutup penjualan.
+	fixed := s.report(periodOrDefault(r)).Income.Opex
 	if req.FixedCost != nil {
 		fixed = *req.FixedCost
 	}
@@ -429,10 +481,9 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		snap = s.snapshots["2026-08"]
 	}
-	ledger := finance.ToLedger(finance.ForPeriod(s.txs, period))
 	s.mu.RUnlock()
 
-	resp := s.aiEngine.Answer(r.Context(), req, snap, ledger)
+	resp := s.aiEngine.Answer(r.Context(), req, snap, s.report(period))
 	writeJSON(w, resp)
 }
 

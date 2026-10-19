@@ -17,7 +17,13 @@ import (
 type state struct {
 	Transactions []finance.Transaction `json:"transactions"`
 	NextTxID     int                   `json:"next_tx_id"`
-	Auth         auth.StoreSnapshot    `json:"auth"`
+	Assets       []finance.Asset       `json:"assets"`
+	NextAssetID  int                   `json:"next_asset_id"`
+	// Opening: neraca awal onboarding; nil = belum diisi.
+	Opening        *finance.OpeningBalance `json:"opening"`
+	Karyawan       []finance.Karyawan      `json:"karyawan"`
+	NextKaryawanID int                     `json:"next_karyawan_id"`
+	Auth           auth.StoreSnapshot      `json:"auth"`
 }
 
 // dataPath: berkas di $DATA_DIR; kosong = mode in-memory (test, dev lokal).
@@ -65,7 +71,12 @@ func (s *Server) save() {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
 	s.mu.RLock()
-	st := state{Transactions: s.txs, NextTxID: s.nextTxID, Auth: s.users.Snapshot()}
+	st := state{
+		Transactions: s.txs, NextTxID: s.nextTxID,
+		Assets: s.assets, NextAssetID: s.nextAssetID,
+		Opening: s.opening, Karyawan: s.karyawan, NextKaryawanID: s.nextKaryawanID,
+		Auth: s.users.Snapshot(),
+	}
 	err := writeFileAtomic(p, st)
 	s.mu.RUnlock()
 	if err != nil {

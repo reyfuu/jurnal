@@ -21,10 +21,10 @@ func TestPasal17(t *testing.T) {
 
 func TestPasal31E(t *testing.T) {
 	for _, c := range []struct{ omzet, pkp, want int64 }{
-		{2_400_000_000, 168_000_000, 18_480_000},    // seluruh PKP dapat fasilitas 50%
+		{2_400_000_000, 168_000_000, 18_480_000},     // seluruh PKP dapat fasilitas 50%
 		{10_000_000_000, 1_000_000_000, 167_200_000}, // sampel sheet Pasal 31E
 		{60_000_000_000, 1_000_000_000, 220_000_000}, // omzet > 50 M: tanpa fasilitas
-		{2_400_000_000, 168_000_999, 18_480_000},    // PKP dibulatkan ke bawah ribuan
+		{2_400_000_000, 168_000_999, 18_480_000},     // PKP dibulatkan ke bawah ribuan
 	} {
 		if got := Pasal31E(c.omzet, c.pkp); got != c.want {
 			t.Errorf("Pasal31E(%d, %d) = %d, want %d", c.omzet, c.pkp, got, c.want)

@@ -1,5 +1,7 @@
 package finance
 
+import "cmp"
+
 // ponytail: single-month ledger, no multi-period carry-over; add period filter when real DB lands.
 
 const (
@@ -19,6 +21,13 @@ const (
 	// expense category lain dihitung sebagai Opex
 )
 
+// Aktivitas arus kas (PSAK 2): operasi, investasi, pendanaan.
+const (
+	AktivitasOperasi   = "operasi"
+	AktivitasInvestasi = "investasi"
+	AktivitasPendanaan = "pendanaan"
+)
+
 // LedgerEntry is one money movement. Settled=false means piutang (income) or utang (expense).
 type LedgerEntry struct {
 	Kind     string `json:"kind"`
@@ -30,28 +39,34 @@ type LedgerEntry struct {
 	Settled  bool   `json:"settled"`
 }
 
-// nonOperating: pos yang menggerakkan kas tapi bukan laba rugi. Nilai = efek bertanda ke kas.
-func nonOperating(e LedgerEntry) (int64, bool) {
+// aktivitasOf memetakan entri ke aktivitas arus kas; dipakai juga untuk menyaring pos
+// yang menggerakkan kas tapi bukan laba rugi.
+func aktivitasOf(e LedgerEntry) string {
 	switch e.Category {
-	case CatCapital, CatLoan:
-		return e.Gross, true
-	case CatAsset, CatLoanPayment, CatPrive:
-		return -e.Gross, true
+	case CatAsset:
+		return AktivitasInvestasi
+	case CatCapital, CatLoan, CatLoanPayment, CatPrive:
+		return AktivitasPendanaan
 	}
-	return 0, false
+	return AktivitasOperasi
 }
 
 type IncomeStatement struct {
-	Omzet       int64  `json:"omzet"`
-	ChannelFees int64  `json:"channel_fees"`
-	NetSales    int64  `json:"net_sales"`
-	COGS        int64  `json:"cogs"`
-	GrossProfit int64  `json:"gross_profit"`
-	Opex        int64  `json:"opex"`
-	OtherIncome int64  `json:"other_income"`
-	NetProfit   int64  `json:"net_profit"`
-	MarginBps   int    `json:"margin_bps"`
-	OpexLines   []Line `json:"opex_lines"`
+	Omzet       int64 `json:"omzet"`
+	ChannelFees int64 `json:"channel_fees"`
+	NetSales    int64 `json:"net_sales"`
+	COGS        int64 `json:"cogs"`
+	GrossProfit int64 `json:"gross_profit"`
+	// Opex = beban operasional yang mengeluarkan kas (tanpa penyusutan).
+	Opex int64 `json:"opex"`
+	// Depreciation & Amortization = beban non-kas dari register aset (PMK 72/2023).
+	Depreciation int64  `json:"depreciation"`
+	Amortization int64  `json:"amortization"`
+	TotalOpex    int64  `json:"total_opex"` // Opex + Depreciation + Amortization
+	OtherIncome  int64  `json:"other_income"`
+	NetProfit    int64  `json:"net_profit"`
+	MarginBps    int    `json:"margin_bps"`
+	OpexLines    []Line `json:"opex_lines"`
 }
 
 type Line struct {
@@ -59,25 +74,68 @@ type Line struct {
 	Amount int64  `json:"amount"`
 }
 
+// CashFlowLine: Amount bertanda — positif menambah kas, negatif mengurangi.
+type CashFlowLine struct {
+	Label  string `json:"label"`
+	Amount int64  `json:"amount"`
+	Detail []Line `json:"detail,omitempty"`
+	// NonKas menandai baris informasi yang sengaja Rp 0 karena tidak menggerakkan kas.
+	NonKas bool `json:"non_kas,omitempty"`
+}
+
+type CashFlowSection struct {
+	Lines []CashFlowLine `json:"lines"`
+	Net   int64          `json:"net"`
+}
+
+func (s *CashFlowSection) add(label string, amount int64, detail ...Line) {
+	s.Lines = append(s.Lines, CashFlowLine{Label: label, Amount: amount, Detail: detail})
+	s.Net += amount
+}
+
+func (s *CashFlowSection) note(label string) {
+	s.Lines = append(s.Lines, CashFlowLine{Label: label, NonKas: true})
+}
+
+// CashFlow menyajikan arus kas satu periode dalam dua metode. Bagian Operasi berbeda
+// (langsung menelusuri kas, tidak langsung mulai dari laba bersih) tapi Net-nya wajib sama;
+// Investasi & Pendanaan identik di kedua metode.
 type CashFlow struct {
 	OpeningBalance int64 `json:"opening_balance"`
 	CashIn         int64 `json:"cash_in"`
 	CashOut        int64 `json:"cash_out"`
 	NetCash        int64 `json:"net_cash"`
 	ClosingBalance int64 `json:"closing_balance"`
+	// NewReceivables & NewPayables hanya mencakup akrual operasional, supaya penyesuaian
+	// modal kerja di metode tidak langsung tepat sama dengan kas operasi.
 	NewReceivables int64 `json:"new_receivables"`
 	NewPayables    int64 `json:"new_payables"`
-	// NonOperating = modal & pinjaman masuk − aset, cicilan, prive (bertanda, lunas maupun belum).
-	// Laba − piutang baru + utang baru + NonOperating = NetCash.
-	NonOperating int64 `json:"non_operating"`
+	// NewPayablesOther & NewReceivablesOther: akrual dari aktivitas investasi & pendanaan,
+	// mis. aset dibeli secara kredit. Tetap jadi utang/piutang di neraca, tapi bukan
+	// penyesuaian modal kerja di metode tidak langsung.
+	NewPayablesOther    int64 `json:"new_payables_other"`
+	NewReceivablesOther int64 `json:"new_receivables_other"`
+	Depreciation        int64 `json:"depreciation"`
+	Amortization        int64 `json:"amortization"`
+	// SetorModal & Prive dipakai neraca untuk menghitung tambahan modal.
+	SetorModal int64 `json:"setor_modal"`
+	Prive      int64 `json:"prive"`
+
+	OperasiLangsung      CashFlowSection `json:"operasi_langsung"`
+	OperasiTidakLangsung CashFlowSection `json:"operasi_tidak_langsung"`
+	Investasi            CashFlowSection `json:"investasi"`
+	Pendanaan            CashFlowSection `json:"pendanaan"`
 }
 
 type BalanceSheetAssets struct {
 	Cash        int64 `json:"cash"`
 	Receivables int64 `json:"receivables"`
 	Inventory   int64 `json:"inventory"`
-	FixedAssets int64 `json:"fixed_assets"`
-	Total       int64 `json:"total"`
+	// FixedAssetsCost & AccumDepreciation berasal dari register aset; FixedAssets = nilai buku.
+	FixedAssetsCost   int64 `json:"fixed_assets_cost"`
+	AccumDepreciation int64 `json:"accum_depreciation"`
+	FixedAssets       int64 `json:"fixed_assets"`
+	Total             int64 `json:"total"`
 }
 
 type BalanceSheetLiabilities struct {
@@ -88,7 +146,7 @@ type BalanceSheetLiabilities struct {
 
 type BalanceSheetEquity struct {
 	OpeningCapital int64 `json:"opening_capital"`
-	AddedCapital   int64 `json:"added_capital"` // setor modal − ambil pribadi
+	AddedCapital   int64 `json:"added_capital"` // setor modal − ambil pribadi + aset masuk tanpa kas
 	CurrentProfit  int64 `json:"current_profit"`
 	Total          int64 `json:"total"`
 }
@@ -100,40 +158,12 @@ type BalanceSheet struct {
 	IsBalanced  bool                    `json:"is_balanced"`
 }
 
-// ponytail: aset tetap belum disusutkan; tambahkan penyusutan bulanan bila dibutuhkan laporan bank.
-func BuildBalanceSheet(entries []LedgerEntry, openingCash, inventory, openingEquity int64) BalanceSheet {
-	is := BuildIncomeStatement(entries)
-	cf := BuildCashFlow(entries, openingCash)
-	var fixed, loans, added int64
-	for _, e := range entries {
-		switch e.Category {
-		case CatAsset:
-			fixed += e.Gross
-		case CatLoan:
-			loans += e.Gross
-		case CatLoanPayment:
-			loans -= e.Gross
-		case CatCapital:
-			added += e.Gross
-		case CatPrive:
-			added -= e.Gross
-		}
-	}
-	a := BalanceSheetAssets{Cash: cf.ClosingBalance, Receivables: cf.NewReceivables, Inventory: inventory, FixedAssets: fixed}
-	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets
-	l := BalanceSheetLiabilities{Payables: cf.NewPayables, Loans: loans}
-	l.Total = l.Payables + l.Loans
-	q := BalanceSheetEquity{OpeningCapital: openingEquity, AddedCapital: added, CurrentProfit: is.NetProfit}
-	q.Total = q.OpeningCapital + q.AddedCapital + q.CurrentProfit
-	return BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total}
-}
-
-func BuildIncomeStatement(entries []LedgerEntry) IncomeStatement {
-	var is IncomeStatement
+func BuildIncomeStatement(entries []LedgerEntry, depreciation, amortization int64) IncomeStatement {
+	is := IncomeStatement{Depreciation: depreciation, Amortization: amortization}
 	opexIdx := map[string]int{}
 	for _, e := range entries {
-		if _, skip := nonOperating(e); skip {
-			continue
+		if aktivitasOf(e) != AktivitasOperasi {
+			continue // modal, pinjaman, aset, cicilan, prive bukan laba rugi
 		}
 		switch {
 		case e.Kind == KindIncome && e.Category == CatSales:
@@ -157,36 +187,175 @@ func BuildIncomeStatement(entries []LedgerEntry) IncomeStatement {
 	}
 	is.NetSales = is.Omzet - is.ChannelFees
 	is.GrossProfit = is.NetSales - is.COGS
-	is.NetProfit = is.GrossProfit - is.Opex + is.OtherIncome
+	is.TotalOpex = is.Opex + is.Depreciation + is.Amortization
+	is.NetProfit = is.GrossProfit - is.TotalOpex + is.OtherIncome
 	if is.Omzet > 0 {
 		is.MarginBps = int(is.NetProfit * 10000 / is.Omzet)
 	}
 	return is
 }
 
-func BuildCashFlow(entries []LedgerEntry, opening int64) CashFlow {
-	cf := CashFlow{OpeningBalance: opening}
+// BuildCashFlow menyusun arus kas dari entri yang sudah lunas; is dipakai untuk metode
+// tidak langsung (laba bersih dan beban non-kas).
+func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) CashFlow {
+	cf := CashFlow{OpeningBalance: opening, Depreciation: is.Depreciation, Amortization: is.Amortization}
+
+	var pelanggan, lainnya, potongan, hpp, opex, beliAset, modal, pinjaman, cicilan, prive int64
+	channel := newTally()
+	opexDetail := newTally()
+
 	for _, e := range entries {
-		if v, ok := nonOperating(e); ok {
-			cf.NonOperating += v
+		kas := e.Gross
+		if e.Kind == KindIncome {
+			kas = e.Gross - e.Fee
 		}
-		switch e.Kind {
-		case KindIncome:
-			net := e.Gross - e.Fee
-			if e.Settled {
-				cf.CashIn += net
-			} else {
-				cf.NewReceivables += net
+		if !e.Settled {
+			// Belum menyentuh kas. Hanya akrual operasional yang jadi penyesuaian modal kerja;
+			// aset yang dibeli kredit tetap jadi utang di neraca tapi bukan kas operasi.
+			operasi := aktivitasOf(e) == AktivitasOperasi
+			switch {
+			case e.Kind == KindIncome && operasi:
+				cf.NewReceivables += kas
+			case e.Kind == KindIncome:
+				cf.NewReceivablesOther += kas
+			case operasi:
+				cf.NewPayables += kas
+			default:
+				cf.NewPayablesOther += kas
 			}
-		case KindExpense:
-			if e.Settled {
-				cf.CashOut += e.Gross
-			} else {
-				cf.NewPayables += e.Gross
-			}
+			continue
+		}
+		if e.Kind == KindIncome {
+			cf.CashIn += kas
+		} else {
+			cf.CashOut += kas
+		}
+		switch {
+		case e.Category == CatSales:
+			pelanggan += kas
+			channel.add(cmp.Or(e.Channel, "Lainnya"), kas)
+		case e.Category == CatCapital:
+			modal += kas
+		case e.Category == CatLoan:
+			pinjaman += kas
+		case e.Category == CatAsset:
+			beliAset += kas
+		case e.Category == CatLoanPayment:
+			cicilan += kas
+		case e.Category == CatPrive:
+			prive += kas
+		case e.Kind == KindIncome:
+			lainnya += kas
+		case e.Category == CatChannelFee:
+			potongan += kas
+		case e.Category == CatCOGS:
+			hpp += kas
+		default:
+			opex += kas
+			opexDetail.add(e.Title, kas)
 		}
 	}
 	cf.NetCash = cf.CashIn - cf.CashOut
 	cf.ClosingBalance = opening + cf.NetCash
+	cf.SetorModal, cf.Prive = modal, prive
+
+	cf.OperasiLangsung.add("Penerimaan kas dari pelanggan", pelanggan, channel.lines()...)
+	cf.OperasiLangsung.add("Penerimaan pendapatan lain", lainnya)
+	cf.OperasiLangsung.add("Pembayaran potongan channel / aplikasi", -potongan)
+	cf.OperasiLangsung.add("Pembayaran ke supplier bahan baku (HPP)", -hpp)
+	cf.OperasiLangsung.add("Pembayaran beban operasional", -opex, opexDetail.lines()...)
+	cf.OperasiLangsung.note("Penjualan tempo & biaya belum dibayar — belum menyentuh kas")
+	cf.OperasiLangsung.note("Penyusutan & amortisasi — tidak mengeluarkan kas")
+
+	cf.OperasiTidakLangsung.add("Laba bersih (dari laporan laba rugi)", is.NetProfit)
+	cf.OperasiTidakLangsung.add("Penyusutan aset tetap", is.Depreciation)
+	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
+	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)
+	cf.OperasiTidakLangsung.add("Kenaikan utang usaha", cf.NewPayables)
+	cf.OperasiTidakLangsung.note("Perubahan persediaan stok — belum dihitung per periode")
+
+	cf.Investasi.add("Beli alat / aset tetap", -beliAset)
+	cf.Pendanaan.add("Setor modal", modal)
+	cf.Pendanaan.add("Terima pinjaman", pinjaman)
+	cf.Pendanaan.add("Bayar cicilan pinjaman", -cicilan)
+	cf.Pendanaan.add("Ambil uang pribadi (prive)", -prive)
 	return cf
+}
+
+// tally menjumlahkan per label sambil menjaga urutan kemunculan.
+type tally struct {
+	idx   map[string]int
+	items []Line
+}
+
+func newTally() *tally { return &tally{idx: map[string]int{}} }
+
+func (t *tally) add(label string, amount int64) {
+	if i, ok := t.idx[label]; ok {
+		t.items[i].Amount += amount
+		return
+	}
+	t.idx[label] = len(t.items)
+	t.items = append(t.items, Line{label, amount})
+}
+
+func (t *tally) lines() []Line { return t.items }
+
+// BuildBalanceSheet menyusun neraca. Modal awal dihitung dari komposisi saldo awal itu sendiri
+// (aktiva awal − kewajiban awal), sehingga aktiva selalu sama dengan pasiva.
+//
+// ponytail: persediaan masih angka saldo awal, belum dihitung dari mutasi stok; karena itu
+// "perubahan persediaan" di arus kas metode tidak langsung masih Rp 0.
+func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, as AssetSummary, opening ReportOpening) BalanceSheet {
+	var loans int64
+	for _, e := range entries {
+		switch e.Category {
+		case CatLoan:
+			loans += e.Gross
+		case CatLoanPayment:
+			loans -= e.Gross
+		}
+	}
+	a := BalanceSheetAssets{
+		Cash:            cf.ClosingBalance,
+		Receivables:     opening.Receivables + cf.NewReceivables + cf.NewReceivablesOther,
+		Inventory:       opening.Inventory,
+		FixedAssetsCost: as.TotalHargaPerolehan, AccumDepreciation: as.TotalAkumulasi, FixedAssets: as.TotalNilaiBuku,
+	}
+	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets
+	l := BalanceSheetLiabilities{
+		Payables: opening.Payables + cf.NewPayables + cf.NewPayablesOther,
+		Loans:    opening.Loans + loans,
+	}
+	l.Total = l.Payables + l.Loans
+	q := BalanceSheetEquity{
+		OpeningCapital: opening.Cash + opening.Receivables + opening.Inventory + as.NilaiBukuAwal - opening.Payables - opening.Loans,
+		AddedCapital:   cf.SetorModal - cf.Prive + as.TambahanTanpaKas,
+		CurrentProfit:  is.NetProfit,
+	}
+	q.Total = q.OpeningCapital + q.AddedCapital + q.CurrentProfit
+	return BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total}
+}
+
+// PeriodReport adalah seluruh laporan satu periode dari satu sumber data, supaya laba rugi,
+// arus kas, neraca, dan register aset tidak pernah saling bertentangan.
+type PeriodReport struct {
+	Period       string          `json:"period"`
+	Income       IncomeStatement `json:"income"`
+	CashFlow     CashFlow        `json:"cash_flow"`
+	BalanceSheet BalanceSheet    `json:"balance_sheet"`
+	Assets       AssetSummary    `json:"assets"`
+}
+
+// BuildPeriodReport menghitung semua laporan periode dari transaksi dan register aset.
+// txs adalah seluruh transaksi; penyaringan per periode dilakukan di sini.
+func BuildPeriodReport(txs []Transaction, assets []Asset, period string, opening ReportOpening) PeriodReport {
+	entries := ToLedger(ForPeriod(txs, period))
+	as := AssetsForPeriod(assets, txs, period)
+	is := BuildIncomeStatement(entries, as.BebanPenyusutan, as.BebanAmortisasi)
+	cf := BuildCashFlow(entries, is, opening.Cash)
+	return PeriodReport{
+		Period: period, Income: is, CashFlow: cf, Assets: as,
+		BalanceSheet: BuildBalanceSheet(entries, is, cf, as, opening),
+	}
 }
