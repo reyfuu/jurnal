@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, Bug, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, Bug, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
   Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
@@ -39,6 +39,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'impor-data', label: 'Impor Data Awal', icon: Upload },
       { view: 'karyawan', label: 'Karyawan', icon: Users },
       { view: 'pengguna', label: 'Pengguna & Akses', icon: UserCog },
+      { view: 'langganan', label: 'Langganan', icon: CreditCard },
       { view: 'master-data', label: 'Daftar Akun (CoA)', icon: Database },
       { view: 'panduan', label: 'Panduan', icon: BookOpen },
       { view: 'lapor-bug', label: 'Lapor Bug', icon: Bug },

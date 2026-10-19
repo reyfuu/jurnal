@@ -6,6 +6,8 @@ set -euo pipefail
 
 APP_PORT="${1:-8085}"
 # Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
+# MIDTRANS_SERVER_KEY / MIDTRANS_CLIENT_KEY (opsional, di .env): pembayaran langganan;
+# MIDTRANS_PRODUCTION=true untuk akun produksi (default sandbox).
 [ -f .env ] && . ./.env
 : "${SEED_PASSWORD:?SEED_PASSWORD wajib di-set (export atau .env) sebelum deploy}"
 IMAGE_NAME="laporan-bisnis:latest"
@@ -25,6 +27,9 @@ docker run -d \
   --restart unless-stopped \
   -p "127.0.0.1:${APP_PORT}:8080" \
   -e SEED_PASSWORD="$SEED_PASSWORD" \
+  -e MIDTRANS_SERVER_KEY="${MIDTRANS_SERVER_KEY:-}" \
+  -e MIDTRANS_CLIENT_KEY="${MIDTRANS_CLIENT_KEY:-}" \
+  -e MIDTRANS_PRODUCTION="${MIDTRANS_PRODUCTION:-false}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"

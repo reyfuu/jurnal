@@ -29,6 +29,7 @@ type state struct {
 	Invoices       []finance.Invoice       `json:"invoices"`
 	NextInvoiceID  int                     `json:"next_invoice_id"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
+	Langganan      *langganan              `json:"langganan,omitempty"`
 }
 
 // dataPath: berkas di $DATA_DIR; kosong = mode in-memory (test, dev lokal).
@@ -108,6 +109,7 @@ func (t *tenant) snapshot() state {
 		Assets: t.assets, NextAssetID: t.nextAssetID,
 		Opening: t.opening, Karyawan: t.karyawan, NextKaryawanID: t.nextKaryawanID,
 		Invoices: t.invoices, NextInvoiceID: t.nextInvoiceID,
+		Langganan: &t.langganan,
 	}
 }
 

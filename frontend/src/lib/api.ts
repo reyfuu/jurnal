@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
 
@@ -23,7 +23,25 @@ export interface Me {
   user: User
   role_label: string
   views: View[]
+  langganan: LanggananStatus
 }
+
+/** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
+export interface LanggananStatus { status: 'trial' | 'aktif' | 'habis'; sampai?: string }
+export interface Paket { id: string; nama: string; harga: number; hari: number; hemat?: string }
+export interface BillingOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal'; waktu: string }
+export interface Billing {
+  langganan: LanggananStatus
+  paket: Paket[]
+  orders: BillingOrder[]
+  client_key: string
+  snap_js: string
+  aktif: boolean
+}
+export const getPlans = () => api<{ paket: Paket[]; trial_hari: number }>('/billing/plans')
+export const getBilling = () => api<Billing>('/billing')
+export const refreshBilling = () => api<Billing>('/billing/refresh', { method: 'POST' })
+export const checkout = (paket: string) => api<{ order_id: string; token: string; redirect_url: string }>('/billing/checkout', { method: 'POST', body: { paket } })
 
 export interface RoleInfo {
   label: string
