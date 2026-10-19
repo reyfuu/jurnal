@@ -143,7 +143,7 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - **Lokasi kode**:
   - `frontend/src/lib/onboarding.ts` berisi teks pertanyaan, alasan, dan opsi (`QUESTIONS`), urutan langkah dan langkah yang dilewati (`steps`), pemetaan ke profil (`toProfile`), serta teks layar akhir (`summary`). Semuanya fungsi murni.
   - Tesnya ada di `frontend/src/lib/onboarding.test.ts`.
-  - UI-nya `OnboardingWizard` di `frontend/src/views/ProfilUsaha.tsx`. Komponen ini memakai ulang `ChoiceGrid`. Memilih jawaban langsung pindah ke langkah berikutnya, dan tersedia tombol Kembali serta "Ubah jawaban".
+  - UI-nya `OnboardingWizard` di `frontend/src/views/ProfilUsaha.tsx`. Komponen ini memakai ulang `ChoiceGrid`. Sejak perbaikan UX 19 Oktober 2026, memilih jawaban tetap di layar yang sama sampai menekan **Lanjut**; tersedia tombol Kembali serta "Ubah jawaban".
   - **Backend tidak berubah.** `PUT /api/v1/business` dan `finance.BusinessProfile.Validate()` tetap menjadi penjaga terakhir.
 - **Menambah atau mengubah pertanyaan**:
   1. Tambah nilai di `Field`.
@@ -157,6 +157,17 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
   - Teks pajak di `summary` (PP 0,5%, batas Rp500 juta, Pasal 31E Rp4,8 miliar) ditulis manual. Selaraskan bila `internal/tax/planning.go` berubah.
   - `pkp` tersimpan tetapi belum dibaca oleh backend.
   - Halaman Pengaturan > Profil Usaha masih memakai form teknis (`ProfilForm`) untuk perubahan berikutnya.
+
+## UX Onboarding — 19 Oktober 2026
+
+- Desain disetujui pengguna: satu pertanyaan per layar, navigasi eksplisit lewat **Lanjut**, jawaban tetap tersimpan saat Kembali/Ubah jawaban, dan ringkasan sebelum menyimpan.
+- `ChoiceGrid` sekarang memakai radio native berlabel. Tombol panah/Spasi dapat memilih; kelompok radio pada Profil Usaha tetap independen. Keadaan terpilih, fokus, dan petunjuk pilihan jelas.
+- Wizard menampilkan progres berdasarkan pertanyaan yang berlaku saat itu. Jumlah dapat berubah mengikuti jenis/bentuk usaha dan status menikah; keterangan ini ditampilkan di bawah progres. Fokus berpindah ke judul pertanyaan saat langkah berubah.
+- Tata letak desktop/mobile memakai token yang ada, pilihan satu kolom di wizard, tombol minimal 44 px, dan ringkasan berupa daftar. Tombol navigasi wizard dinonaktifkan saat menyimpan; error simpan dapat dicoba ulang.
+- File implementasi: `frontend/src/views/ProfilUsaha.tsx`, `frontend/src/index.css`. Kontrak API, pertanyaan, dan pemetaan profil tidak berubah; tidak ada dependensi baru.
+- Spesifikasi: `docs/superpowers/specs/2026-10-19-onboarding-ux-design.md`; rencana: `docs/superpowers/plans/2026-10-19-onboarding-ux.md`.
+- Verifikasi: build frontend berhasil; 29 tes Vitest lulus; lint tanpa error (10 warning di file lain). Browser Chromium lokal pada 1280×900, 375×812, dan 320×740: keyboard, fokus, jasa melewati stok, manufaktur/perdagangan, OP menikah & penghasilan gabung, kembali/edit jawaban, perpindahan ke PT tanpa PTKP, kegagalan simpan/retry, status sibuk, payload profil, dan masuk dashboard lulus. Radio pada halaman Profil Usaha juga diperiksa. Review kode terpisah tidak menemukan bug.
+- Bukti sesi lokal: `/tmp/pajak-onboarding-check.py`, `/tmp/pajak-onboarding-name-desktop.png`, `/tmp/pajak-onboarding-summary-mobile.png`, `/tmp/pajak-onboarding-options-mobile.png`. Tidak memeriksa pembaca layar fisik atau browser selain Chromium. Belum deploy produksi.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
