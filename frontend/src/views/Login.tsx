@@ -16,10 +16,9 @@ const DEMO_ACCOUNTS = [
 ]
 
 export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
-  // daftar: buat usaha baru (kosong) dengan kode undangan, lalu langsung masuk wizard onboarding.
+  // daftar: buat usaha baru (kosong), lalu langsung masuk wizard onboarding.
   const [daftar, setDaftar] = useState(false)
   const [name, setName] = useState('')
-  const [kode, setKode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -32,7 +31,7 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
     setBusy(true)
     setError('')
     try {
-      onLogin(await (daftar ? register(name, email, password, kode) : login(email, password)))
+      onLogin(await (daftar ? register(name, email, password) : login(email, password)))
     } catch (err) {
       setError((err as Error).message)
       setBusy(false)
@@ -85,10 +84,6 @@ export function Login({ onLogin }: { onLogin: (me: Me) => void }) {
                   </Button>
                 </div>
               </div>
-              {daftar && <div className="grid gap-1.5">
-                <Label htmlFor="kode">Kode undangan</Label>
-                <Input id="kode" className="h-11" autoComplete="off" required value={kode} onChange={(e) => setKode(e.target.value)} />
-              </div>}
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
               <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy}>
                 {busy ? 'Memeriksa…' : daftar ? 'Daftar' : 'Masuk'}

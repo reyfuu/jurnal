@@ -3,7 +3,6 @@ package main
 import (
 	"cmp"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -344,15 +343,10 @@ func setSession(w http.ResponseWriter, r *http.Request, token string) {
 	})
 }
 
-// handleRegister: daftar mandiri dengan kode undangan (env REGISTER_CODE). Pendaftar menjadi
+// handleRegister: daftar mandiri (terbuka untuk umum). Pendaftar menjadi
 // Owner sebuah usaha baru yang kosong, lalu langsung login dan masuk wizard onboarding.
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
-	code := os.Getenv("REGISTER_CODE")
-	if code == "" {
-		http.Error(w, "pendaftaran belum dibuka", http.StatusNotFound)
-		return
-	}
-	var req struct{ Name, Email, Password, Kode string }
+	var req struct{ Name, Email, Password string }
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
@@ -360,11 +354,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	if s.blocked(ip) {
 		http.Error(w, "terlalu banyak percobaan, coba lagi dalam 15 menit", http.StatusTooManyRequests)
-		return
-	}
-	if subtle.ConstantTimeCompare([]byte(req.Kode), []byte(code)) != 1 {
-		s.recordAttempt(ip, false)
-		http.Error(w, "kode undangan salah", http.StatusForbidden)
 		return
 	}
 	s.tenantsMu.Lock()

@@ -6,7 +6,6 @@ set -euo pipefail
 
 APP_PORT="${1:-8085}"
 # Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
-# REGISTER_CODE (opsional, di .env): kode undangan halaman Daftar; kosong = pendaftaran tertutup.
 [ -f .env ] && . ./.env
 : "${SEED_PASSWORD:?SEED_PASSWORD wajib di-set (export atau .env) sebelum deploy}"
 IMAGE_NAME="laporan-bisnis:latest"
@@ -26,7 +25,6 @@ docker run -d \
   --restart unless-stopped \
   -p "127.0.0.1:${APP_PORT}:8080" \
   -e SEED_PASSWORD="$SEED_PASSWORD" \
-  -e REGISTER_CODE="${REGISTER_CODE:-}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"

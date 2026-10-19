@@ -286,8 +286,8 @@ export const getPeriods = () => api<PeriodOption[]>('/periods')
 
 export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
-export const register = (name: string, email: string, password: string, kode: string) =>
-  api<Me>('/auth/register', { method: 'POST', body: { name, email, password, kode } })
+export const register = (name: string, email: string, password: string) =>
+  api<Me>('/auth/register', { method: 'POST', body: { name, email, password } })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */

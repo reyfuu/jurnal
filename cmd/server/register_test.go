@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const registerBody = `{"name":"QA Satu","email":"qa1@x.id","password":"rahasia123","kode":"undangan"}`
+const registerBody = `{"name":"QA Satu","email":"qa1@x.id","password":"rahasia123"}`
 
 // register mendaftarkan akun baru dan mengembalikan cookie sesinya.
 func register(t *testing.T, srv *Server, body string) *http.Cookie {
@@ -25,19 +25,7 @@ func register(t *testing.T, srv *Server, body string) *http.Cookie {
 	return nil
 }
 
-func TestRegisterNeedsCode(t *testing.T) {
-	t.Setenv("REGISTER_CODE", "")
-	if rec := do(NewServer(), nil, http.MethodPost, "/api/v1/auth/register", registerBody); rec.Code != http.StatusNotFound {
-		t.Fatalf("register closed: want 404, got %d", rec.Code)
-	}
-	t.Setenv("REGISTER_CODE", "lain")
-	if rec := do(NewServer(), nil, http.MethodPost, "/api/v1/auth/register", registerBody); rec.Code != http.StatusForbidden {
-		t.Fatalf("wrong code: want 403, got %d", rec.Code)
-	}
-}
-
 func TestRegisterCreatesEmptyIsolatedBusiness(t *testing.T) {
-	t.Setenv("REGISTER_CODE", "undangan")
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
 	owner := login(t, srv, "owner@kedaikopisenja.id")
@@ -81,7 +69,6 @@ func TestRegisterCreatesEmptyIsolatedBusiness(t *testing.T) {
 
 func TestRegisteredBusinessSurvivesRestart(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
-	t.Setenv("REGISTER_CODE", "undangan")
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
 	do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"Punya QA","lunas":true}`)
