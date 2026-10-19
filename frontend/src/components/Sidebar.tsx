@@ -22,7 +22,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
   const initials = me.user.name.replace(/\(.*?\)/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
     <aside className="sidebar">
-      <div>
+      <div className="sidebar-main">
         <div className="sidebar-brand">
           <BrandMark />
           <div>

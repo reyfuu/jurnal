@@ -126,7 +126,7 @@
     background: var(--bg-shell);
     border: 1px solid var(--border-shell);
     border-radius: 20px;
-    overflow: hidden;
+    overflow: clip; /* bukan hidden: hidden membuat scroll container sehingga sidebar sticky mati */
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
     min-height: 860px;
   }
@@ -139,6 +139,20 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    /* tetap di layar saat konten di-scroll (pola skinku / AIpreneur) */
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+  }
+
+  /* brand + menu scroll sendiri; tenant-box tetap di bawah */
+  .sidebar-main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 
   .sidebar-brand {
@@ -198,6 +212,7 @@
   }
 
   .tenant-box {
+    flex-shrink: 0;
     margin-top: 20px;
     padding-top: 14px;
     border-top: 1px solid var(--border-subtle);
@@ -595,6 +610,11 @@
       border-right: none;
       border-bottom: 1px solid var(--border-subtle);
       padding: 14px 12px;
+      position: static;
+      height: auto;
+    }
+    .sidebar-main {
+      overflow: visible;
     }
     .sidebar-brand {
       padding: 0 4px 10px;
