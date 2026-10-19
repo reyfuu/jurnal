@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,8 +70,20 @@ func TestMeAndLogout(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&me); err != nil {
 		t.Fatal(err)
 	}
-	if me.User.Role != auth.Kasir || len(me.Views) != 2 {
+	// Menu kasir disebut satu per satu, bukan dihitung: jumlah menu berubah tiap kali ada
+	// fitur baru, sementara yang penting di sini adalah batas aksesnya.
+	if me.User.Role != auth.Kasir {
 		t.Fatalf("me: %+v", me)
+	}
+	for _, v := range []string{"dashboard", "transaksi", "lapor-bug"} {
+		if !slices.Contains(me.Views, v) {
+			t.Errorf("kasir harus punya menu %q, got %v", v, me.Views)
+		}
+	}
+	for _, v := range []string{"transaksi-kelola", "pengguna", "laporan-keuangan", "profil-usaha"} {
+		if slices.Contains(me.Views, v) {
+			t.Errorf("kasir tidak boleh punya menu %q", v)
+		}
 	}
 	do(srv, c, http.MethodPost, "/api/v1/auth/logout", "")
 	if rec := do(srv, c, http.MethodGet, "/api/v1/auth/me", ""); rec.Code != http.StatusUnauthorized {

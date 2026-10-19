@@ -9,7 +9,10 @@ import { LaporanKeuangan } from '@/views/Reports'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
 import { KalkulatorPajak } from '@/views/KalkulatorPajak'
-import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
+import { PajakUMKM, SimulasiHarga, StokModule } from '@/views/Operations'
+import { PiutangUtang, StokGudang } from '@/views/PiutangStok'
+import { ProduksiSupplier } from '@/views/ProduksiSupplier'
+import { LaporBug } from '@/views/LaporBug'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
@@ -24,6 +27,9 @@ export default function App() {
   const [session, setSession] = useState<Session>({ status: 'checking' })
   const [data, setData] = useState<AppData | null>(null)
   const [view, setView] = useState<View>('dashboard')
+  // Menu yang dibuka sebelum ini, dipakai mengisi kolom "terjadi di menu" pada Lapor Bug:
+  // orang membuka Lapor Bug justru setelah meninggalkan halaman yang bermasalah.
+  const [menuSebelum, setMenuSebelum] = useState<View>('dashboard')
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   const [error, setError] = useState('')
@@ -66,7 +72,11 @@ export default function App() {
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
-  const navigate = (v: View) => canSee(v) && setView(v)
+  const navigate = (v: View) => {
+    if (!canSee(v)) return
+    if (v !== view) setMenuSebelum(view)
+    setView(v)
+  }
 
   const changePeriod = (newP: string) => {
     setPeriod(newP)
@@ -150,7 +160,11 @@ export default function App() {
       case 'transaksi':
         return <Transaksi onChanged={() => reload(me!, period)} />
       case 'piutang-utang':
-        return <PiutangUtang d={d} />
+        return <PiutangUtang />
+      case 'stok-gudang':
+        return <StokGudang />
+      case 'produksi-supplier':
+        return <ProduksiSupplier />
       case 'invoice':
         return <InvoiceView />
       case 'simulasi-harga':
@@ -171,6 +185,8 @@ export default function App() {
         return <KaryawanView />
       case 'pengguna':
         return <Pengguna currentUserId={me!.user.id} />
+      case 'lapor-bug':
+        return <LaporBug view={menuSebelum} />
       default:
         return <StokModule d={d} title={VIEW_LABEL[view].toUpperCase()} />
     }

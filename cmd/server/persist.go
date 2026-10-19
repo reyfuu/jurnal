@@ -12,6 +12,7 @@ import (
 
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/support"
 )
 
 // ponytail: snapshot JSON atomik (tulis temp lalu rename) untuk 1 usaha & ratusan user;
@@ -28,7 +29,18 @@ type state struct {
 	NextKaryawanID int                     `json:"next_karyawan_id"`
 	Invoices       []finance.Invoice       `json:"invoices"`
 	NextInvoiceID  int                     `json:"next_invoice_id"`
+	Tagihan        []finance.Tagihan       `json:"tagihan"`
+	NextTagihanID  int                     `json:"next_tagihan_id"`
+	Stok           []finance.StokItem      `json:"stok"`
+	NextStokID     int                     `json:"next_stok_id"`
+	Produk         []finance.Produk        `json:"produk"`
+	NextProdukID   int                     `json:"next_produk_id"`
+	Supplier       []finance.Supplier      `json:"supplier"`
+	NextSupplierID int                     `json:"next_supplier_id"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
+	// Bugs global (bukan per usaha): pengembang perlu melihat laporan dari semua usaha,
+	// jadi hanya ditulis di state usaha 1 bersama data auth.
+	Bugs support.Snapshot `json:"bugs"`
 }
 
 // dataPath: berkas di $DATA_DIR; kosong = mode in-memory (test, dev lokal).
@@ -108,6 +120,10 @@ func (t *tenant) snapshot() state {
 		Assets: t.assets, NextAssetID: t.nextAssetID,
 		Opening: t.opening, Karyawan: t.karyawan, NextKaryawanID: t.nextKaryawanID,
 		Invoices: t.invoices, NextInvoiceID: t.nextInvoiceID,
+		Tagihan: t.tagihan, NextTagihanID: t.nextTagihanID,
+		Stok: t.stok, NextStokID: t.nextStokID,
+		Produk: t.produk, NextProdukID: t.nextProdukID,
+		Supplier: t.supplier, NextSupplierID: t.nextSupplierID,
 	}
 }
 
@@ -129,6 +145,7 @@ func (s *Server) save() {
 		st := t.snapshot()
 		if t.id == 1 {
 			st.Auth = s.users.Snapshot()
+			st.Bugs = s.bugs.Snapshot()
 		}
 		if err := writeFileAtomic(t.file("state"), st); err != nil {
 			log.Printf("GAGAL menyimpan state ke %s: %v", t.file("state"), err)
