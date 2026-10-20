@@ -1,0 +1,111 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"log"
+	"net/http"
+
+	"pajak/internal/finance"
+)
+
+// Ekspor Laporan Keuangan: PDF per tab / semua laporan sekaligus, dan perbandingan beberapa
+// bulan (JSON untuk layar, PDF untuk diunduh). Semua angka dari t.report, sumber yang sama
+// dengan layar Laporan Keuangan.
+
+func (t *tenant) bagianLaporan(rep finance.PeriodReport, bagian, metode string) ([]finance.BagianLaporan, bool, error) {
+	if metode != "" && metode != "langsung" && metode != "tidak-langsung" {
+		return nil, false, fmt.Errorf("metode arus kas %q tidak dikenal", metode)
+	}
+	tl := metode == "tidak-langsung"
+	switch bagian {
+	case "", "semua":
+		return []finance.BagianLaporan{finance.BagianLabaRugi(rep.Income), finance.BagianNeraca(rep.BalanceSheet), finance.BagianArusKas(rep.CashFlow, tl)}, false, nil
+	case "laba-rugi":
+		return []finance.BagianLaporan{finance.BagianLabaRugi(rep.Income)}, false, nil
+	case "neraca":
+		return []finance.BagianLaporan{finance.BagianNeraca(rep.BalanceSheet)}, false, nil
+	case "arus-kas":
+		return []finance.BagianLaporan{finance.BagianArusKas(rep.CashFlow, tl)}, false, nil
+	case "aset":
+		return nil, true, nil
+	}
+	return nil, false, fmt.Errorf("bagian laporan %q tidak dikenal", bagian)
+}
+
+var namaBerkasBagian = map[string]string{"": "Laporan-Keuangan", "semua": "Laporan-Keuangan", "laba-rugi": "Laba-Rugi",
+	"neraca": "Neraca", "arus-kas": "Arus-Kas", "aset": "Register-Aset"}
+
+func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	period := periodOrDefault(r)
+	if !finance.PeriodeSah(period) {
+		http.Error(w, "periode tidak dikenal", http.StatusBadRequest)
+		return
+	}
+	rep := t.report(period)
+	bagian, aset, err := t.bagianLaporan(rep, q.Get("bagian"), q.Get("metode"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var ringkasAset *finance.AssetSummary
+	if aset {
+		ringkasAset = &rep.Assets
+	}
+	var buf bytes.Buffer
+	if err := finance.RenderLaporanPDF(&buf, t.currentProfile().NamaUsaha, finance.LabelPeriode(period), bagian, ringkasAset); err != nil {
+		log.Printf("render laporan PDF %s: %v", period, err)
+		http.Error(w, "gagal membuat PDF", http.StatusInternalServerError)
+		return
+	}
+	kirimPDF(w, fmt.Sprintf("%s-%s.pdf", namaBerkasBagian[q.Get("bagian")], period), buf.Bytes())
+}
+
+func kirimPDF(w http.ResponseWriter, nama string, isi []byte) {
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, nama))
+	_, _ = w.Write(isi)
+}
+
+// banding menyusun perbandingan laba rugi, neraca, dan arus kas (metode langsung) untuk
+// bulan-bulan yang dipilih pengguna.
+func (t *tenant) banding(w http.ResponseWriter, r *http.Request) (finance.Banding, bool) {
+	periode, err := finance.ValidasiPeriodeBanding(r.URL.Query().Get("periode"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return finance.Banding{}, false
+	}
+	laporan := make([]finance.PeriodeLaporan, 0, len(periode))
+	for _, p := range periode {
+		rep := t.report(p)
+		laporan = append(laporan, finance.PeriodeLaporan{Periode: p, Bagian: []finance.BagianLaporan{
+			finance.BagianLabaRugi(rep.Income), finance.BagianNeraca(rep.BalanceSheet), finance.BagianArusKas(rep.CashFlow, false)}})
+	}
+	return finance.SusunBanding(laporan), true
+}
+
+func (t *tenant) handleBanding(w http.ResponseWriter, r *http.Request) {
+	if b, ok := t.banding(w, r); ok {
+		writeJSON(w, b)
+	}
+}
+
+func (t *tenant) handleBandingPDF(w http.ResponseWriter, r *http.Request) {
+	b, ok := t.banding(w, r)
+	if !ok {
+		return
+	}
+	var buf bytes.Buffer
+	if err := finance.RenderBandingPDF(&buf, t.currentProfile().NamaUsaha, b); err != nil {
+		log.Printf("render banding PDF: %v", err)
+		http.Error(w, "gagal membuat PDF", http.StatusInternalServerError)
+		return
+	}
+	n := len(b.Kolom)
+	nama := "Perbandingan-" + b.Kolom[0].Periode
+	if n > 1 {
+		nama += "-sd-" + b.Kolom[n-1].Periode
+	}
+	kirimPDF(w, nama+".pdf", buf.Bytes())
+}

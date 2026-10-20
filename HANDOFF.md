@@ -796,6 +796,12 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   sebelum disimpan. AI mati / gagal / kuota habis → `ai_pesan`, pratinjau tetap jalan.
 - Kuota saran KLU memakai mekanisme yang sama (`jatahAI("klu|<user>")`).
 
+## Unduh PDF & Banding multi-bulan Laporan Keuangan (20 Okt 2026)
+
+- Laporan Keuangan: tombol **Unduh PDF <tab>** (Laba Rugi, Neraca, Arus Kas sesuai metode yang dipilih, Aset) dan **Unduh semua laporan (PDF)** = Laba Rugi + Neraca + Arus Kas, masing-masing satu halaman. `GET /api/v1/reports/pdf?period=&bagian=semua|laba-rugi|neraca|arus-kas|aset&metode=langsung|tidak-langsung` (lewat `exporting`: ditolak di mode lihat-sebagai, menggugurkan garansi seperti ekspor lain).
+- Tab **Banding**: pilih 2–12 bulan bebas (tidak harus berurutan), kolom per bulan + **Total**. Laba rugi & arus kas dijumlahkan; neraca dan saldo kas akhir memakai posisi bulan terakhir ("Posisi akhir"); saldo kas awal dari bulan pertama. Tepat 2 bulan → kolom Selisih & %. `GET /api/v1/reports/banding?periode=2026-07,2026-08` (JSON) dan `/reports/banding.pdf` (A4 rebah, huruf mengecil otomatis bila kolom banyak).
+- Satu susunan baris (`finance.BagianLabaRugi/Neraca/ArusKas`) dipakai PDF dan Banding; `SusunBanding` menjajarkan baris per `kunci` (beban yang hanya ada di sebagian bulan tetap muncul, 0 di bulan lain). `internal/pdf` kini punya `NewLandscape()`.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

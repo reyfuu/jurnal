@@ -1,20 +1,26 @@
 import { useState } from 'react'
+import { FileDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { Aset } from '@/views/Aset'
 import { LaporanAI } from '@/views/LaporanAI'
-import type { AssetSummary, BalanceSheet, CashFlow, CashFlowSection, IncomeStatement } from '@/lib/api'
+import { BandingLaporan } from '@/views/BandingLaporan'
+import { ekspor } from '@/lib/garansi'
+import { laporanPdfUrl, type AssetSummary, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatJt, formatPct, formatRp, formatSignedJt } from '@/lib/format'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
 const BLUE = 'var(--accent-blue)'
 
-type Tab = 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset' | 'ai'
+type Tab = 'laba-rugi' | 'neraca' | 'arus-kas' | 'banding' | 'aset' | 'ai'
+type Metode = 'langsung' | 'tidak-langsung'
 
 const TABS: { id: Tab; label: string; badge?: string }[] = [
   { id: 'laba-rugi', label: 'Laba Rugi' },
   { id: 'neraca', label: 'Neraca' },
   { id: 'arus-kas', label: 'Arus Kas', badge: '2 METODE' },
+  { id: 'banding', label: 'Banding', badge: 'MULTI-BULAN' },
   { id: 'aset', label: 'Aset & Penyusutan' },
   { id: 'ai', label: 'Laporan AI', badge: 'ANALISIS' },
 ]
@@ -23,6 +29,7 @@ const SUBTITLE: Record<Tab, string> = {
   'laba-rugi': 'Laba Rugi, Neraca, Arus Kas & Aset dalam satu tempat',
   neraca: 'Posisi keuangan per akhir periode',
   'arus-kas': 'Dua metode penyajian: Langsung & Tidak Langsung',
+  banding: 'Bandingkan beberapa bulan sekaligus, lengkap dengan totalnya',
   aset: 'Register aset, penyusutan & amortisasi',
   ai: 'Seluruh laporan dalam satu halaman, dibaca & dianalisis AI',
 }
@@ -34,12 +41,17 @@ interface Props {
   assets: AssetSummary
   period: string
   periodLabel: string
+  periods: PeriodOption[]
+  /** false di mode Lihat sebagai klien: server menolak ekspor. */
+  bisaEkspor: boolean
   onAssetsChanged: () => void
 }
 
 /** Satu menu untuk seluruh laporan keuangan; tiap laporan jadi tab. */
-export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, onAssetsChanged }: Props) {
+export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, periods, bisaEkspor, onAssetsChanged }: Props) {
   const [tab, setTab] = useState<Tab>('laba-rugi')
+  const [metode, setMetode] = useState<Metode>('langsung')
+  const bagianTab: BagianPDF | null = tab === 'laba-rugi' || tab === 'neraca' || tab === 'arus-kas' || tab === 'aset' ? tab : null
 
   return (
     <>
@@ -48,6 +60,16 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, onAsse
           <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
             {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
           </span>
+        )}
+        {bisaEkspor && bagianTab && (
+          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined))}>
+            <FileDown /> Unduh PDF {TABS.find((t) => t.id === tab)?.label}
+          </Button>
+        )}
+        {bisaEkspor && tab !== 'banding' && (
+          <Button onClick={() => void ekspor(laporanPdfUrl(period, 'semua', metode))} title="Laba Rugi, Neraca, dan Arus Kas dalam satu PDF">
+            <FileDown /> Unduh semua laporan (PDF)
+          </Button>
         )}
       </PageHeader>
 
@@ -68,7 +90,8 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, onAsse
 
       {tab === 'laba-rugi' && <LabaRugi r={r} cf={cf} />}
       {tab === 'neraca' && <Neraca bs={bs} />}
-      {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} />}
+      {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} metode={metode} setMetode={setMetode} />}
+      {tab === 'banding' && <BandingLaporan periods={periods} period={period} bisaEkspor={bisaEkspor} />}
       {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
       {tab === 'ai' && <LaporanAI key={period} period={period} />}
     </>
@@ -231,8 +254,7 @@ function Section({ title, section, total }: { title: string; section: CashFlowSe
   )
 }
 
-function ArusKas({ cf, netProfit }: { cf: CashFlow; netProfit: number }) {
-  const [metode, setMetode] = useState<'langsung' | 'tidak-langsung'>('langsung')
+function ArusKas({ cf, netProfit, metode, setMetode }: { cf: CashFlow; netProfit: number; metode: Metode; setMetode: (m: Metode) => void }) {
   const operasi = metode === 'langsung' ? cf.operasi_langsung : cf.operasi_tidak_langsung
   const cocok = cf.operasi_langsung.net === cf.operasi_tidak_langsung.net
 

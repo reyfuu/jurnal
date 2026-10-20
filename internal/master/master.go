@@ -43,7 +43,7 @@ const (
 	CatatanKonsultan Izin = "catatan"
 	// Pengaturan: aturan yang berlaku untuk semua klien, mis. frekuensi pengingat.
 	Pengaturan Izin = "pengaturan"
-	Audit          Izin = "audit"
+	Audit      Izin = "audit"
 )
 
 type IzinInfo struct {
