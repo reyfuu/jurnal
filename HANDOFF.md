@@ -824,7 +824,18 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - **Laporan**: tab Laporan mutasi (harian/bulanan; Awal, Beli, Produksi, Terjual, Dipakai produksi, Opname, Akhir, nilai) + Export Excel; kartu per barang (klik nama barang); riwayat dokumen (hapus = stok dihitung ulang; stok awal hanya bisa dihapus bila tidak ada dokumen lain). Barang berriwayat tidak bisa dihapus.
 - Formulir Transaksi: pilih "Barang dari Stok & Gudang" (endpoint ringan `/api/v1/stok/pilihan` juga untuk Kasir). Tanggal bawaan Transaksi & Invoice kini WIB (sebelumnya UTC → sebelum 07.00 jatuh ke kemarin).
 - Produksi & Supplier kini 3 tab (21 Okt 2026): **Produksi** (tab utama; tombol "Catat produksi" memilih produk + batch, dan Laporan Produksi per bulan `GET /api/v1/produksi/laporan` + `.xlsx`), **Produk & Resep** (master produk, diisi sekali), **Supplier**.
-- **Belum** (PR B): laporan keuangan masih memakai cara lama (HPP = belanja bahan, persediaan = saldo awal). Penyambungan HPP terjual, persediaan neraca, arus kas, dan pajak mulai titik nol menyusul.
+- Penyambungan ke laporan keuangan: lihat bagian PR B di bawah.
+
+## Kartu stok → laporan keuangan (21 Okt 2026) — PR B
+
+- Mulai bulan titik nol (`finance.KartuStok.Periode` → `StokPeriode`, `BuildPeriodReportStok`):
+  - **HPP** = belanja bahan tanpa barang / sebelum titik nol + modal barang terjual (rata-rata bergerak) − selisih opname (kurang = beban) − koreksi stok minus. Pembelian barang yang dilacak masuk persediaan (`Kapitalisasi`), tidak lagi jadi HPP.
+  - **Neraca**: persediaan = saldo awal periode (nilai titik nol di bulan titik nol, selanjutnya nilai kartu akhir bulan lalu) + `CashFlow.KenaikanPersediaan`; modal awal ikut dari persediaan awal itu, jadi tetap seimbang.
+  - **Arus kas**: kas tidak berubah; metode tidak langsung mendapat baris "Kenaikan persediaan stok" sehingga tetap sama dengan metode langsung.
+  - Periode sebelum titik nol tidak berubah sama sekali.
+- Semua jalur memakai angka yang sama: `t.report` (laporan, PDF, Banding, simulasi, AI), tren dashboard & AI (`TrendHistory(..., stok)`), `annualized` (Perencanaan Pajak / PPh dari laba).
+- **Laporan CoA**: persediaan awal 1301 = nilai awal kartu; jurnal `coa.PenyesuaianPersediaan` menyamakan 1301 dengan nilai akhir kartu, lawannya 5102 (periodik) / 5101 (perpetual). Laba bersih & HPP CoA = laporan sederhana (diuji kedua metode). 5101 masuk `KodeWajib` (hanya divalidasi saat menerbitkan template baru).
+- UI: Laba Rugi merinci HPP (modal barang terjual, selisih opname, belanja tanpa barang); catatan "persediaan angka tetap / belum dihitung" hanya tampil sebelum titik nol; jembatan laba→kas memuat persediaan.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 

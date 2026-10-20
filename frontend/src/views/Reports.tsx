@@ -91,8 +91,8 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
       </div>
 
       {tab === 'laba-rugi' && <LabaRugi r={r} cf={cf} />}
-      {tab === 'neraca' && <Neraca bs={bs} />}
-      {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} metode={metode} setMetode={setMetode} />}
+      {tab === 'neraca' && <Neraca bs={bs} kartuAktif={!!r.hpp_stok} />}
+      {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!r.hpp_stok} />}
       {tab === 'banding' && <BandingLaporan periods={periods} period={period} bisaEkspor={bisaEkspor} />}
       {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
       {tab === 'ai' && <LaporanAI key={period} period={period} />}
@@ -114,7 +114,17 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
           <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="var(--text-brand)" bold />
           <AmountRow label="Potongan channel / aplikasi" value={formatRp(-r.channel_fees)} color={RED} />
           <AmountRow label="Penjualan bersih" value={formatRp(r.net_sales)} bold />
-          <AmountRow label="HPP (bahan baku)" value={formatRp(-r.cogs)} color={RED} />
+          <AmountRow label={r.hpp_stok ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)'} value={formatRp(-r.cogs)} color={RED} />
+          {r.hpp_stok && (() => {
+            const h = r.hpp_stok
+            const takDilacak = r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi
+            return <>
+              <div className="list-row sub"><span>Modal barang terjual (kartu stok)</span><span className="tabular">{formatRp(-h.hpp_jual)}</span></div>
+              {h.selisih_opname !== 0 && <div className="list-row sub"><span>Selisih stok opname {h.selisih_opname < 0 ? '(hilang / rusak)' : '(lebih)'}</span><span className="tabular">{formatRp(h.selisih_opname)}</span></div>}
+              {h.koreksi !== 0 && <div className="list-row sub"><span>Koreksi nilai stok minus</span><span className="tabular">{formatRp(h.koreksi)}</span></div>}
+              {takDilacak !== 0 && <div className="list-row sub"><span>Belanja bahan tanpa barang di stok</span><span className="tabular">{formatRp(-takDilacak)}</span></div>}
+            </>
+          })()}
           <AmountRow label="Laba kotor" value={formatRp(r.gross_profit)} bold />
           {(r.opex_lines ?? []).map((l, i) => (
             <AmountRow key={i} label={l.label} value={formatRp(-l.amount)} color={RED} />
@@ -145,6 +155,7 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
             {cf.new_receivables > 0 && <>{formatJt(cf.new_receivables)} masih tertahan di piutang. </>}
             {cf.new_payables > 0 && <>{formatJt(cf.new_payables)} biaya sudah dicatat tapi belum dibayar. </>}
             {nonKas > 0 && <>{formatJt(nonKas)} penyusutan &amp; amortisasi tidak mengeluarkan uang sama sekali. </>}
+            {!!cf.kenaikan_persediaan && cf.kenaikan_persediaan > 0 && <>{formatJt(cf.kenaikan_persediaan)} jadi stok yang belum terjual. </>}
             Rinciannya di tab <strong>Arus Kas</strong>.
           </div>
         )}
@@ -157,7 +168,7 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
   )
 }
 
-function Neraca({ bs }: { bs: BalanceSheet }) {
+function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
   const a = bs.assets
   return (
     <div className="report-grid">
@@ -223,9 +234,11 @@ function Neraca({ bs }: { bs: BalanceSheet }) {
           · Nilai buku aset {formatJt(a.fixed_assets)} = total tab Aset &amp; Penyusutan.<br />
           · Laba {formatJt(bs.equity.current_profit)} = baris Laba Bersih di tab Laba Rugi.
         </div>
-        <div className="note-box warn">
-          Nilai persediaan masih angka tetap karena modul stok belum menghitung persediaan dari transaksi.
-        </div>
+        {!kartuAktif && (
+          <div className="note-box warn">
+            Nilai persediaan masih angka saldo awal karena kartu stok belum dimulai. Mulai di menu Stok &amp; Gudang supaya persediaan & HPP dihitung dari pergerakan barang.
+          </div>
+        )}
       </div>
     </div>
   )
@@ -256,7 +269,7 @@ function Section({ title, section, total }: { title: string; section: CashFlowSe
   )
 }
 
-function ArusKas({ cf, netProfit, metode, setMetode }: { cf: CashFlow; netProfit: number; metode: Metode; setMetode: (m: Metode) => void }) {
+function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlow; netProfit: number; metode: Metode; setMetode: (m: Metode) => void; kartuAktif: boolean }) {
   const operasi = metode === 'langsung' ? cf.operasi_langsung : cf.operasi_tidak_langsung
   const cocok = cf.operasi_langsung.net === cf.operasi_tidak_langsung.net
 
@@ -346,11 +359,17 @@ function ArusKas({ cf, netProfit, metode, setMetode }: { cf: CashFlow; netProfit
             <AmountRow label="Beban non-kas (penyusutan + amortisasi)" value={formatSignedJt(cf.depreciation + cf.amortization)} color={GREEN} />
             <AmountRow label="Tertahan di piutang" value={formatSignedJt(-cf.new_receivables)} color={RED} />
             <AmountRow label="Tertunda di utang" value={formatSignedJt(cf.new_payables)} color={GREEN} />
+            {kartuAktif && !!cf.kenaikan_persediaan && (
+              <AmountRow label={cf.kenaikan_persediaan > 0 ? 'Tertahan di persediaan stok' : 'Persediaan stok berkurang'}
+                value={formatSignedJt(-cf.kenaikan_persediaan)} color={cf.kenaikan_persediaan > 0 ? RED : GREEN} />
+            )}
             <AmountRow label="Kas bersih dari operasi" value={formatRp(cf.operasi_tidak_langsung.net)} color={BLUE} bold />
           </div>
           <div className="note-box warn">
-            Perubahan persediaan belum ikut dihitung, dan piutang masih diukur sebagai piutang yang terbit
-            periode ini — bukan selisih saldo awal dan akhir. Perlu dibenahi sebelum dipakai antar-periode.
+            {!kartuAktif
+              ? 'Perubahan persediaan belum ikut dihitung (kartu stok belum dimulai), dan piutang'
+              : 'Kenaikan persediaan dihitung dari kartu stok. Piutang'}{' '}
+            masih diukur sebagai piutang yang terbit periode ini — bukan selisih saldo awal dan akhir.
           </div>
         </div>
       </div>

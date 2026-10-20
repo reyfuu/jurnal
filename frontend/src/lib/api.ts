@@ -189,6 +189,11 @@ export interface IncomeStatement {
   net_profit: number
   margin_bps: number
   opex_lines: { label: string; amount: number }[] | null
+  /** Rincian HPP dari kartu stok (setelah titik nol); tidak ada = HPP = belanja bahan. */
+  hpp_stok?: {
+    aktif: boolean; mulai: string; persediaan_awal: number; persediaan_akhir: number
+    kapitalisasi: number; hpp_jual: number; selisih_opname: number; koreksi: number
+  }
 }
 
 export interface CashFlowLine {
@@ -206,6 +211,8 @@ export interface CashFlowSection {
 }
 
 export interface CashFlow {
+  /** Nilai persediaan akhir − awal dari kartu stok (0 sebelum titik nol). */
+  kenaikan_persediaan?: number
   opening_balance: number
   cash_in: number
   cash_out: number

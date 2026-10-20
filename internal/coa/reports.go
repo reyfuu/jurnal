@@ -54,15 +54,43 @@ type IncomeStatementResult struct {
 
 // IncomeStatement: laba rugi format perdagangan dari neraca saldo.
 func IncomeStatement(tb []Balance, p finance.BusinessProfile) IncomeStatementResult {
+	return IncomeStatementKartu(tb, p, false, 0)
+}
+
+// IncomeStatementKartu: seperti IncomeStatement; bila kartu aktif, neraca saldo sudah memuat
+// jurnal PenyesuaianPersediaan sebesar penyesuaian (1301 = persediaan akhir kartu stok).
+func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, penyesuaian int64) IncomeStatementResult {
 	r := IncomeStatementResult{Metode: "periodik"}
 	r.Pendapatan, r.PenjualanBersih = linesOf(tb, PendapatanUsaha)
 	var hppLines int64
 	r.HPPLines, hppLines = linesOf(tb, HPP)
-	if perpetual(p) {
+	switch {
+	case perpetual(p):
 		r.Metode = "perpetual"
 		r.HPP = hppLines
-		r.Catatan = append(r.Catatan, "Metode perpetual: pembelian tercatat ke Persediaan (1301). HPP per penjualan akan terisi setelah modul kartu stok tersedia.")
-	} else {
+		if kartu {
+			r.Catatan = append(r.Catatan, "Metode perpetual: HPP (5101) = modal barang terjual + selisih stok opname dari kartu stok (rata-rata bergerak).")
+		} else {
+			r.Catatan = append(r.Catatan, "Metode perpetual: pembelian tercatat ke Persediaan (1301). HPP per penjualan terisi setelah kartu stok dimulai di Stok & Gudang.")
+		}
+	case kartu:
+		// Penyesuaian dicatat ke 5102; ditampilkan kembali sebagai persediaan awal/akhir supaya
+		// baris Pembelian tetap menunjukkan pembelian sebenarnya.
+		for _, b := range tb {
+			if b.Kode == "1301" {
+				r.PersediaanAkhir = b.Saldo
+			}
+		}
+		r.PersediaanAwal = r.PersediaanAkhir - penyesuaian
+		for i := range r.HPPLines {
+			if r.HPPLines[i].Kode == "5102" {
+				r.HPPLines[i].Jumlah += penyesuaian
+			}
+		}
+		hppLines += penyesuaian
+		r.HPP = r.PersediaanAwal + hppLines - r.PersediaanAkhir
+		r.Catatan = append(r.Catatan, "Metode periodik: persediaan awal & akhir dari kartu stok (rata-rata bergerak).")
+	default:
 		// ponytail: persediaan akhir = awal sampai stok opname/kartu stok dicatat di aplikasi.
 		for _, b := range tb {
 			if b.Kode == "1301" {

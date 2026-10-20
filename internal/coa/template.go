@@ -18,7 +18,7 @@ var ErrTemplate = errors.New("template COA tidak valid")
 // TestKodeWajib_MencakupKodeDiKode menjaga daftar ini tetap lengkap.
 var kodeSistem = []string{
 	"1101", "1102", "1104", "1201", "1301", "1501", "1502", "1503", "1504", "1505", "1506", "1507", "1508",
-	"2101", "2102", "3101", "3102", "3201", "4101", "5102", "5104", "6113", "6118", "8101", "9103",
+	"2101", "2102", "3101", "3102", "3201", "4101", "5101", "5102", "5104", "6113", "6118", "8101", "9103",
 }
 
 // KodeWajib: kode akun yang harus ada di setiap template terbit, urut.
