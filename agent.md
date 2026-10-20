@@ -19,13 +19,19 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
    - Gunakan `rtk` (jika tersedia di PATH, misal `rtk git status`, `rtk go test`, `rtk bun test`) atau flag output minimal untuk menghemat konteks token pada operasi CLI berulang.
 3. **`graphify`**
    - Gunakan `graphify` (`graphify-out/`) sebagai sumber kebenaran peta arsitektur codebase, relasi antar-modul (Transaksi → Jurnal → Laporan Keuangan → Pajak UMKM), dan deteksi *god nodes* sebelum melakukan refactoring besar.
-4. **`grillme` & `grillme with docs`**
+4. **`leantoken` ([morluto/leantoken](https://github.com/morluto/leantoken))**
+   - **Lapisan pencarian & pembacaan kode pertama** untuk tugas luas (implementasi, debugging, review, arsitektur). Mulai dengan `leantoken.context`, bukan membaca file utuh, supaya konteks token tetap hemat.
+   - Terpasang global sebagai MCP untuk Claude Code & Codex lewat runtime native terpin (`npx leantoken@0.1.28 setup --refresh --private-runtime --yes`; launcher `~/.local/share/leantoken/runtimes/0.1.28/leantoken`, skill di `~/.claude/skills/leantoken/`). Verifikasi: `leantoken doctor --client claude` harus `registration_health: current`.
+   - CLI untuk pemakaian cepat tanpa MCP: `leantoken index`, `context --task "<tugas>"`, `search`, `outline`, `read`. Indeks repo ini: 234 dari 243 file (9 biner dilewati).
+   - Pembagian tugas dengan `graphify`: `graphify` untuk peta arsitektur & relasi modul; `leantoken` untuk menemukan potongan kode relevan dalam batas token.
+   - Catatan jcode: pemanggilan `mcp__leantoken__*` masih gagal (`unknown variant resource_link`), jadi di jcode pakai CLI-nya. Di Claude Code & Codex MCP-nya normal.
+5. **`grillme` & `grillme with docs`**
    - Setiap ada ambiguitas bisnis/teknis/visual, lakukan interogasi desain singkat & tajam (*grill me*) yang mengacu langsung pada dokumen [BRD](file:///home/reyfuu/pajak/docs/BRD.md), [FRD](file:///home/reyfuu/pajak/docs/FRD.md), [TRD](file:///home/reyfuu/pajak/docs/TRD.md), [PRD](file:///home/reyfuu/pajak/docs/PRD.md), [DESIGN_BRIEF](file:///home/reyfuu/pajak/docs/DESIGN_BRIEF.md), dan [DESIGN.md](file:///home/reyfuu/pajak/DESIGN.md).
-5. **`skillspector`**
+6. **`skillspector`**
    - Audit kesiapan skill di awal sesi; pastikan tidak ada regresi aturan dari skill yang terpasang.
-6. **`handoff`**
+7. **`handoff`**
    - Setiap akhir sesi atau sebelum pergantian konteks, perbarui status progres, keputusan arsitektur, dan *next steps* agar sesi berikutnya bisa langsung melanjutkan tanpa kehilangan konteks.
-7. **`harness2` ([google-research/harness2](https://github.com/google-research/harness2) — Propose → Probe → Compose)**
+8. **`harness2` ([google-research/harness2](https://github.com/google-research/harness2) — Propose → Probe → Compose)**
    - **Wajib setiap akhir sesi**, bersama `handoff`: perbaiki *harness* agen proyek ini dari pelajaran sesi, tanpa menunggu aturan yang sama dilanggar dua kali. Komponen harness di proyek ini: `AGENTS.md`/`agent.md` (system prompt & guardrails), `.claude/skills/` (skills), memori proyek (memory), dan `deploy.sh`/`scripts/` (scripts).
      1. *Propose*: usulkan maksimal 3 perubahan harness (aturan yang dilanggar, langkah yang berulang, jebakan deploy/toolchain).
      2. *Probe*: uji tiap usulan pada tugas nyata sesi itu — apakah akan mencegah kesalahan tadi, dan apakah cek/tes yang diusulkan benar-benar lulus/gagal sesuai harapan.
@@ -34,25 +40,32 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
    - Framework terpasang di `~/tools/harness2` (commit `1cfe254`, venv `.venv`, demo lokal: `harness2-demo --output runs/demo --k 2`). Run berbasis model (Vertex AI, `.env`, `gcloud`) **hanya dengan persetujuan user**: ada biaya API, jaringan eksekutor tidak dibatasi, dan sandbox Codex dimatikan.
 
 ### B. Engineering Discipline & Code Quality
-8. **`ponytail` (Lazy Senior Dev / YAGNI Mode — Active Every Response)**
+9. **`ponytail` (Lazy Senior Dev / YAGNI Mode — Active Every Response)**
    - Terapkan *The Ponytail Ladder*:
      1. *Does this need to exist at all?* (YAGNI — kapasitas target adalah **1.000 user**, jangan bangun infrastruktur sekelas 1 juta user seperti Kafka/Kubernetes/Microservices).
      2. *Already in this codebase?* Gunakan ulang helper/tipe yang ada.
      3. *Stdlib / Native platform first* (`net/http` / `database/sql` di Go, atau native `Bun.serve` / `Elysia` di Bun, constraint PostgreSQL di DB).
      4. Tandai kompromi kapasitas yang disengaja dengan komentar `// ponytail: <alasan & batas upgrade>`.
-9. **`tdd` (Test-Driven Development)**
+10. **`tdd` (Test-Driven Development)**
    - **Wajib Red-Green-Refactor** terutama pada domain kritikal finansial:
      - Kalkulasi Omzet, HPP (COGS), Laba Kotor, Laba Bersih, dan Margin Laba.
      - Kalkulasi Arus Kas vs Laba Akrual ("Kas bisa turun walau laba positif").
      - Kalkulasi Pajak UMKM (PPh Final 0,5% PP 55/2022, batas bebas pajak Rp500 juta/tahun untuk WP OP, potongan aplikasi/channel).
      - Penuaan Piutang & Utang (*aging schedule* > 30 hari).
    - Jangan pernah menggunakan `float64` / `number` floating-point biasa untuk uang; gunakan `int64` (Rupiah penuh / sen) atau `decimal`.
-10. **`improve-codebase-architecture` & `setup-matt-pocock-skills`**
+11. **`smokinggun` ([morluto/smokinggun](https://github.com/morluto/smokinggun))**
+   - Pemindai kompleksitas statis untuk mencari *hotspot* sebelum optimasi: `npx --yes --package=smokinggun -- smokinggun scan . --format markdown` (read-only, offline, tidak menjalankan kode repo).
+   - **Temuannya kandidat, bukan bukti.** Setiap temuan wajib divalidasi dengan benchmark Go nyata pada skala target `§3` (1.000 tenant, 4.000–10.000 transaksi/tenant/tahun) sebelum kode diubah. Tanpa pengukuran, perbaikan "performa" melanggar `ponytail`.
+   - Hasil audit 20 Oktober 2026 (51 temuan, 45 di kode aplikasi, semuanya `medium/candidate`):
+     - **Terbukti nyata & sudah diperbaiki**: `klienRows` di Panel Master memindai seluruh transaksi semua usaha pada tiap request (ringkasan 538 ms → 0,6 ms; detail 1,21 s → 0,08 ms). Lihat `BenchmarkKlienRows` di `cmd/server/master_bench_test.go`.
+     - **Terbukti tidak relevan**: `membership-in-loop` di jalur CoA/jurnal (`coa.Find` atas 75 akun, `jenisOf` atas 19 jenis) — Transaksi → Jurnal → Neraca Saldo hanya 2 ms untuk 10.000 transaksi. Lihat `internal/coa/bench_test.go`. Jangan "optimasi" ini tanpa angka baru.
+   - Benchmark yang sudah ada wajib dijalankan ulang (`go test ./... -run '^$' -bench .`) sebelum mengubah jalur Transaksi → Jurnal → Laporan atau Panel Master.
+12. **`improve-codebase-architecture` & `setup-matt-pocock-skills`**
    - Struktur modular berbasis **Vertical Slices / Domain Modules** (`dashboard`, `ledger`, `cashflow`, `transactions`, `receivables`, `inventory`, `production`, `invoicing`, `pricing_sim`, `tax_umkm`, `master_data`).
    - *Make illegal states unrepresentable*: gunakan strict schema validation (TypeBox di Elysia / strict structs & sqlc di Go), branded types untuk ID & nominal Rupiah, dan eksplisit error handling.
 
 ### C. UI/UX, Visual Craft & Verification
-11. **`antislop`, `taste`, & `impeccable`**
+13. **`antislop`, `taste`, & `impeccable`**
     - **DILARANG KERAS** membuat UI generik "AI slop" (gradien ungu-biru murahan, bayangan berlebihan, kartu tanpa hierarki, teks placeholder asal-asalan).
     - Ikuti estetika referensi **Laporan Bisnis by Master Pajak**:
       - **Dark Obsidian Theme**: Background utama `#0B0C0E`, surface kartu `#121418`, border halus `#1F2229` (`1px solid rgba(255,255,255,0.06)`).
@@ -60,17 +73,17 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
       - **Brand Accent**: Amber/Gold `#EAB308` / `#F5C428` untuk logo, metrik utama, CTA, dan active nav state; teks tombol emas menggunakan navy `#222852`.
       - **Semantic Financial Colors**: Emerald `#10B981` (Laba Bersih / tren positif), Sky Blue `#38BDF8` (Saldo Kas & Bank), Rose/Coral `#F43F5E` (peringatan piutang lewat 30 hari).
       - **Typography**: Angka finansial wajib menggunakan `font-variant-numeric: tabular-nums` agar sejajar sempurna.
-12. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
+14. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
     - Gunakan primitif `shadcn/ui` (Radix + Tailwind) yang diperkaya dengan komponen finansial dari `Kokonut UI` dan micro-interactions dari `21st.dev`.
     - Setiap KPI card di Dashboard wajib menampilkan:
       1. Label metrik yang jelas (`Omzet`, `Laba bersih`, `Margin laba`, `Saldo kas & bank`, `Target omzet`, `Piutang belum tertagih`).
       2. Nilai utama singkat & mudah dibaca (`Rp92 jt`, `Rp25 jt`, `27%`, `108%`).
       3. Badge perbandingan periode (`▲ 4% vs bulan lalu`, `+1,7 poin vs bulan lalu`) + mini sparkline / progress bar.
-13. **`agent browser`**
+15. **`agent browser`**
     - Setiap perubahan frontend wajib diverifikasi secara visual menggunakan browser agent untuk memastikan tata letak 6 KPI card atas, 3 grafik tengah, 2 kartu bawah, dan sidebar navigasi presisi di desktop & mobile.
 
 ### D. Reverse Engineering (Situasional)
-14. **`rea` ([morluto/rea](https://github.com/morluto/rea) — skill `reverse-engineer-anything` + MCP `rea`)**
+16. **`rea` ([morluto/rea](https://github.com/morluto/rea) — skill `reverse-engineer-anything` + MCP `rea`)**
     - Aktif setiap sesi, tetapi **dipakai hanya bila tugasnya memang membedah artefak jadi**: aplikasi web/Electron/JS pihak lain (mis. alur kompetitor atau halaman pembayaran Midtrans), file biner, APK, atau situs. Untuk memahami kode repo ini sendiri pakai `graphify`, bukan REA.
     - **Hanya untuk target yang sah dianalisis**: milik sendiri, berizin, atau untuk interoperabilitas/riset sesuai hukum. Tidak untuk membobol lisensi, DRM, atau mengambil data pihak lain.
     - Analisis berjalan lokal; analisis statis JS/.NET tidak menjalankan target. Penangkapan runtime menjalankan target dengan izin user, jadi **minta persetujuan user dulu**.
@@ -126,6 +139,7 @@ Sesuai referensi desain produk **Laporan Bisnis by Master Pajak**, sistem terdir
 
 - [ ] Apakah semua perubahan sudah mengikuti `ponytail` (kode paling simpel, tanpa abstraksi spekulatif)?
 - [ ] Apakah logika finansial & pajak sudah memiliki unit test (`tdd`) yang lulus 100%?
+- [ ] Bila menyentuh jalur Transaksi → Jurnal → Laporan atau Panel Master: apakah `go test ./... -run '^$' -bench .` masih di kisaran angka yang tercatat di `§1.B` (`smokinggun`)?
 - [ ] Apakah dokumen (`BRD.md`, `FRD.md`, `TRD.md`, `PRD.md`) dan `graphify` tetap sinkron?
 - [ ] Apakah UI sudah bebas dari *AI slop* (`antislop`, `taste`, `impeccable`) dan terverifikasi lewat `agent browser`?
 - [ ] Apakah siklus `harness2` (Propose → Probe → Compose) sudah dijalankan dan hasilnya dicatat di `handoff`?
