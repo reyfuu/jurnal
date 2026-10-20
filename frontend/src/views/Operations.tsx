@@ -1,12 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { simulatePrice, type Dashboard, type PriceSim } from '@/lib/api'
+import { type Dashboard } from '@/lib/api'
 import { formatRp } from '@/lib/format'
-import { angka } from '@/lib/angka'
-
-const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
 export function StokModule({ d, title }: { d: Dashboard; title: string }) {
   const [cari, setCari] = useState('')
@@ -95,114 +91,6 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
           </tbody>
         </table>
       </div>
-    </>
-  )
-}
-
-export function SimulasiHarga({ period }: { period: string }) {
-  const [cogs, setCogs] = useState('6800')
-  const [profit, setProfit] = useState('7600')
-  const [fee, setFee] = useState('20')
-  const [fixedCost, setFixedCost] = useState('')
-  const [volume, setVolume] = useState('1500')
-  const [targetNet, setTargetNet] = useState('10000000')
-  const [res, setRes] = useState<PriceSim | null>(null)
-  const [feeShown, setFeeShown] = useState('20')
-  const [busy, setBusy] = useState(false)
-
-  const num = (v: string) => parseFloat(v || '0')
-
-  async function run(e?: FormEvent) {
-    e?.preventDefault()
-    setBusy(true)
-    try {
-      setRes(await simulatePrice(period, {
-        cogs: num(cogs),
-        targetProfit: num(profit),
-        feePct: num(fee),
-        fixedCost: fixedCost.trim() === '' ? undefined : num(fixedCost),
-        monthlyVolume: num(volume),
-        targetNetProfit: num(targetNet),
-      }))
-      setFeeShown(fee || '0')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // hitung ulang otomatis saat periode (sumber biaya tetap) berganti
-  useEffect(() => { void run() }, [period])
-
-  const fields = [
-    { id: 'sim-cogs', label: 'HPP Produk per Cup/Pcs (Rp)', value: cogs, set: setCogs },
-    { id: 'sim-profit', label: 'Target Laba Kotor per Pcs (Rp)', value: profit, set: setProfit },
-    { id: 'sim-fee', label: 'Komisi Aplikasi (%)', value: fee, set: setFee, persen: true },
-    { id: 'sim-fixed', label: 'Biaya Tetap per Bulan (Rp)', value: fixedCost, set: setFixedCost, placeholder: 'Otomatis dari data' },
-    { id: 'sim-volume', label: 'Perkiraan Terjual per Bulan (Pcs)', value: volume, set: setVolume },
-    { id: 'sim-target', label: 'Target Laba Bersih per Bulan (Rp)', value: targetNet, set: setTargetNet },
-  ]
-  const be = res?.break_even
-  const results = res ? [
-    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: 'var(--text-warn)' },
-    { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: formatRp(res.channel_fee), color: 'var(--text-danger)' },
-    { label: 'Uang Bersih Diterima (Take Home)', value: formatRp(res.net_take_home), color: 'var(--accent-green)' },
-  ] : []
-  const beCards = be ? [
-    { label: 'Biaya Tetap per Bulan', value: formatRp(be.fixed_cost), meta: fixedCost.trim() === '' ? 'Dari total beban operasional periode ini' : 'Input manual' },
-    { label: 'Titik Impas (BEP)', value: `${be.bep_units.toLocaleString('id-ID')} pcs`, meta: `± ${be.bep_units_per_day.toLocaleString('id-ID')} pcs/hari · omzet ${formatRp(be.bep_revenue)}` },
-    {
-      label: `Laba Bersih pada ${be.monthly_volume.toLocaleString('id-ID')} pcs`,
-      value: formatRp(be.net_profit_at_volume),
-      color: be.net_profit_at_volume < 0 ? 'var(--text-danger)' : 'var(--accent-green)',
-      meta: be.net_profit_at_volume < 0 ? 'Masih rugi, volume di bawah BEP' : 'Sudah di atas BEP',
-    },
-    { label: 'Harus Terjual untuk Target Laba', value: `${be.units_for_target.toLocaleString('id-ID')} pcs`, meta: `Target ${formatRp(be.target_net_profit)} per bulan` },
-  ] : []
-
-  return (
-    <>
-      <PageHeader
-        title="Simulasi & Harga Channel"
-        subtitle="Jangan sampai ramai orderan di GoFood/GrabFood tapi laba bersih tergerus potongan komisi aplikasi dan biaya tetap."
-      />
-      <form className="card" style={{ padding: 22 }} onSubmit={run}>
-        <div className="chart-title">Kalkulator Harga, Titik Impas & Laba Bersih</div>
-        <div className="form-grid">
-          {fields.map((f) => (
-            <div key={f.id}>
-              <Label htmlFor={f.id} className="kpi-label">{f.label}</Label>
-              {f.persen
-                ? <Input id={f.id} type="number" min={0} step="0.1" placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} value={f.value} onChange={(e) => f.set(e.target.value)} />
-                : <Input id={f.id} placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} {...angka(f.value, (n) => f.set(n ? String(n) : ''))} />}
-            </div>
-          ))}
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="btn-cta" style={{ width: '100%' }} type="submit" disabled={busy}>Hitung</button>
-          </div>
-        </div>
-
-        <div className="sim-results">
-          {results.map((r) => (
-            <div className="card" style={{ background: 'var(--bg-raised)' }} key={r.label}>
-              <div className="kpi-label">{r.label}</div>
-              <div className="kpi-value tabular" style={{ color: r.color }}>{r.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {res?.break_even_error && <p className="text-sm text-destructive" role="alert" style={{ marginTop: 16 }}>{res.break_even_error}</p>}
-        {be && (
-          <div className="sim-results sim-results-4">
-            {beCards.map((c) => (
-              <div className="card" style={{ background: 'var(--bg-raised)' }} key={c.label}>
-                <div className="kpi-label">{c.label}</div>
-                <div className="kpi-value tabular" style={{ color: c.color }}>{c.value}</div>
-                <div className="kpi-meta-row">{c.meta}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </form>
     </>
   )
 }

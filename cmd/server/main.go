@@ -295,6 +295,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
+	s.mux.HandleFunc("POST /api/v1/simulasi", s.guard("simulasi-harga", s.on((*tenant).handleSimulasi)))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
@@ -751,6 +752,9 @@ type simulateReq struct {
 	FixedCost       *int64 `json:"fixed_cost"` // kosong = total beban operasional periode berjalan
 	MonthlyVolume   int64  `json:"monthly_volume"`
 	TargetNetProfit int64  `json:"target_net_profit"`
+	// MarginBps > 0: harga dihitung dari margin yang diinginkan (mis. 6000 = 60%), bukan
+	// TargetProfit per pcs.
+	MarginBps int `json:"margin_bps"`
 }
 
 type simulateResp struct {
@@ -766,6 +770,13 @@ func (s *tenant) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sim := finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee)
+	if req.MarginBps > 0 {
+		var err error
+		if sim, err = finance.HargaUntukMargin(req.COGS, req.FeeBps, req.FixedFee, req.MarginBps); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	// Beban tetap break-even memakai beban operasional kas; penyusutan tidak ikut karena
 	// tidak memengaruhi kas yang harus ditutup penjualan.
 	fixed := s.report(periodOrDefault(r)).Income.Opex
