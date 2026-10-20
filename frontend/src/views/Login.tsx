@@ -56,9 +56,7 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{daftar ? 'Daftar' : 'Masuk'}</CardTitle>
-            <CardDescription>
-              {daftar ? 'Buat akun Owner untuk usaha baru Anda. Datanya mulai kosong.' : 'Gunakan akun yang dibuat oleh Owner bisnis Anda.'}
-            </CardDescription>
+            {!daftar && <CardDescription>Gunakan akun yang dibuat oleh Owner bisnis Anda.</CardDescription>}
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="grid gap-4">
