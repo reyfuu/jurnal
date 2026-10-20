@@ -641,9 +641,11 @@ mengedit `/home/reyfuu/pajak` (branch `feat/rebrand-masterpajak`). Cek `git stat
 mengedit working tree utama. Worktree lain: `/home/reyfuu/pajak-e2e` (`test/e2e-playwright`,
 suite Playwright yang belum tuntas — server Go di harness e2e tidak siap dalam 180 detik).
 
-**Perlu dibereskan**: `server` (binary 18 MB) ter-commit di branch rebrand padahal `.gitignore`
-sudah memuat `bin/`. Jalankan `git rm --cached server` dan tambahkan ke `.gitignore` sebelum PR
-itu di-merge.
+**Biner `server` sudah dikeluarkan dari repo** (ikut PR ini). Berkas 17,6 MB itu masuk lewat
+PR #27 dan ternyata Mach-O **arm64 (macOS)** — tidak bisa dipakai di mana pun selain mesin yang
+membuatnya, dan tidak dirujuk apa pun karena Dockerfile membangun sendiri ke
+`/out/laporan-bisnis`. `.gitignore` sudah memuat `bin/` tapi tidak pola ini, jadi `/server`
+ditambahkan. Berkas lokalnya tidak dihapus.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
