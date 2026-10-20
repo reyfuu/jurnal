@@ -688,6 +688,17 @@ export const tulisCatatan = (klienId: number, b: { halaman: string; periode: str
   api<CatatanKonsultan>(`/master/klien/${klienId}/catatan`, { method: 'POST', body: b })
 export const getCatatanMaster = () => api<{ catatan: CatatanMasterRow[]; pengingat: Pengingat }>('/master/catatan')
 export const aturPengingat = (p: Pengingat) => api<Pengingat>('/master/pengingat', { method: 'PUT', body: p })
+// --- Jadwal pengingat laporan & pajak (Panel Master, berlaku untuk semua klien) ---
+
+export type UntukJadwal = 'semua' | 'op' | 'badan' | 'pkp'
+export interface JadwalPengingat {
+  id: number; judul: string; keterangan?: string
+  frekuensi: 'bulanan' | 'tahunan'; tanggal: number; bulan?: number
+  hari_sebelum: number; untuk: UntukJadwal; aktif: boolean; perlu_verifikasi?: boolean
+}
+export interface PengingatJadwal { id: number; judul: string; keterangan?: string; jatuh_tempo: string; sisa_hari: number }
+export const getJadwalMaster = () => api<{ item: JadwalPengingat[] }>('/master/jadwal')
+export const aturJadwal = (item: JadwalPengingat[]) => api<{ item: JadwalPengingat[] }>('/master/jadwal', { method: 'PUT', body: { item } })
 export const getCatatan = () => api<{ catatan: CatatanKonsultan[]; pengingat: number[]; aturan: Pengingat }>('/catatan')
 export const selesaiCatatan = (id: number) => api<CatatanKonsultan>(`/catatan/${id}/selesai`, { method: 'POST' })
 export const catatanDiingatkan = (ids: number[]) => api<void>('/catatan/diingatkan', { method: 'POST', body: { ids } })
@@ -1531,14 +1542,3 @@ export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: nu
 export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
 export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })
 
-// --- Jadwal pengingat laporan & pajak (Panel Master, berlaku untuk semua klien) ---
-
-export type UntukJadwal = 'semua' | 'op' | 'badan' | 'pkp'
-export interface JadwalPengingat {
-  id: number; judul: string; keterangan?: string
-  frekuensi: 'bulanan' | 'tahunan'; tanggal: number; bulan?: number
-  hari_sebelum: number; untuk: UntukJadwal; aktif: boolean; perlu_verifikasi?: boolean
-}
-export interface PengingatJadwal { id: number; judul: string; keterangan?: string; jatuh_tempo: string; sisa_hari: number }
-export const getJadwalMaster = () => api<{ item: JadwalPengingat[] }>('/master/jadwal')
-export const aturJadwal = (item: JadwalPengingat[]) => api<{ item: JadwalPengingat[] }>('/master/jadwal', { method: 'PUT', body: { item } })
