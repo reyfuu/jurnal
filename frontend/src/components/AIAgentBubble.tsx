@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Bot, Sparkles, X, Send, RefreshCw, MessageSquareQuote } from 'lucide-react'
-import { askAIChat, type AIChatResponse } from '../lib/api'
+import { ArrowRight, Bot, Sparkles, X, Send, RefreshCw, MessageSquareQuote } from 'lucide-react'
+import { askAIChat, type AIChatResponse, type View } from '../lib/api'
 import { Monogram } from '@/components/Logo'
 
 interface Message {
@@ -8,16 +8,18 @@ interface Message {
   sender: 'user' | 'assistant'
   text: string
   suggestions?: string[]
+  tautan?: AIChatResponse['tautan']
 }
 
 const INITIAL_SUGGESTIONS = [
+  'Di mana saya bisa mengisi laporan keuangan?',
   'Ringkas laporan bulan ini',
   'Bagaimana aturan pajak UMKM PP 55/2022?',
   'Bagaimana kondisi arus kas dan piutang saya?',
   'Bagaimana cara hitung simulasi harga komisi GoFood?',
 ]
 
-export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08' }) => {
+export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?: string) => void }> = ({ period = '2026-08', onBuka }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,7 +27,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Master Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.',
+      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Master Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
       suggestions: INITIAL_SUGGESTIONS,
     },
   ])
@@ -59,6 +61,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
         sender: 'assistant',
         text: res.answer,
         suggestions: res.action_suggestions,
+        tautan: res.tautan,
       }
       setMessages((prev) => [...prev, assistantMsg])
     } catch (err: any) {
@@ -170,6 +173,22 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
                     renderFormattedText(m.text)
                   )}
                 </div>
+
+                {/* Tautan ke halaman aplikasi (panduan menu) */}
+                {m.tautan && m.tautan.length > 0 && onBuka && (
+                  <div className="mt-2 flex flex-wrap gap-1.5 max-w-[92%]">
+                    {m.tautan.map((l) => (
+                      <button
+                        key={l.view + (l.tab ?? '') + l.label}
+                        onClick={() => onBuka(l.view, l.tab)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] transition flex items-center gap-1.5"
+                      >
+                        <span>{l.label}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Quick suggestions button */}
                 {m.suggestions && m.suggestions.length > 0 && (

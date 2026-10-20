@@ -42,14 +42,16 @@ interface Props {
   period: string
   periodLabel: string
   periods: PeriodOption[]
+  /** Tab yang dibuka pertama, mis. 'banding' dari tautan Tanya AI. */
+  tabAwal?: string
   /** false di mode Lihat sebagai klien: server menolak ekspor. */
   bisaEkspor: boolean
   onAssetsChanged: () => void
 }
 
 /** Satu menu untuk seluruh laporan keuangan; tiap laporan jadi tab. */
-export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, periods, bisaEkspor, onAssetsChanged }: Props) {
-  const [tab, setTab] = useState<Tab>('laba-rugi')
+export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, periods, tabAwal, bisaEkspor, onAssetsChanged }: Props) {
+  const [tab, setTab] = useState<Tab>(() => TABS.find((t) => t.id === tabAwal)?.id ?? 'laba-rugi')
   const [metode, setMetode] = useState<Metode>('langsung')
   const bagianTab: BagianPDF | null = tab === 'laba-rugi' || tab === 'neraca' || tab === 'arus-kas' || tab === 'aset' ? tab : null
 

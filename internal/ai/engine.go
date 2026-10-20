@@ -17,6 +17,8 @@ type QueryResponse struct {
 	Answer            string   `json:"answer"`
 	Category          string   `json:"category"`
 	ActionSuggestions []string `json:"action_suggestions"`
+	// Tautan: tombol ke halaman aplikasi yang relevan (panduan menu), sudah disaring hak akses.
+	Tautan []Tautan `json:"tautan,omitempty"`
 }
 
 type Engine struct{}

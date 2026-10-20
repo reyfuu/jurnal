@@ -468,6 +468,8 @@ export interface AIChatResponse {
   answer: string
   category: string
   action_suggestions: string[]
+  /** Tombol ke halaman terkait (panduan menu), sudah disaring sesuai hak akses. */
+  tautan?: { view: View; label: string; tab?: string }[]
 }
 
 export const askAIChat = (query: string, period = '2026-08') =>
