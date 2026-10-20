@@ -167,7 +167,69 @@ func normal(s string) string {
 	return " " + strings.Join(strings.Fields(s), " ") + " "
 }
 
-func ada(q, kata string) bool { return strings.Contains(q, " "+kata+" ") }
+func ada(q, kata string) bool {
+	if strings.Contains(q, " "+kata+" ") {
+		return true
+	}
+	// Salah ketik: kata kunci (atau frasa) ≥ 6 huruf boleh beda satu huruf ("trasaksi",
+	// "saldo awla"). Yang lebih pendek harus persis, supaya "stop" tidak dibaca "stok".
+	if len(kata) < 6 {
+		return false
+	}
+	kw, qw := strings.Fields(kata), strings.Fields(q)
+	for i := 0; i+len(kw) <= len(qw); i++ {
+		if bedaHuruf(strings.Join(qw[i:i+len(kw)], " "), kata) <= 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// bedaHuruf: jarak edit (sisip, hapus, ganti, tukar dua huruf bersebelahan).
+func bedaHuruf(a, b string) int {
+	x, y := []rune(a), []rune(b)
+	d := make([][]int, len(x)+1)
+	for i := range d {
+		d[i] = make([]int, len(y)+1)
+		d[i][0] = i
+	}
+	for j := range d[0] {
+		d[0][j] = j
+	}
+	for i := 1; i <= len(x); i++ {
+		for j := 1; j <= len(y); j++ {
+			biaya := 1
+			if x[i-1] == y[j-1] {
+				biaya = 0
+			}
+			d[i][j] = min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+biaya)
+			if i > 1 && j > 1 && x[i-1] == y[j-2] && x[i-2] == y[j-1] {
+				d[i][j] = min(d[i][j], d[i-2][j-2]+1)
+			}
+		}
+	}
+	return d[len(x)][len(y)]
+}
+
+// PanduanUmum: pertanyaan menu yang tidak dikenali — tawarkan menu utama yang bisa dibuka,
+// jangan dijawab dengan ringkasan laporan.
+func PanduanUmum(boleh func(view string) bool) Panduan {
+	p := Panduan{Kode: "umum", Kuat: true, Tautan: []Tautan{},
+		Jawaban: "Maaf, saya belum menangkap menu yang dimaksud. Coba tulis lebih spesifik (mis. *di mana mencatat penjualan?*), atau pilih menu yang paling sering dipakai:"}
+	for _, l := range []Tautan{
+		{View: "transaksi", Label: "Catat transaksi"},
+		{View: "laporan-keuangan", Label: "Laporan Keuangan"},
+		{View: "impor-data", Label: "Impor Data Awal"},
+		{View: "stok-gudang", Label: "Stok & Gudang"},
+		{View: "pajak-umkm", Label: "Pajak UMKM"},
+		{View: "lapor-bug", Label: "Lapor Bug"},
+	} {
+		if boleh(l.View) {
+			p.Tautan = append(p.Tautan, l)
+		}
+	}
+	return p
+}
 
 // TanyaMenu: pertanyaan ini menanyakan tempat/cara memakai menu aplikasi.
 func TanyaMenu(q string) bool {
