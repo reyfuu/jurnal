@@ -18,6 +18,10 @@ type BusinessProfile struct {
 	PKP         bool   `json:"pkp"`          // Pengusaha Kena Pajak (wajib pungut PPN)
 	// MetodePersediaan: periodik | perpetual (perdagangan & manufaktur); menentukan akun HPP aktif.
 	MetodePersediaan string `json:"metode_persediaan"`
+	// MetodePenyusutan: garis_lurus | saldo_menurun untuk SEMUA aset usaha (bangunan tetap garis
+	// lurus). Dipilih sekali; kosong = belum dipilih (profil lama, metode masih per aset).
+	// Setelah terisi tidak bisa diganti dari aplikasi — perubahan metode butuh persetujuan DJP.
+	MetodePenyusutan string `json:"metode_penyusutan,omitempty"`
 	// KLU: kelompok KLU 3 digit (tax.KLUBenchmarks); dasar pembanding NPM & CTTOR DJP.
 	KLU string `json:"klu,omitempty"`
 
@@ -71,6 +75,11 @@ type Option struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 	Hint  string `json:"hint,omitempty"`
+}
+
+var MetodePenyusutanOptions = []Option{
+	{MetodeGarisLurus, "Garis lurus", "Beban penyusutan sama setiap tahun. Paling umum; pilih ini kalau ragu."},
+	{MetodeSaldoMenurun, "Saldo menurun", "Beban besar di tahun-tahun awal lalu mengecil. Bangunan tetap garis lurus."},
 }
 
 var JenisUsahaOptions = []Option{
@@ -132,6 +141,9 @@ func (p *BusinessProfile) Validate() error {
 		p.MetodePersediaan = "periodik" // profil lama (sebelum Fase C) & default UMKM
 	case !hasOption(MetodePersediaanOptions, p.MetodePersediaan):
 		return errors.New("metode persediaan harus periodik atau perpetual")
+	}
+	if p.MetodePenyusutan != "" && !hasOption(MetodePenyusutanOptions, p.MetodePenyusutan) {
+		return errors.New("metode penyusutan harus garis_lurus atau saldo_menurun")
 	}
 	if p.BentukUsaha != "op" {
 		p.PTKP = "" // PTKP hanya berlaku untuk wajib pajak orang pribadi

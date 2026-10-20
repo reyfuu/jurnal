@@ -282,6 +282,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/wilayah", s.guard("", handleWilayah))
 	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePutBusiness))))
+	s.mux.HandleFunc("POST /api/v1/business/metode-penyusutan", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePilihMetode))))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
 	s.mux.HandleFunc("GET /api/v1/kalkulator", s.guard("kalkulator-pajak", s.handleKalkulatorMaster))
@@ -674,7 +675,12 @@ func (s *tenant) openingFor(period string) finance.ReportOpening {
 func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+	rep := finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
+		saran, seragam := finance.MetodeSeragam(s.assets)
+		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
+	}
+	return rep
 }
 
 func (s *tenant) handleFinancial(w http.ResponseWriter, r *http.Request) {

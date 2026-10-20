@@ -200,7 +200,7 @@ export default function App() {
             assets={data!.assets}
             period={period}
             periodLabel={d.period_label}
-            onAssetsChanged={() => reload(me!, period)}
+            onAssetsChanged={() => { void reload(me!, period); getBusiness().then(setBusiness, fail) }} // metode penyusutan bisa dipilih dari tab Aset
           />
         )
       case 'laporan-penjualan':

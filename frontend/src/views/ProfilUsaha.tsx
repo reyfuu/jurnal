@@ -189,6 +189,21 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         </div>
       )}
       <div className="grid gap-1.5">
+        <Label>Metode penyusutan aset</Label>
+        {info.profile?.metode_penyusutan ? (
+          <p className="text-sm">
+            <b>{info.options.metode_penyusutan.find((o) => o.value === info.profile!.metode_penyusutan)?.label}</b> untuk semua aset
+            (bangunan tetap garis lurus). <span className="text-muted-foreground">Sudah dikunci; perubahan metode memerlukan persetujuan DJP.</span>
+          </p>
+        ) : (
+          <>
+            <ChoiceGrid name="Metode penyusutan" options={info.options.metode_penyusutan} value={p.metode_penyusutan ?? ''}
+              onChange={(v) => set({ metode_penyusutan: v as BusinessProfile['metode_penyusutan'] })} />
+            <p className="text-xs" style={{ color: 'var(--text-warn)' }}>Berlaku untuk semua aset dan tidak bisa diubah setelah disimpan.</p>
+          </>
+        )}
+      </div>
+      <div className="grid gap-1.5">
         <Label>Bentuk usaha</Label>
         <ChoiceGrid name="Bentuk usaha" options={info.options.bentuk_usaha} value={p.bentuk_usaha} onChange={(v) => set({ bentuk_usaha: v as BentukUsaha })} />
       </div>

@@ -413,12 +413,20 @@ export interface AssetSummary {
   draft_count: number
   /** Jumlah baris pemetaan jenis harta yang belum diverifikasi ke Lampiran PMK. */
   pemetaan_belum_dicek: number
+  /** Metode penyusutan usaha; '' = belum dipilih (usaha lama, metode masih per aset). */
+  metode_usaha: '' | MetodePenyusutan
+  /** Saat belum dipilih: metode yang sudah seragam dipakai aset, atau campur. */
+  metode_saran?: '' | MetodePenyusutan
+  metode_campur?: boolean
 }
 
 export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
 export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
 export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
 export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
+/** Pilih metode penyusutan usaha sekali; setelah itu terkunci untuk semua aset. */
+export const pilihMetodePenyusutan = (metode: MetodePenyusutan) =>
+  api<BusinessProfile>('/business/metode-penyusutan', { method: 'POST', body: { metode } })
 
 export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo[]; can_edit: boolean }>('/transactions')
 export type SavedTx = Tx & { warnings?: CashWarning[] }
@@ -499,6 +507,8 @@ export interface BusinessProfile {
   ptkp: string
   pkp: boolean
   metode_persediaan: '' | 'periodik' | 'perpetual'
+  /** Dipilih sekali untuk semua aset (bangunan tetap garis lurus), lalu terkunci. */
+  metode_penyusutan?: MetodePenyusutan
   /** Kelompok KLU 3 digit; pembanding NPM & CTTOR DJP. */
   klu?: string
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
@@ -527,7 +537,7 @@ export interface KLUOption { kode: string; nama: string; jenis: JenisUsaha }
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
-  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; provinsi: string[]; klu: KLUOption[] }
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; metode_penyusutan: Option[]; provinsi: string[]; klu: KLUOption[] }
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
