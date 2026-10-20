@@ -212,6 +212,12 @@ CREATE TABLE IF NOT EXISTS billing_orders (
 	waktu     TIMESTAMPTZ NOT NULL
 );
 
+-- Garansi 7 hari (Okt 2026): waktu lunas per order; ekspor pertama & klaim per usaha.
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS dibayar_pada TIMESTAMPTZ;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ekspor_pertama TIMESTAMPTZ;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS garansi_diklaim TIMESTAMPTZ;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS garansi_alasan TEXT;
+
 -- users & sessions lintas usaha (email unik global); disimpan terpisah dari data usaha.
 CREATE TABLE IF NOT EXISTS users (
 	id         INT PRIMARY KEY,

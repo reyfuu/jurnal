@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
-import { checkout, getBilling, refreshBilling, type Billing, type LanggananStatus } from '@/lib/api'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { GARANSI_BELUM_BAYAR, checkout, getBilling, klaimGaransi, refreshBilling, type Billing, type GaransiStatus, type LanggananStatus } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
 declare global {
@@ -30,6 +31,61 @@ export function statusText(l: LanggananStatus) {
   if (l.status === 'aktif') return l.sampai ? `Langganan aktif sampai ${tanggal(l.sampai)}.` : 'Langganan aktif.'
   if (l.status === 'trial') return `Masa coba gratis sampai ${tanggal(l.sampai)}.`
   return 'Langganan belum aktif. Pilih paket untuk mulai memakai Laporan Bisnis.'
+}
+
+export const SYARAT_GARANSI =
+  'Garansi 7 hari uang kembali untuk pembayaran pertama, selama Anda belum mengunduh/ekspor data (Excel atau PDF). Mengajukan garansi menghentikan akses saat itu juga; dana dikembalikan manual lewat Midtrans dalam 3–7 hari kerja.'
+
+// GaransiCard: status garansi + tombol klaim. onDiklaim memuat ulang sesi (akses berhenti).
+function GaransiCard({ g, onDiklaim }: { g: GaransiStatus; onDiklaim: () => void }) {
+  const [alasan, setAlasan] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  if (g.alasan === GARANSI_BELUM_BAYAR) return null
+
+  async function klaim() {
+    setBusy(true)
+    setError('')
+    try {
+      await klaimGaransi(alasan)
+      onDiklaim()
+    } catch (e) {
+      setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: 22, maxWidth: 880, marginBottom: 16 }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Garansi 7 hari uang kembali</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {g.berlaku ? `Berlaku sampai ${tanggal(g.sampai)}. Mengunduh/ekspor data akan menggugurkannya.` : `Tidak berlaku: ${g.alasan}.`}
+          </p>
+        </div>
+        {g.berlaku && (
+          <Dialog>
+            <DialogTrigger asChild><Button variant="outline" size="sm">Ajukan garansi</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajukan garansi uang kembali?</DialogTitle>
+                <DialogDescription>Akses ke aplikasi berhenti saat ini juga. Dana dikembalikan manual lewat Midtrans dalam 3–7 hari kerja.</DialogDescription>
+              </DialogHeader>
+              <label className="grid gap-1.5 text-sm">
+                Alasan (opsional, membantu kami memperbaiki produk)
+                <textarea className="input-field" rows={3} maxLength={500} value={alasan} onChange={(e) => setAlasan(e.target.value)} />
+              </label>
+              {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+              <DialogFooter>
+                <Button variant="destructive" disabled={busy} onClick={() => void klaim()}>{busy ? 'Mengirim…' : 'Ya, ajukan & hentikan akses'}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function Langganan({ onPaid }: { onPaid: () => void }) {
@@ -85,6 +141,8 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
         <p className="mt-1 text-sm text-muted-foreground">{statusText(b.langganan)}</p>
       </div>
 
+      <GaransiCard g={b.garansi} onDiklaim={onPaid} />
+
       {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Master Pajak untuk aktivasi.</p>}
       <div className="grid gap-4 sm:grid-cols-2" style={{ maxWidth: 880 }}>
         {b.paket.map((p) => (
@@ -105,6 +163,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
           </div>
         ))}
       </div>
+      <p className="mt-3 text-xs text-muted-foreground" style={{ maxWidth: 880 }}>{SYARAT_GARANSI}</p>
       {info && <p className="mt-4 text-sm" style={{ color: 'var(--accent-green)' }} role="status">{info}</p>}
       {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
 

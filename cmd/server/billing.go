@@ -43,17 +43,111 @@ func findPaket(id string) (paket, bool) {
 }
 
 type order struct {
-	ID     string    `json:"id"`
-	Paket  string    `json:"paket"`
-	Jumlah int64     `json:"jumlah"`
-	Status string    `json:"status"` // pending | lunas | gagal
-	Waktu  time.Time `json:"waktu"`
+	ID          string    `json:"id"`
+	Paket       string    `json:"paket"`
+	Jumlah      int64     `json:"jumlah"`
+	Status      string    `json:"status"` // pending | lunas | gagal
+	Waktu       time.Time `json:"waktu"`
+	DibayarPada time.Time `json:"dibayar_pada,omitzero"` // saat lunas; awal masa garansi
 }
 
 type langganan struct {
 	TrialSampai time.Time `json:"trial_sampai"`
 	AktifSampai time.Time `json:"aktif_sampai,omitzero"`
 	Orders      []order   `json:"orders"`
+	// Garansi 7 hari uang kembali (lihat statusGaransi).
+	EksporPertama  time.Time `json:"ekspor_pertama,omitzero"` // ekspor data pertama: garansi gugur
+	GaransiDiklaim time.Time `json:"garansi_diklaim,omitzero"`
+	GaransiAlasan  string    `json:"garansi_alasan,omitempty"`
+}
+
+// Garansi 7 hari uang kembali: berlaku untuk pembayaran PERTAMA usaha, 7×24 jam sejak lunas,
+// dan gugur begitu usaha mengekspor datanya (laporan Excel, PDF invoice). Klaim menghentikan
+// akses saat itu juga; operator mengembalikan dana manual lewat dashboard Midtrans.
+const garansiDurasi = 7 * 24 * time.Hour
+
+const (
+	garansiBelumBayar   = "belum ada pembayaran"
+	garansiLewat        = "sudah lewat 7 hari sejak pembayaran pertama"
+	garansiSudahEkspor  = "data sudah pernah diekspor"
+	garansiSudahDiklaim = "garansi sudah diklaim"
+)
+
+type garansiStatus struct {
+	Berlaku bool      `json:"berlaku"`
+	Sampai  time.Time `json:"sampai,omitzero"`
+	Alasan  string    `json:"alasan,omitempty"` // kenapa tidak berlaku
+	OrderID string    `json:"order_id,omitempty"`
+}
+
+func statusGaransi(l langganan, now time.Time) garansiStatus {
+	i := slices.IndexFunc(l.Orders, func(o order) bool { return o.Status == "lunas" })
+	if i < 0 {
+		return garansiStatus{Alasan: garansiBelumBayar}
+	}
+	o := l.Orders[i] // pesanan tersimpan urut waktu: lunas pertama = pembayaran pertama
+	g := garansiStatus{Sampai: o.DibayarPada.Add(garansiDurasi), OrderID: o.ID}
+	switch {
+	case !l.GaransiDiklaim.IsZero():
+		g.Alasan = garansiSudahDiklaim
+	case !l.EksporPertama.IsZero():
+		g.Alasan = garansiSudahEkspor
+	case o.DibayarPada.IsZero() || !now.Before(g.Sampai): // nol = lunas sebelum fitur garansi ada
+		g.Alasan = garansiLewat
+	default:
+		g.Berlaku = true
+	}
+	return g
+}
+
+// handleKlaimGaransi: Owner mengajukan uang kembali. Akses berhenti saat itu juga.
+func (s *Server) handleKlaimGaransi(w http.ResponseWriter, r *http.Request) {
+	var req struct{ Alasan string }
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	t, now := s.tenantOf(r), time.Now()
+	t.mu.Lock()
+	g := statusGaransi(t.langganan, now)
+	if !g.Berlaku {
+		t.mu.Unlock()
+		http.Error(w, "Garansi tidak berlaku: "+g.Alasan, http.StatusConflict)
+		return
+	}
+	l := &t.langganan
+	l.GaransiDiklaim, l.GaransiAlasan = now, clip(strings.TrimSpace(req.Alasan), 500)
+	l.AktifSampai = now
+	if l.TrialSampai.After(now) {
+		l.TrialSampai = now
+	}
+	t.mu.Unlock()
+	log.Printf("GARANSI DIKLAIM usaha %d order %s (%s): kembalikan dana manual lewat dashboard Midtrans", t.id, g.OrderID, currentUser(r).Email)
+	writeJSON(w, s.newMe(currentUser(r)))
+}
+
+// exporting: ekspor data pertama yang berhasil menggugurkan garansi. Respons ditahan sampai
+// tanda itu tersimpan, supaya berkas tidak pernah sampai tanpa garansinya ikut gugur.
+func (s *Server) exporting(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		buf := &bufferedResponse{header: http.Header{}}
+		h(buf, r)
+		if buf.status == 0 || buf.status == http.StatusOK {
+			t := s.tenantOf(r)
+			t.mu.Lock()
+			pertama := t.langganan.EksporPertama.IsZero()
+			if pertama {
+				t.langganan.EksporPertama = time.Now()
+			}
+			t.mu.Unlock()
+			if pertama {
+				if err := s.saveFor(t); err != nil {
+					http.Error(w, "gagal menyimpan, coba lagi", http.StatusServiceUnavailable)
+					return
+				}
+			}
+		}
+		buf.flush(w)
+	}
 }
 
 type langgananStatus struct {
@@ -112,10 +206,12 @@ func (s *Server) handleBilling(w http.ResponseWriter, r *http.Request) {
 	t := s.tenantOf(r)
 	t.mu.RLock()
 	orders := append([]order{}, t.langganan.Orders...) // bukan nil: JSON [] supaya frontend aman
+	garansi := statusGaransi(t.langganan, time.Now())
 	t.mu.RUnlock()
 	slices.Reverse(orders) // terbaru dulu
 	writeJSON(w, map[string]any{
 		"langganan":  t.langgananStatus(time.Now()),
+		"garansi":    garansi,
 		"paket":      paketList,
 		"orders":     orders,
 		"client_key": os.Getenv("MIDTRANS_CLIENT_KEY"),
@@ -219,7 +315,7 @@ func (s *Server) applyPayment(st midtrans.Notification, now time.Time) error {
 			t.mu.Unlock()
 			return fmt.Errorf("jumlah %s tidak cocok dengan order %d", st.GrossAmount, o.Jumlah)
 		}
-		o.Status = "lunas"
+		o.Status, o.DibayarPada = "lunas", now
 		l := &t.langganan
 		mulai := latest(now, l.AktifSampai, l.TrialSampai)
 		l.AktifSampai = mulai.Add(time.Duration(p.Hari) * 24 * time.Hour)

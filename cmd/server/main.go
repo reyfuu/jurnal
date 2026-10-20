@@ -283,7 +283,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/kalkulator/pph-badan", s.guard("kalkulator-pajak", s.handleHitungPPhBadan))
 	s.mux.HandleFunc("GET /api/v1/reports/ai", s.guard("laporan-keuangan", s.on(s.handleAIReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoA)))
-	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoAXlsx)))
+	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleReportCoAXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
@@ -339,7 +339,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/invoice", s.persisting(s.guard("invoice", s.on((*tenant).handleCreateInvoice))))
 	s.mux.HandleFunc("PUT /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdateInvoice))))
 	s.mux.HandleFunc("DELETE /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeleteInvoice))))
-	s.mux.HandleFunc("GET /api/v1/invoice/{id}/pdf", s.guard("invoice", s.on((*tenant).handleInvoicePDF)))
+	s.mux.HandleFunc("GET /api/v1/invoice/{id}/pdf", s.guard("invoice", s.exporting(s.on((*tenant).handleInvoicePDF))))
 
 	s.mux.HandleFunc("GET /api/v1/users", s.guard("pengguna", s.handleListUsers))
 	s.mux.HandleFunc("POST /api/v1/users", s.persisting(s.guard("pengguna", s.handleCreateUser)))
@@ -349,6 +349,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/billing/plans", s.handlePlans)
 	s.mux.HandleFunc("GET /api/v1/billing", s.guard("", s.handleBilling))
 	s.mux.HandleFunc("POST /api/v1/billing/checkout", s.persisting(s.guard("langganan", s.handleCheckout)))
+	s.mux.HandleFunc("POST /api/v1/billing/garansi", s.persisting(s.guard("langganan", s.handleKlaimGaransi)))
 	s.mux.HandleFunc("POST /api/v1/billing/refresh", s.guard("langganan", s.handleBillingRefresh))
 	s.mux.HandleFunc("POST /api/v1/billing/midtrans/notify", s.handleMidtransNotify)
 
@@ -420,6 +421,7 @@ type meResp struct {
 	RoleLabel string          `json:"role_label"`
 	Views     []string        `json:"views"`
 	Langganan langgananStatus `json:"langganan"`
+	Garansi   garansiStatus   `json:"garansi"`
 }
 
 func (s *Server) newMe(u auth.User) meResp {
@@ -429,6 +431,9 @@ func (s *Server) newMe(u auth.User) meResp {
 	s.tenantsMu.RUnlock()
 	if t != nil {
 		me.Langganan = t.langgananStatus(time.Now())
+		t.mu.RLock()
+		me.Garansi = statusGaransi(t.langganan, time.Now())
+		t.mu.RUnlock()
 	}
 	return me
 }

@@ -13,6 +13,7 @@ const CTA_DAFTAR = 'Daftar sekarang'
 const FAQ = [
   ['Apakah saya perlu paham akuntansi?', 'Tidak. Anda cukup menjawab beberapa pertanyaan tentang usaha Anda. Daftar akun, laporan laba rugi, dan neraca disiapkan otomatis dari transaksi yang Anda catat.'],
   ['Bagaimana cara berlangganan?', 'Setelah daftar dan mengisi profil usaha, pilih paket bulanan atau tahunan lalu bayar lewat Midtrans. Semua fitur langsung aktif begitu pembayaran berhasil.'],
+  ['Ada garansi uang kembali?', 'Ada. Garansi 7 hari uang kembali untuk pembayaran pertama, selama Anda belum mengunduh atau mengekspor data (Excel/PDF). Ajukan dari menu Langganan; akses berhenti dan dana dikembalikan lewat Midtrans dalam 3–7 hari kerja.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans. Anda bisa memilih metode yang tersedia di halaman pembayaran, seperti virtual account bank, QRIS, e-wallet, atau kartu.'],
   ['Dari mana angka benchmark DJP-nya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU) dari buku sektoral DJP, data SPT tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
   ['Siapa saja yang bisa memakai akun saya?', 'Owner bisa menambah Admin Keuangan dan Kasir. Tiap peran hanya melihat menu yang sesuai, dan data tiap usaha terpisah dari usaha lain.'],
@@ -186,8 +187,9 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
 
         <section id="harga" className="mx-auto max-w-4xl scroll-mt-20 px-4 py-20 md:px-6">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Harga sederhana.</h2>
-          <p className="mt-3 text-[var(--text-secondary)]">Semua fitur dalam satu paket. Pilih bulanan atau tahunan.</p>
+          <p className="mt-3 text-[var(--text-secondary)]">Semua fitur dalam satu paket. Pilih bulanan atau tahunan. Garansi 7 hari uang kembali.*</p>
           <div className="mt-10"><Pricing onDaftar={onDaftar} /></div>
+          <p className="mt-4 text-xs text-[var(--text-secondary)]">*Untuk pembayaran pertama, selama data belum diunduh/diekspor. Lihat FAQ.</p>
         </section>
 
         <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-4 pb-20 md:px-6">
