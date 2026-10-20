@@ -78,14 +78,15 @@ func (t *tenant) langgananStatus(now time.Time) langgananStatus {
 	return langgananStatus{"habis", cmp.Or(l.AktifSampai, l.TrialSampai)}
 }
 
-// lockedWrite: langganan belum/tidak aktif → hanya baca. Pembayaran, sesi, lapor bug, dan
-// profil usaha (onboarding + cek awal) tetap jalan.
+// lockedWrite: langganan belum/tidak aktif → hanya baca. Pembayaran, sesi, lapor bug,
+// profil usaha (onboarding + cek awal), serta alat gratis (kalkulator & perencanaan pajak:
+// POST yang hanya menghitung, tidak menyimpan) tetap jalan.
 // ponytail: baca (GET) tidak dikunci di server; layar bayar dipaksa di frontend (App.tsx).
 func (s *Server) lockedWrite(r *http.Request, tenantID int) bool {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		return false
 	}
-	for _, p := range []string{"/api/v1/billing", "/api/v1/auth/", "/api/v1/bugs", "/api/v1/business"} {
+	for _, p := range []string{"/api/v1/billing", "/api/v1/auth/", "/api/v1/bugs", "/api/v1/business", "/api/v1/kalkulator/", "/api/v1/tax/planning"} {
 		if strings.HasPrefix(r.URL.Path, p) {
 			return false
 		}
