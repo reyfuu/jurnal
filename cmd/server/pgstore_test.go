@@ -141,6 +141,8 @@ type tenantData struct {
 	NextTagihanID, NextStokID                            int
 	NextProdukID, NextSupplierID, NextKoreksiID          int
 	CoaTemplate                                          int
+	Arsip                                                time.Time
+	ArsipAlasan                                          string
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -150,7 +152,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -202,6 +204,11 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	if rec := postBug(srv, qa, map[string]string{"judul": "Bug PG", "deskripsi": "d", "halaman": "dashboard"}, nil); rec.Code != http.StatusCreated {
 		t.Fatalf("lapor bug: %d %s", rec.Code, rec.Body)
 	}
+	// diarsipkan terakhir: usaha yang diarsip menolak permintaan pemiliknya (termasuk lapor bug)
+	tn.mu.Lock()
+	tn.arsip, tn.arsipAlasan = time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC), "uji arsip"
+	tn.mu.Unlock()
+	srv.saveFor(tn)
 
 	srv2 := NewServer() // muat ulang dari Postgres
 	if got, want := tenantJSON(t, srv2.tenants[tn.id]), tenantJSON(t, tn); got != want {

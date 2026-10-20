@@ -410,3 +410,82 @@ func Restore(snap StoreSnapshot) *Store {
 	}
 	return s
 }
+
+// --- Panel Master: kelola user semua usaha ---
+
+// Get: user mana pun (semua usaha).
+func (s *Store) Get(id int) (User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	r, ok := s.users[id]
+	if !ok {
+		return User{}, false
+	}
+	return r.User, true
+}
+
+// All: semua user, urut ID.
+func (s *Store) All() []User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]User, 0, len(s.users))
+	for _, r := range s.users {
+		out = append(out, r.User)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// UbahKontak: nama, email, dan nomor WA user usaha (bukan akun tim). Role & password tetap.
+func (s *Store) UbahKontak(id int, name, email, wa string) (User, error) {
+	in := Input{Name: name, Email: email, Role: Kasir}
+	if err := validate(&in, false); err != nil {
+		return User{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.users[id]
+	if !ok || r.Role == MP {
+		return User{}, ErrNotFound
+	}
+	if s.emailTaken(in.Email, id) {
+		return User{}, ErrEmailTaken
+	}
+	if r.Email != in.Email {
+		s.revoke(id) // login lama memakai email lain
+	}
+	r.Name, r.Email, r.WA = in.Name, in.Email, strings.TrimSpace(wa)
+	return r.User, nil
+}
+
+// ResetPassword membuat password sementara baru (dikembalikan sekali) dan mengakhiri semua sesi.
+func (s *Store) ResetPassword(id int) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.users[id]
+	if !ok {
+		return "", ErrNotFound
+	}
+	pw := strings.ToLower(rand.Text()[:12])
+	r.hash = hashPassword(pw, r.salt)
+	s.revoke(id)
+	return pw, nil
+}
+
+// HapusUsaha menghapus permanen semua user satu usaha (hard delete usaha). Usaha 0 (tim) ditolak.
+func (s *Store) HapusUsaha(tenantID int) int {
+	if tenantID == 0 {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for id, r := range s.users {
+		if r.TenantID == tenantID {
+			delete(s.users, id)
+			s.revoke(id)
+			n++
+		}
+	}
+	return n
+}

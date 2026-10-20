@@ -15,6 +15,7 @@ import (
 
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"time"
 )
 
 // ponytail: snapshot JSON atomik (tulis temp lalu rename) untuk 1 usaha & ratusan user;
@@ -42,6 +43,8 @@ type state struct {
 	Koreksi        []finance.Koreksi       `json:"koreksi"`
 	NextKoreksiID  int                     `json:"next_koreksi_id"`
 	CoaTemplate    int                     `json:"coa_template,omitempty"`
+	Arsip          time.Time               `json:"arsip,omitzero"`
+	ArsipAlasan    string                  `json:"arsip_alasan,omitempty"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
 	Langganan      *langganan              `json:"langganan,omitempty"`
 }
@@ -134,6 +137,7 @@ func (t *tenant) snapshot() state {
 		Produk: slices.Clone(t.produk), NextProdukID: t.nextProdukID,
 		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
 		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
+		Arsip: t.arsip, ArsipAlasan: t.arsipAlasan,
 	}
 }
 

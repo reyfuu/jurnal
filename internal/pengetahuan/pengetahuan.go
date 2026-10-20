@@ -52,9 +52,12 @@ type Artikel struct {
 }
 
 type Sumber struct {
-	ID           int       `json:"id"`
-	Judul        string    `json:"judul"`
-	Jenis        string    `json:"jenis"` // manual | excel | pdf
+	ID    int    `json:"id"`
+	Judul string `json:"judul"`
+	Jenis string `json:"jenis"` // manual | excel | pdf (format masukan)
+	// Kategori isi: tidak terbatas aturan — pengalaman lapangan tim & pengetahuan umum juga
+	// dipakai AI, dengan label supaya model membedakannya dari peraturan.
+	Kategori     string    `json:"kategori"`
 	Topik        []string  `json:"topik"`
 	Isi          string    `json:"isi"`
 	Status       string    `json:"status"`
@@ -62,6 +65,22 @@ type Sumber struct {
 	Oleh         string    `json:"oleh"`
 	Diverifikasi string    `json:"diverifikasi,omitempty"`
 	Waktu        time.Time `json:"waktu"`
+}
+
+// KategoriSumber: kategori isi sumber pengetahuan (urutan tampilan).
+var KategoriSumber = []struct{ ID, Label string }{
+	{"peraturan", "Peraturan & UU"}, {"artikel", "Artikel / teori pajak"}, {"praktik", "Praktik lapangan"},
+	{"umum", "Pengetahuan umum"}, {"lainnya", "Lainnya"},
+}
+
+// LabelKategori: label kategori; kosong (sumber lama) = Pengetahuan umum.
+func LabelKategori(id string) string {
+	for _, k := range KategoriSumber {
+		if k.ID == id {
+			return k.Label
+		}
+	}
+	return "Pengetahuan umum"
 }
 
 type State struct {
@@ -125,6 +144,12 @@ func (s *State) TambahSumber(src Sumber, oleh string, now time.Time) (Sumber, er
 	if src.Judul == "" || src.Isi == "" || !slices.Contains([]string{"manual", "excel", "pdf"}, src.Jenis) || len(src.Isi) > 2<<20 {
 		return Sumber{}, fmt.Errorf("%w: judul & isi wajib (maks 2 MB teks)", ErrTidakValid)
 	}
+	if src.Kategori = strings.TrimSpace(src.Kategori); src.Kategori == "" {
+		src.Kategori = "umum"
+	}
+	if !slices.ContainsFunc(KategoriSumber, func(k struct{ ID, Label string }) bool { return k.ID == src.Kategori }) {
+		return Sumber{}, fmt.Errorf("%w: kategori %q tidak dikenal", ErrTidakValid, src.Kategori)
+	}
 	src.ID, src.Status, src.DipakaiAI, src.Oleh, src.Diverifikasi, src.Waktu = s.NextSumberID, Menunggu, false, oleh, "", now
 	s.NextSumberID++
 	s.Sumber = append(s.Sumber, src)
@@ -176,10 +201,12 @@ func (s *State) HapusSumber(id int) error {
 const MaksPotongan = 900
 
 type Potongan struct {
-	Ref   string  `json:"ref"`
-	Judul string  `json:"judul"`
-	Teks  string  `json:"teks"`
-	Skor  float64 `json:"skor,omitempty"`
+	Ref   string `json:"ref"`
+	Judul string `json:"judul"`
+	// Kategori: label jenis isi (Artikel pajak, Peraturan & UU, Praktik lapangan, …).
+	Kategori string  `json:"kategori,omitempty"`
+	Teks     string  `json:"teks"`
+	Skor     float64 `json:"skor,omitempty"`
 }
 
 // Potongan: semua potongan yang boleh dipakai AI — artikel terbit & sumber terverifikasi.
@@ -191,7 +218,7 @@ func (s State) Potongan() []Potongan {
 		}
 		kepala := strings.Join(slices.DeleteFunc([]string{a.Kategori, a.DasarHukum, strings.Join(a.Tag, ", ")}, func(x string) bool { return x == "" }), " · ")
 		for _, b := range Pecah(kepala+"\n\n"+a.Isi, MaksPotongan) {
-			out = append(out, Potongan{Ref: RefArtikel(a.ID), Judul: a.Judul, Teks: b})
+			out = append(out, Potongan{Ref: RefArtikel(a.ID), Judul: a.Judul, Kategori: "Artikel pajak terbit", Teks: b})
 		}
 	}
 	for _, src := range s.Sumber {
@@ -199,7 +226,7 @@ func (s State) Potongan() []Potongan {
 			continue
 		}
 		for _, b := range Pecah(src.Isi, MaksPotongan) {
-			out = append(out, Potongan{Ref: RefSumber(src.ID), Judul: src.Judul, Teks: b})
+			out = append(out, Potongan{Ref: RefSumber(src.ID), Judul: src.Judul, Kategori: LabelKategori(src.Kategori), Teks: b})
 		}
 	}
 	return out

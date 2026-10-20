@@ -30,6 +30,13 @@ const (
 	Langganan      Izin = "langganan"
 	Pembayaran     Izin = "pembayaran"
 	Tim            Izin = "tim"
+	// Kelola data: ubah & arsipkan usaha klien, kelola akun pengguna klien. Hapus permanen
+	// (usaha, pengguna, anggota tim) dipisah karena tidak bisa dibatalkan.
+	KlienUbah      Izin = "klien_ubah"
+	PenggunaLihat  Izin = "pengguna_lihat"
+	PenggunaKelola Izin = "pengguna_kelola"
+	PenggunaReset  Izin = "pengguna_reset"
+	HapusPermanen  Izin = "hapus_permanen"
 	Audit          Izin = "audit"
 )
 
@@ -55,6 +62,11 @@ var DaftarIzin = []IzinInfo{
 	{Artikel, "Tulis artikel pajak", "Simpan draft; terbit setelah diverifikasi"},
 	{ArtikelTerbit, "Verifikasi & terbitkan artikel", ""},
 	{Pembayaran, "Lihat pembayaran", "Order Midtrans semua klien yang bisa dilihat"},
+	{KlienUbah, "Ubah & arsipkan usaha klien", "Edit identitas usaha, arsipkan (soft delete) dan pulihkan"},
+	{PenggunaLihat, "Lihat pengguna klien", "Nama, email, nomor HP, usaha, dan status akun"},
+	{PenggunaKelola, "Kelola pengguna klien", "Ubah kontak, nonaktifkan (soft delete) dan aktifkan lagi"},
+	{PenggunaReset, "Reset password pengguna klien", "Membuat password sementara; semua sesi pengguna berakhir"},
+	{HapusPermanen, "Hapus permanen", "Usaha, pengguna, dan anggota tim yang sudah dinonaktifkan/diarsipkan; tidak bisa dibatalkan"},
 	{Tim, "Kelola tim & akses", "Tambah anggota, role, dan penugasan klien"},
 	{Audit, "Lihat audit log", ""},
 }

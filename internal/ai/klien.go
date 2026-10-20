@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -52,6 +53,7 @@ ATURAN MUTLAK:
 1. Jangan menghitung atau memperkirakan angka. Salin angka dari FAKTA apa adanya. *_bps adalah basis poin: 3320 = 33,20%.
 2. Setiap poin WAJIB merujuk sumber dengan nomornya persis (mis. "A-001", "KB-003", "BM-563"). Pakai HANYA nomor yang ada di daftar SUMBER.
 3. Jika tidak ada sumber yang mendukung, jangan buat poinnya.
+4. Label dalam kurung menunjukkan jenis sumber. "(Praktik lapangan)" dan "(Pengetahuan umum)" adalah pengalaman tim, bukan aturan resmi: sampaikan sebagai praktik/kebiasaan, jangan sebagai kewajiban hukum.
 4. Bahasa Indonesia lugas, untuk konsultan. Bukan nasihat hukum final: hal yang menyangkut SPT diverifikasi tim pajak.
 
 Balas HANYA JSON:
@@ -85,7 +87,7 @@ func AnalisaKlien(ctx context.Context, c *llm.Client, f FaktaKlien, sumber []pen
 		if !slices.Contains(refs, p.Ref) {
 			refs = append(refs, p.Ref)
 		}
-		fmt.Fprintf(&daftar, "[%s] %s: %s\n", p.Ref, p.Judul, p.Teks)
+		fmt.Fprintf(&daftar, "[%s] (%s) %s: %s\n", p.Ref, cmp.Or(p.Kategori, "Sumber"), p.Judul, p.Teks)
 	}
 	fakta, err := json.Marshal(f)
 	if err != nil {

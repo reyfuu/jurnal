@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { getTim, hapusRole, simpanRole, tambahAnggota, ubahAnggota, type AnggotaRow, type Izin, type MasterRole, type TimData } from '@/lib/api'
+import { HapusPermanenDialog } from './KelolaDialog'
+import { getTim, hapusAnggotaTim, hapusRole, simpanRole, tambahAnggota, ubahAnggota, type AnggotaRow, type Izin, type MasterRole, type TimData } from '@/lib/api'
 import { formatRelatif } from '@/lib/format'
 
 type Form = { id: number | null; nama: string; email: string; password: string; role: string; klien: number[]; aktif: boolean }
 
-export function TimAkses({ selfId }: { selfId: number }) {
+export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boolean }) {
+  const [hapus, setHapus] = useState<AnggotaRow | null>(null)
   const [tim, setTim] = useState<TimData | null>(null)
   const [tab, setTab] = useState<'anggota' | 'role'>('anggota')
   const [form, setForm] = useState<Form | null>(null)
@@ -87,6 +89,9 @@ export function TimAkses({ selfId }: { selfId: number }) {
                     <td>{formatRelatif(a.user.last_seen)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <Button variant="ghost" size="icon-sm" aria-label={`Ubah ${a.user.name}`} onClick={() => edit(a)}><Pencil /></Button>
+                      {bisaHapus && !a.user.active && a.user.id !== selfId && (
+                        <Button variant="ghost" size="icon-sm" aria-label={`Hapus permanen ${a.user.name}`} onClick={() => setHapus(a)}><Trash2 /></Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -170,7 +175,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
               )}
               {form.id !== null && (
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="tm-aktif">Akun aktif</Label>
+                  <Label htmlFor="tm-aktif">{form.aktif ? 'Akun aktif' : 'Nonaktif (soft delete) — tidak bisa masuk, bisa diaktifkan lagi'}</Label>
                   <Switch id="tm-aktif" checked={form.aktif} disabled={form.id === selfId} onCheckedChange={(v) => set({ aktif: v })} />
                 </div>
               )}
@@ -211,6 +216,11 @@ export function TimAkses({ selfId }: { selfId: number }) {
           )}
         </DialogContent>
       </Dialog>
+      {hapus && (
+        <HapusPermanenDialog open onClose={() => setHapus(null)} judul={`Hapus permanen ${hapus.user.name}`}
+          teks="Akun anggota tim ini dan penugasannya dihapus. Catatan audit yang dibuatnya tetap tersimpan." kunci={hapus.user.email} labelKunci="email anggota"
+          onHapus={async (k) => { await hapusAnggotaTim(hapus.user.id, k); setHapus(null); await muat() }} />
+      )}
     </>
   )
 }

@@ -48,7 +48,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
 
   const refresh = useCallback(async () => {
     const res = await listTransactions()
-    setTxs(res.transactions)
+    setTxs(res.transactions ?? []) // usaha baru tanpa transaksi: server lama mengirim null
     setJenis(res.jenis)
     setCanEdit(res.can_edit)
   }, [])

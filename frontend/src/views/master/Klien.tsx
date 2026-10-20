@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Eye } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { KoreksiCard } from '@/components/KoreksiCard'
 import {
-  analisaKlien, aturLangganan, getKlien, mulaiLihat, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
-  type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
+  analisaKlien, arsipKlien, aturLangganan, getKlien, hapusKlien, mulaiLihat, pulihkanKlien, ubahKlien, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
+  type IdentitasUsaha, type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
 } from '@/lib/api'
+import { AlasanDialog, HapusPermanenDialog } from './KelolaDialog'
 import { formatRelatif, formatRp, formatTanggal } from '@/lib/format'
 import { STATUS_LABEL, STATUS_PILL } from '@/lib/tiket'
 
@@ -93,17 +94,19 @@ export function Ringkasan({ onBuka }: { onBuka: (id: number) => void }) {
   )
 }
 
-type Filter = 'semua' | 'aktif' | 'trial' | 'habis' | 'perhatian'
-const FILTER: [Filter, string][] = [['semua', 'Semua'], ['aktif', 'Aktif'], ['trial', 'Masa coba'], ['habis', 'Habis'], ['perhatian', 'Perlu perhatian']]
+type Filter = 'semua' | 'aktif' | 'trial' | 'habis' | 'perhatian' | 'arsip'
+const FILTER: [Filter, string][] = [['semua', 'Semua'], ['aktif', 'Aktif'], ['trial', 'Masa coba'], ['habis', 'Habis'], ['perhatian', 'Perlu perhatian'], ['arsip', 'Diarsipkan']]
 
-export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
+export function KlienList({ onBuka, bisaLihat, onLihat }: { onBuka: (id: number) => void; bisaLihat: boolean; onLihat: () => void }) {
+  const [lihat, setLihat] = useState<KlienRow | null>(null)
   const [rows, setRows] = useState<KlienRow[] | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<Filter>('semua')
   const [q, setQ] = useState('')
   useEffect(() => { listKlien().then(setRows, (e: Error) => setError(e.message)) }, [])
   const tampil = useMemo(() => (rows ?? []).filter((k) =>
-    (filter === 'semua' || (filter === 'perhatian' ? k.perlu_perhatian : k.status === filter)) &&
+    (filter === 'arsip' ? !!k.arsip : !k.arsip) &&
+    (filter === 'semua' || filter === 'arsip' || (filter === 'perhatian' ? k.perlu_perhatian : k.status === filter)) &&
     [k.nama, k.owner_nama, k.owner_email, k.kota].join(' ').toLowerCase().includes(q.trim().toLowerCase())), [rows, filter, q])
   return (
     <>
@@ -124,6 +127,7 @@ export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
               <tr>
                 <th>Usaha</th><th>Paket</th><th>Status</th><th>Berlaku s/d</th><th>Terakhir aktif</th>
                 <th style={{ textAlign: 'right' }}>Transaksi bulan ini</th><th>Profil</th><th>Ditangani</th>
+                {bisaLihat && <th style={{ textAlign: 'right' }}>Aksi</th>}
               </tr>
             </thead>
             <tbody>
@@ -132,6 +136,7 @@ export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
                   <td>
                     <button className="text-left font-semibold" onClick={() => onBuka(k.id)}>{k.nama}</button>
                     {k.demo && <span className="pill-status pill-status-muted" style={{ fontSize: 10, marginLeft: 6 }}>contoh</span>}
+                    {k.arsip && <span className="pill-status pill-red" style={{ fontSize: 10, marginLeft: 6 }}>diarsipkan</span>}
                     <div className="text-xs text-muted-foreground">{[k.owner_nama, k.kota, k.jenis, k.pkp && 'PKP'].filter(Boolean).join(' · ')}</div>
                   </td>
                   <td>{k.paket ?? <span className="text-muted-foreground">—</span>}</td>
@@ -143,28 +148,41 @@ export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
                   <td className="tabular" style={{ textAlign: 'right' }}>{k.transaksi_bulan_ini.toLocaleString('id-ID')}</td>
                   <td>{k.onboarding ? <span className="pill-status pill-green">Lengkap</span> : <span className="pill-status pill-status-muted">Belum</span>}</td>
                   <td>{k.penangan.length ? k.penangan.map((p) => p.nama.split(' ')[0]).join(', ') : <span className="pill-status pill-amber">Belum ada</span>}</td>
+                  {bisaLihat && (
+                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      {!k.arsip && (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => setLihat(k)} aria-label={`Lihat sebagai ${k.nama}`}>
+                          <Eye /> Lihat sebagai
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
               {rows && tampil.length === 0 && (
-                <tr><td colSpan={8} className="text-center text-muted-foreground" style={{ padding: 24 }}>Tidak ada klien yang cocok.</td></tr>
+                <tr><td colSpan={9} className="text-center text-muted-foreground" style={{ padding: 24 }}>Tidak ada klien yang cocok.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+      {lihat && <LihatDialog open onClose={() => setLihat(null)} klien={lihat} tiket={[]} onMulai={onLihat} />}
     </>
   )
 }
 
 const ORDER_PILL: Record<string, string> = { lunas: 'pill-green', manual: 'pill-amber', pending: 'pill-status-muted', gagal: 'pill-red' }
 
-export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKembali }: {
-  id: number; bisaLangganan: boolean; bisaLihat: boolean; onLihat: () => void; onKembali: () => void
+export function KlienDetailView({ id, bisaLangganan, bisaLihat, bisaUbah, bisaHapus, onLihat, onKembali }: {
+  id: number; bisaLangganan: boolean; bisaLihat: boolean; bisaUbah: boolean; bisaHapus: boolean; onLihat: () => void; onKembali: () => void
 }) {
   const [d, setD] = useState<KlienDetail | null>(null)
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState(false)
   const [lihat, setLihat] = useState(false)
+  const [edit, setEdit] = useState(false)
+  const [arsip, setArsip] = useState(false)
+  const [hapus, setHapus] = useState(false)
   const muat = () => getKlien(id).then(setD, (e: Error) => setError(e.message))
   useEffect(() => { void muat() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   const k = d?.klien
@@ -175,11 +193,20 @@ export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKemba
       </div>
       <PageHeader title={k?.nama ?? 'Memuat…'} subtitle={k ? [k.owner_nama, k.owner_email, k.owner_wa && `WA ${k.owner_wa}`, k.kota].filter(Boolean).join(' · ') : ''}>
         <div className="flex flex-wrap gap-2">
-          {k && bisaLihat && <button className="btn-cta" onClick={() => setLihat(true)}>Lihat sebagai klien</button>}
+          {k && bisaLihat && !k.arsip && <button className="btn-cta" onClick={() => setLihat(true)}>Lihat sebagai klien</button>}
           {k && bisaLangganan && !k.demo && <Button variant="outline" className="h-10 rounded-full" onClick={() => setDialog(true)}>Atur langganan</Button>}
+          {k && bisaUbah && d?.identitas && <Button variant="outline" className="h-10 rounded-full" onClick={() => setEdit(true)}>Edit data usaha</Button>}
+          {k && bisaUbah && !k.demo && !k.arsip && <Button variant="outline" className="h-10 rounded-full" onClick={() => setArsip(true)}>Arsipkan</Button>}
+          {k && bisaUbah && k.arsip && <Button variant="outline" className="h-10 rounded-full" onClick={() => void pulihkanKlien(k.id).then(muat, (e: Error) => setError(e.message))}>Pulihkan dari arsip</Button>}
+          {k && bisaHapus && k.arsip && <Button variant="destructive" className="h-10 rounded-full" onClick={() => setHapus(true)}>Hapus permanen</Button>}
         </div>
       </PageHeader>
       <Gagal error={error} />
+      {k?.arsip && (
+        <div className="card" style={{ padding: '12px 16px', borderColor: 'var(--text-danger)' }} role="status">
+          <strong>Diarsipkan {formatTanggal(k.arsip)}.</strong> {k.arsip_alasan} · Semua pengguna usaha ini tidak bisa masuk sampai dipulihkan.
+        </div>
+      )}
       {d && k && (
         <>
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
@@ -249,6 +276,14 @@ export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKemba
           )}
           <LihatDialog open={lihat} onClose={() => setLihat(false)} klien={k} tiket={d.tiket.filter((t) => t.status !== 'selesai').map((t) => `${t.nomor}: ${t.judul}`)} onMulai={onLihat} />
           <LanggananDialog open={dialog} onClose={() => setDialog(false)} klien={k} onSaved={() => { setDialog(false); void muat() }} />
+          {d.identitas && edit && <EditUsahaDialog klienId={k.id} awal={d.identitas} onClose={() => setEdit(false)} onSaved={() => { setEdit(false); void muat() }} />}
+          <AlasanDialog open={arsip} onClose={() => setArsip(false)} judul={`Arsipkan ${k.nama}`} tombol="Arsipkan"
+            teks="Usaha disembunyikan dari daftar dan semua penggunanya tidak bisa masuk. Data tetap tersimpan dan bisa dipulihkan kapan saja."
+            onKirim={async (alasan) => { await arsipKlien(k.id, alasan); setArsip(false); await muat() }} />
+          <HapusPermanenDialog open={hapus} onClose={() => setHapus(false)} judul={`Hapus permanen ${k.nama}`}
+            teks="Seluruh data usaha (transaksi, laporan, aset, invoice, karyawan) dan semua akun penggunanya dihapus dari database."
+            kunci={d.identitas?.nama_usaha || k.nama} labelKunci="nama usaha"
+            onHapus={async (konfirmasi) => { await hapusKlien(k.id, konfirmasi); onKembali() }} />
         </>
       )}
     </>
@@ -317,6 +352,53 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
             <Label htmlFor="lg-alasan">Alasan</Label>
             <Input id="lg-alasan" required maxLength={300} placeholder="mis. Transfer BCA 20 Okt, bukti di WA" value={alasan} onChange={(e) => setAlasan(e.target.value)} />
           </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditUsahaDialog({ klienId, awal, onClose, onSaved }: { klienId: number; awal: IdentitasUsaha; onClose: () => void; onSaved: () => void }) {
+  const [v, setV] = useState<IdentitasUsaha>(awal)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const field = (key: keyof IdentitasUsaha, label: string) => (
+    <div className="grid gap-1.5">
+      <Label htmlFor={`eu-${key}`}>{label}</Label>
+      <Input id={`eu-${key}`} value={v[key] ?? ''} onChange={(e) => setV({ ...v, [key]: e.target.value })} required={key === 'nama_usaha'} />
+    </div>
+  )
+  async function simpan(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await ubahKlien(klienId, v)
+      onSaved()
+    } catch (err) {
+      setError((err as Error).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <form onSubmit={simpan} className="grid gap-3">
+          <DialogHeader>
+            <DialogTitle>Edit data usaha</DialogTitle>
+            <DialogDescription>Identitas usaha saja. Bentuk usaha, PTKP, dan PKP tetap diubah pemilik di Profil Usaha. Perubahan tercatat di audit log.</DialogDescription>
+          </DialogHeader>
+          {field('nama_usaha', 'Nama usaha')}
+          {field('alamat', 'Alamat')}
+          {field('npwp', 'NPWP')}
+          {field('telepon', 'Telepon usaha')}
+          {field('email', 'Email usaha')}
+          <p className="text-xs text-muted-foreground">Lokasi: {[awal.kecamatan, awal.kota, awal.provinsi].filter(Boolean).join(', ') || '—'} (diubah pemilik di Profil Usaha)</p>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Batal</Button>

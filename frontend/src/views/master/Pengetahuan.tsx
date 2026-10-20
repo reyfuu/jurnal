@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
-  KATEGORI_ARTIKEL, cariPengetahuan, hapusPengetahuan, listArtikel, listPengetahuan, pakaiPengetahuan, simpanArtikel, tulisPengetahuan,
+  KATEGORI_ARTIKEL, KATEGORI_SUMBER, type KategoriSumber, cariPengetahuan, hapusPengetahuan, listArtikel, listPengetahuan, pakaiPengetahuan, simpanArtikel, tulisPengetahuan,
   unggahPengetahuan, verifikasiPengetahuan, type Artikel, type ArtikelInput, type Potongan, type SumberPengetahuan,
 } from '@/lib/api'
 import { formatTanggal } from '@/lib/format'
@@ -128,10 +128,26 @@ export function ArtikelView({ bolehTerbit }: { bolehTerbit: boolean }) {
   )
 }
 
+function KategoriPilih({ v, set }: { v: KategoriSumber; set: (k: KategoriSumber) => void }) {
+  return (
+    <fieldset className="grid gap-1.5">
+      <legend className="text-sm font-medium">Kategori</legend>
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))' }}>
+        {KATEGORI_SUMBER.map(([id, label, ket]) => (
+          <label key={id} className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm" style={{ borderColor: v === id ? 'var(--text-brand)' : 'var(--border-subtle)' }}>
+            <input type="radio" name="kb-kategori" className="mt-1" checked={v === id} onChange={() => set(id)} />
+            <span><span className="font-semibold">{label}</span>{ket && <span className="block text-xs text-muted-foreground">{ket}</span>}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
+
 export function BasisPengetahuan() {
   const [data, setData] = useState<{ sumber: SumberPengetahuan[]; artikel_terbit: number; potongan_dipakai: number } | null>(null)
-  const [tulis, setTulis] = useState<{ judul: string; isi: string; topik: string } | null>(null)
-  const [unggah, setUnggah] = useState<{ file: File | null; judul: string; topik: string } | null>(null)
+  const [tulis, setTulis] = useState<{ judul: string; isi: string; topik: string; kategori: KategoriSumber } | null>(null)
+  const [unggah, setUnggah] = useState<{ file: File | null; judul: string; topik: string; kategori: KategoriSumber } | null>(null)
   const [q, setQ] = useState('')
   const [hasil, setHasil] = useState<Potongan[] | null>(null)
   const [error, setError] = useState('')
@@ -161,8 +177,8 @@ export function BasisPengetahuan() {
     <>
       <PageHeader title="Basis Pengetahuan AI" subtitle="Bahan yang dibaca AI saat menilai klien. Hanya artikel terbit dan sumber yang sudah diverifikasi yang dipakai.">
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="h-10 rounded-full" onClick={() => setTulis({ judul: '', isi: '', topik: '' })}><Plus /> Tulis manual</Button>
-          <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => setUnggah({ file: null, judul: '', topik: '' })}><Upload size={16} /> Impor Excel / PDF</button>
+          <Button variant="outline" className="h-10 rounded-full" onClick={() => setTulis({ judul: '', isi: '', topik: '', kategori: 'praktik' })}><Plus /> Tulis manual</Button>
+          <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => setUnggah({ file: null, judul: '', topik: '', kategori: 'peraturan' })}><Upload size={16} /> Impor Excel / PDF</button>
         </div>
       </PageHeader>
       <Pesan error={!tulis && !unggah ? error : ''} info={info} />
@@ -200,7 +216,7 @@ export function BasisPengetahuan() {
         <div className="chart-title">Sumber</div>
         <div className="table-scroll">
           <table className="data-table" style={{ minWidth: 780 }}>
-            <thead><tr><th>Sumber</th><th>Jenis</th><th>Topik</th><th style={{ textAlign: 'right' }}>Potongan</th><th>Status</th><th>Dipakai AI</th><th /></tr></thead>
+            <thead><tr><th>Sumber</th><th>Kategori</th><th>Topik</th><th style={{ textAlign: 'right' }}>Potongan</th><th>Status</th><th>Dipakai AI</th><th /></tr></thead>
             <tbody>
               {data?.sumber.map((s) => (
                 <tr key={s.id}>
@@ -208,7 +224,10 @@ export function BasisPengetahuan() {
                     <span className="tabular text-xs text-muted-foreground">KB-{String(s.id).padStart(3, '0')}</span> <span className="font-semibold">{s.judul}</span>
                     <div className="text-xs text-muted-foreground" title={s.cuplikan}>{s.cuplikan.slice(0, 90)}{s.cuplikan.length > 90 ? '…' : ''}</div>
                   </td>
-                  <td><span className="pill-status pill-status-muted">{s.jenis.toUpperCase()}</span></td>
+                  <td>
+                    <span className="pill-status pill-status-muted">{KATEGORI_SUMBER.find((k) => k[0] === (s.kategori ?? 'umum'))?.[1]}</span>
+                    <div className="text-xs text-muted-foreground" style={{ marginTop: 2 }}>{s.jenis.toUpperCase()}</div>
+                  </td>
                   <td className="text-xs">{s.topik.join(', ') || '—'}</td>
                   <td className="tabular" style={{ textAlign: 'right' }}>{s.potongan}</td>
                   <td>{s.status === 'menunggu'
@@ -227,8 +246,9 @@ export function BasisPengetahuan() {
       <Dialog open={tulis !== null} onOpenChange={(o) => !o && setTulis(null)}>
         <DialogContent className="sm:max-w-2xl">
           {tulis && (
-            <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void jalankan(() => tulisPengetahuan(tulis.judul, tulis.isi, tulis.topik.split(',')), 'Tersimpan. Menunggu verifikasi sebelum dipakai AI.', () => setTulis(null)) }}>
-              <DialogHeader><DialogTitle>Tulis pengetahuan</DialogTitle><DialogDescription>Tulis seperti menjelaskan ke rekan konsultan. Dipakai AI setelah diverifikasi.</DialogDescription></DialogHeader>
+            <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void jalankan(() => tulisPengetahuan(tulis.judul, tulis.isi, tulis.topik.split(','), tulis.kategori), 'Tersimpan. Menunggu verifikasi sebelum dipakai AI.', () => setTulis(null)) }}>
+              <DialogHeader><DialogTitle>Tulis pengetahuan</DialogTitle><DialogDescription>Tidak harus peraturan atau artikel: pengalaman lapangan, kebiasaan di KPP, tips menangani klien, dan pengetahuan bisnis umum juga boleh. Tulis seperti menjelaskan ke rekan konsultan. Dipakai AI setelah diverifikasi.</DialogDescription></DialogHeader>
+              <KategoriPilih v={tulis.kategori} set={(kategori) => setTulis({ ...tulis, kategori })} />
               <div className="grid gap-1.5"><Label htmlFor="kb-j">Judul</Label><Input id="kb-j" required value={tulis.judul} onChange={(e) => setTulis({ ...tulis, judul: e.target.value })} /></div>
               <div className="grid gap-1.5"><Label htmlFor="kb-i">Isi</Label><textarea id="kb-i" required rows={8} className={textareaClass} value={tulis.isi} onChange={(e) => setTulis({ ...tulis, isi: e.target.value })} /></div>
               <div className="grid gap-1.5"><Label htmlFor="kb-t">Topik (pisah koma)</Label><Input id="kb-t" placeholder="PPh Final, Pembukuan" value={tulis.topik} onChange={(e) => setTulis({ ...tulis, topik: e.target.value })} /></div>
@@ -241,11 +261,12 @@ export function BasisPengetahuan() {
       <Dialog open={unggah !== null} onOpenChange={(o) => !o && setUnggah(null)}>
         <DialogContent>
           {unggah && (
-            <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); if (unggah.file) void jalankan(() => unggahPengetahuan(unggah.file!, unggah.judul, unggah.topik), 'Diunggah dan diindeks. Menunggu verifikasi sebelum dipakai AI.', () => setUnggah(null)) }}>
+            <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); if (unggah.file) void jalankan(() => unggahPengetahuan(unggah.file!, unggah.judul, unggah.topik, unggah.kategori), 'Diunggah dan diindeks. Menunggu verifikasi sebelum dipakai AI.', () => setUnggah(null)) }}>
               <DialogHeader>
                 <DialogTitle>Impor Excel / PDF</DialogTitle>
                 <DialogDescription>Excel: kolom Judul, Isi, Topik, Sumber (satu baris satu potong). PDF: teks diambil per halaman; PDF hasil scan (gambar) belum bisa dibaca.</DialogDescription>
               </DialogHeader>
+              <KategoriPilih v={unggah.kategori} set={(kategori) => setUnggah({ ...unggah, kategori })} />
               <div className="grid gap-1.5"><Label htmlFor="kb-f">Berkas .xlsx / .pdf</Label><Input id="kb-f" type="file" accept=".xlsx,.pdf" required onChange={(e) => setUnggah({ ...unggah, file: e.target.files?.[0] ?? null })} /></div>
               <div className="grid gap-1.5"><Label htmlFor="kb-uj">Judul</Label><Input id="kb-uj" required placeholder="mis. PMK 81/2024" value={unggah.judul} onChange={(e) => setUnggah({ ...unggah, judul: e.target.value })} /></div>
               <div className="grid gap-1.5"><Label htmlFor="kb-ut">Topik (pisah koma)</Label><Input id="kb-ut" placeholder="Administrasi, Coretax" value={unggah.topik} onChange={(e) => setUnggah({ ...unggah, topik: e.target.value })} /></div>

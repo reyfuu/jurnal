@@ -190,7 +190,7 @@ func (s *Server) handleTambahPengetahuan(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
 			return
 		}
-		src.Judul, src.Topik = r.FormValue("judul"), strings.Split(r.FormValue("topik"), ",")
+		src.Judul, src.Topik, src.Kategori = r.FormValue("judul"), strings.Split(r.FormValue("topik"), ","), r.FormValue("kategori")
 		switch strings.ToLower(filepath.Ext(hdr.Filename)) {
 		case ".pdf":
 			src.Jenis = "pdf"
