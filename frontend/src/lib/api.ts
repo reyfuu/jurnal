@@ -1437,7 +1437,7 @@ export interface MarketplaceResult {
   status: 'bebas' | 'lunas' | 'kurang_bayar' | 'lebih_bayar'
   rekomendasi: SaranPajak[]; langkah: Langkah[]; catatan: string[]
 }
-export const hitungMarketplace = (b: { omzet_marketplace: number; omzet_lain: number; npm_bps: number; bentuk: 'op' | 'badan'; skema: 'final' | 'umum'; ptkp: string }) =>
+export const hitungMarketplace = (b: { omzet_marketplace: number; omzet_lain: number; npm_bps: number; laba?: number; bentuk: 'op' | 'badan'; skema: 'final' | 'umum'; ptkp: string }) =>
   api<MarketplaceResult>('/kalkulator/pph22-marketplace', { method: 'POST', body: b })
 export const cariNorma = (q: string) => api<Norma[]>('/kalkulator/norma?q=' + encodeURIComponent(q))
 export const hitungNPPN = (b: { omzet: number; klu: string; wilayah: string; norma_bps: number; ptkp: string }) =>
