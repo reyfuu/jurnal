@@ -112,3 +112,35 @@ func TestCariPanduan_LemahSatuTautan(t *testing.T) {
 		t.Errorf("%+v", p)
 	}
 }
+
+func TestCariPanduan_TahanSalahKetik(t *testing.T) {
+	cek := map[string]string{
+		"kalau mau input trasaksi dmn ya ?": "transaksi#",
+		"dimana bikin invoce":               "invoice#",
+		"cara impor mutsai bank":            "transaksi#",
+		"dmn isi saldo awla":                "impor-data#",
+	}
+	for q, mau := range cek {
+		p, ok := CariPanduan(q, semuaBoleh)
+		if !ok || !p.Kuat || len(p.Tautan) == 0 || viewsDari(p.Tautan)[0] != mau {
+			t.Errorf("%q: %+v, mau %s", q, viewsDari(p.Tautan), mau)
+		}
+	}
+	// Kata pendek tidak dicocokkan longgar: "stok" ≠ "stop".
+	if p, ok := CariPanduan("dimana tombol stop", semuaBoleh); ok && p.Kode == "stok" {
+		t.Error("kata pendek tidak boleh dicocokkan longgar")
+	}
+}
+
+func TestPanduanUmum(t *testing.T) {
+	kasir := func(v string) bool { return v == "dashboard" || v == "transaksi" || v == "lapor-bug" }
+	p := PanduanUmum(kasir)
+	if !p.Kuat || len(p.Tautan) == 0 {
+		t.Fatalf("%+v", p)
+	}
+	for _, l := range p.Tautan {
+		if !kasir(l.View) {
+			t.Errorf("tautan %s tidak boleh untuk kasir", l.View)
+		}
+	}
+}

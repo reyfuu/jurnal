@@ -48,6 +48,13 @@ func TestTanyaAI_PanduanMenuDenganTautan(t *testing.T) {
 	if r.Category != "cashflow" || len(r.Tautan) != 1 {
 		t.Errorf("analisis: %q %+v", r.Category, r.Tautan)
 	}
+	// Salah ketik tetap dikenali; pertanyaan menu yang tidak dikenali tidak dijawab ringkasan laporan.
+	if r = tanyaAI(t, srv, owner, "kalau mau input trasaksi dmn ya ?"); r.Category != "panduan" || len(r.Tautan) == 0 || r.Tautan[0].View != "transaksi" {
+		t.Errorf("salah ketik: %q %+v", r.Category, r.Tautan)
+	}
+	if r = tanyaAI(t, srv, owner, "dimana menu qwerty"); r.Category != "panduan" || len(r.Tautan) == 0 {
+		t.Errorf("menu tak dikenal: %q %+v", r.Category, r.Tautan)
+	}
 	if r = tanyaAI(t, srv, owner, "Ringkas laporan bulan ini"); r.Category != "summary" || len(r.Tautan) != 0 {
 		t.Errorf("ringkasan: %q %+v", r.Category, r.Tautan)
 	}

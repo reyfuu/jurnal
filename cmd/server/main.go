@@ -913,6 +913,9 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 			panduan, cocok = p, true
 		}
 	}
+	if !cocok && ai.TanyaMenu(req.Query) {
+		panduan, cocok = ai.PanduanUmum(boleh), true
+	}
 	if cocok && panduan.Kuat {
 		writeJSON(w, ai.QueryResponse{Answer: panduan.Jawaban, Category: "panduan", Tautan: panduan.Tautan, ActionSuggestions: []string{
 			"Di mana saya mencatat transaksi?", "Bagaimana cara impor mutasi bank?", "Ringkas laporan bulan ini"}})
