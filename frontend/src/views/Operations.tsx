@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { simulatePrice, type Dashboard, type PriceSim } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-const fieldClass = 'h-[38px] bg-[#0d0f13] tabular'
+const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
 export function StokModule({ d, title }: { d: Dashboard; title: string }) {
   const [cari, setCari] = useState('')
@@ -30,14 +30,14 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
       <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
           <Input
-            style={{ flex: '1 1 240px', minWidth: 200, height: 38, background: '#0d0f13' }}
+            style={{ flex: '1 1 240px', minWidth: 200, height: 38, background: 'var(--bg-input)' }}
             placeholder="Cari SKU atau nama item / bahan..."
             value={cari}
             onChange={(e) => setCari(e.target.value)}
           />
           <select
             className="period-select"
-            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            style={{ height: 38, background: 'var(--bg-input)', border: '1px solid var(--border-strong)', color: 'var(--text-primary)', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
@@ -47,7 +47,7 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
           </select>
           <select
             className="period-select"
-            style={{ height: 38, background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
+            style={{ height: 38, background: 'var(--bg-input)', border: '1px solid var(--border-strong)', color: 'var(--text-primary)', borderRadius: 8, padding: '0 12px', fontSize: 13 }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -142,9 +142,9 @@ export function SimulasiHarga({ period }: { period: string }) {
   ]
   const be = res?.break_even
   const results = res ? [
-    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: '#facc15' },
-    { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: formatRp(res.channel_fee), color: '#fb7185' },
-    { label: 'Uang Bersih Diterima (Take Home)', value: formatRp(res.net_take_home), color: '#10b981' },
+    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: 'var(--text-warn)' },
+    { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: formatRp(res.channel_fee), color: 'var(--text-danger)' },
+    { label: 'Uang Bersih Diterima (Take Home)', value: formatRp(res.net_take_home), color: 'var(--accent-green)' },
   ] : []
   const beCards = be ? [
     { label: 'Biaya Tetap per Bulan', value: formatRp(be.fixed_cost), meta: fixedCost.trim() === '' ? 'Dari total beban operasional periode ini' : 'Input manual' },
@@ -152,7 +152,7 @@ export function SimulasiHarga({ period }: { period: string }) {
     {
       label: `Laba Bersih pada ${be.monthly_volume.toLocaleString('id-ID')} pcs`,
       value: formatRp(be.net_profit_at_volume),
-      color: be.net_profit_at_volume < 0 ? '#fb7185' : '#10b981',
+      color: be.net_profit_at_volume < 0 ? 'var(--text-danger)' : 'var(--accent-green)',
       meta: be.net_profit_at_volume < 0 ? 'Masih rugi, volume di bawah BEP' : 'Sudah di atas BEP',
     },
     { label: 'Harus Terjual untuk Target Laba', value: `${be.units_for_target.toLocaleString('id-ID')} pcs`, meta: `Target ${formatRp(be.target_net_profit)} per bulan` },
@@ -180,7 +180,7 @@ export function SimulasiHarga({ period }: { period: string }) {
 
         <div className="sim-results">
           {results.map((r) => (
-            <div className="card" style={{ background: '#101318' }} key={r.label}>
+            <div className="card" style={{ background: 'var(--bg-raised)' }} key={r.label}>
               <div className="kpi-label">{r.label}</div>
               <div className="kpi-value tabular" style={{ color: r.color }}>{r.value}</div>
             </div>
@@ -191,7 +191,7 @@ export function SimulasiHarga({ period }: { period: string }) {
         {be && (
           <div className="sim-results sim-results-4">
             {beCards.map((c) => (
-              <div className="card" style={{ background: '#101318' }} key={c.label}>
+              <div className="card" style={{ background: 'var(--bg-raised)' }} key={c.label}>
                 <div className="kpi-label">{c.label}</div>
                 <div className="kpi-value tabular" style={{ color: c.color }}>{c.value}</div>
                 <div className="kpi-meta-row">{c.meta}</div>
@@ -209,8 +209,8 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
   const kpis = [
     { label: 'Akumulasi Omzet 2026', value: tr.total_gross, meta: <span className="badge-up">Jan – Agu 2026</span> },
     { label: 'Kuota Bebas Pajak WP OP', value: tr.yearly_exemption, meta: <span>PP 55/2022 Pasal 60</span> },
-    { label: 'Omzet Kena Pajak (Di atas Rp500 jt)', value: tr.total_taxable, color: '#facc15', meta: <span>Mulai terlewati di bulan Juli</span> },
-    { label: 'Total PPh Final 0,5% Terutang', value: tr.total_tax_due, color: '#10b981', meta: <span>Siap dilampirkan ke SPT Tahunan</span> },
+    { label: 'Omzet Kena Pajak (Di atas Rp500 jt)', value: tr.total_taxable, color: 'var(--text-warn)', meta: <span>Mulai terlewati di bulan Juli</span> },
+    { label: 'Total PPh Final 0,5% Terutang', value: tr.total_tax_due, color: 'var(--accent-green)', meta: <span>Siap dilampirkan ke SPT Tahunan</span> },
   ]
   return (
     <>
@@ -246,7 +246,7 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
                 <td>{formatRp(m.gross_omzet)}</td>
                 <td>{formatRp(m.cumulative_omzet)}</td>
                 <td>{formatRp(m.taxable_amount)}</td>
-                <td style={{ fontWeight: 700, color: m.tax_due > 0 ? '#facc15' : '#10b981' }}>{formatRp(m.tax_due)}</td>
+                <td style={{ fontWeight: 700, color: m.tax_due > 0 ? 'var(--text-warn)' : 'var(--accent-green)' }}>{formatRp(m.tax_due)}</td>
                 <td><span className={'pill-status ' + (m.tax_due > 0 ? 'pill-amber' : 'pill-green')}>{m.status}</span></td>
               </tr>
             ))}

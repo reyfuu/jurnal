@@ -7,9 +7,9 @@ import {
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
 
-const AMBER = '#facc15'
-const RED = '#fb7185'
-const GREEN = '#10b981'
+const AMBER = 'var(--text-warn)'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--accent-green)'
 
 const BARIS_KOSONG: InvoiceItem = { deskripsi: '', qty: 1, satuan: '', harga_satuan: 0 }
 
@@ -108,7 +108,7 @@ export function InvoiceView() {
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
 
       {info.profil_lengkap && info.profil_lengkap.length > 0 && (
-        <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'rgba(250,204,21,0.35)' }}>
+        <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'color-mix(in srgb, var(--text-warn) 35%, transparent)' }}>
           <div style={{ fontSize: 13, color: AMBER, fontWeight: 600 }}>Lengkapi Profil Usaha sebelum mengirim faktur</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
             Belum diisi: {info.profil_lengkap.join(', ')}. Faktur tetap bisa dicetak, tapi bagian itu akan kosong di PDF.

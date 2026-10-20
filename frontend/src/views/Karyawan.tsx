@@ -6,8 +6,8 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
-const RED = '#fb7185'
-const BLUE = '#38bdf8'
+const RED = 'var(--text-danger)'
+const BLUE = 'var(--accent-blue)'
 
 const KOSONG: KaryawanInput = {
   nama: '', jabatan: '', tanggal_masuk: '', gaji_pokok: 0, tunjangan: 0, ptkp: 'TK/0', npwp: '', aktif: true,

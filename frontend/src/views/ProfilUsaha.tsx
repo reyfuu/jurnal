@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { CekAwalCard } from '@/components/CekAwalCard'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,7 +102,7 @@ function KLUPicker({ value, onChange, options, jenis }: { value: string; onChang
       <div role="radiogroup" aria-label="Bidang usaha (KLU)" className="max-h-72 overflow-y-auto rounded-lg border border-border">
         {list.length === 0 && <p className="p-3 text-sm text-muted-foreground">Tidak ada bidang yang cocok. Coba kata lain.</p>}
         {list.map((o) => (
-          <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-white/5" data-selected={o.kode === value}>
+          <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-accent" data-selected={o.kode === value}>
             <input type="radio" name={name} className="mt-1" checked={o.kode === value} onChange={() => onChange(o.kode)} />
             <span><span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}</span>
           </label>
@@ -332,7 +333,7 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
   return (
     <main className="onboarding-page">
       <div className="onboarding-shell">
-        <header className="onboarding-brand">
+        <header className="onboarding-brand dark">
           <div className="flex items-center gap-2.5">
             <BrandMark size={28} />
             <div>
@@ -340,7 +341,10 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
               <div className="brand-sub">by Master Pajak</div>
             </div>
           </div>
-          <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle className="nav-item size-11 justify-center p-0 text-muted-foreground" />
+            <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
+          </div>
         </header>
         <section className="onboarding-panel" aria-labelledby={labelledBy}>{children}</section>
       </div>
@@ -372,7 +376,7 @@ export function ProfilUsaha({ info, onSaved }: { info: BusinessInfo; onSaved: (p
       <PageHeader title="Profil Usaha" subtitle="Jenis & bentuk usaha menentukan CoA, format laporan, dan simulasi pajak" />
       <div className="card" style={{ padding: 22, maxWidth: 760 }}>
         <ProfilForm info={info} onSaved={(p) => { setSaved(true); onSaved(p) }} submitLabel="Simpan perubahan" />
-        {saved && <p className="mt-3 text-sm" style={{ color: '#10b981' }} role="status">Profil usaha tersimpan.</p>}
+        {saved && <p className="mt-3 text-sm" style={{ color: 'var(--accent-green)' }} role="status">Profil usaha tersimpan.</p>}
       </div>
     </>
   )

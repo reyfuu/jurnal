@@ -1,4 +1,5 @@
 import { LogOut } from 'lucide-react'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { NAV } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
 
@@ -21,7 +22,7 @@ interface Props {
 export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
   const initials = me.user.name.replace(/\(.*?\)/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
-    <aside className="sidebar">
+    <aside className="sidebar dark">
       <div className="sidebar-main">
         <div className="sidebar-brand">
           <BrandMark />
@@ -62,6 +63,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
             <div className="tenant-name truncate">{me.user.name}</div>
             <div className="tenant-meta">{me.role_label}</div>
           </div>
+          <ThemeToggle className="nav-item" style={{ width: 'auto', padding: 6 }} />
           <button className="nav-item" style={{ width: 'auto', padding: 6 }} onClick={onLogout} title="Keluar" aria-label="Keluar">
             <LogOut className="nav-icon" />
           </button>

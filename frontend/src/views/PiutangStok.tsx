@@ -9,16 +9,16 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
-const RED = '#fb7185'
-const GREEN = '#34d399'
-const BLUE = '#38bdf8'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--text-profit)'
+const BLUE = 'var(--accent-blue)'
 
 const selectStyle = {
-  height: 38, background: '#0d0f13', border: '1px solid #262c38',
-  color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13,
+  height: 38, background: 'var(--bg-input)', border: '1px solid var(--border-strong)',
+  color: 'var(--text-primary)', borderRadius: 8, padding: '0 12px', fontSize: 13,
 } as const
 
-const inputStyle = { flex: '1 1 240px', minWidth: 200, height: 38, background: '#0d0f13' } as const
+const inputStyle = { flex: '1 1 240px', minWidth: 200, height: 38, background: 'var(--bg-input)' } as const
 
 const aksiBtn = { width: 'auto', padding: '4px 8px', fontSize: 12 } as const
 
@@ -147,7 +147,7 @@ export function PiutangUtang() {
         <Kpi label="Piutang Belum Tertagih" value={formatRp(data.total_piutang)} color={GREEN} meta="pelanggan belum bayar" />
         <Kpi label="Utang Belum Dibayar" value={formatRp(data.total_utang)} color={RED} meta="kewajiban ke supplier" />
         <Kpi
-          label="Piutang Sudah Terlambat" value={formatRp(data.piutang_terlambat)} color="#facc15"
+          label="Piutang Sudah Terlambat" value={formatRp(data.piutang_terlambat)} color="var(--text-warn)"
           meta={`${data.jumlah_terlambat} tagihan lewat jatuh tempo`}
         />
         <Kpi label="Tagihan Tercatat" value={String(list.length)} meta={`${tampil.length} tampil sesuai filter`} />
@@ -378,7 +378,7 @@ export function StokGudang() {
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 16 }}>
         <Kpi label="Item Tercatat" value={String(data.total_item)} meta={`${tampil.length} tampil sesuai filter`} />
         <Kpi label="Nilai Persediaan" value={formatJt(data.nilai_persediaan)} color={BLUE} meta="jumlah × harga pokok" />
-        <Kpi label="Stok Menipis" value={String(data.menipis)} color={data.menipis > 0 ? '#facc15' : undefined} meta="sudah di bawah batas minimum" />
+        <Kpi label="Stok Menipis" value={String(data.menipis)} color={data.menipis > 0 ? 'var(--text-warn)' : undefined} meta="sudah di bawah batas minimum" />
         <Kpi label="Stok Habis" value={String(data.habis)} color={data.habis > 0 ? RED : undefined} meta="jumlahnya nol" />
       </div>
 

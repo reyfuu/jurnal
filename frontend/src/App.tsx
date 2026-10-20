@@ -144,13 +144,13 @@ export default function App() {
             </div>
           )}
           {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'rgba(234, 179, 8, 0.08)' }} role="status">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'color-mix(in srgb, var(--accent-amber) 8%, transparent)' }} role="status">
               <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata DJP.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
             </div>
           )}
           {data && (
-            <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: '#101318', padding: '10px 16px', borderRadius: 10, border: '1px solid #1c222c' }}>
+            <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: 'var(--bg-raised)', padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-shell)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Periode Laporan:
@@ -164,7 +164,7 @@ export default function App() {
                 <select
                   id="global-period-select"
                   className="period-select tabular"
-                  style={{ background: '#0d0f13', border: '1px solid #262c38', color: '#fff', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border-strong)', color: 'var(--text-primary)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
                   value={period}
                   onChange={(e) => changePeriod(e.target.value)}
                 >

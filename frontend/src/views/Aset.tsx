@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { createAsset, deleteAsset, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
-const AMBER = '#facc15'
-const RED = '#fb7185'
-const BLUE = '#38bdf8'
+const AMBER = 'var(--text-warn)'
+const RED = 'var(--text-danger)'
+const BLUE = 'var(--accent-blue)'
 
 /** Tarif tahunan dari basis poin: 625 → "6,25%", 2500 → "25%". */
 const formatTarif = (bps: number) => (bps / 100).toString().replace('.', ',') + '%'
@@ -322,7 +322,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                     <td>{y.tahun}{y.bulan < 12 && <span style={{ color: 'var(--text-muted)' }}> ({y.bulan} bln)</span>}</td>
                     <td style={{ textAlign: 'right' }}>{formatRp(y.dasar_awal)}</td>
                     <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(y.penyusutan)}</td>
-                    <td style={{ textAlign: 'right', color: y.sisa_akhir === 0 ? '#34d399' : BLUE }}>{formatRp(y.sisa_akhir)}</td>
+                    <td style={{ textAlign: 'right', color: y.sisa_akhir === 0 ? 'var(--text-profit)' : BLUE }}>{formatRp(y.sisa_akhir)}</td>
                   </tr>
                 ))}
               </tbody>

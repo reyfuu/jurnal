@@ -59,6 +59,21 @@ Navy dipakai solid pada latar login/onboarding, sidebar, favicon, dan warna tema
 | `--text-secondary` | `#949BA6` | Subjudul halaman, nama metrik (`Omzet`, `Laba bersih`), item menu sidebar inaktif, nav link atas. |
 | `--text-muted` | `#5E6572` | Label grup sidebar (`RINGKASAN`, `LAPORAN`, dll.), label sumbu X/Y grafik (`Okt 25`, `25 jt`), teks `vs bulan lalu`, `Data contoh tidak disimpan`. |
 
+### 2.4 Tema Terang (Oktober 2026)
+Tabel di atas adalah tema **gelap** (default, kelas `.dark` di `<html>`). Tema **terang** dipilih lewat tombol matahari/bulan di sidebar dan header onboarding, disimpan di `localStorage` (`tema`). Nilainya ada di `:root` pada `frontend/src/index.css`; tokennya sama, nilainya:
+
+| Token | Gelap | Terang |
+|---|---|---|
+| `--bg-outer` / `--bg-shell` / `--bg-card` | `#090A0C` / `#0F1115` / `#15181E` | `#EEF0F4` / `#F7F8FA` / `#FFFFFF` |
+| `--bg-raised` / `--bg-input` / `--border-strong` | `#101318` / `#0D0F13` / `#262C38` | `#F1F3F6` / `#FFFFFF` / `#D1D5DB` |
+| `--text-primary` / `--text-secondary` / `--text-muted` | `#F4F5F7` / `#949BA6` / `#616875` | `#111827` / `#4B5563` / `#6B7280` |
+| `--accent-amber` / `--accent-green` / `--accent-blue` | `#EAB308` / `#10B981` / `#38BDF8` | `#CA8A04` / `#059669` / `#0284C7` |
+| `--text-profit` / `--text-danger` / `--text-warn` | `#34D399` / `#FB7185` / `#FACC15` | `#047857` / `#BE123C` / `#A16207` |
+
+Aturan:
+- Jangan menulis hex di komponen; pakai token (`var(--text-profit)`, dst.). Tint putih transparan ditulis `color-mix(in srgb, var(--text-primary) N%, transparent)` agar ikut tema.
+- Sidebar navy, Landing, header login/onboarding, dan gelembung AI selalu gelap (diberi kelas `dark`) karena berlatar navy.
+
 ---
 
 ## 3. Typography & Numeric Rules

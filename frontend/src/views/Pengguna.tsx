@@ -157,7 +157,7 @@ export function Pengguna({ currentUserId }: { currentUserId: number }) {
                   {ROLE_ORDER.map((r) => (
                     <td key={r} style={{ textAlign: 'center' }}>
                       {roles[r].views.includes(item.view)
-                        ? <Check size={16} className="inline" color="#34d399" aria-label="boleh" />
+                        ? <Check size={16} className="inline" color="var(--text-profit)" aria-label="boleh" />
                         : <span style={{ color: 'var(--text-muted)' }} aria-label="tidak">–</span>}
                     </td>
                   ))}

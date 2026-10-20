@@ -42,11 +42,11 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
     <main className="login-page flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         {onBack && (
-          <Button type="button" variant="ghost" className="mb-4 -ml-2 text-muted-foreground" onClick={onBack}>
+          <Button type="button" variant="ghost" className="dark mb-4 -ml-2 text-muted-foreground" onClick={onBack}>
             <ArrowLeft aria-hidden="true" /> Kembali ke beranda
           </Button>
         )}
-        <div className="mb-6 flex items-center justify-center gap-2.5">
+        <div className="dark mb-6 flex items-center justify-center gap-2.5">
           <BrandMark size={28} />
           <div>
             <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
@@ -103,14 +103,14 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
           </CardContent>
         </Card>
 
-        {import.meta.env.DEV && <div className="mt-5 rounded-xl border border-[var(--border-subtle)] p-3.5 text-xs text-muted-foreground">
+        {import.meta.env.DEV && <div className="dark mt-5 rounded-xl border border-[var(--border-subtle)] p-3.5 text-xs text-muted-foreground">
           <div className="mb-2 font-semibold text-foreground">Akun demo · password <code className="font-mono">{DEMO_PASSWORD}</code></div>
           <div className="grid gap-1">
             {DEMO_ACCOUNTS.map((a) => (
               <button
                 key={a.email}
                 type="button"
-                className="flex justify-between rounded-md px-2 py-1 text-left hover:bg-white/5"
+                className="flex justify-between rounded-md px-2 py-1 text-left hover:bg-accent"
                 onClick={() => { setEmail(a.email); setPassword(DEMO_PASSWORD) }}
               >
                 <span className="font-mono">{a.email}</span>

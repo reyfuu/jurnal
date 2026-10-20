@@ -11,10 +11,10 @@ export function CashWarningBanner({ warnings }: { warnings?: CashWarning[] | nul
   const lowest = warnings.reduce((m, w) => (w.saldo < m.saldo ? w : m), first)
   const penyebab = [...new Set(warnings.flatMap((w) => w.penyebab ?? []))]
   return (
-    <div className="card" role="alert" style={{ borderColor: '#fb7185', background: 'rgba(251,113,133,0.08)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-      <AlertTriangle size={18} color="#fb7185" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
+    <div className="card" role="alert" style={{ borderColor: 'var(--text-danger)', background: 'color-mix(in srgb, var(--text-danger) 8%, transparent)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <AlertTriangle size={18} color="var(--text-danger)" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
       <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-        <div style={{ fontWeight: 700, color: '#fb7185' }}>
+        <div style={{ fontWeight: 700, color: 'var(--text-danger)' }}>
           Saldo kas minus mulai {tgl(first.tanggal)}
           {warnings.length > 1 && ` (${warnings.length} hari)`}, terendah {formatRp(lowest.saldo)} pada {tgl(lowest.tanggal)}
         </div>

@@ -53,7 +53,7 @@ function Pricing({ onDaftar }: { onDaftar: () => void }) {
 
 export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: () => void }) {
   return (
-    <div className="min-h-[100dvh] bg-[var(--brand-navy)] text-[var(--text-primary)]">
+    <div className="dark min-h-[100dvh] bg-[var(--brand-navy)] text-[var(--text-primary)]">
       <header className="sticky top-0 z-20 border-b border-white/5 bg-[var(--brand-navy)]/90 backdrop-blur">
         <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 md:px-6" aria-label="Utama">
           <a href="#" className="flex items-center gap-2.5" aria-label="Laporan Bisnis, ke atas">
