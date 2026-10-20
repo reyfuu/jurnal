@@ -1541,4 +1541,3 @@ export interface PorsiProduk { nama: string; harga: number; modal: number; ada_m
 export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: number; tambah_tetap: number }
 export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
 export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })
-
