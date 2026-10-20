@@ -5,6 +5,7 @@ import {
   type Karyawan, type KaryawanInput, type KaryawanSummary,
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const BLUE = 'var(--accent-blue)'
@@ -114,15 +115,13 @@ export function KaryawanView() {
             <label>
               <span className="kpi-label">Gaji Pokok</span>
               <input
-                className="input-field tabular" type="number" min={1} required value={form.gaji_pokok || ''}
-                onChange={(e) => setForm({ ...form, gaji_pokok: Number(e.target.value) })}
+                className="input-field tabular" required {...angka(form.gaji_pokok, (n) => setForm({ ...form, gaji_pokok: n }))}
               />
             </label>
             <label>
               <span className="kpi-label">Tunjangan Tetap</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.tunjangan || ''}
-                onChange={(e) => setForm({ ...form, tunjangan: Number(e.target.value) })}
+                className="input-field tabular" {...angka(form.tunjangan, (n) => setForm({ ...form, tunjangan: n }))}
               />
             </label>
             <label>

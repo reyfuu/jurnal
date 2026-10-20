@@ -8,6 +8,7 @@ import {
   type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--text-profit)'
@@ -196,8 +197,7 @@ export function PiutangUtang() {
             <label>
               <span className="kpi-label">Nominal</span>
               <input
-                className="input-field tabular" type="number" min={1} required value={form.nominal || ''}
-                onChange={(e) => setForm({ ...form, nominal: Number(e.target.value) })}
+                className="input-field tabular" required {...angka(form.nominal, (n) => setForm({ ...form, nominal: n }))}
               />
             </label>
             <label>
@@ -420,8 +420,7 @@ export function StokGudang() {
             <label>
               <span className="kpi-label">Jumlah</span>
               <input
-                className="input-field tabular" type="number" min={0} required value={form.jumlah || 0}
-                onChange={(e) => setForm({ ...form, jumlah: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.jumlah, (n) => setForm({ ...form, jumlah: n }))}
               />
             </label>
             <label>
@@ -431,22 +430,19 @@ export function StokGudang() {
             <label>
               <span className="kpi-label">Stok Minimum</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.stok_min || 0}
-                onChange={(e) => setForm({ ...form, stok_min: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.stok_min, (n) => setForm({ ...form, stok_min: n }))}
               />
             </label>
             <label>
               <span className="kpi-label">Harga Pokok / Satuan</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.harga_pokok || 0}
-                onChange={(e) => setForm({ ...form, harga_pokok: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
               />
             </label>
             <label>
               <span className="kpi-label">Harga Jual / Satuan</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.harga_jual || 0}
-                onChange={(e) => setForm({ ...form, harga_jual: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.harga_jual, (n) => setForm({ ...form, harga_jual: n }))}
               />
             </label>
           </div>

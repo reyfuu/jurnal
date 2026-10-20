@@ -8,6 +8,7 @@ import {
   type StokRow, type SupplierInput, type SupplierRow,
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--text-profit)'
@@ -167,8 +168,7 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
                     </span>
                   ) : (
                     <input
-                      className="input-field tabular" type="number" min={0} value={b.harga_manual || ''}
-                      onChange={(e) => ubah(i, { harga_manual: Number(e.target.value) })}
+                      className="input-field tabular" {...angka(b.harga_manual, (n) => ubah(i, { harga_manual: n }))}
                     />
                   )}
                 </td>
@@ -346,31 +346,27 @@ export function ProduksiSupplier() {
             <label>
               <span className="kpi-label">Hasil per Batch</span>
               <input
-                className="input-field tabular" type="number" min={1} required value={form.hasil_per_batch || ''}
-                onChange={(e) => setForm({ ...form, hasil_per_batch: Number(e.target.value) })}
+                className="input-field tabular" required {...angka(form.hasil_per_batch, (n) => setForm({ ...form, hasil_per_batch: n }))}
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>isi 1 bila resepnya untuk satu unit</span>
             </label>
             <label>
               <span className="kpi-label">Tenaga Kerja per Batch</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.biaya_tenaga_kerja || 0}
-                onChange={(e) => setForm({ ...form, biaya_tenaga_kerja: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.biaya_tenaga_kerja, (n) => setForm({ ...form, biaya_tenaga_kerja: n }))}
               />
             </label>
             <label>
               <span className="kpi-label">Overhead per Batch</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.biaya_overhead || 0}
-                onChange={(e) => setForm({ ...form, biaya_overhead: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.biaya_overhead, (n) => setForm({ ...form, biaya_overhead: n }))}
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>gas, listrik, es, tisu</span>
             </label>
             <label>
               <span className="kpi-label">Harga Jual per Satuan</span>
               <input
-                className="input-field tabular" type="number" min={0} value={form.harga_jual || 0}
-                onChange={(e) => setForm({ ...form, harga_jual: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(form.harga_jual, (n) => setForm({ ...form, harga_jual: n }))}
               />
             </label>
             <label>
@@ -501,8 +497,7 @@ export function ProduksiSupplier() {
             <label>
               <span className="kpi-label">Tempo Bayar (hari)</span>
               <input
-                className="input-field tabular" type="number" min={0} value={supForm.tempo_hari || 0}
-                onChange={(e) => setSupForm({ ...supForm, tempo_hari: Number(e.target.value) })}
+                className="input-field tabular" placeholder="0" {...angka(supForm.tempo_hari, (n) => setSupForm({ ...supForm, tempo_hari: n }))}
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>0 = bayar tunai</span>
             </label>

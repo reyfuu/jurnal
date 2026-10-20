@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { simulatePrice, type Dashboard, type PriceSim } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
@@ -135,7 +136,7 @@ export function SimulasiHarga({ period }: { period: string }) {
   const fields = [
     { id: 'sim-cogs', label: 'HPP Produk per Cup/Pcs (Rp)', value: cogs, set: setCogs },
     { id: 'sim-profit', label: 'Target Laba Kotor per Pcs (Rp)', value: profit, set: setProfit },
-    { id: 'sim-fee', label: 'Komisi Aplikasi (%)', value: fee, set: setFee },
+    { id: 'sim-fee', label: 'Komisi Aplikasi (%)', value: fee, set: setFee, persen: true },
     { id: 'sim-fixed', label: 'Biaya Tetap per Bulan (Rp)', value: fixedCost, set: setFixedCost, placeholder: 'Otomatis dari data' },
     { id: 'sim-volume', label: 'Perkiraan Terjual per Bulan (Pcs)', value: volume, set: setVolume },
     { id: 'sim-target', label: 'Target Laba Bersih per Bulan (Rp)', value: targetNet, set: setTargetNet },
@@ -170,7 +171,9 @@ export function SimulasiHarga({ period }: { period: string }) {
           {fields.map((f) => (
             <div key={f.id}>
               <Label htmlFor={f.id} className="kpi-label">{f.label}</Label>
-              <Input id={f.id} type="number" min={0} placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} value={f.value} onChange={(e) => f.set(e.target.value)} />
+              {f.persen
+                ? <Input id={f.id} type="number" min={0} step="0.1" placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} value={f.value} onChange={(e) => f.set(e.target.value)} />
+                : <Input id={f.id} placeholder={f.placeholder} className={fieldClass + ' mt-1.5'} {...angka(f.value, (n) => f.set(n ? String(n) : ''))} />}
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>

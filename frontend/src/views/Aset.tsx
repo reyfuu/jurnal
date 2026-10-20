@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createAsset, deleteAsset, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const AMBER = 'var(--text-warn)'
 const RED = 'var(--text-danger)'
@@ -179,8 +180,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
             <label>
               <span className="kpi-label">Harga Perolehan</span>
               <input
-                className="input-field tabular" type="number" min={1} required value={form.harga_perolehan || ''}
-                onChange={(e) => setForm({ ...form, harga_perolehan: Number(e.target.value) })}
+                className="input-field tabular" required {...angka(form.harga_perolehan, (n) => setForm({ ...form, harga_perolehan: n }))}
               />
             </label>
 

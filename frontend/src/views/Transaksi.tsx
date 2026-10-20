@@ -14,6 +14,7 @@ import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
 import { MutasiDialog } from '@/views/MutasiDialog'
 import { channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, summarize } from '@/lib/transaksi'
+import { angka } from '@/lib/angka'
 
 const PAGE = 100
 const ALL = '__all__' // Radix Select tidak menerima value kosong
@@ -302,8 +303,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                 )}
                 <Field id="tx-nominal" label="Nominal (Rp)">
                   <Input
-                    id="tx-nominal" type="number" inputMode="numeric" min={1} required className="tabular"
-                    value={editing.input.nominal || ''} onChange={(e) => set({ nominal: Number(e.target.value) })}
+                    id="tx-nominal" required className="tabular"
+                    {...angka(editing.input.nominal, (n) => set({ nominal: n }))}
                   />
                 </Field>
                 <Field id="tx-ket" label="Keterangan">
@@ -314,8 +315,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                 </Field>
                 <Field id="tx-qty" label="Jumlah">
                   <Input
-                    id="tx-qty" type="number" min={0} placeholder="porsi / unit" className="tabular"
-                    value={editing.input.qty || ''} onChange={(e) => set({ qty: Number(e.target.value) })}
+                    id="tx-qty" placeholder="porsi / unit" className="tabular"
+                    {...angka(editing.input.qty, (n) => set({ qty: n }))}
                   />
                 </Field>
                 <Field id="tx-channel" label="Channel">

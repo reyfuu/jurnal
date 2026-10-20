@@ -36,7 +36,7 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
       <div>
         <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark DJP & risiko pajak</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          NPM (laba sebelum pajak ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional DJP{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
+          NPM (laba bersih ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional DJP{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
         </p>
       </div>
       {c.status !== 'kurang_data' && c.klu && (

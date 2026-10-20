@@ -1,6 +1,9 @@
 package tax
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPasal17(t *testing.T) {
 	for _, c := range []struct{ pkp, want int64 }{
@@ -145,5 +148,20 @@ func TestCekPKP(t *testing.T) {
 		if len(r.Catatan) == 0 {
 			t.Errorf("CekPKP(%d): catatan kosong", c.omzet)
 		}
+	}
+}
+
+// Pilihan PTKP tidak lagi menawarkan K/I/*, tetapi nilainya tetap ada untuk data lama.
+func TestPTKPCodesTanpaKI(t *testing.T) {
+	if len(PTKPCodes) != 8 {
+		t.Fatalf("want 8 pilihan (TK/0–K/3), got %v", PTKPCodes)
+	}
+	for _, c := range PTKPCodes {
+		if _, ok := PTKP[c]; !ok || strings.HasPrefix(c, "K/I/") {
+			t.Fatalf("pilihan %q tidak sah", c)
+		}
+	}
+	if _, err := CompareBentukUsaha(1_000_000_000, 1000, "K/I/0"); err != nil {
+		t.Fatalf("profil lama K/I/0 harus tetap terhitung: %v", err)
 	}
 }
