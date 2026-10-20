@@ -43,25 +43,28 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   const [tahun, setTahun] = useState(() => String(new Date().getFullYear()))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [berkas, setBerkas] = useState<File | null>(null)
 
   function reset(next: boolean) {
     if (!next) {
       setHasil(null)
       setRows([])
       setNama('')
+      setBerkas(null)
       setError('')
     }
     onOpenChange(next)
   }
 
-  async function pilihBerkas(f: File | undefined) {
+  async function pilihBerkas(f: File | undefined | null, th = tahun) {
     if (!f) return
+    setBerkas(f)
     setNama(f.name)
     setHasil(null)
     setError('')
     setBusy(true)
     try {
-      const h = await previewMutasi(f, Number(tahun) || undefined)
+      const h = await previewMutasi(f, Number(th) || undefined)
       setHasil(h)
       setRows(h.rows ?? [])
     } catch (e) {
@@ -114,14 +117,16 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
             </label>
             {/* Lebar dikunci ke lebar input: tanpa itu keterangan di bawahnya melebar
                 melewati kolomnya sendiri dan menabrak nama berkas di sebelahnya. */}
-            <label className="grid gap-1" style={{ width: 110 }}>
+            <label className="grid gap-1" style={{ width: 200 }}>
               <span className="kpi-label">Tahun mutasi</span>
               <input
                 className="input-field tabular" type="number" min={2000} max={2100}
                 value={tahun} onChange={(e) => setTahun(e.target.value)}
+                // Ganti tahun setelah berkas dipilih: baca ulang supaya tanggalnya ikut berubah.
+                onBlur={() => { if (berkas && tahun.length === 4) void pilihBerkas(berkas) }}
               />
               <span style={{ fontSize: 11, lineHeight: 1.3, color: 'var(--text-muted)' }}>
-                dipakai bila tanggalnya tanpa tahun
+                hanya untuk tanggal tanpa tahun (mis. 15/01). Mutasi Des–Jan: isi tahun Januari-nya.
               </span>
             </label>
             {nama && <span className="text-sm text-muted-foreground" style={{ paddingBottom: 2 }}>{nama}</span>}
@@ -139,6 +144,14 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 {!!hasil.dibantu_ai && <span className="pill-status pill-brand">{hasil.dibantu_ai} baris dikelompokkan AI</span>}
                 {hasil.format && <span className="text-sm text-muted-foreground">kolom terbaca: {hasil.format}</span>}
               </div>
+
+              {!!hasil.per_bulan?.length && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Masuk ke bulan:</span>
+                  {hasil.per_bulan.map((b) => <span key={b.bulan} className="pill-status pill-brand">{b.label}: {b.jumlah} baris</span>)}
+                </div>
+              )}
+              {(hasil.peringatan ?? []).map((p) => <div key={p} className="note-box warn">{p}</div>)}
 
               {!!hasil.dibantu_ai && (
                 <div className="note-box">

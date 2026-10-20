@@ -275,3 +275,65 @@ func TestMutasi_KelompokRendahDanSaranAI(t *testing.T) {
 		t.Errorf("perlu diperiksa %d, dibantu AI %d", h.PerluDiperiksa, h.DibantuAI)
 	}
 }
+
+func tanggalSemua(h finance.MutasiHasil) string {
+	var s []string
+	for _, r := range h.Rows {
+		s = append(s, r.Tanggal)
+	}
+	return strings.Join(s, ",")
+}
+
+func TestParseMutasi_TanggalHariBulanDanPerBulan(t *testing.T) {
+	h := finance.ParseMutasi([][]string{
+		{"Tanggal", "Keterangan", "Debet", "Kredit"},
+		{"15/01/2026", "QRIS penjualan", "", "100.000"},
+		{"31/01/2026", "Listrik", "50.000", ""},
+		{"03/02/2026", "QRIS penjualan", "", "70.000"},
+	}, 2026, nil)
+	if got := tanggalSemua(h); got != "2026-01-15,2026-01-31,2026-02-03" {
+		t.Fatalf("tanggal %s", got)
+	}
+	if len(h.PerBulan) != 2 || h.PerBulan[0].Bulan != "2026-01" || h.PerBulan[0].Jumlah != 2 || h.PerBulan[1].Label != "Februari 2026" {
+		t.Errorf("per bulan %+v", h.PerBulan)
+	}
+}
+
+func TestParseMutasi_FormatBulanTanggalTerdeteksi(t *testing.T) {
+	// 01/25/2026 tidak mungkin hari/bulan, jadi seluruh berkas dibaca bulan/hari.
+	h := finance.ParseMutasi([][]string{
+		{"Date", "Description", "Debit", "Credit"},
+		{"01/05/2026", "Transfer masuk", "", "100.000"},
+		{"01/25/2026", "Transfer masuk", "", "100.000"},
+		{"02/03/2026", "Transfer masuk", "", "100.000"},
+	}, 2026, nil)
+	if got := tanggalSemua(h); got != "2026-01-05,2026-01-25,2026-02-03" {
+		t.Fatalf("tanggal %s", got)
+	}
+	if !strings.Contains(strings.Join(h.Peringatan, " "), "bulan/tanggal") {
+		t.Errorf("harus ada peringatan format terbalik: %v", h.Peringatan)
+	}
+}
+
+func TestParseMutasi_LintasTahunTanpaTahun(t *testing.T) {
+	// Cetakan 25 Des – 5 Jan tanpa tahun; tahun yang diisi = tahun Januari-nya.
+	h := finance.ParseMutasi([][]string{
+		{"TANGGAL", "KETERANGAN", "JUMLAH"},
+		{"28/12", "QRIS CR", "100.000,00 CR"},
+		{"31/12", "QRIS CR", "100.000,00 CR"},
+		{"02/01", "QRIS CR", "100.000,00 CR"},
+	}, 2026, nil)
+	if got := tanggalSemua(h); got != "2025-12-28,2025-12-31,2026-01-02" {
+		t.Fatalf("tanggal %s", got)
+	}
+}
+
+func TestParseMutasi_PeringatanTanggalMasaDepan(t *testing.T) {
+	h := finance.ParseMutasi([][]string{
+		{"Tanggal", "Keterangan", "Debet", "Kredit"},
+		{"15/01/2099", "QRIS", "", "100.000"},
+	}, 2099, nil)
+	if !strings.Contains(strings.Join(h.Peringatan, " "), "masa depan") {
+		t.Errorf("peringatan %v", h.Peringatan)
+	}
+}
