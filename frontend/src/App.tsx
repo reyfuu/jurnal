@@ -182,7 +182,7 @@ export default function App() {
           )}
           {canSee('profil-usaha') && !me.lihat && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--accent-orange) 30%, transparent)', background: 'var(--accent-orange-soft)' }} role="status">
-              <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata DJP.</span>
+              <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata nasional.</span>
               <Button size="sm" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
             </div>
           )}

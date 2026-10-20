@@ -21,7 +21,7 @@ import (
 	"pajak/internal/xlsx"
 )
 
-// Katalog Panel Master: template COA per jenis usaha & benchmark NPM DJP, berversi. Klien
+// Katalog Panel Master: template COA per jenis usaha & benchmark NPM nasional, berversi. Klien
 // dipatok ke versi template-nya (tenant.coaTemplate) supaya versi baru tidak mengubah pembukuan
 // yang sudah berjalan; Owner memilih kapan memperbarui (POST /coa/perbarui).
 
@@ -29,7 +29,7 @@ import (
 // ponytail: satu server per proses, sama seperti benchmark aktif di internal/tax.
 var katalogAktif atomic.Pointer[katalog.State]
 
-// pasangKatalog memasang st sebagai katalog aktif aplikasi (COA tenant & benchmark DJP).
+// pasangKatalog memasang st sebagai katalog aktif aplikasi (COA tenant & benchmark nasional).
 func pasangKatalog(st katalog.State) {
 	katalogAktif.Store(&st)
 	b := st.BenchmarkAktif()

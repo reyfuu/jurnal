@@ -51,7 +51,7 @@ func TestCekAwal(t *testing.T) {
 	if r.NPMBps != 200 || r.Status != "di_bawah" || r.KLU.Kode != "471" {
 		t.Fatalf("NPM 2%% toko: %+v", r)
 	}
-	if l := levels(r); l["NPM di bawah rata-rata DJP"] != "tinggi" || l["Mendekati batas bebas pajak"] != "info" || l["CTTOR di bawah rata-rata DJP"] != "" {
+	if l := levels(r); l["NPM di bawah rata-rata nasional"] != "tinggi" || l["Mendekati batas bebas pajak"] != "info" || l["CTTOR di bawah rata-rata nasional"] != "" {
 		t.Fatalf("risiko: %+v", r.Risiko)
 	}
 	if r.CTTORPesan == "" {
@@ -64,7 +64,7 @@ func TestCekAwal(t *testing.T) {
 
 	// CV (Pasal 31E, non-final) dengan laba tipis: CTTOR di bawah rata-rata dinilai sebagai risiko.
 	r = CekAwal(CekAwalInput{BentukUsaha: "cv", KLU: "620", Omzet: 1_000_000_000, Laba: 10_000_000})
-	if l := levels(r); l["CTTOR di bawah rata-rata DJP"] != "sedang" {
+	if l := levels(r); l["CTTOR di bawah rata-rata nasional"] != "sedang" {
 		t.Fatalf("CTTOR non-final: %+v %s", r.Risiko, r.CTTORPesan)
 	}
 

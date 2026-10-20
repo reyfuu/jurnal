@@ -1,5 +1,5 @@
 // Package katalog: data acuan yang dikelola tim Master Pajak di Panel Master — template COA per
-// jenis usaha, benchmark NPM/CTTOR DJP, dan parameter pajak (tarif, PTKP, batas, norma) —
+// jenis usaha, benchmark NPM/CTTOR nasional, dan parameter pajak (tarif, PTKP, batas, norma) —
 // masing-masing berversi (draft → terbit/aktif → arsip). Hanya data & aturan; HTTP dan penyimpanan ada di cmd/server.
 package katalog
 

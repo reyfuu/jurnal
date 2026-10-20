@@ -73,7 +73,7 @@ func TestAnalisaKlien_BalasanRusak(t *testing.T) {
 }
 
 func TestQueryKlien(t *testing.T) {
-	q := QueryKlien(faktaContoh(), []string{"NPM di bawah rata-rata DJP"})
+	q := QueryKlien(faktaContoh(), []string{"NPM di bawah rata-rata nasional"})
 	for _, want := range []string{"Penyediaan Minuman", "pph final", "NPM di bawah"} {
 		if !strings.Contains(strings.ToLower(q), strings.ToLower(want)) {
 			t.Errorf("query %q tidak memuat %q", q, want)

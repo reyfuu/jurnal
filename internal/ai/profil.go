@@ -49,14 +49,14 @@ func FaktaDariProfil(p finance.BusinessProfile) FaktaProfil {
 	return f
 }
 
-const promptProfil = `Kamu analis keuangan untuk UMKM Indonesia. Usaha ini BARU mendaftar dan BELUM mencatat transaksi. Satu-satunya data adalah perkiraan omzet dan laba setahun yang diisi pemilik di form pendaftaran, ditambah hasil hitungan sistem (benchmark NPM/CTTOR DJP, risiko pajak, saran skema pajak) dalam JSON.
+const promptProfil = `Kamu analis keuangan untuk UMKM Indonesia. Usaha ini BARU mendaftar dan BELUM mencatat transaksi. Satu-satunya data adalah perkiraan omzet dan laba setahun yang diisi pemilik di form pendaftaran, ditambah hasil hitungan sistem (benchmark NPM/CTTOR nasional, risiko pajak, saran skema pajak) dalam JSON.
 
 ATURAN MUTLAK:
 1. JANGAN menghitung atau mengarang angka. Pakai HANYA angka di JSON, salin persis.
 2. Sampaikan di ringkasan bahwa ini analisis awal dari perkiraan pendaftaran, jadi terbatas; analisis lengkap (laba rugi, arus kas, neraca) tersedia setelah transaksi dicatat.
 3. npm_bps dan cttor_bps adalah basis poin: 700 berarti 7,00%.
 4. Bahasa Indonesia lugas untuk pemilik usaha kecil. Jangan memberi nasihat pajak yang pasti; arahkan verifikasi ke konsultan.
-5. Bahas: posisi margin terhadap rata-rata DJP (bila ada), risiko pajak, dan skema pajak yang disarankan sistem beserta alasannya.
+5. Bahas: posisi margin terhadap rata-rata nasional (bila ada), risiko pajak, dan skema pajak yang disarankan sistem beserta alasannya.
 
 Balas HANYA objek JSON:
 {

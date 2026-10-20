@@ -22,10 +22,10 @@ type BusinessProfile struct {
 	// lurus). Dipilih sekali; kosong = belum dipilih (profil lama, metode masih per aset).
 	// Setelah terisi tidak bisa diganti dari aplikasi — perubahan metode butuh persetujuan DJP.
 	MetodePenyusutan string `json:"metode_penyusutan,omitempty"`
-	// KLU: kelompok KLU 3 digit (tax.KLUBenchmarks); dasar pembanding NPM & CTTOR DJP.
+	// KLU: kelompok KLU 3 digit (tax.KLUBenchmarks); dasar pembanding NPM & CTTOR nasional.
 	KLU string `json:"klu,omitempty"`
 
-	// Perkiraan setahun dari onboarding: dipakai cek benchmark DJP & Perencanaan Pajak
+	// Perkiraan setahun dari onboarding: dipakai cek benchmark nasional & Perencanaan Pajak
 	// selama belum ada data transaksi. Laba sebelum pajak boleh negatif (rugi).
 	OmzetTahunan     int64 `json:"omzet_tahunan,omitempty"`
 	LabaSebelumPajak int64 `json:"laba_sebelum_pajak,omitempty"`
@@ -164,7 +164,7 @@ func (p BusinessProfile) JenisLabel() string {
 	return ""
 }
 
-// CekAwal: NPM vs benchmark DJP dan risiko pajak dari perkiraan omzet & laba profil.
+// CekAwal: NPM vs benchmark nasional dan risiko pajak dari perkiraan omzet & laba profil.
 func (p BusinessProfile) CekAwal() tax.CekAwalResult {
 	return tax.CekAwal(tax.CekAwalInput{
 		BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, KLU: p.KLU, PKP: p.PKP,

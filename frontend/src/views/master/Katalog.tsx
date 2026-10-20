@@ -290,7 +290,7 @@ export function BenchmarkView() {
 
   return (
     <>
-      <PageHeader title="Benchmark NPM DJP" subtitle="Rata-rata nasional margin laba (NPM) dan beban pajak (CTTOR) per KLU. Versi aktif dipakai untuk menilai wajar tidaknya laba klien.">
+      <PageHeader title="Benchmark NPM Nasional" subtitle="Rata-rata nasional margin laba (NPM) dan beban pajak (CTTOR) per KLU. Versi aktif dipakai untuk menilai wajar tidaknya laba klien.">
         <Button variant="outline" className="h-10 rounded-full" onClick={() => setImpor(true)}><Upload /> Impor versi baru</Button>
       </PageHeader>
       <Pesan error={error} info={info} />
@@ -340,7 +340,7 @@ export function BenchmarkView() {
           </div>
         </div>
       )}
-      <ImporDialog open={impor} onClose={() => setImpor(false)} judul="Impor benchmark DJP"
+      <ImporDialog open={impor} onClose={() => setImpor(false)} judul="Impor benchmark NPM nasional"
         keterangan="Kolom: KLU, Nama, NPM (%), CTTOR (%). Versi baru disimpan sebagai draft; aktifkan setelah diperiksa. KLU yang dipakai klien wajib tetap ada."
         fields={[{ id: 'nama', label: 'Nama versi', placeholder: 'mis. Buku sektoral DJP 2024 · SPT 2023', wajib: true }, { id: 'sumber', label: 'Sumber (tampil di laporan klien)', placeholder: 'Opsional' }]}
         onKirim={async (file, n) => { await imporBenchmark(file, n.nama ?? '', n.sumber ?? ''); setImpor(false); setInfo('Versi baru tersimpan sebagai draft.'); await muat() }} />

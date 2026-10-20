@@ -406,7 +406,7 @@ function AnalisaCard({ id }: { id: number }) {
     }
   }
   const f = a?.fakta
-  const judulRef = (r: string) => a?.sumber.find((s) => s.ref === r)?.judul ?? (r.startsWith('BM-') ? `Benchmark DJP ${f?.klu_nama}` : '')
+  const judulRef = (r: string) => a?.sumber.find((s) => s.ref === r)?.judul ?? (r.startsWith('BM-') ? `Benchmark nasional ${f?.klu_nama}` : '')
   return (
     <div className="card" style={{ padding: 20, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       <div className="flex flex-wrap items-center gap-3">
@@ -419,7 +419,7 @@ function AnalisaCard({ id }: { id: number }) {
         <>
           <div className="table-scroll">
             <table className="data-table tabular" style={{ minWidth: 520 }}>
-              <thead><tr><th>Ukuran</th><th style={{ textAlign: 'right' }}>Klien</th><th style={{ textAlign: 'right' }}>Benchmark DJP{f.klu ? ` · KLU ${f.klu}` : ''}</th><th>Sumber</th></tr></thead>
+              <thead><tr><th>Ukuran</th><th style={{ textAlign: 'right' }}>Klien</th><th style={{ textAlign: 'right' }}>Benchmark nasional{f.klu ? ` · KLU ${f.klu}` : ''}</th><th>Sumber</th></tr></thead>
               <tbody>
                 <tr><td>Margin laba bersih (NPM)</td><td style={{ textAlign: 'right' }}>{pctBps(f.npm_bps)}</td><td style={{ textAlign: 'right' }}>{f.benchmark_npm_bps !== undefined ? pctBps(f.benchmark_npm_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>
                 <tr><td>Beban pajak / omzet (CTTOR)</td><td style={{ textAlign: 'right' }} className="text-muted-foreground">—</td><td style={{ textAlign: 'right' }}>{f.benchmark_cttor_bps !== undefined ? pctBps(f.benchmark_cttor_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>

@@ -52,7 +52,7 @@ function SaranCard({ s }: { s: SaranBentuk }) {
   )
 }
 
-// CekAwalCard: NPM vs rasio benchmark DJP + risiko pajak. Dihitung backend (tax.CekAwal),
+// CekAwalCard: NPM vs rasio benchmark nasional + risiko pajak. Dihitung backend (tax.CekAwal),
 // dipakai di ringkasan onboarding dan Perencanaan Pajak.
 export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
   const [c, setC] = useState<CekAwal | null>(null)
@@ -73,9 +73,9 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
     {c.saran && <SaranCard s={c.saran} />}
     <section className="grid gap-4 rounded-lg border border-border p-4" aria-labelledby="cek-awal-title">
       <div>
-        <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark DJP & risiko pajak</h3>
+        <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark nasional & risiko pajak</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          NPM (laba bersih ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional DJP{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
+          NPM (laba bersih ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
         </p>
       </div>
       {c.status !== 'kurang_data' && c.klu && (

@@ -153,7 +153,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
             </div>
             <div><span className="text-2xl font-bold tabular">{formatRp(p.harga)}</span> <span className="text-sm text-muted-foreground">/ {p.hari === 365 ? 'tahun' : 'bulan'}</span></div>
             <ul className="grid gap-1.5 text-sm text-muted-foreground">
-              {['Semua fitur laporan & pajak', 'Pengguna tanpa batas', 'Laporan AI & cek benchmark DJP'].map((x) => (
+              {['Semua fitur laporan & pajak', 'Pengguna tanpa batas', 'Laporan AI & cek benchmark nasional'].map((x) => (
                 <li key={x} className="flex items-center gap-2"><Check className="size-4 text-[var(--accent-green)]" aria-hidden="true" />{x}</li>
               ))}
             </ul>
