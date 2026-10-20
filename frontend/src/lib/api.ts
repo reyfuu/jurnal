@@ -1031,7 +1031,8 @@ export interface ImportError {
 }
 
 /** Tingkat keyakinan tebakan jenis. 'rendah' = hanya arah uangnya yang pasti. */
-export type Keyakinan = 'tinggi' | 'sedang' | 'rendah'
+/** ai = baris yang tidak dikenali kata kunci, jenisnya disarankan AI (tetap periksa). */
+export type Keyakinan = 'tinggi' | 'sedang' | 'rendah' | 'ai'
 
 export interface MutasiRow {
   /** Nomor baris di berkas aslinya, supaya baris yang keliru bisa ditunjuk. */
@@ -1064,6 +1065,9 @@ export interface MutasiHasil {
   perlu_diperiksa: number
   duplikat: number
   format: string
+  /** Baris yang jenisnya disarankan AI, dan kenapa AI tidak dipakai (bila ada). */
+  dibantu_ai?: number
+  ai_pesan?: string
 }
 
 export interface MutasiCommitResult {

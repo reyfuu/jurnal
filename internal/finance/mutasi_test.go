@@ -246,3 +246,32 @@ func TestParseMutasi_RingkasanPerJenis(t *testing.T) {
 		t.Errorf("baris berkeyakinan rendah = %d, want 2 (transfer masuk tanpa penanda + tarik tunai)", h.PerluDiperiksa)
 	}
 }
+
+func TestMutasi_KelompokRendahDanSaranAI(t *testing.T) {
+	h := finance.MutasiHasil{Rows: []finance.MutasiRow{
+		{Keterangan: "TRSF E-BANKING CR 1234567890 BUDI SANTOSO", Arah: "masuk", Nominal: 500_000, Jenis: "Penjualan", Keyakinan: finance.KeyakinanRendah},
+		{Keterangan: "TRSF E-BANKING CR 9876543210 BUDI SANTOSO", Arah: "masuk", Nominal: 750_000, Jenis: "Penjualan", Keyakinan: finance.KeyakinanRendah},
+		{Keterangan: "BIAYA ADM", Arah: "keluar", Nominal: 10_000, Jenis: "Biaya Lain", Keyakinan: finance.KeyakinanTinggi},
+		{Keterangan: "DB 0011 TOKO SINAR JAYA", Arah: "keluar", Nominal: 2_000_000, Jenis: "Biaya Lain", Keyakinan: finance.KeyakinanRendah},
+	}, PerluDiperiksa: 3}
+	g := h.KelompokRendah()
+	if len(g) != 2 { // dua baris Budi dengan nomor rekening berbeda = satu kelompok
+		t.Fatalf("kelompok = %+v", g)
+	}
+	if g[0].Keterangan != "TRSF E-BANKING CR # BUDI SANTOSO" || len(g[0].Baris) != 2 {
+		t.Errorf("nomor panjang harus disamarkan & baris digabung: %+v", g[0])
+	}
+	h.TerapkanSaran(map[string]finance.SaranJenis{
+		g[0].Kunci: {Jenis: "Setor Modal", Alasan: "transfer pribadi pemilik"},
+		g[1].Kunci: {Jenis: "Penjualan", Alasan: "salah arah"}, // Penjualan bukan jenis keluar → diabaikan
+	})
+	if r := h.Rows[0]; r.Jenis != "Setor Modal" || r.Keyakinan != finance.KeyakinanAI || r.Alasan != "Saran AI: transfer pribadi pemilik" {
+		t.Errorf("baris 1 = %+v", r)
+	}
+	if h.Rows[3].Keyakinan != finance.KeyakinanRendah || h.Rows[2].Keyakinan != finance.KeyakinanTinggi {
+		t.Error("saran salah arah / baris yakin tidak boleh berubah")
+	}
+	if h.PerluDiperiksa != 1 || h.DibantuAI != 2 {
+		t.Errorf("perlu diperiksa %d, dibantu AI %d", h.PerluDiperiksa, h.DibantuAI)
+	}
+}

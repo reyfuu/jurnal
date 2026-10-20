@@ -20,6 +20,7 @@ const (
 	KeyakinanTinggi = "tinggi" // kata kunci khas, mis. "BIAYA ADM", "GAJI", "QRIS"
 	KeyakinanSedang = "sedang" // biasanya benar, tapi tergantung konteks usaha
 	KeyakinanRendah = "rendah" // hanya arah uangnya yang pasti; jenisnya wajib diperiksa
+	KeyakinanAI     = "ai"     // baris rendah yang jenisnya disarankan AI; tetap bisa dikoreksi
 )
 
 // MutasiRow: satu baris mutasi beserta tebakan jenisnya.
@@ -56,6 +57,10 @@ type MutasiHasil struct {
 	// PerluDiperiksa: baris berkeyakinan rendah atau belum punya jenis.
 	PerluDiperiksa int `json:"perlu_diperiksa"`
 	Duplikat       int `json:"duplikat"`
+	// DibantuAI: baris berkeyakinan rendah yang jenisnya disarankan AI. AIPesan: kenapa AI
+	// tidak dipakai (belum aktif, kuota habis, gagal) — kosong bila dipakai atau tidak perlu.
+	DibantuAI int    `json:"dibantu_ai"`
+	AIPesan   string `json:"ai_pesan,omitempty"`
 	// Format menyebut kolom apa yang dikenali, supaya jelas berkasnya terbaca sebagai apa.
 	Format string `json:"format"`
 }
@@ -400,4 +405,97 @@ func MutasiKeTransaksi(rows []MutasiRow) ([]Transaction, []ImportError) {
 		out = append(out, t)
 	}
 	return out, errs
+}
+
+// --- bantuan AI untuk baris yang tidak dikenali kata kunci ---
+
+// KelompokMutasi: baris berkeyakinan rendah yang keterangannya sama (setelah nomor disamarkan)
+// dan arahnya sama. Dikirim ke AI sekali per kelompok supaya hemat token.
+type KelompokMutasi struct {
+	Kunci      string `json:"-"`
+	Keterangan string `json:"keterangan"` // nomor ≥4 digit diganti "#" (rekening, referensi)
+	Arah       string `json:"arah"`
+	Nominal    int64  `json:"nominal"` // nominal baris pertama, sebagai gambaran
+	Baris      []int  `json:"-"`       // indeks di Rows
+}
+
+type SaranJenis struct{ Jenis, Alasan string }
+
+// SamarkanAngka: deret angka ≥4 digit (rekening, nomor referensi, kartu) diganti "#", spasi
+// dirapikan, huruf besar. Dipakai sebelum keterangan mutasi dikirim ke layanan AI.
+func SamarkanAngka(s string) string {
+	var b strings.Builder
+	digit := 0
+	flush := func(buf string) {
+		if digit >= 4 {
+			b.WriteString("#")
+		} else {
+			b.WriteString(buf)
+		}
+	}
+	var buf strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			buf.WriteRune(r)
+			digit++
+			continue
+		}
+		if digit > 0 {
+			flush(buf.String())
+			buf.Reset()
+			digit = 0
+		}
+		b.WriteRune(r)
+	}
+	if digit > 0 {
+		flush(buf.String())
+	}
+	return strings.ToUpper(strings.Join(strings.Fields(b.String()), " "))
+}
+
+func (h *MutasiHasil) KelompokRendah() []KelompokMutasi {
+	var out []KelompokMutasi
+	idx := map[string]int{}
+	for i, r := range h.Rows {
+		if r.Keyakinan != KeyakinanRendah {
+			continue
+		}
+		ket := SamarkanAngka(r.Keterangan)
+		kunci := r.Arah + "|" + ket
+		if j, ok := idx[kunci]; ok {
+			out[j].Baris = append(out[j].Baris, i)
+			continue
+		}
+		idx[kunci] = len(out)
+		out = append(out, KelompokMutasi{Kunci: kunci, Keterangan: ket, Arah: r.Arah, Nominal: r.Nominal, Baris: []int{i}})
+	}
+	return out
+}
+
+// TerapkanSaran memasang saran AI per kelompok (kunci = KelompokMutasi.Kunci). Jenis yang tidak
+// ada di JenisList atau berlawanan arah diabaikan; baris yang dibantu tidak lagi dihitung
+// "perlu diperiksa" tetapi tetap ditandai Saran AI.
+func (h *MutasiHasil) TerapkanSaran(saran map[string]SaranJenis) {
+	for _, g := range h.KelompokRendah() {
+		s, ok := saran[g.Kunci]
+		if !ok || !jenisArah(s.Jenis, g.Arah) {
+			continue
+		}
+		for _, i := range g.Baris {
+			h.Rows[i].Jenis, h.Rows[i].Keyakinan = s.Jenis, KeyakinanAI
+			h.Rows[i].Alasan = "Saran AI: " + strings.TrimSpace(s.Alasan)
+			h.PerluDiperiksa--
+			h.DibantuAI++
+		}
+	}
+	h.Ringkasan = rekapMutasi(h.Rows)
+}
+
+func jenisArah(jenis, arah string) bool {
+	for _, j := range JenisList {
+		if j.Nama == jenis {
+			return j.Arah == arah
+		}
+	}
+	return false
 }

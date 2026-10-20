@@ -5,8 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { commitMutasi, previewMutasi, type JenisInfo, type Keyakinan, type MutasiHasil, type MutasiRow } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-const WARNA: Record<Keyakinan, string> = { tinggi: 'pill-green', sedang: 'pill-amber', rendah: 'pill-red' }
-const LABEL: Record<Keyakinan, string> = { tinggi: 'Yakin', sedang: 'Perkiraan', rendah: 'Periksa' }
+const WARNA: Record<Keyakinan, string> = { tinggi: 'pill-green', sedang: 'pill-amber', rendah: 'pill-red', ai: 'pill-brand' }
+const LABEL: Record<Keyakinan, string> = { tinggi: 'Yakin', sedang: 'Perkiraan', rendah: 'Periksa', ai: 'Saran AI' }
 
 /** Ringkasan per jenis dihitung ulang di sini supaya ikut berubah saat jenisnya dikoreksi. */
 function rekap(rows: MutasiRow[]) {
@@ -136,9 +136,17 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 <span className="pill-status pill-green">Masuk {formatRp(hasil.total_masuk)}</span>
                 <span className="pill-status pill-red">Keluar {formatRp(hasil.total_keluar)}</span>
                 {hasil.duplikat > 0 && <span className="pill-status pill-amber">{hasil.duplikat} diduga sudah pernah dicatat</span>}
+                {!!hasil.dibantu_ai && <span className="pill-status pill-brand">{hasil.dibantu_ai} baris dikelompokkan AI</span>}
                 {hasil.format && <span className="text-sm text-muted-foreground">kolom terbaca: {hasil.format}</span>}
               </div>
 
+              {!!hasil.dibantu_ai && (
+                <div className="note-box">
+                  <strong>{hasil.dibantu_ai} baris tidak dikenali kata kunci, jadi jenisnya disarankan AI</strong> (tanda <em>Saran AI</em>).
+                  Baca alasannya di setiap baris dan ganti bila kurang tepat. Nomor rekening disamarkan sebelum dikirim ke AI.
+                </div>
+              )}
+              {hasil.ai_pesan && <p className="text-sm text-muted-foreground">{hasil.ai_pesan}</p>}
               {perluDiperiksa > 0 && (
                 <div className="note-box warn">
                   <strong>{perluDiperiksa} baris masih perlu diperiksa.</strong> Keterangannya tidak memuat penanda
