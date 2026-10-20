@@ -1,0 +1,314 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  aturLangganan, getKlien, getPlans, getRingkasanMaster, listKlien,
+  type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
+} from '@/lib/api'
+import { formatRelatif, formatRp, formatTanggal } from '@/lib/format'
+import { STATUS_LABEL, STATUS_PILL } from '@/lib/tiket'
+
+const STATUS: Record<KlienRow['status'], [string, string]> = {
+  aktif: ['pill-green', 'Aktif'], trial: ['pill-amber', 'Masa coba'], habis: ['pill-red', 'Habis'],
+}
+export const StatusPill = ({ s }: { s: KlienRow['status'] }) => <span className={'pill-status ' + STATUS[s][0]}>{STATUS[s][1]}</span>
+
+function Gagal({ error }: { error: string }) {
+  return error ? <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div> : null
+}
+
+function Kpi({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: string }) {
+  return (
+    <div className="card" style={{ padding: 18 }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value tabular" style={tone ? { color: tone } : undefined}>{value}</div>
+      {sub && <div className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function KlienMini({ rows, onBuka, kanan, kosong }: { rows: KlienRow[]; onBuka: (id: number) => void; kanan: (k: KlienRow) => React.ReactNode; kosong: string }) {
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground" style={{ padding: '12px 0' }}>{kosong}</p>
+  return (
+    <ul className="list-rows">
+      {rows.map((k) => (
+        <li key={k.id} className="list-row" style={{ alignItems: 'center', gap: 12 }}>
+          <button className="text-left" style={{ minWidth: 0, flex: 1 }} onClick={() => onBuka(k.id)}>
+            <div className="text-sm font-semibold truncate">{k.nama}</div>
+            <div className="text-xs text-muted-foreground truncate">{[k.owner_nama, k.kota].filter(Boolean).join(' · ') || k.owner_email}</div>
+          </button>
+          {kanan(k)}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function Ringkasan({ onBuka }: { onBuka: (id: number) => void }) {
+  const [r, setR] = useState<RingkasanMaster | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { getRingkasanMaster().then(setR, (e: Error) => setError(e.message)) }, [])
+  return (
+    <>
+      <PageHeader title="Ringkasan" subtitle="Kondisi klien Laporan Bisnis hari ini. Angka keuangan klien tidak ditampilkan di Panel Master." />
+      <Gagal error={error} />
+      {r && (
+        <>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+            <Kpi label="Klien" value={r.klien} sub={`${r.aktif} aktif · ${r.trial} masa coba · ${r.habis} habis`} />
+            {r.mrr !== undefined && <Kpi label="Pendapatan bulanan (MRR)" value={formatRp(r.mrr)} sub={`dari ${r.aktif} langganan aktif`} />}
+            <Kpi label="Perlu perhatian" value={r.perlu_perhatian.length} tone={r.perlu_perhatian.length ? 'var(--accent-red)' : undefined} sub="habis, segera habis, atau 14 hari tidak dibuka" />
+            <Kpi label="Tiket terbuka" value={r.tiket_terbuka} sub="baru + sedang dikerjakan" />
+          </div>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', alignItems: 'start' }}>
+            <div className="card" style={{ padding: 20 }}>
+              <div className="chart-title">Perlu perhatian</div>
+              <KlienMini rows={r.perlu_perhatian} onBuka={onBuka} kosong="Semua klien aman."
+                kanan={(k) => <span className="text-xs text-muted-foreground" style={{ whiteSpace: 'nowrap' }}>{k.alasan}</span>} />
+            </div>
+            {r.belum_ditugaskan ? (
+              <div className="card" style={{ padding: 20 }}>
+                <div className="chart-title">Belum ditugaskan</div>
+                <div className="chart-subtitle">Tiketnya hanya terlihat oleh yang melihat semua klien. Tugaskan di Tim &amp; Akses.</div>
+                <KlienMini rows={r.belum_ditugaskan} onBuka={onBuka} kosong="Semua klien sudah punya penanggung jawab."
+                  kanan={(k) => <StatusPill s={k.status} />} />
+              </div>
+            ) : (
+              <div className="card" style={{ padding: 20 }}>
+                <div className="chart-title">Terakhir aktif</div>
+                <KlienMini rows={r.terakhir_aktif} onBuka={onBuka} kosong="Belum ada klien."
+                  kanan={(k) => <span className="text-xs text-muted-foreground" style={{ whiteSpace: 'nowrap' }}>{formatRelatif(k.terakhir_aktif)}</span>} />
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+type Filter = 'semua' | 'aktif' | 'trial' | 'habis' | 'perhatian'
+const FILTER: [Filter, string][] = [['semua', 'Semua'], ['aktif', 'Aktif'], ['trial', 'Masa coba'], ['habis', 'Habis'], ['perhatian', 'Perlu perhatian']]
+
+export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
+  const [rows, setRows] = useState<KlienRow[] | null>(null)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState<Filter>('semua')
+  const [q, setQ] = useState('')
+  useEffect(() => { listKlien().then(setRows, (e: Error) => setError(e.message)) }, [])
+  const tampil = useMemo(() => (rows ?? []).filter((k) =>
+    (filter === 'semua' || (filter === 'perhatian' ? k.perlu_perhatian : k.status === filter)) &&
+    [k.nama, k.owner_nama, k.owner_email, k.kota].join(' ').toLowerCase().includes(q.trim().toLowerCase())), [rows, filter, q])
+  return (
+    <>
+      <PageHeader title="Klien" subtitle={rows ? `${rows.length} usaha yang bisa Anda lihat` : 'Memuat…'} />
+      <Gagal error={error} />
+      <div className="card" style={{ padding: 20 }}>
+        <div className="flex flex-wrap items-center gap-3" style={{ marginBottom: 12 }}>
+          <div className="tabbar" role="tablist" aria-label="Saring status">
+            {FILTER.map(([f, l]) => (
+              <button key={f} role="tab" className="tab-btn" aria-selected={filter === f} onClick={() => setFilter(f)}>{l}</button>
+            ))}
+          </div>
+          <Input aria-label="Cari klien" placeholder="Cari usaha, owner, kota" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260, marginLeft: 'auto' }} />
+        </div>
+        <div className="table-scroll">
+          <table className="data-table" style={{ minWidth: 900 }}>
+            <thead>
+              <tr>
+                <th>Usaha</th><th>Paket</th><th>Status</th><th>Berlaku s/d</th><th>Terakhir aktif</th>
+                <th style={{ textAlign: 'right' }}>Transaksi bulan ini</th><th>Profil</th><th>Ditangani</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tampil.map((k) => (
+                <tr key={k.id} onClick={() => onBuka(k.id)} style={{ cursor: 'pointer' }}>
+                  <td>
+                    <button className="text-left font-semibold" onClick={() => onBuka(k.id)}>{k.nama}</button>
+                    {k.demo && <span className="pill-status pill-status-muted" style={{ fontSize: 10, marginLeft: 6 }}>contoh</span>}
+                    <div className="text-xs text-muted-foreground">{[k.owner_nama, k.kota, k.jenis, k.pkp && 'PKP'].filter(Boolean).join(' · ')}</div>
+                  </td>
+                  <td>{k.paket ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td><StatusPill s={k.status} /></td>
+                  <td className="tabular">{formatTanggal(k.sampai)}</td>
+                  <td>{k.perlu_perhatian && k.alasan?.startsWith('Tidak aktif')
+                    ? <span className="pill-status pill-red">{formatRelatif(k.terakhir_aktif)}</span>
+                    : formatRelatif(k.terakhir_aktif)}</td>
+                  <td className="tabular" style={{ textAlign: 'right' }}>{k.transaksi_bulan_ini.toLocaleString('id-ID')}</td>
+                  <td>{k.onboarding ? <span className="pill-status pill-green">Lengkap</span> : <span className="pill-status pill-status-muted">Belum</span>}</td>
+                  <td>{k.penangan.length ? k.penangan.map((p) => p.nama.split(' ')[0]).join(', ') : <span className="pill-status pill-amber">Belum ada</span>}</td>
+                </tr>
+              ))}
+              {rows && tampil.length === 0 && (
+                <tr><td colSpan={8} className="text-center text-muted-foreground" style={{ padding: 24 }}>Tidak ada klien yang cocok.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
+const ORDER_PILL: Record<string, string> = { lunas: 'pill-green', manual: 'pill-amber', pending: 'pill-status-muted', gagal: 'pill-red' }
+
+export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; bisaLangganan: boolean; onKembali: () => void }) {
+  const [d, setD] = useState<KlienDetail | null>(null)
+  const [error, setError] = useState('')
+  const [dialog, setDialog] = useState(false)
+  const muat = () => getKlien(id).then(setD, (e: Error) => setError(e.message))
+  useEffect(() => { void muat() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const k = d?.klien
+  return (
+    <>
+      <div>
+        <Button variant="ghost" size="sm" onClick={onKembali}><ArrowLeft /> Klien</Button>
+      </div>
+      <PageHeader title={k?.nama ?? 'Memuat…'} subtitle={k ? [k.owner_nama, k.owner_email, k.owner_wa && `WA ${k.owner_wa}`, k.kota].filter(Boolean).join(' · ') : ''}>
+        {k && bisaLangganan && !k.demo && <button className="btn-cta" onClick={() => setDialog(true)}>Atur langganan</button>}
+      </PageHeader>
+      <Gagal error={error} />
+      {d && k && (
+        <>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+            <Kpi label="Langganan" value={k.paket ?? '—'} sub={`${STATUS[k.status][1]}${k.sampai ? ' s/d ' + formatTanggal(k.sampai) : ''}`} />
+            <Kpi label="Terakhir aktif" value={formatRelatif(k.terakhir_aktif)} sub={k.daftar ? `daftar ${formatTanggal(k.daftar)}` : undefined} />
+            <Kpi label="Transaksi bulan ini" value={k.transaksi_bulan_ini.toLocaleString('id-ID')} sub={`${k.user} user · profil ${k.onboarding ? 'lengkap' : 'belum diisi'}`} />
+            <Kpi label="Ditangani" value={k.penangan.map((p) => p.nama).join(', ') || '—'} sub={k.klu ? `KLU ${k.klu}${k.pkp ? ' · PKP' : ''}` : undefined} />
+          </div>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', alignItems: 'start' }}>
+            <div className="card" style={{ padding: 20 }}>
+              <div className="chart-title">Pengguna</div>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead><tr><th>Nama</th><th>Role</th><th>Terakhir aktif</th></tr></thead>
+                  <tbody>
+                    {d.users.map((u) => (
+                      <tr key={u.id}>
+                        <td><div className="font-semibold">{u.name}</div><div className="text-xs text-muted-foreground">{u.email}</div></td>
+                        <td>{u.role}{!u.active && <span className="pill-status pill-red" style={{ marginLeft: 6 }}>nonaktif</span>}</td>
+                        <td>{formatRelatif(u.last_seen)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="card" style={{ padding: 20 }}>
+              <div className="chart-title">Tiket</div>
+              {d.tiket.length === 0 ? <p className="text-sm text-muted-foreground" style={{ paddingTop: 8 }}>Tidak ada tiket.</p> : (
+                <ul className="list-rows">
+                  {d.tiket.map((t) => (
+                    <li key={t.id} className="list-row" style={{ gap: 12 }}>
+                      <span style={{ minWidth: 0 }}><span className="tabular text-xs text-muted-foreground">{t.nomor}</span> <span className="text-sm">{t.judul}</span></span>
+                      <span className={'pill-status ' + STATUS_PILL[t.status]}>{STATUS_LABEL[t.status]}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div className="card" style={{ padding: 20 }}>
+            <div className="chart-title">Riwayat langganan</div>
+            {d.orders.length === 0 ? <p className="text-sm text-muted-foreground" style={{ paddingTop: 8 }}>Belum ada pembayaran.</p> : (
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead><tr><th>Order</th><th>Paket</th><th style={{ textAlign: 'right' }}>Jumlah</th><th>Status</th><th>Tanggal</th></tr></thead>
+                  <tbody>
+                    {[...d.orders].reverse().map((o) => (
+                      <tr key={o.id}>
+                        <td className="tabular text-xs">{o.id}</td><td>{o.paket}</td>
+                        <td className="tabular" style={{ textAlign: 'right' }}>{formatRp(o.jumlah)}</td>
+                        <td><span className={'pill-status ' + (ORDER_PILL[o.status] ?? 'pill-status-muted')}>{o.status}</span></td>
+                        <td className="tabular">{formatTanggal(o.waktu)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <LanggananDialog open={dialog} onClose={() => setDialog(false)} klien={k} onSaved={() => { setDialog(false); void muat() }} />
+        </>
+      )}
+    </>
+  )
+}
+
+function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onClose: () => void; klien: KlienRow; onSaved: () => void }) {
+  const [aksi, setAksi] = useState<'trial' | 'aktifkan'>('aktifkan')
+  const [paket, setPaket] = useState('bulanan')
+  const [hari, setHari] = useState('7')
+  const [alasan, setAlasan] = useState('')
+  const [plans, setPlans] = useState<Paket[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { if (open) getPlans().then((r) => setPlans(r.paket), () => {}) }, [open])
+  async function simpan(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await aturLangganan(klien.id, aksi === 'trial' ? { aksi, hari: Number(hari), alasan } : { aksi, paket, alasan })
+      setAlasan('')
+      onSaved()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <form onSubmit={simpan} className="grid gap-4">
+          <DialogHeader>
+            <DialogTitle>Atur langganan · {klien.nama}</DialogTitle>
+            <DialogDescription>Untuk pembayaran transfer, promo, atau kompensasi. Alasan masuk audit log.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-1.5">
+            <Label htmlFor="lg-aksi">Aksi</Label>
+            <Select value={aksi} onValueChange={(v) => setAksi(v as 'trial' | 'aktifkan')}>
+              <SelectTrigger id="lg-aksi" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aktifkan">Aktifkan paket manual</SelectItem>
+                <SelectItem value="trial">Perpanjang masa coba</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {aksi === 'aktifkan' ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="lg-paket">Paket</Label>
+              <Select value={paket} onValueChange={setPaket}>
+                <SelectTrigger id="lg-paket" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.nama} · {formatRp(p.harga)} · {p.hari} hari</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Masa aktif bertambah dari tanggal berakhir sekarang. Tidak membuka garansi 7 hari.</p>
+            </div>
+          ) : (
+            <div className="grid gap-1.5">
+              <Label htmlFor="lg-hari">Tambah berapa hari</Label>
+              <Input id="lg-hari" type="number" min={1} max={90} required value={hari} onChange={(e) => setHari(e.target.value)} />
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="lg-alasan">Alasan</Label>
+            <Input id="lg-alasan" required maxLength={300} placeholder="mis. Transfer BCA 20 Okt, bukti di WA" value={alasan} onChange={(e) => setAlasan(e.target.value)} />
+          </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

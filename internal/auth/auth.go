@@ -22,6 +22,9 @@ const (
 	Owner Role = "owner"
 	Admin Role = "admin"
 	Kasir Role = "kasir"
+	// MP: anggota tim MasterPajak. Tidak punya usaha (tenant_id 0) dan hanya membuka Panel
+	// Master; role tim & klien yang ditugaskan diatur di internal/master.
+	MP Role = "mp"
 )
 
 type RoleInfo struct {
@@ -41,6 +44,7 @@ var Roles = map[Role]RoleInfo{
 	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "pengguna", "profil-usaha", "langganan")},
 	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data")},
 	Kasir: {"Kasir", "Dashboard dan catat transaksi (tanpa ubah/hapus).", []string{"dashboard", "transaksi", "lapor-bug"}},
+	MP:    {"Tim MasterPajak", "Panel Master sesuai role tim.", []string{"panel-master"}},
 }
 
 func (r Role) Can(view string) bool { return slices.Contains(Roles[r].Views, view) }
@@ -52,11 +56,13 @@ type User struct {
 	Role      Role   `json:"role"`
 	Active    bool   `json:"active"`
 	CreatedAt string `json:"created_at"`
-	TenantID  int    `json:"tenant_id"`    // usaha pemilik data; 1 = usaha awal (Kedai Kopi Senja)
+	TenantID  int    `json:"tenant_id"`    // usaha pemilik data; 1 = usaha awal (Kedai Kopi Senja); 0 = tim MP
 	WA        string `json:"wa,omitempty"` // 628…; wajib saat daftar mandiri, opsional untuk user tambahan
 	// Persetujuan UU PDP (UU 27/2022) saat daftar: waktu (UTC) & versi kebijakan privasi.
 	PersetujuanPDP time.Time `json:"persetujuan_pdp,omitzero"`
 	VersiPDP       string    `json:"versi_pdp,omitempty"`
+	// LastSeen: terakhir memakai aplikasi (dicatat paling sering tiap touchInterval).
+	LastSeen time.Time `json:"last_seen,omitzero"`
 }
 
 // Input untuk Create/Update. Password kosong saat Update = tidak diubah.
@@ -66,7 +72,7 @@ type Input struct {
 	Role     Role   `json:"role"`
 	Active   bool   `json:"active"`
 	Password string `json:"password"`
-	TenantID int    `json:"-"` // diisi server, bukan dari body request; 0 = usaha 1
+	TenantID int    `json:"-"` // diisi server, bukan dari body request; 0 = usaha 1 (role MP: tanpa usaha)
 	WA       string `json:"-"` // hanya lewat daftar mandiri; Update tidak mengubahnya
 	// Persetujuan UU PDP, diisi server saat daftar mandiri.
 	PersetujuanPDP time.Time `json:"-"`
@@ -132,6 +138,14 @@ func hashPassword(password string, salt []byte) []byte {
 
 func normEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
 
+// tenantFor: akun tim MP tidak punya usaha; user lain minimal usaha 1 (data lama tanpa tenant_id).
+func tenantFor(role Role, tenantID int) int {
+	if role == MP {
+		return 0
+	}
+	return max(tenantID, 1)
+}
+
 func validate(in *Input, requirePassword bool) error {
 	in.Name, in.Email = strings.TrimSpace(in.Name), normEmail(in.Email)
 	_, roleOK := Roles[in.Role]
@@ -181,6 +195,9 @@ func (s *Store) Create(in Input) (User, error) {
 	if err := validate(&in, true); err != nil {
 		return User{}, err
 	}
+	if in.Role == MP && in.TenantID != 0 { // Owner usaha tidak bisa membuat akun tim
+		return User{}, ErrInvalid
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.emailTaken(in.Email, 0) {
@@ -189,7 +206,7 @@ func (s *Store) Create(in Input) (User, error) {
 	s.nextID++
 	salt := []byte(rand.Text())
 	r := &record{
-		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02"), TenantID: max(in.TenantID, 1),
+		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02"), TenantID: tenantFor(in.Role, in.TenantID),
 			WA: in.WA, PersetujuanPDP: in.PersetujuanPDP, VersiPDP: in.VersiPDP},
 		salt: salt,
 		hash: hashPassword(in.Password, salt),
@@ -203,6 +220,9 @@ func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if err := validate(&in, false); err != nil {
 		return User{}, err
 	}
+	if (in.Role == MP) != (tenantID == 0) { // user usaha tidak bisa dipindah ke tim, dan sebaliknya
+		return User{}, ErrInvalid
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r, ok := s.users[id]
@@ -212,7 +232,7 @@ func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if s.emailTaken(in.Email, id) {
 		return User{}, ErrEmailTaken
 	}
-	if (in.Role != Owner || !in.Active) && s.activeOwners(tenantID, id) == 0 {
+	if tenantID != 0 && (in.Role != Owner || !in.Active) && s.activeOwners(tenantID, id) == 0 {
 		return User{}, ErrLastOwner
 	}
 	if !in.Active || in.Role != r.Role {
@@ -232,7 +252,7 @@ func (s *Store) Delete(tenantID, id int) error {
 	if r, ok := s.users[id]; !ok || r.TenantID != tenantID {
 		return ErrNotFound
 	}
-	if s.activeOwners(tenantID, id) == 0 {
+	if tenantID != 0 && s.activeOwners(tenantID, id) == 0 {
 		return ErrLastOwner
 	}
 	delete(s.users, id)
@@ -267,6 +287,7 @@ func (s *Store) Login(email, password string) (string, User, error) {
 		if r.Email == email && r.Active && subtle.ConstantTimeCompare(hashPassword(password, r.salt), r.hash) == 1 {
 			token := rand.Text()
 			s.sessions[token] = session{r.ID, s.Now().Add(SessionTTL)}
+			r.LastSeen = s.Now().UTC().Truncate(time.Second)
 			return token, r.User, nil
 		}
 	}
@@ -292,6 +313,36 @@ func (s *Store) UserBySession(token string) (User, bool) {
 		return User{}, false
 	}
 	return r.User, true
+}
+
+// touchInterval: last_seen cukup akurat per 5 menit; lebih sering hanya menambah tulisan.
+const touchInterval = 5 * time.Minute
+
+// Touch mencatat user masih memakai aplikasi; true bila last_seen berubah.
+// ponytail: tidak memicu simpan sendiri — ikut tersimpan pada penulisan berikutnya, jadi
+// paling banyak hilang beberapa menit bila server mati.
+func (s *Store) Touch(id int, now time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.users[id]
+	if !ok || now.Sub(r.LastSeen) < touchInterval {
+		return false
+	}
+	r.LastSeen = now.UTC().Truncate(time.Second)
+	return true
+}
+
+// FindByEmail: user dengan email ini (tanpa membedakan huruf besar & spasi tepi).
+func (s *Store) FindByEmail(email string) (User, bool) {
+	email = normEmail(email)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, r := range s.users {
+		if r.Email == email {
+			return r.User, true
+		}
+	}
+	return User{}, false
 }
 
 // revoke menghapus semua sesi milik user; pemanggil memegang s.mu.
@@ -343,7 +394,7 @@ func (s *Store) Snapshot() StoreSnapshot {
 func Restore(snap StoreSnapshot) *Store {
 	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
 	for _, u := range snap.Users {
-		u.TenantID = max(u.TenantID, 1) // state.json lama belum menyimpan tenant_id
+		u.TenantID = tenantFor(u.Role, u.TenantID) // state.json lama belum menyimpan tenant_id
 		s.users[u.ID] = &record{u.User, u.Salt, u.Hash}
 		s.nextID = max(s.nextID, u.ID)
 	}

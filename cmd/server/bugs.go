@@ -33,6 +33,15 @@ type bugReport struct {
 	// laporannya tersimpan tapi belum sampai — pengembang masih bisa membacanya di aplikasi.
 	Diteruskan bool   `json:"diteruskan"`
 	GagalKirim string `json:"gagal_kirim,omitempty"`
+	// Status tiket di Panel Master: "" (= baru) | dikerjakan | selesai. Balasan tim terbaca pelapor.
+	Status  string       `json:"status,omitempty"`
+	Balasan []bugBalasan `json:"balasan,omitempty"`
+}
+
+type bugBalasan struct {
+	Nama  string    `json:"nama"` // anggota tim yang membalas
+	Isi   string    `json:"isi"`
+	Waktu time.Time `json:"waktu"`
 }
 
 type bugStore struct {
@@ -164,11 +173,17 @@ func (s *Server) handleCreateBug(w http.ResponseWriter, r *http.Request) {
 
 // handleBugScreenshot: hanya laporan milik usaha user sendiri; usaha lain dapat 404.
 func (s *Server) handleBugScreenshot(w http.ResponseWriter, r *http.Request) {
+	tid := currentUser(r).TenantID
+	s.serveBugScreenshot(w, r, func(rep bugReport) bool { return rep.TenantID == tid })
+}
+
+// serveBugScreenshot mengirim lampiran laporan {id} bila boleh(laporan); selain itu 404.
+func (s *Server) serveBugScreenshot(w http.ResponseWriter, r *http.Request, boleh func(bugReport) bool) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	b := s.bugs
 	b.mu.Lock()
 	var name string
-	if id >= 1 && id <= len(b.list) && (isMaster(r) || b.list[id-1].TenantID == currentUser(r).TenantID) {
+	if id >= 1 && id <= len(b.list) && boleh(b.list[id-1]) {
 		name = b.list[id-1].Screenshot
 	}
 	img := b.mem[name]
@@ -190,14 +205,13 @@ func (s *Server) handleBugScreenshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListBugs(w http.ResponseWriter, r *http.Request) {
-	// ID Master (pengembang) melihat laporan seluruh usaha; pengguna biasa hanya usahanya.
-	master := isMaster(r)
+	// Hanya laporan usaha sendiri; tim MasterPajak membaca semua lewat Panel Master.
 	tid := currentUser(r).TenantID
 	b := s.bugs
 	b.mu.Lock()
 	out := []bugReport{}
 	for i := len(b.list) - 1; i >= 0; i-- { // terbaru dulu
-		if master || b.list[i].TenantID == tid {
+		if b.list[i].TenantID == tid {
 			out = append(out, b.list[i])
 		}
 	}
@@ -213,13 +227,12 @@ func clip(s string, n int) string {
 	return s
 }
 
-// handleBugInfo: ke mana laporan dikirim, dan apakah yang login ID Master.
+// handleBugInfo: ke mana laporan dikirim.
 //
 // Endpoint terpisah, bukan digabung ke /bugs: bentuk balasan /bugs sudah dipakai halaman Lapor
 // Bug sebagai array, dan mengubahnya jadi objek akan memecahkan pemanggil yang sudah ada.
 func (s *Server) handleBugInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, bugInfo{
-		Master:         isMaster(r),
 		PenerusanAktif: s.bugHook.aktif(),
 		PenerusanKe:    s.bugHook.tujuan(),
 	})

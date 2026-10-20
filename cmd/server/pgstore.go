@@ -13,6 +13,7 @@ import (
 
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/master"
 )
 
 // Penyimpanan PostgreSQL (DATABASE_URL). Data tetap dilayani dari memori; Postgres adalah
@@ -198,6 +199,61 @@ func insertBugDB(db *sql.DB, rep bugReport) error {
 	return tx.Commit()
 }
 
+// updateBugDB menyimpan status & balasan tiket (isi laporan tidak pernah berubah).
+func updateBugDB(db *sql.DB, rep bugReport) error {
+	balasan, err := json.Marshal(rep.Balasan)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`UPDATE bug_reports SET status = NULLIF($2, ''), balasan = $3 WHERE id = $1`, rep.ID, rep.Status, balasan)
+	return err
+}
+
+// saveMasterDB menulis ulang role & anggota tim, lalu MENAMBAHKAN baris audit baru.
+func saveMasterDB(db *sql.DB, st master.State, auditBaru []master.Catatan) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM mp_roles; DELETE FROM mp_anggota`); err != nil {
+		return err
+	}
+	for _, r := range []struct {
+		table string
+		rows  any
+	}{{"mp_roles", st.Roles}, {"mp_anggota", st.Anggota}, {"mp_audit", auditBaru}} {
+		if err := insertRows(tx, r.table, nil, r.rows); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func loadMasterDB(db *sql.DB) (master.State, error) {
+	st := master.NewState()
+	var roles []master.Role
+	for _, q := range []struct {
+		dst   any
+		query string
+	}{
+		{&roles, `SELECT jsonb_agg(to_jsonb(r)) FROM mp_roles r`},
+		{&st.Anggota, `SELECT jsonb_agg(to_jsonb(a) ORDER BY user_id) FROM mp_anggota a`},
+		{&st.Audit, `SELECT jsonb_agg(to_jsonb(x) ORDER BY id) FROM mp_audit x`},
+	} {
+		if err := selectJSON(db, q.dst, q.query); err != nil {
+			return st, err
+		}
+	}
+	if len(roles) > 0 { // DB lama tanpa tim: role bawaan
+		st.Roles = roles
+	}
+	for _, c := range st.Audit {
+		st.NextAuditID = max(st.NextAuditID, c.ID+1)
+	}
+	return st, nil
+}
+
 // loadDB memuat semua data; ok=false bila DB masih kosong (belum ada usaha).
 func (s *Server) loadDB() (ok bool, err error) {
 	var ids []int
@@ -227,6 +283,9 @@ func (s *Server) loadDB() (ok bool, err error) {
 	}
 	s.users = auth.Restore(snap)
 	s.bugs = &bugStore{path: dataPath("bugs.json"), mem: map[string][]byte{}}
+	if s.master, err = loadMasterDB(s.db); err != nil {
+		return false, fmt.Errorf("tim MasterPajak: %w", err)
+	}
 	return true, selectJSON(s.db, &s.bugs.list, `SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY id), '[]') FROM bug_reports b`)
 }
 

@@ -8,6 +8,8 @@ APP_PORT="${1:-8085}"
 # Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
 # MIDTRANS_SERVER_KEY / MIDTRANS_CLIENT_KEY (opsional, di .env): pembayaran langganan;
 # MIDTRANS_PRODUCTION=true untuk akun produksi (default sandbox).
+# MASTER_EMAIL + MASTER_PASSWORD (opsional, di .env): membuat akun Master pertama Panel Master
+# sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
 # dbeaver_ro untuk DBeaver. Buat dengan `openssl rand -hex 24` dan simpan di .env.
 [ -f .env ] && . ./.env
@@ -55,6 +57,8 @@ docker run -d \
   -e MIDTRANS_SERVER_KEY="${MIDTRANS_SERVER_KEY:-}" \
   -e MIDTRANS_CLIENT_KEY="${MIDTRANS_CLIENT_KEY:-}" \
   -e MIDTRANS_PRODUCTION="${MIDTRANS_PRODUCTION:-false}" \
+  -e MASTER_EMAIL="${MASTER_EMAIL:-}" \
+  -e MASTER_PASSWORD="${MASTER_PASSWORD:-}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"

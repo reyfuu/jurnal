@@ -206,6 +206,9 @@ func (s *Server) saveAll() {
 			log.Fatalf("impor laporan bug %d: %v", rep.ID, err)
 		}
 	}
+	if err := saveMasterDB(s.db, s.master, s.master.Audit); err != nil {
+		log.Fatalf("impor tim MasterPajak: %v", err)
+	}
 }
 
 // sessionTenant: usaha milik sesi valid pertama di cookies; ok=false bila tidak ada sesi.

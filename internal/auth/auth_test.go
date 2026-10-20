@@ -190,3 +190,68 @@ func TestNormalizeWA(t *testing.T) {
 		}
 	}
 }
+
+func TestMP_TanpaUsaha(t *testing.T) {
+	s := auth.NewStore()
+	u, err := s.Create(auth.Input{Name: "Andi", Email: "andi@masterpajak.id", Role: auth.MP, Active: true, Password: "rahasia123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.TenantID != 0 {
+		t.Errorf("akun tim auth.MP tidak boleh punya usaha, tenant_id = %d", u.TenantID)
+	}
+	if len(s.List(1)) != 3 || len(s.List(0)) != 1 {
+		t.Errorf("List usaha 1 = %d user, List tim = %d", len(s.List(1)), len(s.List(0)))
+	}
+	// Update akun tim: tidak terkena aturan Owner terakhir.
+	if _, err := s.Update(0, u.ID, auth.Input{Name: "Andi P", Email: u.Email, Role: auth.MP, Active: false}); err != nil {
+		t.Fatalf("nonaktifkan akun tim: %v", err)
+	}
+	snap := s.Snapshot()
+	if r := auth.Restore(snap); r.List(0)[0].TenantID != 0 {
+		t.Error("auth.Restore mengubah tenant_id akun tim jadi usaha 1")
+	}
+}
+
+func TestMP_TidakBisaDibuatDariUsaha(t *testing.T) {
+	s := auth.NewStore()
+	if _, err := s.Create(auth.Input{Name: "X", Email: "x@contoh.id", Role: auth.MP, Active: true, Password: "rahasia123", TenantID: 1}); !errors.Is(err, auth.ErrInvalid) {
+		t.Errorf("Owner usaha membuat akun tim: err = %v", err)
+	}
+	if _, err := s.Update(1, 2, auth.Input{Name: "Dimas", Email: "admin@kedaikopisenja.id", Role: auth.MP, Active: true}); !errors.Is(err, auth.ErrInvalid) {
+		t.Errorf("ubah user usaha jadi tim: err = %v", err)
+	}
+	if auth.MP.Can("dashboard") || !auth.MP.Can("panel-master") {
+		t.Error("role mp hanya boleh view panel-master")
+	}
+}
+
+func TestTouch_LastSeen(t *testing.T) {
+	s := auth.NewStore()
+	t0 := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	if !s.Touch(1, t0) {
+		t.Fatal("sentuhan pertama harus mencatat")
+	}
+	if s.Touch(1, t0.Add(4*time.Minute)) {
+		t.Error("di bawah 5 menit tidak perlu dicatat ulang")
+	}
+	if !s.Touch(1, t0.Add(5*time.Minute)) {
+		t.Error("5 menit kemudian harus tercatat")
+	}
+	if got := s.List(1)[0].LastSeen; !got.Equal(t0.Add(5 * time.Minute)) {
+		t.Errorf("last_seen = %v", got)
+	}
+	if s.Touch(99, t0) {
+		t.Error("user tidak ada")
+	}
+}
+
+func TestFindByEmail(t *testing.T) {
+	s := auth.NewStore()
+	if u, ok := s.FindByEmail(" Owner@KedaiKopiSenja.id "); !ok || u.ID != 1 {
+		t.Errorf("FindByEmail = %+v %v", u, ok)
+	}
+	if _, ok := s.FindByEmail("tidak@ada.id"); ok {
+		t.Error("email tak ada ditemukan")
+	}
+}

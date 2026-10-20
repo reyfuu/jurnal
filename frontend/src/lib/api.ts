@@ -7,8 +7,9 @@ export type View =
   | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
+  | 'panel-master' // akun tim MasterPajak: seluruh aplikasi diganti Panel Master
 
-export type Role = 'owner' | 'admin' | 'kasir'
+export type Role = 'owner' | 'admin' | 'kasir' | 'mp'
 
 export interface User {
   id: number
@@ -18,6 +19,9 @@ export interface User {
   active: boolean
   created_at: string
   wa?: string
+  tenant_id?: number
+  /** Terakhir memakai aplikasi; dicatat paling sering tiap 5 menit. */
+  last_seen?: string
 }
 
 export interface Me {
@@ -26,6 +30,8 @@ export interface Me {
   views: View[]
   langganan: LanggananStatus
   garansi: GaransiStatus
+  /** Hanya akun tim MasterPajak: role tim dan izin efektifnya. */
+  master?: MasterMe
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
@@ -557,13 +563,17 @@ export interface BugReport {
   /** true = sudah sampai ke webhook pengembang; false dengan gagal_kirim = baru tersimpan di server. */
   diteruskan: boolean
   gagal_kirim?: string
-  /** Hanya terisi untuk ID Master, yang melihat laporan lintas usaha. */
   tenant_id?: number
+  /** Status tiket di Panel Master; kosong = baru. */
+  status?: TiketStatus
+  /** Balasan tim MasterPajak, terbaca pelapor. */
+  balasan?: { nama: string; isi: string; waktu: string }[]
 }
 
-/** Ke mana laporan dikirim, dan apakah yang login ID Master (pengembang). */
+export type TiketStatus = 'baru' | 'dikerjakan' | 'selesai'
+
+/** Ke mana laporan dikirim. */
 export interface BugInfo {
-  master: boolean
   penerusan_aktif: boolean
   /** Host tujuan penerusan, tanpa token di path-nya. */
   penerusan_ke: string
@@ -583,6 +593,53 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
   if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
   return res.json()
 }
+
+// --- Panel Master (akun tim MasterPajak) ---
+
+export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'langganan' | 'pembayaran' | 'tim' | 'audit'
+export interface IzinInfo { id: Izin; label: string; keterangan?: string }
+export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
+/** klien -1 = semua klien. */
+export interface MasterMe { role: MasterRole; izin: Izin[]; klien: number }
+export interface Orang { id: number; nama: string }
+
+export interface KlienRow {
+  id: number; nama: string; jenis?: string; kota?: string; klu?: string; pkp: boolean; demo?: boolean
+  owner_nama?: string; owner_email?: string; owner_wa?: string; user: number
+  status: LanggananStatus['status']; sampai?: string; paket?: string
+  terakhir_aktif?: string; transaksi_bulan_ini: number; onboarding: boolean; daftar?: string
+  penangan: Orang[]; perlu_perhatian: boolean; alasan?: string
+}
+export interface RingkasanMaster {
+  klien: number; aktif: number; trial: number; habis: number; mrr?: number; tiket_terbuka: number
+  perlu_perhatian: KlienRow[]; belum_ditugaskan?: KlienRow[]; terakhir_aktif: KlienRow[]
+}
+export interface TiketRow extends BugReport { tenant_id: number; status: TiketStatus; nomor: string; klien_nama: string }
+export interface MasterOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal' | 'manual'; waktu: string; dibayar_pada?: string }
+export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[] }
+export interface PembayaranRow { klien_id: number; klien_nama: string; order: MasterOrder; garansi?: GaransiStatus }
+export interface AnggotaRow { user: User; role: string; klien: number[] }
+export interface TimData { anggota: AnggotaRow[]; roles: MasterRole[]; izin: IzinInfo[]; klien: Orang[] }
+export interface AuditRow { id: number; waktu: string; user_id: number; nama: string; peran: string; aksi: string; klien_id?: number; keterangan?: string }
+
+export const getRingkasanMaster = () => api<RingkasanMaster>('/master/ringkasan')
+export const listKlien = () => api<KlienRow[]>('/master/klien')
+export const getKlien = (id: number) => api<KlienDetail>(`/master/klien/${id}`)
+export const aturLangganan = (id: number, body: { aksi: 'trial' | 'aktifkan'; hari?: number; paket?: string; alasan: string }) =>
+  api<LanggananStatus>(`/master/klien/${id}/langganan`, { method: 'POST', body })
+export const listTiket = () => api<TiketRow[]>('/master/tiket')
+export const ubahTiket = (id: number, body: { status?: TiketStatus; balasan?: string }) => api<BugReport>(`/master/tiket/${id}`, { method: 'PUT', body })
+export const tiketScreenshotUrl = (id: number) => `/api/v1/master/tiket/${id}/screenshot`
+export const listPembayaran = () => api<PembayaranRow[]>('/master/pembayaran')
+export const getTim = () => api<TimData>('/master/tim')
+export const tambahAnggota = (body: { nama: string; email: string; password: string; role: string; klien: number[] }) =>
+  api<AnggotaRow>('/master/tim', { method: 'POST', body })
+export const ubahAnggota = (id: number, body: { role: string; klien: number[]; aktif: boolean }) =>
+  api<AnggotaRow>(`/master/tim/${id}`, { method: 'PUT', body })
+export const simpanRole = (r: { id?: string; nama: string; izin: Izin[] }) =>
+  r.id ? api<MasterRole>(`/master/roles/${r.id}`, { method: 'PUT', body: r }) : api<MasterRole>('/master/roles', { method: 'POST', body: r })
+export const hapusRole = (id: string) => api<void>(`/master/roles/${id}`, { method: 'DELETE' })
+export const listAudit = () => api<AuditRow[]>('/master/audit')
 
 export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
 export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }

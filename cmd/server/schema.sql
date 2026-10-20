@@ -254,6 +254,37 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 	screenshot TEXT -- nama berkas di $DATA_DIR/bugs/
 );
 
+-- Panel Master (Okt 2026): aktivitas user, status & balasan tiket, tim MasterPajak.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
+ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS balasan JSONB;
+
+CREATE TABLE IF NOT EXISTS mp_roles (
+	id    TEXT PRIMARY KEY,
+	nama  TEXT NOT NULL,
+	kunci BOOLEAN NOT NULL,
+	izin  JSONB
+);
+
+-- Anggota tim: user_id menunjuk users (role 'mp'); klien = array id usaha yang ditugaskan.
+CREATE TABLE IF NOT EXISTS mp_anggota (
+	user_id INT PRIMARY KEY,
+	role    TEXT NOT NULL,
+	klien   JSONB
+);
+
+-- Audit log Panel Master: hanya ditambah, tidak pernah diubah atau dihapus aplikasi.
+CREATE TABLE IF NOT EXISTS mp_audit (
+	id         INT PRIMARY KEY,
+	waktu      TIMESTAMPTZ NOT NULL,
+	user_id    INT NOT NULL,
+	nama       TEXT,
+	peran      TEXT,
+	aksi       TEXT NOT NULL,
+	klien_id   INT,
+	keterangan TEXT
+);
+
 -- lb_rows: siapkan array JSON untuk jsonb_populate_recordset. String kosong jadi NULL
 -- (kolom DATE menolak ''), dan tenant_id ditempel bila tid tidak NULL.
 CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$

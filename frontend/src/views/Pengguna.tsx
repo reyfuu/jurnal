@@ -13,7 +13,7 @@ import {
 } from '@/lib/api'
 
 const ROLE_ORDER: Role[] = ['owner', 'admin', 'kasir']
-const ROLE_PILL: Record<Role, string> = { owner: 'pill-amber', admin: 'pill-green', kasir: 'pill-status-muted' }
+const ROLE_PILL: Record<Role, string> = { owner: 'pill-amber', admin: 'pill-green', kasir: 'pill-status-muted', mp: 'pill-status-muted' }
 // Izin di luar menu sidebar (dicek server lewat guard yang sama).
 const EXTRA_PERMISSIONS = [{ view: 'transaksi-kelola', label: 'Ubah & hapus transaksi' }] as const
 
@@ -104,7 +104,7 @@ export function Pengguna({ currentUserId }: { currentUserId: number }) {
                     {self && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> (Anda)</span>}
                   </td>
                   <td style={{ color: 'var(--text-secondary)' }}>{u.email}</td>
-                  <td><span className={'pill-status ' + ROLE_PILL[u.role]}>{roles?.[u.role].label ?? u.role}</span></td>
+                  <td><span className={'pill-status ' + ROLE_PILL[u.role]}>{roles?.[u.role]?.label ?? u.role}</span></td>
                   <td>
                     <span className={'pill-status ' + (u.active ? 'pill-green' : 'pill-red')}>{u.active ? 'Aktif' : 'Nonaktif'}</span>
                   </td>
