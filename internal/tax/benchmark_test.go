@@ -76,3 +76,20 @@ func TestCekAwal(t *testing.T) {
 		t.Fatalf("rugi: %+v", l)
 	}
 }
+
+func TestAktifkanBenchmark_DipakaiFindKLU(t *testing.T) {
+	t.Cleanup(func() { AktifkanBenchmark(KLUBenchmarks, SumberBenchmark) })
+	AktifkanBenchmark([]KLUBenchmark{{Kode: "563", Nama: "Penyediaan Minuman", CTTORBps: 45, NPMBps: 610}}, "DJP 2024")
+	if k, ok := FindKLU("563"); !ok || k.NPMBps != 610 {
+		t.Fatalf("FindKLU tidak memakai versi aktif: %+v %v", k, ok)
+	}
+	if _, ok := FindKLU("471"); ok {
+		t.Error("KLU di luar versi aktif masih ditemukan")
+	}
+	if got := CekAwal(CekAwalInput{KLU: "563", Omzet: 100, Laba: 10}).Sumber; got != "DJP 2024" {
+		t.Errorf("sumber = %q", got)
+	}
+	if n := len(BenchmarkAktif()); n != 1 {
+		t.Errorf("BenchmarkAktif = %d baris", n)
+	}
+}

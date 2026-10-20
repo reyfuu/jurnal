@@ -23,6 +23,7 @@ import (
 	"pajak/internal/ai"
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/katalog"
 	"pajak/internal/llm"
 	"pajak/internal/master"
 	"pajak/internal/xlsx"
@@ -60,6 +61,8 @@ type tenant struct {
 	// koreksi: usulan tim MasterPajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
+	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
+	coaTemplateID int
 	seedTx        map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile       *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
 	langganan     langganan                // masa coba & pembayaran Midtrans
@@ -83,6 +86,9 @@ type Server struct {
 	masterMu sync.Mutex
 	master   master.State
 	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
+	// katalog: template COA & benchmark DJP berversi; versi aktifnya dipasang lewat pasangKatalog.
+	katalogMu sync.Mutex
+	katalog   katalog.State
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -148,6 +154,7 @@ func (t *tenant) restore(st *state) {
 	if st.NextKoreksiID > 0 {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
 	}
+	t.coaTemplateID = st.CoaTemplate
 }
 
 func NewServer() *Server {
@@ -176,6 +183,8 @@ func NewServer() *Server {
 			s.saveAll()
 		}
 	}
+	segarkanBawaan(&s.katalog)
+	pasangKatalog(s.katalog)
 	s.bootstrapMaster()
 	s.adoptOrphans()
 	s.routes()
@@ -213,6 +222,7 @@ func (s *Server) loadFiles() bool {
 	tenants[1] = demo
 	s.tenants, s.users, s.bugs = tenants, users, loadBugs()
 	s.master = loadMasterFile()
+	s.katalog = loadKatalogFile()
 	return st != nil
 }
 
@@ -375,6 +385,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
 
 	s.masterRoutes()
+	s.katalogRoutes()
 	s.mux.HandleFunc("GET /api/v1/koreksi", s.guard("usulan-koreksi", s.on((*tenant).handleListKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/setujui", s.persisting(s.guard("usulan-koreksi", s.handleSetujuiKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/tolak", s.persisting(s.guard("usulan-koreksi", s.handleTolakKoreksi)))

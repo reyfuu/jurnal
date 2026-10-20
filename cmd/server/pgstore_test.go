@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"pajak/internal/auth"
+	"pajak/internal/coa"
 	"pajak/internal/finance"
+	"pajak/internal/katalog"
+	"pajak/internal/tax"
 )
 
 // pgTest: tes Postgres hanya jalan bila TEST_DATABASE_URL di-set; skema dikosongkan dulu.
@@ -137,6 +140,7 @@ type tenantData struct {
 	NextTxID, NextAssetID, NextKaryawanID, NextInvoiceID int
 	NextTagihanID, NextStokID                            int
 	NextProdukID, NextSupplierID, NextKoreksiID          int
+	CoaTemplate                                          int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -146,7 +150,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -190,6 +194,7 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.koreksi = []finance.Koreksi{filled[finance.Koreksi](15)}
 	tn.koreksi[0].ID = 1
 	tn.nextKoreksiID = 2
+	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
 	tn.mu.Unlock()
@@ -310,5 +315,29 @@ func TestPostgresPanelMaster(t *testing.T) {
 	srv3 := NewServer()
 	if n, last := len(srv3.master.Audit), srv3.master.Audit[len(srv3.master.Audit)-1]; n != len(srv.master.Audit)+1 || last.ID != n || last.Aksi != "Buka detail klien" {
 		t.Fatalf("audit setelah muat ulang: %d baris, terakhir %+v", n, last)
+	}
+}
+
+// Versi template COA & benchmark buatan tim tersimpan utuh; versi 1 tetap mengikuti kode.
+func TestPostgresKatalog(t *testing.T) {
+	t.Cleanup(func() { tax.AktifkanBenchmark(tax.KLUBenchmarks, tax.SumberBenchmark) })
+	pgTest(t)
+	srv, m := serverMaster(t)
+	baru := append(slices.Clone(coa.Master), coa.Account{Kode: "6119", Nama: "Beban Asuransi", Subtype: "opex", Normal: coa.Debit, Kelompok: coa.BebanOperasional, Kondisi: coa.Selalu})
+	body, _ := json.Marshal(map[string]any{"jenis": "perdagangan", "akun": baru})
+	do(srv, m, http.MethodPost, "/api/v1/master/coa/draft", string(body))
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/2/terbitkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("terbit: %d %s", rec.Code, rec.Body)
+	}
+	unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(tax.KLUBenchmarks[:5]), map[string]string{"nama": "Uji"})
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/benchmark/2/aktifkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("aktifkan: %d %s", rec.Code, rec.Body)
+	}
+	srv2 := NewServer()
+	if got, want := normJSON(t, srv2.katalog), normJSON(t, srv.katalog); got != want {
+		t.Fatalf("katalog berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
+	}
+	if n := len(tax.BenchmarkAktif()); n != 5 {
+		t.Errorf("benchmark aktif setelah muat ulang = %d baris", n)
 	}
 }

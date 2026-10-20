@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // KLUBenchmark: rata-rata nasional CTTOR (PPh terutang / peredaran usaha) dan NPM (laba sebelum
@@ -20,12 +21,32 @@ type KLUBenchmark struct {
 
 const SumberBenchmark = "Buku sektoral DJP 2021 (SPT tahun pajak 2020), angka nasional"
 
+type benchmarkSet struct {
+	baris  []KLUBenchmark
+	sumber string
+}
+
+// aktif: versi benchmark yang dipakai seluruh aplikasi; diganti dari Panel Master
+// (AktifkanBenchmark). Bawaan = data DJP yang dibangkitkan di klu_data.go.
+var aktif atomic.Pointer[benchmarkSet]
+
+func init() { AktifkanBenchmark(KLUBenchmarks, SumberBenchmark) }
+
+// AktifkanBenchmark mengganti versi benchmark yang dipakai FindKLU & CekAwal. baris disalin.
+func AktifkanBenchmark(baris []KLUBenchmark, sumber string) {
+	aktif.Store(&benchmarkSet{slices.Clone(baris), sumber})
+}
+
+// BenchmarkAktif: salinan baris versi aktif.
+func BenchmarkAktif() []KLUBenchmark { return slices.Clone(aktif.Load().baris) }
+
 func FindKLU(kode string) (KLUBenchmark, bool) {
-	i := slices.IndexFunc(KLUBenchmarks, func(k KLUBenchmark) bool { return k.Kode == kode })
+	b := aktif.Load().baris
+	i := slices.IndexFunc(b, func(k KLUBenchmark) bool { return k.Kode == kode })
 	if i < 0 {
 		return KLUBenchmark{}, false
 	}
-	return KLUBenchmarks[i], true
+	return b[i], true
 }
 
 // JenisKLU: jenis usaha aplikasi untuk menyaring daftar KLU di onboarding.
@@ -98,7 +119,7 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 // CekAwal: NPM & CTTOR usaha vs rata-rata nasional KLU-nya, plus risiko pemeriksaan / bentuk
 // usaha, untuk ringkasan onboarding dan Perencanaan Pajak.
 func CekAwal(in CekAwalInput) CekAwalResult {
-	r := CekAwalResult{Sumber: SumberBenchmark, Risiko: []Risiko{}}
+	r := CekAwalResult{Sumber: aktif.Load().sumber, Risiko: []Risiko{}}
 	if k, ok := FindKLU(in.KLU); ok {
 		r.KLU = &k
 	}

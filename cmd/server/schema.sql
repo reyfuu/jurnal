@@ -306,6 +306,30 @@ CREATE TABLE IF NOT EXISTS koreksi (
 	PRIMARY KEY (tenant_id, id)
 );
 
+-- Katalog Panel Master (Okt 2026): template COA per jenis usaha & benchmark DJP, berversi.
+-- Versi 1 (bawaan) selalu diisi ulang dari kode saat boot. tenants.coa_template = versi template
+-- yang dipatok untuk usaha itu (0 = ikut versi terbaru).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS coa_template INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS coa_template (
+	id      INT PRIMARY KEY,
+	jenis   TEXT NOT NULL,
+	versi   INT NOT NULL,
+	status  TEXT NOT NULL,
+	akun    JSONB NOT NULL,
+	catatan TEXT,
+	oleh    TEXT,
+	waktu   TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS benchmark_versi (
+	id     INT PRIMARY KEY,
+	nama   TEXT NOT NULL,
+	sumber TEXT,
+	status TEXT NOT NULL,
+	baris  JSONB NOT NULL,
+	oleh   TEXT,
+	waktu  TIMESTAMPTZ
+);
+
 -- lb_rows: siapkan array JSON untuk jsonb_populate_recordset. String kosong jadi NULL
 -- (kolom DATE menolak ''), dan tenant_id ditempel bila tid tidak NULL.
 CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$

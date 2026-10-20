@@ -13,6 +13,7 @@ import (
 
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/katalog"
 	"pajak/internal/master"
 )
 
@@ -89,6 +90,7 @@ type tenantRow struct {
 	NextProdukID   int       `json:"next_produk_id"`
 	NextSupplierID int       `json:"next_supplier_id"`
 	NextKoreksiID  int       `json:"next_koreksi_id"`
+	CoaTemplate    int       `json:"coa_template"`
 	TrialSampai    time.Time `json:"trial_sampai,omitzero"`
 	AktifSampai    time.Time `json:"aktif_sampai,omitzero"`
 	EksporPertama  time.Time `json:"ekspor_pertama,omitzero"`
@@ -139,7 +141,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		return err
 	}
 	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
-		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, l.TrialSampai, l.AktifSampai,
+		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
 		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
@@ -256,6 +258,52 @@ func loadMasterDB(db *sql.DB) (master.State, error) {
 	return st, nil
 }
 
+// saveKatalogDB menulis ulang semua versi template COA & benchmark (puluhan baris).
+func saveKatalogDB(db *sql.DB, st katalog.State) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM coa_template; DELETE FROM benchmark_versi`); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "coa_template", nil, st.Template); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "benchmark_versi", nil, st.Benchmark); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// loadKatalogDB: DB tanpa katalog (sebelum fitur ini) = katalog bawaan.
+func loadKatalogDB(db *sql.DB) (katalog.State, error) {
+	st := katalog.NewState()
+	var tm []katalog.Template
+	var bm []katalog.Benchmark
+	if err := selectJSON(db, &tm, `SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM coa_template t`); err != nil {
+		return st, err
+	}
+	if err := selectJSON(db, &bm, `SELECT jsonb_agg(to_jsonb(b) ORDER BY id) FROM benchmark_versi b`); err != nil {
+		return st, err
+	}
+	if len(tm) > 0 {
+		st.Template = tm
+	}
+	if len(bm) > 0 {
+		st.Benchmark = bm
+	}
+	for _, t := range st.Template {
+		st.NextTemplateID = max(st.NextTemplateID, t.ID+1)
+	}
+	for _, b := range st.Benchmark {
+		st.NextBenchmarkID = max(st.NextBenchmarkID, b.ID+1)
+	}
+	segarkanBawaan(&st)
+	return st, nil
+}
+
 // loadDB memuat semua data; ok=false bila DB masih kosong (belum ada usaha).
 func (s *Server) loadDB() (ok bool, err error) {
 	var ids []int
@@ -288,6 +336,9 @@ func (s *Server) loadDB() (ok bool, err error) {
 	if s.master, err = loadMasterDB(s.db); err != nil {
 		return false, fmt.Errorf("tim MasterPajak: %w", err)
 	}
+	if s.katalog, err = loadKatalogDB(s.db); err != nil {
+		return false, fmt.Errorf("katalog: %w", err)
+	}
 	return true, selectJSON(s.db, &s.bugs.list, `SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY id), '[]') FROM bug_reports b`)
 }
 
@@ -298,7 +349,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
 		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
-		NextKoreksiID: row.NextKoreksiID,
+		NextKoreksiID: row.NextKoreksiID, CoaTemplate: row.CoaTemplate,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai,
 			EksporPertama: row.EksporPertama, GaransiDiklaim: row.GaransiDiklaim, GaransiAlasan: row.GaransiAlasan}}
 	var items []invoiceItemRow

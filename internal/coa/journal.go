@@ -167,8 +167,13 @@ type Balance struct {
 	Saldo  int64 `json:"saldo"`  // menurut saldo normal akun (negatif = berlawanan)
 }
 
-// TrialBalance: neraca saldo dari saldo awal + jurnal, urut sesuai CoA.
+// TrialBalance: neraca saldo dari saldo awal + jurnal, urut sesuai CoA Master.
 func TrialBalance(active []Account, opening map[string]int64, lines []Line) []Balance {
+	return TrialBalanceFrom(Master, active, opening, lines)
+}
+
+// TrialBalanceFrom: neraca saldo urut sesuai template; akun nonaktif tetap muncul bila bersaldo.
+func TrialBalanceFrom(template, active []Account, opening map[string]int64, lines []Line) []Balance {
 	net := map[string]int64{}
 	for k, v := range opening {
 		net[k] += v
@@ -177,7 +182,7 @@ func TrialBalance(active []Account, opening map[string]int64, lines []Line) []Ba
 		net[l.Kode] += l.Debit - l.Kredit
 	}
 	var out []Balance
-	for _, acc := range Master { // urutan Master; akun nonaktif tetap muncul bila bersaldo
+	for _, acc := range template {
 		n, ok := net[acc.Kode]
 		if !ok {
 			continue

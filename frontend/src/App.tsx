@@ -243,7 +243,7 @@ export default function App() {
       case 'profil-usaha':
         return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
       case 'master-data':
-        return <DaftarAkun />
+        return <DaftarAkun bisaPerbarui={canSee('profil-usaha') && !me!.lihat} />
       case 'impor-data':
         return <ImporDataAwal onChanged={() => reload(me!, period)} />
       case 'karyawan':
