@@ -57,9 +57,12 @@ type tenant struct {
 	nextProdukID   int
 	supplier       []finance.Supplier
 	nextSupplierID int
-	seedTx         map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
-	profile        *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
-	langganan      langganan                // masa coba & pembayaran Midtrans
+	// koreksi: usulan tim MasterPajak; mengubah txs hanya setelah disetujui pemilik.
+	koreksi       []finance.Koreksi
+	nextKoreksiID int
+	seedTx        map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
+	profile       *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
+	langganan     langganan                // masa coba & pembayaran Midtrans
 }
 
 type Server struct {
@@ -79,13 +82,14 @@ type Server struct {
 	// master: tim MasterPajak (role, penugasan klien, audit log) untuk Panel Master.
 	masterMu sync.Mutex
 	master   master.State
+	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
 }
 
 // newTenant membuat usaha kosong (hasil register).
 func newTenant(id int) *tenant {
 	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{},
 		nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1, nextTagihanID: 1, nextStokID: 1,
-		nextProdukID: 1, nextSupplierID: 1}
+		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -97,7 +101,7 @@ func demoTenant() *tenant {
 	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
 		invoices: finance.SeedInvoices(), tagihan: finance.SeedTagihan(), stok: finance.SeedStok(),
 		produk: finance.SeedProduk(), supplier: finance.SeedSupplier(),
-		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1}
+		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
 	t.nextInvoiceID = len(t.invoices) + 1
 	t.nextTagihanID, t.nextStokID = len(t.tagihan)+1, len(t.stok)+1
@@ -141,6 +145,9 @@ func (t *tenant) restore(st *state) {
 	if st.NextSupplierID > 0 {
 		t.supplier, t.nextSupplierID = st.Supplier, st.NextSupplierID
 	}
+	if st.NextKoreksiID > 0 {
+		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
+	}
 }
 
 func NewServer() *Server {
@@ -150,6 +157,7 @@ func NewServer() *Server {
 		aiEngine: ai.NewEngine(),
 		mux:      http.NewServeMux(),
 		bugHook:  newBugHook(),
+		lihat:    map[int]lihatGrant{},
 	}
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
@@ -367,6 +375,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
 
 	s.masterRoutes()
+	s.mux.HandleFunc("GET /api/v1/koreksi", s.guard("usulan-koreksi", s.on((*tenant).handleListKoreksi)))
+	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/setujui", s.persisting(s.guard("usulan-koreksi", s.handleSetujuiKoreksi)))
+	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/tolak", s.persisting(s.guard("usulan-koreksi", s.handleTolakKoreksi)))
 
 	s.mux.HandleFunc("GET /", s.handleStatic)
 }
@@ -400,22 +411,32 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "sesi berakhir, silakan login", http.StatusUnauthorized)
 			return
 		}
+		s.users.Touch(u.ID, time.Now())
+		ctx := r.Context()
+		// Akun tim tidak punya usaha: selain Panel Master hanya boleh membaca /auth/me, atau data
+		// satu usaha lewat lihat-sebagai (hanya baca). Tanpa ini endpoint "cukup login" (view "")
+		// akan berjalan atas usaha yang tidak ada.
+		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
+			g, ok := s.lihatUntuk(u.ID, time.Now())
+			if !ok {
+				http.Error(w, "akun tim MasterPajak hanya membuka Panel Master", http.StatusForbidden)
+				return
+			}
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				http.Error(w, "mode lihat sebagai klien hanya baca", http.StatusForbidden)
+				return
+			}
+			u, ctx = sebagaiKlien(u, g), context.WithValue(ctx, lihatKey{}, true)
+		}
 		if view != "" && !u.Role.Can(view) {
 			http.Error(w, "akses ditolak untuk role ini", http.StatusForbidden)
 			return
 		}
-		// Akun tim tidak punya usaha: selain Panel Master hanya boleh membaca /auth/me.
-		// Tanpa ini endpoint "cukup login" (view "") akan berjalan atas usaha yang tidak ada.
-		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
-			http.Error(w, "akun tim MasterPajak hanya membuka Panel Master", http.StatusForbidden)
-			return
-		}
-		s.users.Touch(u.ID, time.Now())
 		if s.lockedWrite(r, u.TenantID) {
 			http.Error(w, "Langganan belum aktif. Pilih paket di menu Langganan untuk mulai memakai aplikasi.", http.StatusPaymentRequired)
 			return
 		}
-		h(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
+		h(w, r.WithContext(context.WithValue(ctx, ctxKey{}, u)))
 	}
 }
 
@@ -440,12 +461,19 @@ type meResp struct {
 	Langganan langgananStatus `json:"langganan"`
 	Garansi   garansiStatus   `json:"garansi"`
 	Master    *masterInfo     `json:"master,omitempty"` // hanya akun tim MasterPajak
+	Lihat     *lihatInfo      `json:"lihat,omitempty"`  // akun tim yang sedang lihat-sebagai
+	// KoreksiMenunggu: usulan koreksi yang menunggu keputusan pemilik usaha.
+	KoreksiMenunggu int `json:"koreksi_menunggu,omitempty"`
 }
 
 func (s *Server) newMe(u auth.User) meResp {
 	me := meResp{User: u, RoleLabel: auth.Roles[u.Role].Label, Views: auth.Roles[u.Role].Views}
 	if u.Role == auth.MP {
 		me.Master = s.masterInfoFor(u)
+		if me.Lihat = s.lihatInfoFor(u); me.Lihat != nil {
+			// Menu klien versi baca; layar bayar tidak relevan untuk tim.
+			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif"}
+		}
 		return me
 	}
 	s.tenantsMu.RLock()
@@ -456,6 +484,9 @@ func (s *Server) newMe(u auth.User) meResp {
 		t.mu.RLock()
 		me.Garansi = statusGaransi(t.langganan, time.Now())
 		t.mu.RUnlock()
+		if u.Role.Can("usulan-koreksi") {
+			me.KoreksiMenunggu = t.koreksiMenunggu()
+		}
 	}
 	return me
 }
@@ -594,6 +625,7 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	// Role tim MasterPajak bukan pilihan untuk user usaha (auth menolaknya juga).
 	roles := maps.Clone(auth.Roles)
 	delete(roles, auth.MP)
+	delete(roles, auth.Lihat)
 	writeJSON(w, usersResp{Users: s.users.List(currentUser(r).TenantID), Roles: roles})
 }
 
@@ -816,7 +848,7 @@ func (s *tenant) handleListTransactions(w http.ResponseWriter, r *http.Request) 
 	s.mu.RLock()
 	txs := slices.Clone(s.txs)
 	s.mu.RUnlock()
-	writeJSON(w, txListResp{Transactions: txs, Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola")})
+	writeJSON(w, txListResp{Transactions: txs, Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola") && !sedangLihat(r)})
 }
 
 // decodeTx membaca dan memvalidasi body; menulis 400 dan mengembalikan false bila gagal.

@@ -378,10 +378,11 @@ func (s *Server) klienDari(w http.ResponseWriter, r *http.Request) *tenant {
 }
 
 type klienDetail struct {
-	Klien  klienRow    `json:"klien"`
-	Users  []auth.User `json:"users"`
-	Orders []order     `json:"orders"`
-	Tiket  []tiketRow  `json:"tiket"`
+	Klien   klienRow     `json:"klien"`
+	Users   []auth.User  `json:"users"`
+	Orders  []order      `json:"orders"`
+	Tiket   []tiketRow   `json:"tiket"`
+	Koreksi []koreksiRow `json:"koreksi"`
 }
 
 func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request) {
@@ -406,6 +407,7 @@ func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request)
 			d.Tiket = append(d.Tiket, x)
 		}
 	}
+	d.Koreksi = koreksiRows(t)
 	if err := s.catat(r, "Buka detail klien", t.id, ""); err != nil {
 		writeMasterErr(w, err)
 		return
@@ -821,4 +823,8 @@ func (s *Server) masterRoutes() {
 	m.HandleFunc("PUT /api/v1/master/roles/{id}", s.guardMP(s.handleMasterSimpanRole, master.Tim))
 	m.HandleFunc("DELETE /api/v1/master/roles/{id}", s.guardMP(s.handleMasterHapusRole, master.Tim))
 	m.HandleFunc("GET /api/v1/master/audit", s.guardMP(s.handleMasterAudit, master.Audit))
+	m.HandleFunc("POST /api/v1/master/klien/{id}/lihat", s.guardMP(s.handleMulaiLihat, master.LihatSebagai))
+	m.HandleFunc("DELETE /api/v1/master/lihat", s.guardMP(s.handleSelesaiLihat))
+	m.HandleFunc("POST /api/v1/master/klien/{id}/koreksi", s.guardMP(s.handleUsulKoreksi, master.UsulKoreksi))
+	m.HandleFunc("GET /api/v1/master/koreksi", s.guardMP(s.handleMasterKoreksi, master.UsulKoreksi, master.KlienSemua))
 }

@@ -582,6 +582,26 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
+## Panel Master — tahap 2: lihat sebagai klien & usulan koreksi (20 Okt 2026)
+
+- **Lihat sebagai klien** (izin `lihat_sebagai`): `POST /master/klien/{id}/lihat {alasan}` membuka
+  akses baca 2 jam (memori saja; restart = selesai). Selama aktif, `guard` menjalankan permintaan
+  akun tim ke endpoint data usaha sebagai user sementara ber-role `auth.Lihat` (menu Admin tanpa
+  izin ubah) atas usaha itu. Semua metode selain GET/HEAD → 403; `exporting` menolak (ekspor
+  menggugurkan garansi 7 hari klien). Penugasan & izin dicek ulang tiap request, jadi mencabutnya
+  di Tim & Akses langsung menghentikan akses. Role `lihat` tidak bisa diberikan ke user mana pun.
+- **Usulan koreksi** (izin `usul_koreksi`): `finance.Koreksi` menyimpan potret `Sebelum` + `Usulan`.
+  `TerapkanKoreksi` menolak (`ErrKoreksiBasi`) bila transaksinya sudah berubah/hilang sejak
+  diusulkan → status `kedaluwarsa`, perubahan pemilik tidak tertimpa. `HitungDampak` = laba bersih
+  per bulan sebelum/sesudah (tanpa penyusutan register aset).
+- **Keputusan** hanya Owner (view `usulan-koreksi`): `POST /koreksi/{id}/setujui|tolak {catatan}`.
+  Keputusan klien ikut tercatat di audit log Panel Master (peran "Owner klien").
+- Frontend: dialog Ubah di Transaksi dipakai ulang sebagai form usulan saat lihat-sebagai (alasan
+  wajib, "Usulkan hapus"); `KoreksiCard` dipakai klien & Panel Master; banner jumlah usulan
+  menunggu untuk Owner (`me.koreksi_menunggu`).
+- Postgres: tabel `koreksi` (sebelum/usulan JSONB) + `tenants.next_koreksi_id`; ikut diuji di
+  `TestPostgresSimpanMuatSemuaField` (terbukti gagal bila pemetaan dibuang).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
@@ -595,9 +615,8 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
    Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
    berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
    mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
-   Panel Master tahap 2–4 (lihat preview): lihat-sebagai-klien + usulan koreksi yang berlaku
-   setelah klien setuju → template COA & benchmark ke database → artikel pajak, basis
-   pengetahuan AI, analisa AI per klien.
+   Panel Master tahap 3–4 (lihat preview): template COA & benchmark ke database → artikel pajak,
+   basis pengetahuan AI, analisa AI per klien.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 

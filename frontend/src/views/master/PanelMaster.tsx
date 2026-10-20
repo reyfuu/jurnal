@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, LayoutGrid, LogOut, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { CreditCard, FileCheck2, LayoutGrid, LogOut, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -7,16 +7,18 @@ import { KlienDetailView, KlienList, Ringkasan } from './Klien'
 import { TiketBoard } from './Tiket'
 import { TimAkses } from './Tim'
 import { AuditLog, Pembayaran } from './Lainnya'
+import { KoreksiMaster } from './Koreksi'
 
-export type Page = 'ringkasan' | 'klien' | 'tiket' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
-const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin }[] }[] = [
+const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
   {
     group: 'Klien',
     items: [
       { page: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
       { page: 'klien', label: 'Klien', icon: Users },
+      { page: 'koreksi', label: 'Usulan Koreksi', icon: FileCheck2, izin: ['usul_koreksi', 'klien_semua'] },
       { page: 'tiket', label: 'Tiket · Lapor Bug', icon: Ticket, izin: 'tiket' },
     ],
   },
@@ -31,9 +33,9 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
 ]
 
 /** Seluruh aplikasi untuk akun tim MasterPajak: hanya metadata klien, tanpa angka keuangan. */
-export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) {
+export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () => void; onLihat: () => void }) {
   const izin = me.master?.izin ?? []
-  const bisa = (i?: Izin) => (i ? izin.includes(i) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
+  const bisa = (i?: Izin | Izin[]) => (i ? [i].flat().some((x) => izin.includes(x)) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
   const [page, setPage] = useState<Page>('ringkasan')
   const [klienId, setKlienId] = useState<number | null>(null)
   const go = (p: Page) => { setPage(p); setKlienId(null) }
@@ -100,7 +102,8 @@ export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) 
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
             ? <KlienList onBuka={buka} />
-            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} onKembali={() => setKlienId(null)} />)}
+            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
+          {page === 'koreksi' && <KoreksiMaster />}
           {page === 'tiket' && <TiketBoard />}
           {page === 'pembayaran' && <Pembayaran />}
           {page === 'tim' && <TimAkses selfId={me.user.id} />}

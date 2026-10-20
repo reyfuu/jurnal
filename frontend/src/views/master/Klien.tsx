@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { KoreksiCard } from '@/components/KoreksiCard'
 import {
-  aturLangganan, getKlien, getPlans, getRingkasanMaster, listKlien,
+  aturLangganan, getKlien, mulaiLihat, getPlans, getRingkasanMaster, listKlien,
   type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
 } from '@/lib/api'
 import { formatRelatif, formatRp, formatTanggal } from '@/lib/format'
@@ -157,10 +158,13 @@ export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
 
 const ORDER_PILL: Record<string, string> = { lunas: 'pill-green', manual: 'pill-amber', pending: 'pill-status-muted', gagal: 'pill-red' }
 
-export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; bisaLangganan: boolean; onKembali: () => void }) {
+export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKembali }: {
+  id: number; bisaLangganan: boolean; bisaLihat: boolean; onLihat: () => void; onKembali: () => void
+}) {
   const [d, setD] = useState<KlienDetail | null>(null)
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState(false)
+  const [lihat, setLihat] = useState(false)
   const muat = () => getKlien(id).then(setD, (e: Error) => setError(e.message))
   useEffect(() => { void muat() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   const k = d?.klien
@@ -170,7 +174,10 @@ export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; 
         <Button variant="ghost" size="sm" onClick={onKembali}><ArrowLeft /> Klien</Button>
       </div>
       <PageHeader title={k?.nama ?? 'Memuat…'} subtitle={k ? [k.owner_nama, k.owner_email, k.owner_wa && `WA ${k.owner_wa}`, k.kota].filter(Boolean).join(' · ') : ''}>
-        {k && bisaLangganan && !k.demo && <button className="btn-cta" onClick={() => setDialog(true)}>Atur langganan</button>}
+        <div className="flex flex-wrap gap-2">
+          {k && bisaLihat && <button className="btn-cta" onClick={() => setLihat(true)}>Lihat sebagai klien</button>}
+          {k && bisaLangganan && !k.demo && <Button variant="outline" className="h-10 rounded-full" onClick={() => setDialog(true)}>Atur langganan</Button>}
+        </div>
       </PageHeader>
       <Gagal error={error} />
       {d && k && (
@@ -233,6 +240,13 @@ export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; 
               </div>
             )}
           </div>
+          {d.koreksi.length > 0 && (
+            <>
+              <div className="chart-title">Usulan koreksi</div>
+              {d.koreksi.map((x) => <KoreksiCard key={x.id} k={x} sub={`${x.oleh} · ${formatRelatif(x.waktu)}`} />)}
+            </>
+          )}
+          <LihatDialog open={lihat} onClose={() => setLihat(false)} klien={k} tiket={d.tiket.filter((t) => t.status !== 'selesai').map((t) => `${t.nomor}: ${t.judul}`)} onMulai={onLihat} />
           <LanggananDialog open={dialog} onClose={() => setDialog(false)} klien={k} onSaved={() => { setDialog(false); void muat() }} />
         </>
       )}
@@ -306,6 +320,54 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
             <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function LihatDialog({ open, onClose, klien, tiket, onMulai }: { open: boolean; onClose: () => void; klien: KlienRow; tiket: string[]; onMulai: () => void }) {
+  const [alasan, setAlasan] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function mulai(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await mulaiLihat(klien.id, alasan)
+      onMulai()
+    } catch (err) {
+      setError((err as Error).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <form onSubmit={mulai} className="grid gap-4">
+          <DialogHeader>
+            <DialogTitle>Lihat sebagai {klien.nama}</DialogTitle>
+            <DialogDescription>
+              Anda akan melihat laporan klien apa adanya, <strong>tanpa bisa mengubah</strong>, selama 2 jam. Akses ini tercatat di audit log.
+            </DialogDescription>
+          </DialogHeader>
+          {tiket.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tiket.map((t) => (
+                <button key={t} type="button" className="pill-status pill-status-muted" onClick={() => setAlasan(`Tiket ${t}`)}>{t}</button>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="lh-alasan">Alasan</Label>
+            <Input id="lh-alasan" required maxLength={300} placeholder="mis. Pendampingan pembukuan bulanan" value={alasan} onChange={(e) => setAlasan(e.target.value)} />
+          </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Membuka…' : 'Mulai lihat'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

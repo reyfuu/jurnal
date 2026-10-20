@@ -133,9 +133,10 @@ type tenantData struct {
 	Stok                                                 []finance.StokItem
 	Produk                                               []finance.Produk
 	Supplier                                             []finance.Supplier
+	Koreksi                                              []finance.Koreksi
 	NextTxID, NextAssetID, NextKaryawanID, NextInvoiceID int
 	NextTagihanID, NextStokID                            int
-	NextProdukID, NextSupplierID                         int
+	NextProdukID, NextSupplierID, NextKoreksiID          int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -143,9 +144,9 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	t.Helper()
 	tn.mu.RLock()
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
-		tn.tagihan, tn.stok, tn.produk, tn.supplier,
+		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -185,6 +186,10 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.produk[0].ID = 1
 	tn.supplier = []finance.Supplier{filled[finance.Supplier](14)}
 	tn.supplier[0].ID = 1
+	// Usulan koreksi: potret & usulan transaksi disimpan sebagai JSONB.
+	tn.koreksi = []finance.Koreksi{filled[finance.Koreksi](15)}
+	tn.koreksi[0].ID = 1
+	tn.nextKoreksiID = 2
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
 	tn.mu.Unlock()
