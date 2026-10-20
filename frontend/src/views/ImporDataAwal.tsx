@@ -5,6 +5,7 @@ import {
   type OnboardingResult, type OpeningBalance, type OpeningInfo,
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const BLUE = 'var(--accent-blue)'
@@ -293,8 +294,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
                 <label key={f.key}>
                   <span className="kpi-label">{f.label}</span>
                   <input
-                    className="input-field tabular" type="number" min={0} value={(form[f.key] as number) || ''}
-                    onChange={(e) => setForm({ ...form, [f.key]: Number(e.target.value) })}
+                    className="input-field tabular" {...angka(form[f.key] as number, (n) => setForm({ ...form, [f.key]: n }))}
                   />
                   <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{f.hint}</span>
                 </label>

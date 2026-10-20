@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getTaxPlanning, type BusinessProfile, type TaxPlanning } from '@/lib/api'
 import { formatJt, formatPct, formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
@@ -62,7 +63,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
         <div className="form-grid">
           <div>
             <Label htmlFor="tp-omzet" className="kpi-label">Omzet per Tahun (Rp)</Label>
-            <Input id="tp-omzet" type="number" min={0} className={fieldClass + ' mt-1.5'} value={omzet} onChange={(e) => setOmzet(e.target.value)} />
+            <Input id="tp-omzet" className={fieldClass + ' mt-1.5'} {...angka(omzet, (n) => setOmzet(String(n)))} />
           </div>
           <div>
             <Label htmlFor="tp-margin" className="kpi-label">Margin Laba Bersih (%)</Label>

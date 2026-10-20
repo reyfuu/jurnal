@@ -56,7 +56,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     alasan: 'Omzet adalah total penjualan sebelum dikurangi biaya. Angka ini menentukan batas bebas pajak (Rp500 juta untuk usaha pribadi) dan batas PPh Final UMKM (Rp4,8 miliar). Perkiraan kasar sudah cukup.',
   },
   laba: {
-    judul: 'Kira-kira berapa laba bersih usaha per tahun, sebelum dipotong pajak?',
+    judul: 'Kira-kira berapa laba bersih usaha per tahun?',
     alasan: 'Omzet dikurangi semua biaya usaha. Kami bandingkan dengan rasio benchmark DJP untuk usaha sejenis. Isi 0 bila impas, atau beri tanda minus bila rugi.',
   },
   bentuk: {
@@ -170,7 +170,7 @@ export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
         : 'Laporan laba rugi dan neraca dasar siap dipakai. Daftar akun khusus untuk jenis usaha ini sedang kami siapkan.',
     },
     ...(p.omzet_tahunan
-      ? [{ judul: 'Omzet & laba per tahun', isi: `Omzet ${formatRp(p.omzet_tahunan)}, laba sebelum pajak ${formatRp(p.laba_sebelum_pajak ?? 0)}.` }]
+      ? [{ judul: 'Omzet & laba per tahun', isi: `Omzet ${formatRp(p.omzet_tahunan)}, laba bersih ${formatRp(p.laba_sebelum_pajak ?? 0)}.` }]
       : []),
     ...(p.metode_persediaan
       ? [{

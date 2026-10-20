@@ -5,6 +5,7 @@ import {
   type HasilPKP, type KalkulatorMaster, type Langkah, type PotongResult, type PPh21Response, type PPhBadanResult,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const AMBER = 'var(--text-warn)'
 const RED = 'var(--text-danger)'
@@ -353,7 +354,7 @@ function Uang({ label, v, set, hint }: { label: string; v: number; set: (n: numb
   return (
     <label style={{ display: 'block', marginBottom: 12 }}>
       <span className="kpi-label" style={{ display: 'block', marginBottom: 4 }}>{label}</span>
-      <input className="input-field tabular" type="number" min={0} value={v || ''} onChange={(e) => set(Number(e.target.value))} />
+      <input className="input-field tabular" {...angka(v, set)} />
       <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
         {formatRp(v)}{hint ? ` · ${hint}` : ''}
       </span>

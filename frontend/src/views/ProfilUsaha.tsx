@@ -210,7 +210,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <Input id="biz-omzet" className="tabular" inputMode="numeric" value={p.omzet_tahunan ? formatRp(p.omzet_tahunan) : ''} onChange={(e) => set({ omzet_tahunan: parseRp(e.target.value) || 0 })} placeholder="Rp0" />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="biz-laba">Laba sebelum pajak per tahun</Label>
+          <Label htmlFor="biz-laba">Laba bersih per tahun</Label>
           <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
         </div>
         <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark DJP dan Perencanaan Pajak selama belum ada data transaksi.</p>
@@ -244,7 +244,7 @@ const tampilRp = (s = '') => {
   return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : formatRp(n)
 }
 
-const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba sebelum pajak per tahun' } as const
+const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba bersih per tahun' } as const
 
 // Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
 function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessProfile) => void; provinsi: string[]; klu: KLUOption[] }) {
@@ -343,8 +343,12 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
       )}
       {error && <p className="onboarding-error" role="alert">{error}</p>}
       <div className="onboarding-actions">
-        {i > 0 && <Button type="button" variant="ghost" className="min-h-11 px-3" disabled={busy} onClick={() => move(isSummary ? 0 : i - 1)}><ArrowLeft aria-hidden="true" />{isSummary ? 'Ubah jawaban' : 'Kembali'}</Button>}
-        <Button type="submit" className="onboarding-primary min-h-11 px-5 font-bold" disabled={busy || !answered(step, a)}>
+        {i > 0 && (
+          <Button type="button" variant="outline" className="min-h-11 rounded-full px-5 font-semibold" disabled={busy} onClick={() => move(isSummary ? 0 : i - 1)}>
+            <ArrowLeft aria-hidden="true" />{isSummary ? 'Ubah jawaban' : 'Kembali'}
+          </Button>
+        )}
+        <Button type="submit" className="onboarding-primary min-h-11 rounded-full px-6 font-bold" disabled={busy || !answered(step, a)}>
           {busy ? 'Menyimpan…' : isSummary ? 'Simpan & mulai' : 'Lanjut'}
           {!busy && <ArrowRight aria-hidden="true" />}
         </Button>

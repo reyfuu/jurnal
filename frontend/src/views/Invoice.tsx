@@ -6,6 +6,7 @@ import {
 } from '@/lib/api'
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
+import { angka } from '@/lib/angka'
 
 const AMBER = 'var(--text-warn)'
 const RED = 'var(--text-danger)'
@@ -188,10 +189,9 @@ export function InvoiceView() {
                 {form.items.map((it, i) => (
                   <tr key={i}>
                     <td><input className="input-field" required value={it.deskripsi} onChange={(e) => ubahBaris(i, { deskripsi: e.target.value })} /></td>
-                    <td><input className="input-field" type="number" min={1} value={it.qty} onChange={(e) => ubahBaris(i, { qty: Number(e.target.value) })} /></td>
+                    <td><input className="input-field tabular" {...angka(it.qty, (n) => ubahBaris(i, { qty: n }))} /></td>
                     <td><input className="input-field" value={it.satuan ?? ''} placeholder="pcs" onChange={(e) => ubahBaris(i, { satuan: e.target.value })} /></td>
-                    <td><input className="input-field" type="number" min={0} style={{ textAlign: 'right' }} value={it.harga_satuan}
-                      onChange={(e) => ubahBaris(i, { harga_satuan: Number(e.target.value) })} /></td>
+                    <td><input className="input-field tabular" style={{ textAlign: 'right' }} {...angka(it.harga_satuan, (n) => ubahBaris(i, { harga_satuan: n }))} /></td>
                     <td style={{ textAlign: 'right' }}>{formatRp(it.qty * it.harga_satuan)}</td>
                     <td>
                       {form.items.length > 1 && (
@@ -213,8 +213,7 @@ export function InvoiceView() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
             <div>
               <Field label="Diskon (Rp)">
-                <input className="input-field" type="number" min={0} value={form.diskon_rp}
-                  onChange={(e) => setForm({ ...form, diskon_rp: Number(e.target.value) })} />
+                <input className="input-field tabular" {...angka(form.diskon_rp, (n) => setForm({ ...form, diskon_rp: n }))} />
               </Field>
               <Field label="PPN (basis poin)" hint={form.ppn_bps ? `${form.ppn_bps / 100}% — dari tarif di Profil Usaha` : 'Non-PKP: tidak memungut PPN'}>
                 <input className="input-field" type="number" min={0} max={10000} value={form.ppn_bps}

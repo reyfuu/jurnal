@@ -15,8 +15,9 @@ var PTKP = map[string]int64{
 	"K/I/0": 112_500_000, "K/I/1": 117_000_000, "K/I/2": 121_500_000, "K/I/3": 126_000_000,
 }
 
-// PTKPCodes: urutan tampilan dropdown.
-var PTKPCodes = []string{"TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3", "K/I/0", "K/I/1", "K/I/2", "K/I/3"}
+// PTKPCodes: urutan tampilan dropdown. K/I/* (penghasilan istri digabung) tidak ditawarkan lagi,
+// tetapi tetap ada di PTKP supaya profil/karyawan lama yang memakainya masih terhitung.
+var PTKPCodes = []string{"TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3"}
 
 const (
 	batasBebasOP   = 500_000_000    // omzet bebas PPh final WP OP per tahun
