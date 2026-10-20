@@ -1182,3 +1182,7 @@ export const hitungPotong = (b: { jenis: string; objek: string; nilai_bruto: num
   api<PotongResult>('/kalkulator/potong', { method: 'POST', body: b })
 export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pajak: number }) =>
   api<PPhBadanResult>('/kalkulator/pph-badan', { method: 'POST', body: b })
+
+/** Posisi omzet setahun terhadap batas wajib PKP Rp4,8 M. */
+export interface HasilPKP { omzet: number; batas: number; wajib_pkp: boolean; sisa: number; pemakaian_bps: number; catatan: string[] }
+export const cekPKP = (omzet: number) => api<HasilPKP>('/kalkulator/pkp', { method: 'POST', body: { omzet } })

@@ -19,6 +19,7 @@ import { ProduksiSupplier } from '@/views/ProduksiSupplier'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
+import { AlatGratis } from '@/views/AlatGratis'
 import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { KaryawanView } from '@/views/Karyawan'
@@ -36,6 +37,7 @@ export default function App() {
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   const [error, setError] = useState('')
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
+  const [layarBayar, setLayarBayar] = useState<'langganan' | 'alat'>('langganan') // usaha belum berlangganan
 
   const me = session.status === 'in' ? session.me : null
 
@@ -112,7 +114,15 @@ export default function App() {
   if (me.langganan.status === 'habis') {
     return (
       <OnboardingShell onLogout={onLogout}>
-        {canSee('langganan') ? (
+        {canSee('kalkulator-pajak') && (
+          <div className="tabbar" role="tablist" aria-label="Langganan atau alat gratis" style={{ marginBottom: 20 }}>
+            <button role="tab" className="tab-btn" aria-selected={layarBayar === 'langganan'} onClick={() => setLayarBayar('langganan')}>Langganan</button>
+            <button role="tab" className="tab-btn" aria-selected={layarBayar === 'alat'} onClick={() => setLayarBayar('alat')}>Alat Gratis</button>
+          </div>
+        )}
+        {layarBayar === 'alat' && canSee('kalkulator-pajak') ? (
+          <AlatGratis profile={business.profile} ptkpCodes={business.options.ptkp} onLangganan={() => setLayarBayar('langganan')} />
+        ) : canSee('langganan') ? (
           <Langganan onPaid={onPaid} />
         ) : (
           <p className="text-sm">Langganan usaha belum aktif. Hubungi Owner Anda untuk memilih paket, lalu muat ulang halaman ini.</p>

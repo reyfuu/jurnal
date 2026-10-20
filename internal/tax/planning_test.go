@@ -83,7 +83,67 @@ func TestCompareEntitas(t *testing.T) {
 	if cv := byID["cv"]; cv.Dividen != 0 {
 		t.Fatalf("CV has no dividend tax, got %+v", cv)
 	}
-	if len(r) != 5 {
-		t.Fatalf("want 5 entities, got %d", len(r))
+	if cv := byID["cv_pp"]; cv.PPh != 2_000_000 || cv.Dividen != 0 {
+		t.Fatalf("CV dengan PPh Final 0,5%% atas seluruh omzet, tanpa dividen: %+v", cv)
+	}
+	if len(r) != 6 {
+		t.Fatalf("want 6 entities, got %d", len(r))
+	}
+}
+
+// PP 55/2022 hanya untuk omzet s.d. Rp4,8 M: di atasnya skema PPh Final tidak boleh ditawarkan.
+func TestPerbandinganTanpaPPFinalDiAtas4_8M(t *testing.T) {
+	r, _ := CompareBentukUsaha(4_800_000_001, 1000, "TK/0")
+	for _, s := range r.Skema {
+		if s.ID == SkemaPPOP || s.ID == SkemaPPBadan {
+			t.Fatalf("skema %s tidak boleh muncul di atas Rp4,8 M", s.ID)
+		}
+	}
+	if r.Termurah == SkemaPPOP || r.Termurah == SkemaPPBadan {
+		t.Fatalf("termurah tidak boleh PPh Final: %s", r.Termurah)
+	}
+	if r, _ := CompareBentukUsaha(batasFasilitas, 1000, "TK/0"); len(r.Skema) != 6 {
+		t.Fatalf("tepat Rp4,8 M masih boleh PPh Final: %d skema", len(r.Skema))
+	}
+	for _, e := range CompareEntitas(4_800_000_001, 9000) {
+		if e.ID == "op" || e.ID == "pt_perorangan" || e.ID == "cv_pp" {
+			t.Fatalf("entitas %s (PPh Final) tidak boleh muncul di atas Rp4,8 M", e.ID)
+		}
+	}
+}
+
+// Rugi: pajak tarif umum 0, bukan negatif.
+func TestPerbandinganRugiTidakNegatif(t *testing.T) {
+	r, _ := CompareBentukUsaha(1_000_000_000, -500, "TK/0")
+	for _, s := range r.Skema {
+		if s.Pajak < 0 {
+			t.Fatalf("skema %s negatif: %d", s.ID, s.Pajak)
+		}
+	}
+	for _, e := range CompareEntitas(1_000_000_000, 10_500) {
+		if e.PPh < 0 || e.Total < 0 {
+			t.Fatalf("entitas %s negatif: %+v", e.ID, e)
+		}
+	}
+}
+
+func TestCekPKP(t *testing.T) {
+	for _, c := range []struct {
+		omzet     int64
+		wajib     bool
+		sisa, bps int64
+	}{
+		{0, false, 4_800_000_000, 0},
+		{1_200_000_000, false, 3_600_000_000, 2500},
+		{4_800_000_000, false, 0, 10_000}, // tepat 4,8 M masih pengusaha kecil
+		{4_800_000_001, true, 0, 10_000},
+	} {
+		r := CekPKP(c.omzet)
+		if r.WajibPKP != c.wajib || r.Sisa != c.sisa || r.PemakaianBps != c.bps || r.Batas != batasFasilitas {
+			t.Errorf("CekPKP(%d) = %+v; want wajib=%v sisa=%d bps=%d", c.omzet, r, c.wajib, c.sisa, c.bps)
+		}
+		if len(r.Catatan) == 0 {
+			t.Errorf("CekPKP(%d): catatan kosong", c.omzet)
+		}
 	}
 }

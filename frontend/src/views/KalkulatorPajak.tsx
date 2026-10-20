@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
-  getKalkulator, hitungPPh21, hitungPPhBadan, hitungPotong,
-  type KalkulatorMaster, type Langkah, type PotongResult, type PPh21Response, type PPhBadanResult,
+  cekPKP, getKalkulator, hitungPPh21, hitungPPhBadan, hitungPotong,
+  type HasilPKP, type KalkulatorMaster, type Langkah, type PotongResult, type PPh21Response, type PPhBadanResult,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
@@ -28,6 +28,7 @@ export function KalkulatorPajak() {
     { id: 'pph21', label: 'PPh 21' },
     ...m.jenis.map((j) => ({ id: j.id, label: j.nama.replace('PPh Pasal', 'PPh') })),
     { id: 'pph-badan', label: 'PPh Badan' },
+    { id: 'pkp', label: 'Cek PKP' },
   ]
 
   return (
@@ -55,6 +56,7 @@ export function KalkulatorPajak() {
 
       {tab === 'pph21' && <FormPPh21 m={m} />}
       {tab === 'pph-badan' && <FormPPhBadan m={m} />}
+      {tab === 'pkp' && <FormCekPKP />}
       {m.jenis.filter((j) => j.id === tab).map((j) => <FormPotong key={j.id} jenis={j} />)}
     </>
   )
@@ -149,7 +151,7 @@ function FormPPh21({ m }: { m: KalkulatorMaster }) {
 
 // ===== PPh potong-pungut (23, 4(2), 22, 15, PPN, PPnBM) =====
 
-function FormPotong({ jenis }: { jenis: KalkulatorMaster['jenis'][number] }) {
+export function FormPotong({ jenis }: { jenis: KalkulatorMaster['jenis'][number] }) {
   const [objek, setObjek] = useState(jenis.objek[0].kode)
   const [bruto, setBruto] = useState(10_000_000)
   const [npwp, setNpwp] = useState(true)
@@ -228,7 +230,7 @@ function FormPotong({ jenis }: { jenis: KalkulatorMaster['jenis'][number] }) {
 
 // ===== PPh Badan =====
 
-function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
+export function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
   const [omzet, setOmzet] = useState(4_000_000_000)
   const [pkp, setPkp] = useState(500_000_000)
   const [r, setR] = useState<PPhBadanResult | null>(null)
@@ -272,6 +274,62 @@ function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
             langkah={r.langkah}
           />
           <p className="kpi-meta-row" style={{ marginTop: 10 }}>{r.catatan}</p>
+        </>
+      )}
+    />
+  )
+}
+
+// ===== Cek ambang PKP =====
+
+export function FormCekPKP() {
+  const [omzet, setOmzet] = useState(3_000_000_000)
+  const [r, setR] = useState<HasilPKP | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function hitung(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      setR(await cekPKP(omzet))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dua
+      kiri={
+        <form onSubmit={hitung}>
+          <div className="chart-title">Cek Ambang PKP</div>
+          <div className="chart-subtitle">Batas pengusaha kecil PPN: omzet Rp4,8 miliar setahun</div>
+          <Uang label="Omzet setahun (atau kumulatif tahun berjalan)" v={omzet} set={setOmzet} hint="Seluruh peredaran bruto" />
+          <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy}>
+            {busy ? 'Menghitung…' : 'Cek'}
+          </button>
+          {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 12 }}>{error}</p>}
+        </form>
+      }
+      kanan={r && (
+        <>
+          <div className="chart-title">Hasil</div>
+          <p className={'pill-status ' + (r.wajib_pkp ? 'pill-red' : 'pill-green')} style={{ marginTop: 12 }}>
+            {r.wajib_pkp ? 'Wajib dikukuhkan sebagai PKP' : 'Belum wajib PKP'}
+          </p>
+          <div className="progress-track" aria-hidden="true">
+            <div className="progress-bar" style={{ width: r.pemakaian_bps / 100 + '%', background: r.wajib_pkp ? RED : undefined }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '10px 0', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-muted)' }}>{persen(r.pemakaian_bps)} dari batas {formatRp(r.batas)}</span>
+            <span className="tabular" style={{ fontWeight: 700 }}>{r.wajib_pkp ? `Lewat ${formatRp(r.omzet - r.batas)}` : `Sisa ${formatRp(r.sisa)}`}</span>
+          </div>
+          <ul style={{ display: 'grid', gap: 8, paddingLeft: 18, listStyle: 'disc', fontSize: 13, lineHeight: 1.6 }}>
+            {r.catatan.map((c) => <li key={c}>{c}</li>)}
+          </ul>
         </>
       )}
     />

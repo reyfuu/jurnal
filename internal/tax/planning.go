@@ -104,9 +104,12 @@ func CompareBentukUsaha(omzet int64, netMarginBps int64, ptkpCode string) (Bentu
 		{SkemaPPBadan, "PPh Final 0,5% Badan", "Seluruh omzet x 0,5%", omzet * 5 / 1000, 0},
 		{SkemaPasal17OP, "PPh Pasal 17 Orang Pribadi (pembukuan)", "Tarif progresif atas laba - PTKP", Pasal17(laba - ptkp), 0},
 		{SkemaPasal31E, "PPh Badan Pasal 31E", "22% dengan fasilitas 50% untuk omzet s.d. Rp4,8 M", Pasal31E(omzet, laba), 0},
-		{SkemaBadan22, "PPh Badan Tarif Umum 22%", "Laba x 22%", laba * 22 / 100, 0},
+		{SkemaBadan22, "PPh Badan Tarif Umum 22%", "Laba x 22%", max(0, laba*22/100), 0},
 		{SkemaNPPN, "Norma (NPPN) Orang Pribadi", "Tarif progresif atas 50% omzet - PTKP", Pasal17(omzet/2 - ptkp), 0},
 	}}
+	if omzet > batasFasilitas { // PP 55/2022 hanya untuk omzet s.d. Rp4,8 M
+		r.Skema = slices.DeleteFunc(r.Skema, func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
+	}
 	best := slices.MinFunc(r.Skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
 	r.Termurah = best.ID
 	for i := range r.Skema {
@@ -134,15 +137,20 @@ func CompareEntitas(omzet, costBps int64) []Entitas {
 		id, nama string
 		pph      int64
 		dividen  bool
+		ppFinal  bool
 	}{
-		{"op", "Orang Pribadi (PPh Final 0,5%)", ppFinalOP(omzet), false},
-		{"pt_perorangan", "PT Perorangan (PPh Final 0,5%)", omzet * 5 / 1000, true},
-		{"cv", "CV (Pasal 31E)", Pasal31E(omzet, laba), false},
-		{"pt", "PT (Pasal 31E)", Pasal31E(omzet, laba), true},
-		{"badan_umum", "Badan Tarif Umum 22%", laba * 22 / 100, true},
+		{"op", "Orang Pribadi (PPh Final 0,5%)", ppFinalOP(omzet), false, true},
+		{"pt_perorangan", "PT Perorangan (PPh Final 0,5%)", omzet * 5 / 1000, true, true},
+		{"cv_pp", "CV (PPh Final 0,5%)", omzet * 5 / 1000, false, true},
+		{"cv", "CV (Pasal 31E)", Pasal31E(omzet, laba), false, false},
+		{"pt", "PT (Pasal 31E)", Pasal31E(omzet, laba), true, false},
+		{"badan_umum", "Badan Tarif Umum 22%", max(0, laba*22/100), true, false},
 	}
 	out := make([]Entitas, 0, len(rows))
 	for _, r := range rows {
+		if r.ppFinal && omzet > batasFasilitas { // PP 55/2022 hanya untuk omzet s.d. Rp4,8 M
+			continue
+		}
 		e := Entitas{ID: r.id, Nama: r.nama, PPh: r.pph}
 		if r.dividen {
 			e.Dividen = max(0, laba-r.pph) / 10
@@ -154,4 +162,35 @@ func CompareEntitas(omzet, costBps int64) []Entitas {
 		out = append(out, e)
 	}
 	return out
+}
+
+// HasilPKP: posisi omzet setahun terhadap batas pengusaha kecil PPN (Rp4,8 M).
+type HasilPKP struct {
+	Omzet        int64    `json:"omzet"`
+	Batas        int64    `json:"batas"`
+	WajibPKP     bool     `json:"wajib_pkp"`
+	Sisa         int64    `json:"sisa"`          // ruang omzet sebelum wajib PKP
+	PemakaianBps int64    `json:"pemakaian_bps"` // omzet / batas, maks 100%
+	Catatan      []string `json:"catatan"`
+}
+
+// CekPKP: pengusaha kecil (PMK 197/2013) beromzet s.d. Rp4,8 M setahun buku. Lewat dari itu
+// wajib melaporkan usaha untuk dikukuhkan PKP dan mulai memungut PPN.
+func CekPKP(omzet int64) HasilPKP {
+	omzet = max(0, omzet)
+	r := HasilPKP{Omzet: omzet, Batas: batasFasilitas, WajibPKP: omzet > batasFasilitas,
+		Sisa: max(0, batasFasilitas-omzet), PemakaianBps: min(10_000, omzet*10_000/batasFasilitas)}
+	if r.WajibPKP {
+		r.Catatan = []string{
+			"Omzet melewati Rp4,8 M: wajib melaporkan usaha untuk dikukuhkan sebagai PKP paling lambat akhir bulan berikutnya setelah bulan omzet terlampaui (PMK 197/2013).",
+			"Setelah dikukuhkan, PKP memungut PPN atas penyerahan, menerbitkan e-Faktur, dan melaporkan SPT Masa PPN setiap bulan.",
+			"Tahun pajak berikutnya tidak lagi memenuhi syarat PPh Final 0,5% (PP 55/2022); pajak penghasilan memakai tarif umum atau Pasal 31E untuk badan.",
+		}
+	} else {
+		r.Catatan = []string{
+			"Masih pengusaha kecil: belum wajib dikukuhkan PKP, tetapi boleh memilih menjadi PKP secara sukarela (misalnya bila pembeli utama adalah PKP yang butuh faktur pajak).",
+			"Pantau omzet kumulatif setiap bulan; begitu melewati Rp4,8 M, kewajiban PKP berlaku mulai bulan berikutnya.",
+		}
+	}
+	return r
 }

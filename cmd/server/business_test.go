@@ -62,7 +62,7 @@ func TestTaxPlanningEndpoint(t *testing.T) {
 	}
 	rec := do(srv, owner, http.MethodPost, "/api/v1/tax/planning", `{}`)
 	_ = json.NewDecoder(rec.Body).Decode(&r)
-	if rec.Code != http.StatusOK || r.Input.Omzet <= 0 || r.Input.NetMarginBps <= 0 || r.Input.PTKP != "K/1" || len(r.BentukUsaha.Skema) != 6 || len(r.Entitas) != 5 {
+	if rec.Code != http.StatusOK || r.Input.Omzet <= 0 || r.Input.NetMarginBps <= 0 || r.Input.PTKP != "K/1" || len(r.BentukUsaha.Skema) != 6 || len(r.Entitas) != 6 {
 		t.Fatalf("defaults from data/profile: %d %+v", rec.Code, r.Input)
 	}
 	rec = do(srv, owner, http.MethodPost, "/api/v1/tax/planning", `{"omzet":2400000000,"net_margin_bps":700,"ptkp":"K/3"}`)

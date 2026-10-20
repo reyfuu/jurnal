@@ -70,6 +70,17 @@ func (s *Server) handleHitungPPhBadan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, res)
 }
 
+// handleCekPKP: posisi omzet setahun terhadap batas wajib PKP Rp4,8 M (alat gratis).
+func (s *Server) handleCekPKP(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Omzet int64 `json:"omzet"`
+	}
+	if !decodeBody(w, r, &in) {
+		return
+	}
+	writeJSON(w, tax.CekPKP(in.Omzet))
+}
+
 func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		http.Error(w, "data perhitungan tidak valid", http.StatusBadRequest)

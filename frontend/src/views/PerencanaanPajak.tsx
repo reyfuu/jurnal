@@ -93,7 +93,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
           </div>
 
           <div className="card">
-            <div className="chart-title">Perbandingan 6 Skema Pajak (per tahun)</div>
+            <div className="chart-title">Perbandingan {bu.skema.length} Skema Pajak (per tahun)</div>
             <table className="data-table tabular">
               <thead>
                 <tr><th>Skema</th><th>Dasar perhitungan</th><th style={{ textAlign: 'right' }}>Pajak setahun</th><th style={{ textAlign: 'right' }}>Lebih mahal dari termurah</th></tr>
