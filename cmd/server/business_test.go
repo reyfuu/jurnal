@@ -100,3 +100,35 @@ func TestWilayahEndpoint(t *testing.T) {
 		t.Fatalf("wilayah valid: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestSaranKLU_TanpaAIPakaiPencarian(t *testing.T) {
+	srv := NewServer()
+	qa := register(t, srv, registerBody) // belum berlangganan: tetap boleh (onboarding)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/business/klu-saran", `{"deskripsi":"laundry kiloan dekat kampus","jenis":"jasa"}`)
+	var body struct {
+		AI    bool `json:"ai"`
+		Saran []struct {
+			Kode   string   `json:"kode"`
+			Contoh []string `json:"contoh"`
+		} `json:"saran"`
+	}
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	if rec.Code != http.StatusOK || body.AI || len(body.Saran) == 0 || body.Saran[0].Kode != "962" || len(body.Saran[0].Contoh) == 0 {
+		t.Fatalf("saran KLU: %d %+v", rec.Code, body)
+	}
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/business/klu-saran", `{"deskripsi":"ab"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("deskripsi terlalu pendek: %d", rec.Code)
+	}
+}
+
+func TestJatahSaranKLU(t *testing.T) {
+	srv := NewServer()
+	for i := 0; i < maxSaranKLUAI; i++ {
+		if !srv.jatahSaranKLU(7) {
+			t.Fatalf("jatah ke-%d ditolak", i+1)
+		}
+	}
+	if srv.jatahSaranKLU(7) || !srv.jatahSaranKLU(8) {
+		t.Fatal("kuota per user tidak berlaku")
+	}
+}

@@ -25,26 +25,54 @@ function SaranCard({ s }: { s: SaranBentuk }) {
       <div>
         <div className="text-xs font-semibold" style={{ color: warna }}>Kesimpulan: bentuk usaha & skema pajak</div>
         <h3 id="saran-bentuk-title" className="mt-1 text-base font-bold">{s.judul}</h3>
-        {!sama && <p className="mt-1 text-sm font-semibold tabular" style={{ color: 'var(--accent-green)' }}>Hemat sekitar {formatRp(s.hemat)} per tahun</p>}
       </div>
+      {!sama && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-border p-3">
+            <div className="text-xs text-muted-foreground">Penghematan pajak</div>
+            <div className="mt-1 text-2xl font-bold tabular" style={{ color: 'var(--accent-green)' }}>{formatPct(s.hemat_bps)}</div>
+            <div className="text-xs text-muted-foreground">lebih kecil dari skema Anda sekarang</div>
+          </div>
+          <div className="rounded-md border border-border p-3">
+            <div className="text-xs text-muted-foreground">Hemat per tahun</div>
+            <div className="mt-1 text-2xl font-bold tabular" style={{ color: 'var(--accent-green)' }}>{formatRp(s.hemat)}</div>
+            <div className="text-xs text-muted-foreground">{formatRp(s.hemat ? Math.round(s.hemat / 12) : 0)} per bulan</div>
+          </div>
+        </div>
+      )}
       <ul className="grid gap-2">
         {s.alasan.map((a) => <li key={a} className="text-sm leading-relaxed">{a}</li>)}
       </ul>
-      <details>
-        <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Lihat perbandingan {s.skema.length} skema</summary>
-        <ul className="mt-2 grid gap-1">
-          {[...s.skema].sort((a, b) => a.pajak - b.pajak).map((k) => (
-            <li key={k.id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-              <span>
-                {k.nama}
-                {k.id === s.termurah && <span className="pill-status pill-green" style={{ marginLeft: 6 }}>Disarankan</span>}
-                {k.id === s.sekarang && k.id !== s.termurah && <span className="pill-status pill-amber" style={{ marginLeft: 6 }}>Sekarang</span>}
-              </span>
-              <span className="tabular">{formatRp(k.pajak)}</span>
-            </li>
-          ))}
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground">Perbandingan {s.skema.length} skema pajak per tahun (% dari omzet)</div>
+        <ul className="mt-2 grid gap-2.5">
+          {(() => {
+            const urut = [...s.skema].sort((a, b) => a.pajak - b.pajak)
+            const maks = Math.max(1, ...urut.map((k) => k.pajak))
+            return urut.map((k) => {
+              const warnaBar = k.id === s.termurah ? 'var(--accent-green)' : k.id === s.sekarang ? 'var(--accent-amber-bright)' : 'var(--border-strong)'
+              return (
+                <li key={k.id} className="grid gap-1 text-sm">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span>
+                      {k.nama}
+                      {k.id === s.termurah && <span className="pill-status pill-green" style={{ marginLeft: 6 }}>Disarankan</span>}
+                      {k.id === s.sekarang && k.id !== s.termurah && <span className="pill-status pill-amber" style={{ marginLeft: 6 }}>Sekarang</span>}
+                    </span>
+                    <span className="tabular">
+                      {formatRp(k.pajak)}
+                      <span className="text-xs text-muted-foreground"> · {s.omzet > 0 ? formatPct(Math.round((k.pajak * 10_000) / s.omzet)) : '0,00%'}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full" style={{ background: 'var(--border-subtle)' }} aria-hidden="true">
+                    <div className="h-1.5 rounded-full" style={{ width: `${Math.max(2, (k.pajak / maks) * 100)}%`, background: warnaBar }} />
+                  </div>
+                </li>
+              )
+            })
+          })()}
         </ul>
-      </details>
+      </div>
       <ul className="grid gap-1">
         {s.catatan.map((c) => <li key={c} className="text-xs text-muted-foreground">{c}</li>)}
       </ul>

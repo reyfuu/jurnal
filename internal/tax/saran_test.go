@@ -16,7 +16,11 @@ func TestSaranBentukUsaha_SampelWorkbook(t *testing.T) {
 		t.Fatalf("narasi: %q %v", s.Judul, s.Alasan)
 	}
 	gabung := strings.Join(s.Alasan, " ")
-	for _, kata := range []string{"Rp8.400.000", "Rp9.500.000", "Rp1.100.000", "pembukuan"} {
+	// 1,1 jt / 9,5 jt = 11,57% lebih kecil
+	if s.HematBps != 1157 || s.Omzet != 2_400_000_000 {
+		t.Errorf("hemat %d bps, omzet %d", s.HematBps, s.Omzet)
+	}
+	for _, kata := range []string{"Rp8.400.000", "Rp9.500.000", "Rp1.100.000", "11,57% lebih kecil", "pembukuan"} {
 		if !strings.Contains(gabung, kata) {
 			t.Errorf("alasan tidak menyebut %s: %s", kata, gabung)
 		}

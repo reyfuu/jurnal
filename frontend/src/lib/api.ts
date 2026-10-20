@@ -540,7 +540,12 @@ export interface BusinessProfile {
 }
 
 export interface Option { value: string; label: string; hint?: string }
-export interface KLUOption { kode: string; nama: string; jenis: JenisUsaha }
+/** contoh: kegiatan (uraian KBLI 5 digit) di bawah kategori ini, supaya orang awam tidak salah pilih. */
+export interface KLUOption { kode: string; nama: string; jenis: JenisUsaha; contoh?: string[] }
+export interface SaranKLU { kode: string; nama: string; jenis: JenisUsaha; alasan?: string; contoh: string[] }
+/** Rekomendasi bidang usaha dari cerita pemilik; ai=false berarti hasil pencarian kata. */
+export const saranKLU = (deskripsi: string, jenis?: string) =>
+  api<{ ai: boolean; model?: string; saran: SaranKLU[] }>('/business/klu-saran', { method: 'POST', body: { deskripsi, jenis: jenis ?? '' } })
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
@@ -580,6 +585,8 @@ export interface CekAwal {
 export interface SaranBentuk {
   termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]
   hemat: number; skema: TaxSkema[]; laba: number; ptkp: number
+  /** hemat ÷ pajak skema sekarang, basis poin (8523 = 85,23% lebih kecil). */
+  hemat_bps: number; omzet: number
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
 

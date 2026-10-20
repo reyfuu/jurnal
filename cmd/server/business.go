@@ -33,11 +33,11 @@ func saveProfile(p string, prof finance.BusinessProfile) error {
 }
 
 // kluOptions: daftar KLU untuk picker onboarding, dengan jenis usaha untuk penyaringan.
-var kluOptions = func() []map[string]string {
+var kluOptions = func() []map[string]any {
 	klu := tax.BenchmarkAktif()
-	out := make([]map[string]string, 0, len(klu))
+	out := make([]map[string]any, 0, len(klu))
 	for _, k := range klu {
-		out = append(out, map[string]string{"kode": k.Kode, "nama": k.Nama, "jenis": tax.JenisKLU(k.Kode)})
+		out = append(out, map[string]any{"kode": k.Kode, "nama": k.Nama, "jenis": tax.JenisKLU(k.Kode), "contoh": tax.ContohKLU(k.Kode, 3)})
 	}
 	return out
 }()

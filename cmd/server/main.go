@@ -89,7 +89,10 @@ type Server struct {
 	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
 	// katalog: template COA & benchmark nasional berversi; versi aktifnya dipasang lewat pasangKatalog.
 	katalogMu sync.Mutex
-	katalog   katalog.State
+	// kluAI: waktu pemakaian saran KLU dengan AI per user (kuota harian, lihat klu.go).
+	kluMu   sync.Mutex
+	kluAI   map[int][]time.Time
+	katalog katalog.State
 	// pengetahuan: artikel pajak & sumber yang dibaca AI (Panel Master, Pustaka Pajak klien).
 	pengetahuanMu sync.Mutex
 	pengetahuan   pengetahuan.State
@@ -304,6 +307,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.on((*tenant).handleGetBusiness)))
 	s.mux.HandleFunc("GET /api/v1/wilayah", s.guard("", handleWilayah))
 	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
+	s.mux.HandleFunc("POST /api/v1/business/klu-saran", s.guard("", s.handleSaranKLU))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePutBusiness))))
 	s.mux.HandleFunc("POST /api/v1/business/metode-penyusutan", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePilihMetode))))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
