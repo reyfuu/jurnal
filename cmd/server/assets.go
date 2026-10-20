@@ -84,7 +84,7 @@ func (s *tenant) handlePilihMetode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, prof)
 }
 
-const errMetodeTerkunci = "Metode penyusutan sudah dipilih dan dikunci untuk semua aset. Perubahan metode memerlukan persetujuan DJP; hubungi tim MasterPajak."
+const errMetodeTerkunci = "Metode penyusutan sudah dipilih dan dikunci untuk semua aset. Perubahan metode memerlukan persetujuan DJP; hubungi tim Master Pajak."
 
 func (s *tenant) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.decodeAsset(w, r)

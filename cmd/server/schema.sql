@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 	screenshot TEXT -- nama berkas di $DATA_DIR/bugs/
 );
 
--- Panel Master (Okt 2026): aktivitas user, status & balasan tiket, tim MasterPajak.
+-- Panel Master (Okt 2026): aktivitas user, status & balasan tiket, tim Master Pajak.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS status TEXT;
 ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS balasan JSONB;
@@ -283,6 +283,92 @@ CREATE TABLE IF NOT EXISTS mp_audit (
 	aksi       TEXT NOT NULL,
 	klien_id   INT,
 	keterangan TEXT
+);
+
+-- Usulan koreksi (Okt 2026): tim mengusulkan, pemilik usaha memutuskan. sebelum = potret
+-- transaksi saat diusulkan; usulan = transaksi pengganti (NULL untuk hapus).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_koreksi_id INT NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS koreksi (
+	tenant_id       INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id              INT NOT NULL,
+	transaksi_id    INT NOT NULL,
+	jenis           TEXT NOT NULL,
+	sebelum         JSONB NOT NULL,
+	usulan          JSONB,
+	alasan          TEXT NOT NULL,
+	oleh_id         INT NOT NULL,
+	oleh            TEXT,
+	waktu           TIMESTAMPTZ NOT NULL,
+	status          TEXT NOT NULL,
+	catatan         TEXT,
+	diputuskan_oleh TEXT,
+	diputuskan_pada TIMESTAMPTZ,
+	PRIMARY KEY (tenant_id, id)
+);
+
+-- Katalog Panel Master (Okt 2026): template COA per jenis usaha & benchmark DJP, berversi.
+-- Versi 1 (bawaan) selalu diisi ulang dari kode saat boot. tenants.coa_template = versi template
+-- yang dipatok untuk usaha itu (0 = ikut versi terbaru).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS coa_template INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS coa_template (
+	id      INT PRIMARY KEY,
+	jenis   TEXT NOT NULL,
+	versi   INT NOT NULL,
+	status  TEXT NOT NULL,
+	akun    JSONB NOT NULL,
+	catatan TEXT,
+	oleh    TEXT,
+	waktu   TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS benchmark_versi (
+	id     INT PRIMARY KEY,
+	nama   TEXT NOT NULL,
+	sumber TEXT,
+	status TEXT NOT NULL,
+	baris  JSONB NOT NULL,
+	oleh   TEXT,
+	waktu  TIMESTAMPTZ
+);
+
+-- Parameter pajak (Okt 2026): tarif, PTKP, batas omzet, TER, objek potong, norma NPPN — berversi.
+-- isi = tax.Parameter utuh (JSONB). Versi 1 (bawaan) diisi ulang dari kode saat boot.
+CREATE TABLE IF NOT EXISTS parameter_pajak (
+	id     INT PRIMARY KEY,
+	nama   TEXT NOT NULL,
+	dasar  TEXT,
+	status TEXT NOT NULL,
+	isi    JSONB NOT NULL,
+	oleh   TEXT,
+	waktu  TIMESTAMPTZ
+);
+
+-- Pengetahuan (Okt 2026): artikel pajak & sumber yang dibaca AI. Hanya artikel terbit dan sumber
+-- terverifikasi (dipakai_ai) yang dikirim ke model.
+CREATE TABLE IF NOT EXISTS artikel (
+	id            INT PRIMARY KEY,
+	judul         TEXT NOT NULL,
+	kategori      TEXT NOT NULL,
+	dasar_hukum   TEXT,
+	berlaku_sejak TEXT,
+	tag           JSONB,
+	isi           TEXT NOT NULL,
+	status        TEXT NOT NULL,
+	tampil_klien  BOOLEAN NOT NULL,
+	oleh          TEXT,
+	diverifikasi  TEXT,
+	waktu         TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS sumber_pengetahuan (
+	id           INT PRIMARY KEY,
+	judul        TEXT NOT NULL,
+	jenis        TEXT NOT NULL,
+	topik        JSONB,
+	isi          TEXT NOT NULL,
+	status       TEXT NOT NULL,
+	dipakai_ai   BOOLEAN NOT NULL,
+	oleh         TEXT,
+	diverifikasi TEXT,
+	waktu        TIMESTAMPTZ
 );
 
 -- lb_rows: siapkan array JSON untuk jsonb_populate_recordset. String kosong jadi NULL

@@ -290,6 +290,15 @@ func TestMaster_LastSeenTercatat(t *testing.T) {
 	}
 }
 
+func slicesAny[T any](s []T, f func(T) bool) bool {
+	for _, x := range s {
+		if f(x) {
+			return true
+		}
+	}
+	return false
+}
+
 // TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya: klienRows memindai seluruh
 // transaksi tiap usaha, jadi hanya daftar klien dan detail klien yang menghitungnya.
 // Ringkasan, pembayaran, dan tim tidak boleh ikut memindai (lihat BenchmarkKlienRows).

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  createTransaction, deleteTransaction, getCoA, listTransactions, updateTransaction, type CashWarning, type CoAInfo, type JenisInfo, type SavedTx, type Tx, type TxInput,
+  createTransaction, deleteTransaction, getCoA, listTransactions, updateTransaction, usulKoreksi, type CashWarning, type CoAInfo, type JenisInfo, type SavedTx, type Tx, type TxInput,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
@@ -26,7 +26,9 @@ const EMPTY: TxInput = {
 
 type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
 
-export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
+/** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
+ *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
+export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean } }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
@@ -39,6 +41,10 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
   const [coa, setCoa] = useState<CoAInfo | null>(null)
+  const [alasan, setAlasan] = useState('')
+  const [terkirim, setTerkirim] = useState('')
+  const usulMode = !!lihat?.bolehUsul
+  const bisaBuka = canEdit || usulMode
 
   const refresh = useCallback(async () => {
     const res = await listTransactions()
@@ -70,8 +76,9 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false })
   }
   function openEdit(t: Tx) {
-    if (!canEdit) return
+    if (!bisaBuka) return
     setError('')
+    setAlasan('')
     const { id, ...input } = t
     setEditing({ id, input, confirmDelete: false })
   }
@@ -81,7 +88,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     setError('')
     try {
       const res = await fn()
-      setWarnings((res as SavedTx | undefined)?.warnings)
+      if (usulMode) setTerkirim(`${(res as { nomor: string }).nomor} terkirim ke pemilik usaha. Pembukuan belum berubah sampai disetujui.`)
+      else setWarnings((res as SavedTx | undefined)?.warnings)
       setEditing(null)
       await Promise.all([refresh(), onChanged()])
     } catch (err) {
@@ -96,6 +104,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     if (!editing) return
     const { id, input } = editing
     const body = { ...input, tanggal_lunas: input.lunas ? input.tanggal_lunas : '' }
+    if (usulMode && id !== null) return void run(() => usulKoreksi(lihat!.klienId, { transaksi_id: id, jenis: 'ubah', usulan: body, alasan }))
     void run(() => (id === null ? createTransaction(body) : updateTransaction(id, body)))
   }
 
@@ -106,10 +115,13 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
     <>
       <PageHeader title="Transaksi" subtitle="Catat, ubah, dan cari transaksi" />
 
+      {terkirim && <div className="pill-status pill-green" role="status" style={{ alignSelf: 'flex-start' }}>{terkirim}</div>}
       <div className="tx-toolbar">
-        <button className="btn-cta inline-flex items-center gap-1.5" onClick={openNew}>
-          <Plus size={16} strokeWidth={2.4} /> Catat transaksi
-        </button>
+        {!lihat && (
+          <button className="btn-cta inline-flex items-center gap-1.5" onClick={openNew}>
+            <Plus size={16} strokeWidth={2.4} /> Catat transaksi
+          </button>
+        )}
         {canEdit && (
           <>
             <Button variant="outline" className="h-10 rounded-full" onClick={() => setImporting(true)}>
@@ -194,7 +206,8 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Daftar transaksi</div>
         <div className="chart-subtitle">
-          {canEdit ? 'Klik baris untuk mengubah, menandai lunas, atau menghapus.' : 'Ubah dan hapus transaksi hanya untuk Owner atau Admin Keuangan.'}
+          {usulMode ? 'Klik baris untuk mengusulkan koreksi ke pemilik usaha.'
+            : canEdit ? 'Klik baris untuk mengubah, menandai lunas, atau menghapus.' : 'Ubah dan hapus transaksi hanya untuk Owner atau Admin Keuangan.'}
         </div>
         {shown.length === 0 ? (
           <p className="workspace-subtitle" style={{ padding: '24px 0' }}>
@@ -205,7 +218,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
             <thead>
               <tr>
                 <th>Tanggal</th><th>Jenis</th>{coa?.supported && <th>Akun</th>}<th>Keterangan</th><th>Pihak</th><th style={{ textAlign: 'right' }}>Nominal</th><th>Status</th>
-                {canEdit && <th />}
+                {bisaBuka && <th />}
               </tr>
             </thead>
             <tbody>
@@ -213,7 +226,7 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                 const masuk = isMasuk(posOf[t.jenis])
                 const sub = [t.item && (t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (
-                  <tr key={t.id} className={canEdit ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
+                  <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
                     {coa?.supported && (
@@ -232,9 +245,9 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                         ? <span className="pill-status pill-amber">Belum lunas</span>
                         : t.tanggal_lunas && <span className="pill-status pill-green">Lunas {formatTanggal(t.tanggal_lunas)}</span>}
                     </td>
-                    {canEdit && (
+                    {bisaBuka && (
                       <td style={{ textAlign: 'right' }}>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Ubah ${t.keterangan || t.jenis}`} onClick={(e) => { e.stopPropagation(); openEdit(t) }}>
+                        <Button variant="ghost" size="icon-sm" aria-label={`${usulMode ? 'Usulkan koreksi' : 'Ubah'} ${t.keterangan || t.jenis}`} onClick={(e) => { e.stopPropagation(); openEdit(t) }}>
                           <Pencil />
                         </Button>
                       </td>
@@ -259,8 +272,10 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
           {editing && (
             <form onSubmit={save} className="grid gap-4">
               <DialogHeader>
-                <DialogTitle>{editing.id === null ? 'Catat transaksi' : 'Ubah transaksi'}</DialogTitle>
-                <DialogDescription>Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.</DialogDescription>
+                <DialogTitle>{usulMode ? 'Usulkan koreksi' : editing.id === null ? 'Catat transaksi' : 'Ubah transaksi'}</DialogTitle>
+                <DialogDescription>{usulMode
+                  ? 'Ubah isian yang perlu dikoreksi. Pembukuan klien tidak berubah sampai pemilik usaha menyetujui.'
+                  : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -341,27 +356,39 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                 )}
               </div>
 
+              {usulMode && (
+                <Field id="tx-alasan" label="Alasan untuk pemilik usaha" hint="Pakai bahasa pemilik usaha, bukan istilah akuntansi. Wajib.">
+                  <textarea id="tx-alasan" required rows={2} maxLength={500} value={alasan} onChange={(e) => setAlasan(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                    placeholder="mis. Mesin dipakai lebih dari setahun, jadi dicatat sebagai aset" />
+                </Field>
+              )}
+
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
               <DialogFooter className="sm:justify-between">
                 {editing.id !== null ? (
                   editing.confirmDelete ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Hapus transaksi ini?</span>
-                      <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => void run(() => deleteTransaction(editing.id!))}>
-                        Ya, hapus
+                      <span className="text-sm text-muted-foreground">{usulMode ? 'Usulkan hapus transaksi ini?' : 'Hapus transaksi ini?'}</span>
+                      <Button type="button" variant="destructive" size="sm" disabled={busy || (usulMode && !alasan.trim())}
+                        title={usulMode && !alasan.trim() ? 'Isi alasan dulu' : undefined}
+                        onClick={() => void run(() => usulMode
+                          ? usulKoreksi(lihat!.klienId, { transaksi_id: editing.id!, jenis: 'hapus', alasan })
+                          : deleteTransaction(editing.id!))}>
+                        {usulMode ? 'Ya, usulkan' : 'Ya, hapus'}
                       </Button>
                       <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ ...editing, confirmDelete: false })}>Batal</Button>
                     </div>
                   ) : (
                     <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setEditing({ ...editing, confirmDelete: true })}>
-                      Hapus
+                      {usulMode ? 'Usulkan hapus' : 'Hapus'}
                     </Button>
                   )
                 ) : <span />}
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={() => setEditing(null)}>Batal</Button>
-                  <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan'}</Button>
+                  <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
                 </div>
               </DialogFooter>
             </form>

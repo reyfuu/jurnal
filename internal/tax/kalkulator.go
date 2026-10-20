@@ -9,18 +9,8 @@ import (
 // Kalkulator pajak: PPh 21, PPh 23, PPh 4 ayat (2), PPh Final UMKM, dan PPN.
 //
 // Semua tarif ditulis dalam basis poin (bps): 1100 = 11%, 50 = 0,5%. Nilai Rupiah selalu
-// bilangan bulat; pembulatan ke bawah mengikuti kebiasaan pemotongan pajak.
-
-const (
-	// BiayaJabatanBps: 5% dari penghasilan bruto, dibatasi BiayaJabatanMaxTahun.
-	BiayaJabatanBps      = 500
-	BiayaJabatanMaxTahun = 6_000_000 // Rp 500.000/bulan
-
-	// TanpaNPWPTambahanBps: pemotongan 20% lebih tinggi untuk PPh 21 tanpa NPWP,
-	// dan 100% lebih tinggi untuk PPh 23.
-	TanpaNPWPPPh21Bps = 12_000 // 120% dari tarif normal
-	TanpaNPWPPPh23Bps = 20_000 // 200% dari tarif normal
-)
+// bilangan bulat; pembulatan ke bawah mengikuti kebiasaan pemotongan pajak. Angka aturannya
+// (tarif, PTKP, biaya jabatan, pengali tanpa NPWP) dibaca dari parameter aktif, P().
 
 // ===== PPh 21 =====
 
@@ -68,7 +58,8 @@ type Langkah struct {
 // penghitungan ulang Desember, jadi totalnya setahun tetap benar; yang bisa berbeda hanya
 // pembagian beban antar bulan.
 func HitungPPh21(in PPh21Input) (PPh21Result, error) {
-	ptkp, ok := PTKP[strings.TrimSpace(in.PTKPStatus)]
+	pr := P()
+	ptkp, ok := PTKPOf(in.PTKPStatus)
 	if !ok {
 		return PPh21Result{}, fmt.Errorf("status PTKP %q tidak dikenal", in.PTKPStatus)
 	}
@@ -80,7 +71,7 @@ func HitungPPh21(in PPh21Input) (PPh21Result, error) {
 		var r PPh21Result
 		r.PTKP = ptkp
 		r.BrutoSetahun = brutoBulanan * 12
-		r.BiayaJabatan = minI64(r.BrutoSetahun*BiayaJabatanBps/10_000, BiayaJabatanMaxTahun)
+		r.BiayaJabatan = minI64(r.BrutoSetahun*pr.BiayaJabatanBps/10_000, pr.BiayaJabatanMaks)
 		r.IuranPensiun = in.IuranPensiun * 12
 		r.NetoSetahun = r.BrutoSetahun - r.BiayaJabatan - r.IuranPensiun
 		pkp := r.NetoSetahun - ptkp
@@ -91,7 +82,7 @@ func HitungPPh21(in PPh21Input) (PPh21Result, error) {
 		r.PPhSetahun = Pasal17(r.PKP)
 		if !in.PunyaNPWP && r.PPhSetahun > 0 {
 			normal := r.PPhSetahun
-			r.PPhSetahun = normal * TanpaNPWPPPh21Bps / 10_000
+			r.PPhSetahun = normal * pr.TanpaNPWPPPh21Bps / 10_000
 			r.TambahanTanpaNPWP = r.PPhSetahun - normal
 		}
 		r.PPhSebulan = r.PPhSetahun / 12
@@ -129,36 +120,37 @@ func HitungPPh21(in PPh21Input) (PPh21Result, error) {
 
 	r.Langkah = []Langkah{
 		{"Penghasilan bruto setahun", r.BrutoSetahun, "penghasilan sebulan x 12"},
-		{"Biaya jabatan", -r.BiayaJabatan, "5% dari bruto, maksimal Rp 6.000.000 setahun"},
+		{"Biaya jabatan", -r.BiayaJabatan, fmt.Sprintf("%s dari bruto, maksimal %s setahun", persenBps(int(pr.BiayaJabatanBps)), rp(pr.BiayaJabatanMaks))},
 		{"Iuran pensiun setahun", -r.IuranPensiun, ""},
 		{"Penghasilan neto setahun", r.NetoSetahun, ""},
 		{"PTKP " + in.PTKPStatus, -r.PTKP, ""},
 		{"Penghasilan kena pajak", r.PKP, "dibulatkan ke bawah ke ribuan penuh"},
-		{"PPh 21 setahun", r.PPhSetahun, tarifKeterangan(in.PunyaNPWP)},
+		{"PPh 21 setahun", r.PPhSetahun, tarifKeterangan(in.PunyaNPWP, pr.TanpaNPWPPPh21Bps)},
 		{"PPh 21 sebulan", r.PPhSebulan, "setahun dibagi 12"},
 	}
 	return r, nil
 }
 
-func tarifKeterangan(punyaNPWP bool) string {
+func tarifKeterangan(punyaNPWP bool, pengaliBps int64) string {
 	if punyaNPWP {
 		return "tarif progresif Pasal 17"
 	}
-	return "tarif Pasal 17 + 20% karena tanpa NPWP"
+	return "tarif Pasal 17 + " + persenBps(int(pengaliBps-10_000)) + " karena tanpa NPWP"
 }
 
 // ===== TER (PMK 168/2023) =====
 
-// TERKategori memetakan status PTKP ke kategori tarif efektif bulanan.
+// TERKategori (bawaan) memetakan status PTKP ke kategori tarif efektif bulanan.
 var TERKategori = map[string]string{
 	"TK/0": "A", "TK/1": "A", "K/0": "A",
 	"TK/2": "B", "TK/3": "B", "K/1": "B", "K/2": "B",
 	"K/3": "C",
 }
 
-// === SATU-SATUNYA TEMPAT MELENGKAPI TABEL TER ===
+// === TABEL TER BAWAAN ===
 //
-// Lapisan di bawah ini BELUM LENGKAP. Lampiran PMK 168/2023 memuat 44 lapis untuk kategori A
+// Tim melengkapi TER di Panel Master → Parameter Pajak (versi baru, lalu aktifkan); daftar di
+// bawah hanya bawaan versi 1. Lapisan di bawah ini BELUM LENGKAP. Lampiran PMK 168/2023 memuat 44 lapis untuk kategori A
 // serta sekitar 40 lapis untuk B dan C; yang tercantum di sini hanya baris yang sudah
 // terverifikasi. Sengaja tidak ditebak: tarif pajak yang salah lebih berbahaya daripada
 // kalkulator yang berkata "belum bisa dihitung".
@@ -168,6 +160,8 @@ var TERKategori = map[string]string{
 //  2. Tambahkan baris {BatasBawah, BatasAtas, TarifBps} berurutan menaik. BatasAtas -1 = tanpa batas.
 //  3. Tarif dalam basis poin: 0,25% = 25, 5% = 500, 34% = 3400.
 //  4. Setelah satu kategori utuh dari 0 sampai tanpa batas, HitungTER otomatis memakainya.
+//
+// Lebih cepat lewat Panel Master; mengubah daftar ini hanya mengubah bawaan versi 1.
 var TERLapisan = map[string][]TERBaris{
 	"A": {
 		{0, 5_400_000, 0},
@@ -197,7 +191,7 @@ type TERBaris struct {
 func TERBelumLengkap() []string {
 	var out []string
 	for _, k := range []string{"A", "B", "C"} {
-		l := TERLapisan[k]
+		l := P().TER.Lapisan[k]
 		if len(l) == 0 || l[len(l)-1].BatasAtas != -1 {
 			out = append(out, k)
 		}
@@ -205,17 +199,18 @@ func TERBelumLengkap() []string {
 	return out
 }
 
-var ErrTERBelumLengkap = errors.New("lapisan TER belum lengkap untuk penghasilan sebesar ini; lengkapi TERLapisan dari Lampiran PMK 168/2023")
+var ErrTERBelumLengkap = errors.New("lapisan TER belum lengkap untuk penghasilan sebesar ini; lengkapi di Panel Master → Parameter Pajak dari Lampiran PMK 168/2023")
 
 // HitungTER mengembalikan tarif efektif bulanan dan PPh 21 sebulan menurut TER.
 // Bila penghasilan jatuh di luar lapisan yang sudah terverifikasi, fungsi ini menolak
 // menghitung alih-alih menebak.
 func HitungTER(brutoBulanan int64, ptkpStatus string) (tarifBps int, pph int64, err error) {
-	kat, ok := TERKategori[strings.TrimSpace(ptkpStatus)]
+	ter := P().TER
+	kat, ok := ter.Kategori[strings.TrimSpace(ptkpStatus)]
 	if !ok {
 		return 0, 0, fmt.Errorf("status PTKP %q tidak dikenal", ptkpStatus)
 	}
-	for _, b := range TERLapisan[kat] {
+	for _, b := range ter.Lapisan[kat] {
 		if brutoBulanan >= b.BatasBawah && (b.BatasAtas < 0 || brutoBulanan <= b.BatasAtas) {
 			return b.TarifBps, brutoBulanan * int64(b.TarifBps) / 10_000, nil
 		}

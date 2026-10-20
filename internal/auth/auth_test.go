@@ -255,3 +255,22 @@ func TestFindByEmail(t *testing.T) {
 		t.Error("email tak ada ditemukan")
 	}
 }
+
+// Role lihat hanya dipakai server untuk mode lihat-sebagai: tidak bisa diberikan ke user.
+func TestLihat_TidakBisaDiberikan(t *testing.T) {
+	s := auth.NewStore()
+	if _, err := s.Create(auth.Input{Name: "X", Email: "x@contoh.id", Role: auth.Lihat, Active: true, Password: "rahasia123", TenantID: 1}); !errors.Is(err, auth.ErrInvalid) {
+		t.Errorf("buat user role lihat: err = %v", err)
+	}
+	if _, err := s.Update(1, 2, auth.Input{Name: "Dimas", Email: "admin@kedaikopisenja.id", Role: auth.Lihat, Active: true}); !errors.Is(err, auth.ErrInvalid) {
+		t.Errorf("ubah user jadi lihat: err = %v", err)
+	}
+	for _, v := range []string{"transaksi-kelola", "impor-data", "pengguna", "langganan", "lapor-bug", "kalkulator-pajak"} {
+		if auth.Lihat.Can(v) {
+			t.Errorf("role lihat tidak boleh punya %s", v)
+		}
+	}
+	if !auth.Lihat.Can("laporan-keuangan") || !auth.Lihat.Can("transaksi") {
+		t.Error("role lihat harus bisa membaca laporan & transaksi")
+	}
+}

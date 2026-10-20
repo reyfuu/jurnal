@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { cekAwal, type BusinessProfile, type CekAwal } from '@/lib/api'
+import { cekAwal, type BusinessProfile, type CekAwal, type SaranBentuk } from '@/lib/api'
+import { formatRp } from '@/lib/format'
 
 // 2 desimal, sama dengan PDF DJP dan pesan dari server
 const formatPct = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
@@ -13,6 +14,42 @@ const LEVEL: Record<CekAwal['risiko'][number]['level'], { label: string; color: 
   tinggi: { label: 'Risiko tinggi', color: 'var(--accent-red)' },
   sedang: { label: 'Perlu dipertimbangkan', color: 'var(--accent-orange)' },
   info: { label: 'Info', color: 'var(--text-secondary)' },
+}
+
+/** Saran skema pajak paling hemat (sheet "Bentuk Usaha"), dengan alasan dalam bahasa awam. */
+function SaranCard({ s }: { s: SaranBentuk }) {
+  const sama = s.termurah === s.sekarang
+  const warna = sama ? 'var(--accent-green)' : 'var(--accent-amber-bright)'
+  return (
+    <section className="grid gap-3 rounded-lg border p-4" style={{ borderColor: warna }} aria-labelledby="saran-bentuk-title">
+      <div>
+        <div className="text-xs font-semibold" style={{ color: warna }}>Kesimpulan: bentuk usaha & skema pajak</div>
+        <h3 id="saran-bentuk-title" className="mt-1 text-base font-bold">{s.judul}</h3>
+        {!sama && <p className="mt-1 text-sm font-semibold tabular" style={{ color: 'var(--accent-green)' }}>Hemat sekitar {formatRp(s.hemat)} per tahun</p>}
+      </div>
+      <ul className="grid gap-2">
+        {s.alasan.map((a) => <li key={a} className="text-sm leading-relaxed">{a}</li>)}
+      </ul>
+      <details>
+        <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Lihat perbandingan {s.skema.length} skema</summary>
+        <ul className="mt-2 grid gap-1">
+          {[...s.skema].sort((a, b) => a.pajak - b.pajak).map((k) => (
+            <li key={k.id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+              <span>
+                {k.nama}
+                {k.id === s.termurah && <span className="pill-status pill-green" style={{ marginLeft: 6 }}>Disarankan</span>}
+                {k.id === s.sekarang && k.id !== s.termurah && <span className="pill-status pill-amber" style={{ marginLeft: 6 }}>Sekarang</span>}
+              </span>
+              <span className="tabular">{formatRp(k.pajak)}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+      <ul className="grid gap-1">
+        {s.catatan.map((c) => <li key={c} className="text-xs text-muted-foreground">{c}</li>)}
+      </ul>
+    </section>
+  )
 }
 
 // CekAwalCard: NPM vs rasio benchmark DJP + risiko pajak. Dihitung backend (tax.CekAwal),
@@ -32,6 +69,8 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
   if (!c) return <p className="text-sm text-muted-foreground">Menghitung cek awal…</p>
   const st = STATUS[c.status]
   return (
+    <div className="grid gap-4">
+    {c.saran && <SaranCard s={c.saran} />}
     <section className="grid gap-4 rounded-lg border border-border p-4" aria-labelledby="cek-awal-title">
       <div>
         <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark DJP & risiko pajak</h3>
@@ -66,5 +105,6 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
         </ul>
       ) : c.status !== 'kurang_data' && <p className="text-sm text-muted-foreground">Tidak ada risiko pajak menonjol dari data ini.</p>}
     </section>
+    </div>
   )
 }

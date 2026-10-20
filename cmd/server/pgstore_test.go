@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"pajak/internal/auth"
+	"pajak/internal/coa"
 	"pajak/internal/finance"
+	"pajak/internal/katalog"
+	"pajak/internal/tax"
 )
 
 // pgTest: tes Postgres hanya jalan bila TEST_DATABASE_URL di-set; skema dikosongkan dulu.
@@ -133,9 +136,11 @@ type tenantData struct {
 	Stok                                                 []finance.StokItem
 	Produk                                               []finance.Produk
 	Supplier                                             []finance.Supplier
+	Koreksi                                              []finance.Koreksi
 	NextTxID, NextAssetID, NextKaryawanID, NextInvoiceID int
 	NextTagihanID, NextStokID                            int
-	NextProdukID, NextSupplierID                         int
+	NextProdukID, NextSupplierID, NextKoreksiID          int
+	CoaTemplate                                          int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -143,9 +148,9 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	t.Helper()
 	tn.mu.RLock()
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
-		tn.tagihan, tn.stok, tn.produk, tn.supplier,
+		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -185,6 +190,11 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.produk[0].ID = 1
 	tn.supplier = []finance.Supplier{filled[finance.Supplier](14)}
 	tn.supplier[0].ID = 1
+	// Usulan koreksi: potret & usulan transaksi disimpan sebagai JSONB.
+	tn.koreksi = []finance.Koreksi{filled[finance.Koreksi](15)}
+	tn.koreksi[0].ID = 1
+	tn.nextKoreksiID = 2
+	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
 	tn.mu.Unlock()
@@ -305,5 +315,52 @@ func TestPostgresPanelMaster(t *testing.T) {
 	srv3 := NewServer()
 	if n, last := len(srv3.master.Audit), srv3.master.Audit[len(srv3.master.Audit)-1]; n != len(srv.master.Audit)+1 || last.ID != n || last.Aksi != "Buka detail klien" {
 		t.Fatalf("audit setelah muat ulang: %d baris, terakhir %+v", n, last)
+	}
+}
+
+// Versi template COA & benchmark buatan tim tersimpan utuh; versi 1 tetap mengikuti kode.
+func TestPostgresKatalog(t *testing.T) {
+	t.Cleanup(func() { tax.AktifkanBenchmark(tax.KLUBenchmarks, tax.SumberBenchmark) })
+	pgTest(t)
+	srv, m := serverMaster(t)
+	baru := append(slices.Clone(coa.Master), coa.Account{Kode: "6119", Nama: "Beban Asuransi", Subtype: "opex", Normal: coa.Debit, Kelompok: coa.BebanOperasional, Kondisi: coa.Selalu})
+	body, _ := json.Marshal(map[string]any{"jenis": "perdagangan", "akun": baru})
+	do(srv, m, http.MethodPost, "/api/v1/master/coa/draft", string(body))
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/2/terbitkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("terbit: %d %s", rec.Code, rec.Body)
+	}
+	unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(tax.KLUBenchmarks[:5]), map[string]string{"nama": "Uji"})
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/benchmark/2/aktifkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("aktifkan: %d %s", rec.Code, rec.Body)
+	}
+	pulihkanParameter(t)
+	do(srv, m, http.MethodPost, "/api/v1/master/parameter/1/salin", "")
+	unggahXlsx(srv, m, "/api/v1/master/parameter/2/norma", [][]string{{"KLU"}, {"47111", "Toko", "20", "15", "-"}}, nil)
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/parameter/2/aktifkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("aktifkan parameter: %d %s", rec.Code, rec.Body)
+	}
+	tax.AktifkanParameter(tax.ParameterBawaan()) // muat ulang harus memasang lagi versi aktif dari DB
+	srv2 := NewServer()
+	if got, want := normJSON(t, srv2.katalog), normJSON(t, srv.katalog); got != want {
+		t.Fatalf("katalog berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
+	}
+	if n := len(tax.BenchmarkAktif()); n != 5 {
+		t.Errorf("benchmark aktif setelah muat ulang = %d baris", n)
+	}
+	if n, ok := tax.CariNorma("47111"); !ok || len(tax.P().Norma) != 1 || n.DaerahLainBps != -1 {
+		t.Errorf("parameter aktif setelah muat ulang: norma %d baris %+v", len(tax.P().Norma), n)
+	}
+}
+
+// Artikel & sumber pengetahuan (termasuk status verifikasi & pemakaian AI) tersimpan utuh.
+func TestPostgresPengetahuan(t *testing.T) {
+	pgTest(t)
+	srv, m := serverMaster(t)
+	do(srv, m, http.MethodPost, "/api/v1/master/artikel", `{"judul":"PPh Final","kategori":"PPh Final UMKM","tag":["omzet"],"isi":"Tarif 0,5%.","tampil_klien":true,"terbit":true}`)
+	do(srv, m, http.MethodPost, "/api/v1/master/pengetahuan", `{"judul":"Batas omzet","isi":"OP sampai Rp500 juta.","topik":["PPh Final"]}`)
+	do(srv, m, http.MethodPost, "/api/v1/master/pengetahuan/1/verifikasi", "")
+	srv2 := NewServer()
+	if got, want := normJSON(t, srv2.pengetahuan), normJSON(t, srv.pengetahuan); got != want || len(srv.pengetahuan.Artikel) != 1 {
+		t.Fatalf("pengetahuan berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
 	}
 }

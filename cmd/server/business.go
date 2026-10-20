@@ -34,8 +34,9 @@ func saveProfile(p string, prof finance.BusinessProfile) error {
 
 // kluOptions: daftar KLU untuk picker onboarding, dengan jenis usaha untuk penyaringan.
 var kluOptions = func() []map[string]string {
-	out := make([]map[string]string, 0, len(tax.KLUBenchmarks))
-	for _, k := range tax.KLUBenchmarks {
+	klu := tax.BenchmarkAktif()
+	out := make([]map[string]string, 0, len(klu))
+	for _, k := range klu {
 		out = append(out, map[string]string{"kode": k.Kode, "nama": k.Nama, "jenis": tax.JenisKLU(k.Kode)})
 	}
 	return out
@@ -102,6 +103,9 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan profil usaha", http.StatusInternalServerError)
 		return
+	}
+	if s.profile == nil || s.profile.JenisUsaha != prof.JenisUsaha {
+		s.coaTemplateID = 0 // jenis usaha berganti: ikut template terbaru jenis yang baru
 	}
 	s.profile = &prof
 	finance.TerapkanMetode(s.assets, prof.MetodePenyusutan)

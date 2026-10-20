@@ -2,22 +2,16 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
   cekPKP, getKalkulator, hitungPPh21, hitungPPhBadan, hitungPotong,
-  type HasilPKP, type KalkulatorMaster, type Langkah, type PotongResult, type PPh21Response, type PPhBadanResult,
+  type BusinessProfile, type HasilPKP, type KalkulatorMaster, type PotongResult, type PPh21Response, type PPhBadanResult,
 } from '@/lib/api'
+import { Dua, Hasil, Uang } from '@/components/KalkulatorUI'
 import { formatRp } from '@/lib/format'
-import { angka } from '@/lib/angka'
-
-const SOROT = 'var(--text-brand)'
-const RED = 'var(--text-danger)'
-const GREEN = 'var(--accent-green)'
-
-/** 1500 → "15%", 175 → "1,75%". */
-const persen = (bps: number) =>
-  (bps % 100 === 0 ? String(bps / 100) : (bps / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')).replace('.', ',') + '%'
+import { GREEN, RED, SOROT, persen } from '@/lib/kalkulator'
+import { FormBeliSewa, FormGrossUp, FormNPPN, FormPPNHarga } from './KalkulatorRencana'
 
 type TabID = 'pph21' | 'pph-badan' | string
 
-export function KalkulatorPajak() {
+export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }) {
   const [m, setM] = useState<KalkulatorMaster | null>(null)
   const [tab, setTab] = useState<TabID>('pph21')
   const [error, setError] = useState('')
@@ -31,33 +25,46 @@ export function KalkulatorPajak() {
     { id: 'pph-badan', label: 'PPh Badan' },
     { id: 'pkp', label: 'Cek PKP' },
   ]
+  const rencana: { id: TabID; label: string }[] = [
+    { id: 'nppn', label: 'NPPN' },
+    { id: 'gross-up', label: 'Gross Up' },
+    { id: 'ppn-harga', label: 'PPN & Harga Jual' },
+    { id: 'beli-sewa', label: 'Beli vs Sewa Aset' },
+  ]
 
   return (
     <>
       <PageHeader
         title="Kalkulator Pajak"
-        subtitle="Hitung PPh 21, 22, 23, 4 ayat (2), 15, PPh Badan, PPN, dan PPnBM. Setiap hasil menampilkan langkah perhitungannya."
+        subtitle="Hitung PPh 21, 22, 23, 4 ayat (2), 15, PPh Badan, PPN, dan PPnBM, plus alat perencanaan: NPPN, gross up, harga jual PPN, beli vs sewa aset."
       />
 
       <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
           <span style={{ color: 'var(--text-warn)', fontWeight: 600 }}>Alat bantu, bukan pengganti konsultan.</span>{' '}
-          Tarif mengikuti ketentuan yang berlaku umum dan setiap objek mencantumkan rujukan aturannya.
+          Tarif mengikuti parameter pajak yang dikelola tim Master Pajak dan setiap objek mencantumkan rujukan aturannya.
           Minta tim pajak memverifikasi baris yang relevan sebelum dipakai untuk SPT.
         </div>
       </div>
 
-      <div className="tabbar" role="tablist" aria-label="Jenis pajak">
-        {tabs.map((t) => (
-          <button key={t.id} role="tab" className="tab-btn" aria-selected={t.id === tab} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {([['Hitung pajak', tabs], ['Perencanaan', rencana]] as const).map(([judul, daftar]) => (
+        <div key={judul} className="tabbar" role="tablist" aria-label={judul} style={{ marginBottom: judul === 'Hitung pajak' ? 4 : 18 }}>
+          <span className="kpi-label" style={{ alignSelf: 'center', padding: '0 10px 0 2px', minWidth: 92 }}>{judul}</span>
+          {daftar.map((t) => (
+            <button key={t.id} role="tab" className="tab-btn" aria-selected={t.id === tab} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      ))}
 
       {tab === 'pph21' && <FormPPh21 m={m} />}
       {tab === 'pph-badan' && <FormPPhBadan m={m} />}
       {tab === 'pkp' && <FormCekPKP />}
+      {tab === 'nppn' && <FormNPPN m={m} profile={profile} />}
+      {tab === 'gross-up' && <FormGrossUp m={m} profile={profile} />}
+      {tab === 'ppn-harga' && <FormPPNHarga m={m} profile={profile} />}
+      {tab === 'beli-sewa' && <FormBeliSewa m={m} profile={profile} />}
       {m.jenis.filter((j) => j.id === tab).map((j) => <FormPotong key={j.id} jenis={j} />)}
     </>
   )
@@ -334,60 +341,5 @@ export function FormCekPKP() {
         </>
       )}
     />
-  )
-}
-
-// ===== Bagian bersama =====
-
-function Dua({ kiri, kanan }: { kiri: React.ReactNode; kanan: React.ReactNode }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>
-      <div className="card" style={{ padding: 20, justifyContent: 'flex-start' }}>{kiri}</div>
-      <div className="card" style={{ padding: 20, justifyContent: 'flex-start' }}>
-        {kanan ?? <p className="workspace-subtitle" style={{ margin: 0 }}>Isi formulir di sebelah kiri lalu tekan Hitung.</p>}
-      </div>
-    </div>
-  )
-}
-
-function Uang({ label, v, set, hint }: { label: string; v: number; set: (n: number) => void; hint?: string }) {
-  return (
-    <label style={{ display: 'block', marginBottom: 12 }}>
-      <span className="kpi-label" style={{ display: 'block', marginBottom: 4 }}>{label}</span>
-      <input className="input-field tabular" {...angka(v, set)} />
-      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-        {formatRp(v)}{hint ? ` · ${hint}` : ''}
-      </span>
-    </label>
-  )
-}
-
-function Hasil({ utama, langkah }: { utama: { label: string; v: number; warna?: string; persen?: boolean }[]; langkah: Langkah[] }) {
-  return (
-    <>
-      <div className="chart-title">Hasil</div>
-      <div style={{ marginTop: 12, marginBottom: 16 }}>
-        {utama.map((u) => (
-          <div key={u.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '8px 0' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{u.label}</span>
-            <span className="tabular" style={{ fontWeight: 700, fontSize: 16, color: u.warna }}>
-              {u.persen ? `${u.v}`.replace('.', ',') + '%' : formatRp(u.v)}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="chart-subtitle" style={{ marginBottom: 6 }}>Langkah perhitungan</div>
-      <div className="list-rows tabular">
-        {langkah.map((l, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 0', fontSize: 13 }}>
-            <span>
-              {l.label}
-              {l.keterangan && <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{l.keterangan}</span>}
-            </span>
-            <span style={{ whiteSpace: 'nowrap' }}>{formatRp(l.nilai)}</span>
-          </div>
-        ))}
-      </div>
-    </>
   )
 }

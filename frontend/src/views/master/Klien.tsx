@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { KoreksiCard } from '@/components/KoreksiCard'
 import {
-  aturLangganan, getKlien, getPlans, getRingkasanMaster, listKlien,
+  analisaKlien, aturLangganan, getKlien, mulaiLihat, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
   type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
 } from '@/lib/api'
 import { formatRelatif, formatRp, formatTanggal } from '@/lib/format'
@@ -157,10 +158,13 @@ export function KlienList({ onBuka }: { onBuka: (id: number) => void }) {
 
 const ORDER_PILL: Record<string, string> = { lunas: 'pill-green', manual: 'pill-amber', pending: 'pill-status-muted', gagal: 'pill-red' }
 
-export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; bisaLangganan: boolean; onKembali: () => void }) {
+export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKembali }: {
+  id: number; bisaLangganan: boolean; bisaLihat: boolean; onLihat: () => void; onKembali: () => void
+}) {
   const [d, setD] = useState<KlienDetail | null>(null)
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState(false)
+  const [lihat, setLihat] = useState(false)
   const muat = () => getKlien(id).then(setD, (e: Error) => setError(e.message))
   useEffect(() => { void muat() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   const k = d?.klien
@@ -170,7 +174,10 @@ export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; 
         <Button variant="ghost" size="sm" onClick={onKembali}><ArrowLeft /> Klien</Button>
       </div>
       <PageHeader title={k?.nama ?? 'Memuat…'} subtitle={k ? [k.owner_nama, k.owner_email, k.owner_wa && `WA ${k.owner_wa}`, k.kota].filter(Boolean).join(' · ') : ''}>
-        {k && bisaLangganan && !k.demo && <button className="btn-cta" onClick={() => setDialog(true)}>Atur langganan</button>}
+        <div className="flex flex-wrap gap-2">
+          {k && bisaLihat && <button className="btn-cta" onClick={() => setLihat(true)}>Lihat sebagai klien</button>}
+          {k && bisaLangganan && !k.demo && <Button variant="outline" className="h-10 rounded-full" onClick={() => setDialog(true)}>Atur langganan</Button>}
+        </div>
       </PageHeader>
       <Gagal error={error} />
       {d && k && (
@@ -233,6 +240,14 @@ export function KlienDetailView({ id, bisaLangganan, onKembali }: { id: number; 
               </div>
             )}
           </div>
+          {bisaLihat && <AnalisaCard id={k.id} />}
+          {d.koreksi.length > 0 && (
+            <>
+              <div className="chart-title">Usulan koreksi</div>
+              {d.koreksi.map((x) => <KoreksiCard key={x.id} k={x} sub={`${x.oleh} · ${formatRelatif(x.waktu)}`} />)}
+            </>
+          )}
+          <LihatDialog open={lihat} onClose={() => setLihat(false)} klien={k} tiket={d.tiket.filter((t) => t.status !== 'selesai').map((t) => `${t.nomor}: ${t.judul}`)} onMulai={onLihat} />
           <LanggananDialog open={dialog} onClose={() => setDialog(false)} klien={k} onSaved={() => { setDialog(false); void muat() }} />
         </>
       )}
@@ -310,5 +325,135 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function LihatDialog({ open, onClose, klien, tiket, onMulai }: { open: boolean; onClose: () => void; klien: KlienRow; tiket: string[]; onMulai: () => void }) {
+  const [alasan, setAlasan] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function mulai(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await mulaiLihat(klien.id, alasan)
+      onMulai()
+    } catch (err) {
+      setError((err as Error).message)
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <form onSubmit={mulai} className="grid gap-4">
+          <DialogHeader>
+            <DialogTitle>Lihat sebagai {klien.nama}</DialogTitle>
+            <DialogDescription>
+              Anda akan melihat laporan klien apa adanya, <strong>tanpa bisa mengubah</strong>, selama 2 jam. Akses ini tercatat di audit log.
+            </DialogDescription>
+          </DialogHeader>
+          {tiket.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tiket.map((t) => (
+                <button key={t} type="button" className="pill-status pill-status-muted" onClick={() => setAlasan(`Tiket ${t}`)}>{t}</button>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="lh-alasan">Alasan</Label>
+            <Input id="lh-alasan" required maxLength={300} placeholder="mis. Pendampingan pembukuan bulanan" value={alasan} onChange={(e) => setAlasan(e.target.value)} />
+          </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Membuka…' : 'Mulai lihat'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const pctBps = (bps: number) => (bps < 0 ? '−' : '') + (Math.abs(bps) / 100).toFixed(2).replace('.', ',') + '%'
+const STATUS_NPM: Record<string, [string, string]> = {
+  wajar: ['pill-green', 'Setara / di atas rata-rata'], di_bawah: ['pill-red', 'Di bawah rata-rata'], kurang_data: ['pill-status-muted', 'Data belum cukup'],
+}
+
+function Ref({ r, judul }: { r: string; judul: string }) {
+  return (
+    <span className="pill-status tabular" title={judul}
+      style={{ fontSize: 11, color: 'var(--accent-blue)', border: '1px solid color-mix(in srgb, var(--accent-blue) 40%, transparent)' }}>{r}</span>
+  )
+}
+
+/** Analisa AI per klien: angka dihitung sistem, AI hanya menulis penilaian bersumber. Dijalankan
+ *  atas permintaan (memanggil model & tercatat di audit log). */
+function AnalisaCard({ id }: { id: number }) {
+  const [a, setA] = useState<AnalisaKlien | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function jalankan() {
+    setBusy(true)
+    setError('')
+    try {
+      setA(await analisaKlien(id))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const f = a?.fakta
+  const judulRef = (r: string) => a?.sumber.find((s) => s.ref === r)?.judul ?? (r.startsWith('BM-') ? `Benchmark DJP ${f?.klu_nama}` : '')
+  return (
+    <div className="card" style={{ padding: 20, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="chart-title">Analisa AI</div>
+        <span className="text-xs text-muted-foreground">Angka dihitung sistem · AI hanya menulis penilaian dan wajib menyebut sumber</span>
+        <Button size="sm" variant="outline" style={{ marginLeft: 'auto' }} disabled={busy} onClick={() => void jalankan()}>{busy ? 'Menganalisa…' : a ? 'Jalankan ulang' : 'Jalankan analisa'}</Button>
+      </div>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {f && (
+        <>
+          <div className="table-scroll">
+            <table className="data-table tabular" style={{ minWidth: 520 }}>
+              <thead><tr><th>Ukuran</th><th style={{ textAlign: 'right' }}>Klien</th><th style={{ textAlign: 'right' }}>Benchmark DJP{f.klu ? ` · KLU ${f.klu}` : ''}</th><th>Sumber</th></tr></thead>
+              <tbody>
+                <tr><td>Margin laba bersih (NPM)</td><td style={{ textAlign: 'right' }}>{pctBps(f.npm_bps)}</td><td style={{ textAlign: 'right' }}>{f.benchmark_npm_bps !== undefined ? pctBps(f.benchmark_npm_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>
+                <tr><td>Beban pajak / omzet (CTTOR)</td><td style={{ textAlign: 'right' }} className="text-muted-foreground">—</td><td style={{ textAlign: 'right' }}>{f.benchmark_cttor_bps !== undefined ? pctBps(f.benchmark_cttor_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>
+                <tr><td>Omzet setahun (rata-rata × 12)</td><td style={{ textAlign: 'right' }}>{formatRp(f.omzet_setahun)}</td><td /><td /></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={'pill-status ' + STATUS_NPM[f.status_npm][0]}>{STATUS_NPM[f.status_npm][1]}</span>
+            {f.klu_nama && <span className="text-muted-foreground">{f.klu_nama} · {f.sumber_benchmark}</span>}
+            {f.risiko?.map((r) => <span key={r} className="pill-status pill-amber">{r}</span>)}
+          </div>
+          {a!.analisa.tersedia ? (
+            <div className="grid gap-2">
+              <p className="text-sm" style={{ borderLeft: '3px solid var(--accent-blue)', paddingLeft: 10 }}><strong>Penilaian:</strong> {a!.analisa.penilaian}</p>
+              {a!.analisa.poin?.map((p, i) => (
+                <div key={i} className="text-sm">
+                  <strong>{p.judul}</strong> {p.sumber.map((r) => <Ref key={r} r={r} judul={judulRef(r)} />)}
+                  <p className="text-muted-foreground">{p.isi}</p>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Model: {a!.analisa.model}. Penilaian AI bukan nasihat final; hal yang menyangkut SPT diverifikasi tim pajak.</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{a!.analisa.alasan}</p>
+          )}
+          {a!.sumber.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">{a!.sumber.length} sumber yang ditemukan untuk klien ini</summary>
+              <ul className="mt-2 grid gap-1">{a!.sumber.map((s, i) => <li key={i}><Ref r={s.ref} judul={s.judul} /> {s.judul}</li>)}</ul>
+            </details>
+          )}
+        </>
+      )}
+    </div>
   )
 }

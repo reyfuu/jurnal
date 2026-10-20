@@ -22,9 +22,12 @@ const (
 	Owner Role = "owner"
 	Admin Role = "admin"
 	Kasir Role = "kasir"
-	// MP: anggota tim MasterPajak. Tidak punya usaha (tenant_id 0) dan hanya membuka Panel
+	// MP: anggota tim Master Pajak. Tidak punya usaha (tenant_id 0) dan hanya membuka Panel
 	// Master; role tim & klien yang ditugaskan diatur di internal/master.
 	MP Role = "mp"
+	// Lihat: peran sementara anggota tim saat "lihat sebagai klien" — hanya baca. Tidak pernah
+	// disimpan di user mana pun; server memasangnya per request (lihat cmd/server/lihat.go).
+	Lihat Role = "lihat"
 )
 
 type RoleInfo struct {
@@ -36,15 +39,19 @@ type RoleInfo struct {
 var financeViews = []string{
 	// "arus-kas" dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 	"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
-	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "kalkulator-pajak", "karyawan", "master-data", "panduan", "lapor-bug",
+	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "kalkulator-pajak", "karyawan", "master-data", "panduan", "pustaka", "lapor-bug",
 }
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.
 var Roles = map[Role]RoleInfo{
-	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "pengguna", "profil-usaha", "langganan")},
+	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "pengguna", "profil-usaha", "langganan", "usulan-koreksi")},
 	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data")},
 	Kasir: {"Kasir", "Dashboard dan catat transaksi (tanpa ubah/hapus).", []string{"dashboard", "transaksi", "lapor-bug"}},
-	MP:    {"Tim MasterPajak", "Panel Master sesuai role tim.", []string{"panel-master"}},
+	MP:    {"Tim Master Pajak", "Panel Master sesuai role tim.", []string{"panel-master"}},
+	Lihat: {"Lihat sebagai (tim Master Pajak)", "Membaca data usaha tanpa bisa mengubah.", []string{
+		"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
+		"produksi-supplier", "invoice", "pajak-umkm", "karyawan", "master-data", "profil-usaha",
+	}},
 }
 
 func (r Role) Can(view string) bool { return slices.Contains(Roles[r].Views, view) }
@@ -195,7 +202,7 @@ func (s *Store) Create(in Input) (User, error) {
 	if err := validate(&in, true); err != nil {
 		return User{}, err
 	}
-	if in.Role == MP && in.TenantID != 0 { // Owner usaha tidak bisa membuat akun tim
+	if in.Role == MP && in.TenantID != 0 || in.Role == Lihat { // Owner usaha tidak bisa membuat akun tim
 		return User{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -220,7 +227,7 @@ func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if err := validate(&in, false); err != nil {
 		return User{}, err
 	}
-	if (in.Role == MP) != (tenantID == 0) { // user usaha tidak bisa dipindah ke tim, dan sebaliknya
+	if (in.Role == MP) != (tenantID == 0) || in.Role == Lihat { // user usaha tidak bisa dipindah ke tim, dan sebaliknya
 		return User{}, ErrInvalid
 	}
 	s.mu.Lock()

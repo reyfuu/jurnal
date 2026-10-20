@@ -7,9 +7,11 @@ export type View =
   | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
-  | 'panel-master' // akun tim MasterPajak: seluruh aplikasi diganti Panel Master
+  | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
+  | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim Master Pajak
+  | 'pustaka' // artikel pajak dari tim Master Pajak
 
-export type Role = 'owner' | 'admin' | 'kasir' | 'mp'
+export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
 export interface User {
   id: number
@@ -30,8 +32,12 @@ export interface Me {
   views: View[]
   langganan: LanggananStatus
   garansi: GaransiStatus
-  /** Hanya akun tim MasterPajak: role tim dan izin efektifnya. */
+  /** Hanya akun tim Master Pajak: role tim dan izin efektifnya. */
   master?: MasterMe
+  /** Akun tim yang sedang "lihat sebagai klien": views berisi menu klien versi baca. */
+  lihat?: { klien_id: number; nama: string; alasan: string; sampai: string }
+  /** Usulan koreksi yang menunggu keputusan pemilik usaha. */
+  koreksi_menunggu?: number
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
@@ -567,6 +573,12 @@ export interface CekAwal {
   cttor_pesan?: string
   sumber: string
   risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
+  /** Kesimpulan sheet "Bentuk Usaha": skema pajak paling hemat + alasan. null bila omzet kosong. */
+  saran: SaranBentuk | null
+}
+export interface SaranBentuk {
+  termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]
+  hemat: number; skema: TaxSkema[]; laba: number; ptkp: number
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
 
@@ -579,7 +591,7 @@ export interface BugReport {
   tenant_id?: number
   /** Status tiket di Panel Master; kosong = baru. */
   status?: TiketStatus
-  /** Balasan tim MasterPajak, terbaca pelapor. */
+  /** Balasan tim Master Pajak, terbaca pelapor. */
   balasan?: { nama: string; isi: string; waktu: string }[]
 }
 
@@ -607,9 +619,10 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
   return res.json()
 }
 
-// --- Panel Master (akun tim MasterPajak) ---
+// --- Panel Master (akun tim Master Pajak) ---
 
-export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'langganan' | 'pembayaran' | 'tim' | 'audit'
+export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
+  | 'parameter_pajak' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -629,7 +642,7 @@ export interface RingkasanMaster {
 }
 export interface TiketRow extends BugReport { tenant_id: number; status: TiketStatus; nomor: string; klien_nama: string }
 export interface MasterOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal' | 'manual'; waktu: string; dibayar_pada?: string }
-export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[] }
+export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[]; koreksi: KoreksiRow[] }
 export interface PembayaranRow { klien_id: number; klien_nama: string; order: MasterOrder; garansi?: GaransiStatus }
 export interface AnggotaRow { user: User; role: string; klien: number[] }
 export interface TimData { anggota: AnggotaRow[]; roles: MasterRole[]; izin: IzinInfo[]; klien: Orang[] }
@@ -653,6 +666,27 @@ export const simpanRole = (r: { id?: string; nama: string; izin: Izin[] }) =>
   r.id ? api<MasterRole>(`/master/roles/${r.id}`, { method: 'PUT', body: r }) : api<MasterRole>('/master/roles', { method: 'POST', body: r })
 export const hapusRole = (id: string) => api<void>(`/master/roles/${id}`, { method: 'DELETE' })
 export const listAudit = () => api<AuditRow[]>('/master/audit')
+export const mulaiLihat = (klien: number, alasan: string) => api<Me['lihat']>(`/master/klien/${klien}/lihat`, { method: 'POST', body: { alasan } })
+export const selesaiLihat = () => api<void>('/master/lihat', { method: 'DELETE' })
+
+// --- Usulan koreksi ---
+
+export type KoreksiStatus = 'menunggu' | 'disetujui' | 'ditolak' | 'kedaluwarsa'
+export interface KoreksiRow {
+  id: number; nomor: string; transaksi_id: number; jenis: 'ubah' | 'hapus'
+  sebelum: Tx; usulan?: Tx
+  alasan: string; oleh: string; waktu: string; status: KoreksiStatus
+  catatan?: string; diputuskan_oleh?: string; diputuskan_pada?: string
+  klien_id: number; klien_nama: string
+  /** Laba bersih per bulan sebelum/sesudah, dihitung server. */
+  dampak: { periode: string; laba_sebelum: number; laba_sesudah: number }[]
+}
+export const usulKoreksi = (klien: number, body: { transaksi_id: number; jenis: 'ubah' | 'hapus'; usulan?: TxInput; alasan: string }) =>
+  api<KoreksiRow>(`/master/klien/${klien}/koreksi`, { method: 'POST', body })
+export const listKoreksiMaster = () => api<KoreksiRow[]>('/master/koreksi')
+export const listKoreksi = () => api<KoreksiRow[]>('/koreksi')
+export const putuskanKoreksi = (id: number, setuju: boolean, catatan: string) =>
+  api<KoreksiRow>(`/koreksi/${id}/${setuju ? 'setujui' : 'tolak'}`, { method: 'POST', body: { catatan } })
 
 export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
 export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }
@@ -682,9 +716,44 @@ export interface CoAInfo {
   accounts: Account[] | null
   mapping: { jenis: string; kode: string; nama: string }[] | null
   kelompok: string[]
+  /** Versi template COA yang dipakai usaha ini. */
+  template?: { id: number; jenis: string; versi: number }
+  /** Ada versi template lebih baru dari tim Master Pajak; berlaku setelah Owner menerapkannya. */
+  pembaruan?: { id: number; versi: number; diff: DiffAkun } | null
 }
+export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[] }
 
 export const getCoA = () => api<CoAInfo>('/coa')
+export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
+
+// --- Katalog Panel Master: template COA & benchmark DJP ---
+
+export type StatusKatalog = 'draft' | 'terbit' | 'aktif' | 'arsip'
+export interface TemplateCOA { id: number; jenis: string; versi: number; status: StatusKatalog; akun: Account[]; catatan?: string; oleh?: string; waktu: string }
+export interface KLUBenchmark { kode: string; nama: string; cttor_bps: number; npm_bps: number }
+export interface BenchmarkVersi { id: number; nama: string; sumber: string; status: StatusKatalog; baris: KLUBenchmark[]; oleh?: string; waktu: string }
+export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; kode_wajib: string[]; klien_per_template: Record<number, number> }
+
+async function unggah<T>(path: string, file: File, fields: Record<string, string>): Promise<T> {
+  const form = new FormData()
+  form.append('file', file)
+  for (const [k, v] of Object.entries(fields)) form.append(k, v)
+  const res = await fetch('/api/v1' + path, { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+export const getKatalogCOA = () => api<KatalogCOA>('/master/coa')
+export const simpanDraftCOA = (jenis: string, akun: Account[], catatan: string) =>
+  api<TemplateCOA>('/master/coa/draft', { method: 'POST', body: { jenis, akun, catatan } })
+export const imporDraftCOA = (file: File, jenis: string, catatan: string) => unggah<TemplateCOA>('/master/coa/draft', file, { jenis, catatan })
+export const hapusDraftCOA = (id: number) => api<void>(`/master/coa/${id}`, { method: 'DELETE' })
+export const terbitkanCOA = (id: number) => api<TemplateCOA>(`/master/coa/${id}/terbitkan`, { method: 'POST' })
+export const unduhCOAUrl = (id: number) => `/api/v1/master/coa/${id}/xlsx`
+export const getKatalogBenchmark = () => api<{ versi: BenchmarkVersi[]; klien_per_klu: Record<string, number> }>('/master/benchmark')
+export const imporBenchmark = (file: File, nama: string, sumber: string) => unggah<BenchmarkVersi>('/master/benchmark', file, { nama, sumber })
+export const aktifkanBenchmark = (id: number) => api<BenchmarkVersi>(`/master/benchmark/${id}/aktifkan`, { method: 'POST' })
+export const unduhBenchmarkUrl = (id: number) => `/api/v1/master/benchmark/${id}/xlsx`
 
 export interface ReportLine { kode: string; nama: string; jumlah: number }
 export interface Balance extends Account { debit: number; kredit: number; saldo: number }
@@ -1232,6 +1301,7 @@ export interface KalkulatorMaster {
     belum_lengkap: string[] | null
   }
   tarif_badan_bps: number
+  parameter: { ppn_efektif_bps: number; dasar_umkm: string; batas_nppn: number; batas_pkp: number }
 }
 
 export interface Langkah { label: string; nilai: number; keterangan?: string }
@@ -1271,6 +1341,106 @@ export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pa
 export interface HasilPKP { omzet: number; batas: number; wajib_pkp: boolean; sisa: number; pemakaian_bps: number; catatan: string[] }
 export const cekPKP = (omzet: number) => api<HasilPKP>('/kalkulator/pkp', { method: 'POST', body: { omzet } })
 
+// --- Kalkulator perencanaan (Tax Planning Calculator V2.1) ---
+
+export type Wilayah = 'ibukota10' | 'ibukota_lain' | 'daerah_lain'
+/** Norma per KLU 5 digit; -1 = tidak tersedia untuk wilayah itu. */
+export interface Norma { klu: string; uraian: string; ibukota10_bps: number; ibukota_lain_bps: number; daerah_lain_bps: number }
+export interface NPPNResult {
+  norma: Norma | null; norma_bps: number; neto: number; ptkp: number; pkp: number; pph: number
+  pph_final: number; boleh: boolean; catatan: string[]; langkah: Langkah[]
+}
+export interface GrossUpResult {
+  nilai_kontrak: number; dpp: number; pajak: number; diterima: number; tarif_efektif_bps: number; final: boolean; langkah: Langkah[]
+}
+export interface SkemaPPN {
+  id: 'non_pkp' | 'pkp_dibebankan' | 'pkp_ditanggung'; nama: string; keterangan: string
+  harga_pembeli: number; dpp: number; ppn_keluaran: number; ppn_masukan: number; ppn_setor: number; hpp: number; opex: number; laba: number
+}
+export interface PPNHargaResult { tarif_efektif_bps: number; skema: SkemaPPN[]; kenaikan_harga_bps: number; laba_tertinggi: string; catatan: string[] }
+export interface TahunAset { tahun: number; beban: number; laba: number; pph: number }
+export interface OpsiAset { tahun: TahunAset[]; total_pph: number; total_kas: number }
+export interface BeliSewaResult {
+  metode: string; beli: OpsiAset; sewa: OpsiAset; potong_sewa: number; rekomendasi: 'beli' | 'sewa'; selisih: number; catatan: string[]
+}
+export const cariNorma = (q: string) => api<Norma[]>('/kalkulator/norma?q=' + encodeURIComponent(q))
+export const hitungNPPN = (b: { omzet: number; klu: string; wilayah: string; norma_bps: number; ptkp: string }) =>
+  api<NPPNResult>('/kalkulator/nppn', { method: 'POST', body: b })
+export const hitungGrossUp = (b: { jenis: string; objek: string; diterima: number; punya_npwp: boolean }) =>
+  api<GrossUpResult>('/kalkulator/gross-up', { method: 'POST', body: b })
+export const hitungPPNHarga = (b: { pembelian: number; termasuk_ppn: boolean; porsi_dari_pkp_bps: number; markup_bps: number; opex_bps: number; opex_nominal: number }) =>
+  api<PPNHargaResult>('/kalkulator/ppn-harga', { method: 'POST', body: b })
+export const hitungBeliSewa = (b: {
+  bentuk: 'badan' | 'op'; ptkp: string; omzet: number; biaya_lain: number; harga_aset: number
+  umur_tahun: number; metode: string; bangunan: boolean; sewa_per_tahun: number
+}) => api<BeliSewaResult>('/kalkulator/beli-sewa', { method: 'POST', body: b })
+
+// --- Parameter pajak (Panel Master) ---
+
+export interface Lapis { sampai: number; tarif_bps: number }
+export interface TERBaris { batas_bawah: number; batas_atas: number; tarif_bps: number }
+/** Isi satu versi parameter; norma tidak ikut (dikelola lewat Excel). */
+export interface ParameterIsi {
+  ptkp: Record<string, number>
+  pasal17: Lapis[]
+  biaya_jabatan_bps: number; biaya_jabatan_maks: number; tanpa_npwp_pph21_bps: number; dasar_bukan_pegawai_bps: number
+  ter: { kategori: Record<string, string>; lapisan: Record<string, TERBaris[]> }
+  umkm_tarif_bps: number; umkm_bebas_op: number; batas_omzet_umkm: number; dasar_umkm: string
+  badan_tarif_bps: number; fasilitas_31e_bps: number; batas_31e_penuh: number; batas_31e: number; dividen_bps: number
+  batas_pkp: number; ppn_tarif_bps: number; ppn_dpp_pembilang: number; ppn_dpp_penyebut: number
+  batas_nppn: number; norma_perbandingan_bps: number
+  objek: JenisPajak[]
+  perlu_verifikasi: string[] | null
+}
+export interface ParameterVersi {
+  id: number; nama: string; dasar: string; status: StatusKatalog; isi: ParameterIsi
+  oleh?: string; waktu: string; jumlah_norma: number
+}
+export const getParameter = () => api<{ versi: ParameterVersi[]; ptkp_codes: string[]; objek_terikat: string[] }>('/master/parameter')
+export const salinParameter = (id: number) => api<ParameterVersi>(`/master/parameter/${id}/salin`, { method: 'POST' })
+export const ubahParameter = (id: number, b: { nama: string; dasar: string; isi: ParameterIsi }) =>
+  api<ParameterVersi>(`/master/parameter/${id}`, { method: 'PUT', body: b })
+export const hapusParameter = (id: number) => api<void>(`/master/parameter/${id}`, { method: 'DELETE' })
+export const aktifkanParameter = (id: number) => api<ParameterVersi>(`/master/parameter/${id}/aktifkan`, { method: 'POST' })
+export const imporNorma = (id: number, file: File) => unggah<ParameterVersi>(`/master/parameter/${id}/norma`, file, {})
+export const unduhNormaUrl = (id: number) => `/api/v1/master/parameter/${id}/norma.xlsx`
+
+// --- Artikel pajak, basis pengetahuan AI, analisa AI per klien ---
+
+export const KATEGORI_ARTIKEL = ['PPh Final UMKM', 'PPh 21', 'PPh 23', 'PPh Badan', 'PPN', 'Pembukuan', 'Administrasi'] as const
+export interface Artikel {
+  id: number; judul: string; kategori: string; dasar_hukum?: string; berlaku_sejak?: string; tag: string[]; isi: string
+  status: 'draft' | 'terbit'; tampil_klien: boolean; oleh: string; diverifikasi?: string; waktu: string
+}
+export type ArtikelInput = Pick<Artikel, 'judul' | 'kategori' | 'dasar_hukum' | 'berlaku_sejak' | 'tag' | 'isi' | 'tampil_klien'>
+export interface SumberPengetahuan {
+  id: number; judul: string; jenis: 'manual' | 'excel' | 'pdf'; topik: string[]; status: 'menunggu' | 'terverifikasi'
+  dipakai_ai: boolean; oleh: string; diverifikasi?: string; waktu: string; potongan: number; cuplikan: string
+}
+export interface Potongan { ref: string; judul: string; teks: string; skor?: number }
+export interface FaktaKlien {
+  nama: string; jenis_usaha: string; bentuk_usaha: string; pkp: boolean; klu?: string; klu_nama?: string
+  omzet_setahun: number; npm_bps: number; benchmark_npm_bps?: number; benchmark_cttor_bps?: number; sumber_benchmark?: string
+  status_npm: 'kurang_data' | 'di_bawah' | 'wajar'; risiko?: string[]
+}
+export interface AnalisaKlien {
+  fakta: FaktaKlien; sumber: Potongan[]
+  analisa: { tersedia: boolean; alasan?: string; model?: string; penilaian?: string; poin?: { judul: string; isi: string; sumber: string[] }[] }
+}
+
+export const listArtikel = () => api<Artikel[]>('/master/artikel')
+export const simpanArtikel = (id: number | null, a: ArtikelInput, terbit: boolean) =>
+  api<Artikel>(id ? `/master/artikel/${id}` : '/master/artikel', { method: id ? 'PUT' : 'POST', body: { ...a, terbit } })
+export const listPustaka = () => api<Artikel[]>('/pustaka')
+export const listPengetahuan = () => api<{ sumber: SumberPengetahuan[]; artikel_terbit: number; potongan_dipakai: number }>('/master/pengetahuan')
+export const tulisPengetahuan = (judul: string, isi: string, topik: string[]) =>
+  api<SumberPengetahuan>('/master/pengetahuan', { method: 'POST', body: { judul, isi, topik } })
+export const unggahPengetahuan = (file: File, judul: string, topik: string) => unggah<SumberPengetahuan>('/master/pengetahuan', file, { judul, topik })
+export const verifikasiPengetahuan = (id: number) => api<unknown>(`/master/pengetahuan/${id}/verifikasi`, { method: 'POST' })
+export const pakaiPengetahuan = (id: number, dipakai_ai: boolean) => api<unknown>(`/master/pengetahuan/${id}`, { method: 'PUT', body: { dipakai_ai } })
+export const hapusPengetahuan = (id: number) => api<void>(`/master/pengetahuan/${id}`, { method: 'DELETE' })
+export const cariPengetahuan = (q: string) => api<Potongan[]>(`/master/pengetahuan/cari?q=${encodeURIComponent(q)}`)
+export const analisaKlien = (id: number) => api<AnalisaKlien>(`/master/klien/${id}/analisa`)
 // --- Simulasi usaha (Simulasi & Harga) ---
 
 export interface DasarSimulasi {

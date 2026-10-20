@@ -13,7 +13,9 @@ import (
 
 	"pajak/internal/auth"
 	"pajak/internal/finance"
+	"pajak/internal/katalog"
 	"pajak/internal/master"
+	"pajak/internal/pengetahuan"
 )
 
 // Penyimpanan PostgreSQL (DATABASE_URL). Data tetap dilayani dari memori; Postgres adalah
@@ -88,6 +90,8 @@ type tenantRow struct {
 	NextStokID     int       `json:"next_stok_id"`
 	NextProdukID   int       `json:"next_produk_id"`
 	NextSupplierID int       `json:"next_supplier_id"`
+	NextKoreksiID  int       `json:"next_koreksi_id"`
+	CoaTemplate    int       `json:"coa_template"`
 	TrialSampai    time.Time `json:"trial_sampai,omitzero"`
 	AktifSampai    time.Time `json:"aktif_sampai,omitzero"`
 	EksporPertama  time.Time `json:"ekspor_pertama,omitzero"`
@@ -138,7 +142,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		return err
 	}
 	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
-		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, l.TrialSampai, l.AktifSampai,
+		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
 		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
@@ -159,6 +163,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		{"produk", st.Produk},
 		{"produk_bahan", bahan},
 		{"supplier", st.Supplier},
+		{"koreksi", st.Koreksi},
 		{"billing_orders", l.Orders},
 	} {
 		if err := insertRows(tx, r.table, t.id, r.rows); err != nil {
@@ -254,6 +259,103 @@ func loadMasterDB(db *sql.DB) (master.State, error) {
 	return st, nil
 }
 
+// saveKatalogDB menulis ulang semua versi template COA & benchmark (puluhan baris).
+func saveKatalogDB(db *sql.DB, st katalog.State) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM coa_template; DELETE FROM benchmark_versi; DELETE FROM parameter_pajak`); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "parameter_pajak", nil, st.Parameter); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "coa_template", nil, st.Template); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "benchmark_versi", nil, st.Benchmark); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// loadKatalogDB: DB tanpa katalog (sebelum fitur ini) = katalog bawaan.
+func loadKatalogDB(db *sql.DB) (katalog.State, error) {
+	st := katalog.NewState()
+	var tm []katalog.Template
+	var bm []katalog.Benchmark
+	if err := selectJSON(db, &tm, `SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM coa_template t`); err != nil {
+		return st, err
+	}
+	if err := selectJSON(db, &bm, `SELECT jsonb_agg(to_jsonb(b) ORDER BY id) FROM benchmark_versi b`); err != nil {
+		return st, err
+	}
+	var pm []katalog.ParameterVersi
+	if err := selectJSON(db, &pm, `SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM parameter_pajak p`); err != nil {
+		return st, err
+	}
+	if len(pm) > 0 {
+		st.Parameter = pm
+	}
+	for _, p := range st.Parameter {
+		st.NextParameterID = max(st.NextParameterID, p.ID+1)
+	}
+	if len(tm) > 0 {
+		st.Template = tm
+	}
+	if len(bm) > 0 {
+		st.Benchmark = bm
+	}
+	for _, t := range st.Template {
+		st.NextTemplateID = max(st.NextTemplateID, t.ID+1)
+	}
+	for _, b := range st.Benchmark {
+		st.NextBenchmarkID = max(st.NextBenchmarkID, b.ID+1)
+	}
+	segarkanBawaan(&st)
+	return st, nil
+}
+
+// savePengetahuanDB menulis ulang artikel & sumber pengetahuan.
+// ponytail: tulis ulang semua baris tiap perubahan; isi PDF bisa ratusan KB per sumber —
+// pindah ke upsert per baris bila sumber melewati ~200 atau simpan terasa lambat.
+func savePengetahuanDB(db *sql.DB, st pengetahuan.State) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM artikel; DELETE FROM sumber_pengetahuan`); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "artikel", nil, st.Artikel); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "sumber_pengetahuan", nil, st.Sumber); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func loadPengetahuanDB(db *sql.DB) (pengetahuan.State, error) {
+	st := pengetahuan.NewState()
+	if err := selectJSON(db, &st.Artikel, `SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM artikel a`); err != nil {
+		return st, err
+	}
+	if err := selectJSON(db, &st.Sumber, `SELECT jsonb_agg(to_jsonb(x) ORDER BY id) FROM sumber_pengetahuan x`); err != nil {
+		return st, err
+	}
+	for _, a := range st.Artikel {
+		st.NextArtikelID = max(st.NextArtikelID, a.ID+1)
+	}
+	for _, x := range st.Sumber {
+		st.NextSumberID = max(st.NextSumberID, x.ID+1)
+	}
+	return st, nil
+}
+
 // loadDB memuat semua data; ok=false bila DB masih kosong (belum ada usaha).
 func (s *Server) loadDB() (ok bool, err error) {
 	var ids []int
@@ -284,7 +386,13 @@ func (s *Server) loadDB() (ok bool, err error) {
 	s.users = auth.Restore(snap)
 	s.bugs = &bugStore{path: dataPath("bugs.json"), mem: map[string][]byte{}}
 	if s.master, err = loadMasterDB(s.db); err != nil {
-		return false, fmt.Errorf("tim MasterPajak: %w", err)
+		return false, fmt.Errorf("tim Master Pajak: %w", err)
+	}
+	if s.katalog, err = loadKatalogDB(s.db); err != nil {
+		return false, fmt.Errorf("katalog: %w", err)
+	}
+	if s.pengetahuan, err = loadPengetahuanDB(s.db); err != nil {
+		return false, fmt.Errorf("pengetahuan: %w", err)
 	}
 	return true, selectJSON(s.db, &s.bugs.list, `SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY id), '[]') FROM bug_reports b`)
 }
@@ -296,6 +404,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
 		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
+		NextKoreksiID: row.NextKoreksiID, CoaTemplate: row.CoaTemplate,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai,
 			EksporPertama: row.EksporPertama, GaransiDiklaim: row.GaransiDiklaim, GaransiAlasan: row.GaransiAlasan}}
 	var items []invoiceItemRow
@@ -314,6 +423,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 		{&st.Produk, rowsOf("produk", "id")},
 		{&bahan, rowsOf("produk_bahan", "produk_id, no")},
 		{&st.Supplier, rowsOf("supplier", "id")},
+		{&st.Koreksi, rowsOf("koreksi", "id")},
 		{&st.Langganan.Orders, rowsOf("billing_orders", "waktu, id")},
 	} {
 		if err := selectJSON(db, q.dst, q.query, t.id); err != nil {

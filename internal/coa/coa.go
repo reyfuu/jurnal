@@ -167,13 +167,18 @@ func isPT(p finance.BusinessProfile) bool {
 
 func perpetual(p finance.BusinessProfile) bool { return p.MetodePersediaan == "perpetual" }
 
-// Active: akun yang berlaku untuk profil usaha (bentuk badan & metode persediaan).
+// Active: akun Master yang berlaku untuk profil usaha (bentuk badan & metode persediaan).
 func Active(p finance.BusinessProfile) []Account {
 	if !Supported(p) {
 		return nil
 	}
+	return ActiveFrom(Master, p)
+}
+
+// ActiveFrom: akun template yang berlaku untuk profil usaha.
+func ActiveFrom(template []Account, p finance.BusinessProfile) []Account {
 	var out []Account
-	for _, acc := range Master {
+	for _, acc := range template {
 		switch acc.Kondisi {
 		case JikaPT:
 			if !isPT(p) {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, LayoutGrid, LogOut, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, Brain, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -7,17 +7,32 @@ import { KlienDetailView, KlienList, Ringkasan } from './Klien'
 import { TiketBoard } from './Tiket'
 import { TimAkses } from './Tim'
 import { AuditLog, Pembayaran } from './Lainnya'
+import { KoreksiMaster } from './Koreksi'
+import { BenchmarkView, TemplateCOAView } from './Katalog'
+import { ArtikelView, BasisPengetahuan } from './Pengetahuan'
+import { ParameterView } from './Parameter'
 
-export type Page = 'ringkasan' | 'klien' | 'tiket' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
-const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin }[] }[] = [
+const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
   {
     group: 'Klien',
     items: [
       { page: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
       { page: 'klien', label: 'Klien', icon: Users },
+      { page: 'koreksi', label: 'Usulan Koreksi', icon: FileCheck2, izin: ['usul_koreksi', 'klien_semua'] },
       { page: 'tiket', label: 'Tiket · Lapor Bug', icon: Ticket, izin: 'tiket' },
+    ],
+  },
+  {
+    group: 'Pengetahuan',
+    items: [
+      { page: 'pengetahuan', label: 'Basis Pengetahuan AI', icon: Brain, izin: 'pengetahuan' },
+      { page: 'artikel', label: 'Artikel Pajak', icon: BookOpen, izin: ['artikel', 'artikel_terbit'] },
+      { page: 'coa', label: 'Template COA', icon: Network, izin: 'coa_template' },
+      { page: 'benchmark', label: 'Benchmark NPM DJP', icon: Gauge, izin: 'benchmark' },
+      { page: 'parameter', label: 'Parameter Pajak', icon: Percent, izin: 'parameter_pajak' },
     ],
   },
   {
@@ -31,9 +46,9 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
 ]
 
 /** Seluruh aplikasi untuk akun tim Master Pajak: hanya metadata klien, tanpa angka keuangan. */
-export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) {
+export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () => void; onLihat: () => void }) {
   const izin = me.master?.izin ?? []
-  const bisa = (i?: Izin) => (i ? izin.includes(i) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
+  const bisa = (i?: Izin | Izin[]) => (i ? [i].flat().some((x) => izin.includes(x)) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
   const [page, setPage] = useState<Page>('ringkasan')
   const [klienId, setKlienId] = useState<number | null>(null)
   const go = (p: Page) => { setPage(p); setKlienId(null) }
@@ -99,7 +114,13 @@ export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) 
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
             ? <KlienList onBuka={buka} />
-            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} onKembali={() => setKlienId(null)} />)}
+            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
+          {page === 'koreksi' && <KoreksiMaster />}
+          {page === 'pengetahuan' && <BasisPengetahuan />}
+          {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}
+          {page === 'coa' && <TemplateCOAView />}
+          {page === 'benchmark' && <BenchmarkView />}
+          {page === 'parameter' && <ParameterView />}
           {page === 'tiket' && <TiketBoard />}
           {page === 'pembayaran' && <Pembayaran />}
           {page === 'tim' && <TimAkses selfId={me.user.id} />}

@@ -5,7 +5,7 @@ import { VIEW_LABEL } from '@/lib/nav'
 import { LaporBug } from '@/views/LaporBug'
 import { Landing } from '@/views/Landing'
 import { Langganan, statusText } from '@/views/Langganan'
-import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
+import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
@@ -26,6 +26,8 @@ import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
 import { PanelMaster } from '@/views/master/PanelMaster'
+import { UsulanKoreksi } from '@/views/UsulanKoreksi'
+import { Pustaka } from '@/views/Pustaka'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -63,7 +65,7 @@ export default function App() {
 
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
-    if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha
+    if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha (kecuali lihat-sebagai)
     setView(m.views[0])
     getBusiness().then(setBusiness, fail)
     getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
@@ -88,7 +90,9 @@ export default function App() {
     setAuth(null)
   }
 
-  if (me.views.includes('panel-master')) return <PanelMaster me={me} onLogout={onLogout} />
+  // Masuk/keluar lihat-sebagai: muat ulang me; data usaha dibuang supaya tidak tertukar.
+  const gantiMode = () => { setBusiness(null); setData(null); getMe().then(signIn, fail) }
+  if (me.views.includes('panel-master')) return <PanelMaster me={me} onLogout={onLogout} onLihat={gantiMode} />
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
@@ -141,13 +145,27 @@ export default function App() {
         <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
+          {me.lihat && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm" role="status"
+              style={{ borderColor: 'var(--accent-amber)', background: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent-amber) 12%, transparent) 0 12px, transparent 12px 24px)' }}>
+              <strong style={{ color: 'var(--accent-amber)' }}>Lihat sebagai klien · baca saja</strong>
+              <span>{me.lihat.nama} · alasan “{me.lihat.alasan}” · tercatat di audit log · berakhir {new Date(me.lihat.sampai).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+              <Button size="sm" variant="outline" className="rounded-full" style={{ marginLeft: 'auto' }} onClick={() => void selesaiLihat().finally(gantiMode)}>Kembali ke Panel Master</Button>
+            </div>
+          )}
+          {!!me.koreksi_menunggu && view !== 'usulan-koreksi' && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
+              <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan Master Pajak menunggu keputusan Anda. Pembukuan belum berubah.</span>
+              <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('usulan-koreksi')}>Tinjau</Button>
+            </div>
+          )}
           {me.langganan.status === 'trial' && view !== 'langganan' && ( // usaha lama yang masih masa coba
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--border-shell)' }} role="status">
               <span>{statusText(me.langganan)}</span>
               {canSee('langganan') && <Button size="sm" variant="accent" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
             </div>
           )}
-          {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
+          {canSee('profil-usaha') && !me.lihat && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--accent-orange) 30%, transparent)', background: 'var(--accent-orange-soft)' }} role="status">
               <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata DJP.</span>
               <Button size="sm" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
@@ -182,7 +200,7 @@ export default function App() {
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>
-      <AIAgentBubble period={period} />
+      {!me.lihat && <AIAgentBubble period={period} />}
     </main>
   )
 
@@ -206,7 +224,8 @@ export default function App() {
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'transaksi':
-        return <Transaksi onChanged={() => reload(me!, period)} />
+        return <Transaksi onChanged={() => reload(me!, period)}
+          lihat={me!.lihat && { klienId: me!.lihat.klien_id, bolehUsul: !!me!.master?.izin.includes('usul_koreksi') }} />
       case 'piutang-utang':
         return <PiutangUtang />
       case 'stok-gudang':
@@ -220,19 +239,23 @@ export default function App() {
       case 'pajak-umkm':
         return <PajakUMKM d={d} />
       case 'kalkulator-pajak':
-        return <KalkulatorPajak />
+        return <KalkulatorPajak profile={business?.profile ?? null} />
       case 'perencanaan-pajak':
         return <PerencanaanPajak profile={business!.profile} ptkpCodes={business!.options.ptkp} />
       case 'profil-usaha':
         return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
       case 'master-data':
-        return <DaftarAkun />
+        return <DaftarAkun bisaPerbarui={canSee('profil-usaha') && !me!.lihat} />
       case 'impor-data':
         return <ImporDataAwal onChanged={() => reload(me!, period)} />
       case 'karyawan':
         return <KaryawanView />
       case 'langganan':
         return <Langganan onPaid={onPaid} />
+      case 'pustaka':
+        return <Pustaka />
+      case 'usulan-koreksi':
+        return <UsulanKoreksi onChanged={() => { void reload(me!, period); getMe().then((m) => setSession({ status: 'in', me: m }), fail) }} />
       case 'lapor-bug':
         return <LaporBug halamanAwal={VIEW_LABEL[bugFrom]} />
       case 'pengguna':

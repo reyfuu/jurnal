@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // KLUBenchmark: rata-rata nasional CTTOR (PPh terutang / peredaran usaha) dan NPM (laba sebelum
@@ -20,12 +21,32 @@ type KLUBenchmark struct {
 
 const SumberBenchmark = "Buku sektoral DJP 2021 (SPT tahun pajak 2020), angka nasional"
 
+type benchmarkSet struct {
+	baris  []KLUBenchmark
+	sumber string
+}
+
+// aktif: versi benchmark yang dipakai seluruh aplikasi; diganti dari Panel Master
+// (AktifkanBenchmark). Bawaan = data DJP yang dibangkitkan di klu_data.go.
+var aktif atomic.Pointer[benchmarkSet]
+
+func init() { AktifkanBenchmark(KLUBenchmarks, SumberBenchmark) }
+
+// AktifkanBenchmark mengganti versi benchmark yang dipakai FindKLU & CekAwal. baris disalin.
+func AktifkanBenchmark(baris []KLUBenchmark, sumber string) {
+	aktif.Store(&benchmarkSet{slices.Clone(baris), sumber})
+}
+
+// BenchmarkAktif: salinan baris versi aktif.
+func BenchmarkAktif() []KLUBenchmark { return slices.Clone(aktif.Load().baris) }
+
 func FindKLU(kode string) (KLUBenchmark, bool) {
-	i := slices.IndexFunc(KLUBenchmarks, func(k KLUBenchmark) bool { return k.Kode == kode })
+	b := aktif.Load().baris
+	i := slices.IndexFunc(b, func(k KLUBenchmark) bool { return k.Kode == kode })
 	if i < 0 {
 		return KLUBenchmark{}, false
 	}
-	return KLUBenchmarks[i], true
+	return b[i], true
 }
 
 // JenisKLU: jenis usaha aplikasi untuk menyaring daftar KLU di onboarding.
@@ -63,6 +84,7 @@ type CekAwalResult struct {
 	CTTORPesan string        `json:"cttor_pesan,omitempty"`
 	Sumber     string        `json:"sumber"`
 	Risiko     []Risiko      `json:"risiko"`
+	Saran      *SaranBentuk  `json:"saran"` // skema pajak paling hemat; nil bila omzet kosong
 }
 
 func pct(bps int64) string {
@@ -82,7 +104,7 @@ func rp(n int64) string {
 
 // skemaSaatIni: skema PPh yang berlaku untuk bentuk usaha sekarang (sama dengan ringkasan onboarding).
 func skemaSaatIni(bentuk string, omzet int64) string {
-	finalOK := omzet <= batasFasilitas
+	finalOK := omzet <= P().BatasOmzetUMKM
 	switch {
 	case bentuk == "op" && finalOK:
 		return SkemaPPOP
@@ -98,7 +120,7 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 // CekAwal: NPM & CTTOR usaha vs rata-rata nasional KLU-nya, plus risiko pemeriksaan / bentuk
 // usaha, untuk ringkasan onboarding dan Perencanaan Pajak.
 func CekAwal(in CekAwalInput) CekAwalResult {
-	r := CekAwalResult{Sumber: SumberBenchmark, Risiko: []Risiko{}}
+	r := CekAwalResult{Sumber: aktif.Load().sumber, Risiko: []Risiko{}, Saran: SaranBentukUsaha(in.BentukUsaha, in.PTKP, in.Omzet, in.Laba)}
 	if k, ok := FindKLU(in.KLU); ok {
 		r.KLU = &k
 	}
@@ -128,14 +150,16 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	} else if r.Status == "di_bawah" {
 		add("tinggi", "NPM di bawah rata-rata DJP", fmt.Sprintf("DJP membandingkan SPT dengan rasio sektor. NPM %s di bawah rata-rata nasional %s berpotensi diminta klarifikasi (SP2DK) atau diperiksa.", pct(r.NPMBps), pct(k.NPMBps)))
 	}
-	if in.Omzet > batasFasilitas {
-		if !in.PKP {
-			add("tinggi", "Wajib menjadi PKP", "Omzet di atas Rp4,8 miliar per tahun wajib dikukuhkan sebagai PKP dan memungut PPN.")
-		}
-		add("tinggi", "Tidak bisa memakai PPh Final 0,5%", "Omzet di atas Rp4,8 miliar tidak memenuhi syarat PPh Final UMKM; wajib pembukuan dan tarif umum.")
+	pr := P()
+	if in.Omzet > pr.BatasPKP && !in.PKP {
+		add("tinggi", "Wajib menjadi PKP", "Omzet di atas "+rp(pr.BatasPKP)+" per tahun wajib dikukuhkan sebagai PKP dan memungut PPN.")
 	}
-	if in.BentukUsaha == "op" && in.Omzet >= batasBebasOP*8/10 && in.Omzet <= batasBebasOP {
-		add("info", "Mendekati batas bebas pajak", "Omzet di atas Rp500 juta per tahun mulai dikenai PPh Final 0,5% atas kelebihannya.")
+	umkm := persenBps(int(pr.UMKMTarifBps))
+	if in.Omzet > pr.BatasOmzetUMKM {
+		add("tinggi", "Tidak bisa memakai PPh Final "+umkm, "Omzet di atas "+rp(pr.BatasOmzetUMKM)+" tidak memenuhi syarat PPh Final UMKM; wajib pembukuan dan tarif umum.")
+	}
+	if in.BentukUsaha == "op" && in.Omzet >= pr.UMKMBebasOP*8/10 && in.Omzet <= pr.UMKMBebasOP {
+		add("info", "Mendekati batas bebas pajak", "Omzet di atas "+rp(pr.UMKMBebasOP)+" per tahun mulai dikenai PPh Final "+umkm+" atas kelebihannya.")
 	}
 
 	ptkp := cmp.Or(in.PTKP, "TK/0")
@@ -147,7 +171,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 		return r
 	}
 	skema := bu.Skema
-	if in.Omzet > batasFasilitas { // PPh Final hanya untuk omzet s.d. 4,8 M
+	if in.Omzet > pr.BatasOmzetUMKM { // PPh final hanya sampai batas omzet UMKM
 		skema = slices.DeleteFunc(slices.Clone(skema), func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
 	}
 	now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet) })]
@@ -158,19 +182,12 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	final := now.ID == SkemaPPOP || now.ID == SkemaPPBadan
 	switch {
 	case final:
-		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s dengan PPh Final 0,5%%; rata-rata nasional %s. Untuk PPh Final, besarnya pajak ditetapkan dari omzet, jadi perbandingan ini hanya informasi.", pct(r.CTTORBps), pct(k.CTTORBps))
+		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s dengan PPh Final %s; rata-rata nasional %s. Untuk PPh Final, besarnya pajak ditetapkan dari omzet, jadi perbandingan ini hanya informasi.", pct(r.CTTORBps), persenBps(int(pr.UMKMTarifBps)), pct(k.CTTORBps))
 	case r.CTTORBps < k.CTTORBps:
 		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, di bawah rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
 		add("sedang", "CTTOR di bawah rata-rata DJP", fmt.Sprintf("Perbandingan pajak terutang dengan omzet (%s) lebih rendah dari rata-rata nasional KLU %s (%s). Pastikan semua penghasilan tercatat.", pct(r.CTTORBps), k.Kode, pct(k.CTTORBps)))
 	default:
 		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, setara atau di atas rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
-	}
-
-	best := slices.MinFunc(skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
-	if hemat := now.Pajak - best.Pajak; hemat >= 1_000_000 && hemat*10 >= now.Pajak {
-		add("sedang", "Bentuk usaha belum paling hemat",
-			fmt.Sprintf("Skema sekarang (%s) sekitar %s per tahun. %s sekitar %s, hemat %s. Bandingkan di menu Perencanaan Pajak.",
-				now.Nama, rp(now.Pajak), best.Nama, rp(best.Pajak), rp(hemat)))
 	}
 	return r
 }

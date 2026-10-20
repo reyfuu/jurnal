@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, Bug, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
   Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
@@ -30,6 +30,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'pajak-umkm', label: 'Pajak UMKM', icon: Shield },
       { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: SquarePercent },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Target },
+      { view: 'pustaka', label: 'Pustaka Pajak', icon: Library },
     ],
   },
   {
@@ -42,6 +43,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'langganan', label: 'Langganan', icon: CreditCard },
       { view: 'master-data', label: 'Daftar Akun (CoA)', icon: Database },
       { view: 'panduan', label: 'Panduan', icon: BookOpen },
+      { view: 'usulan-koreksi', label: 'Usulan Koreksi', icon: FileCheck2 },
       { view: 'lapor-bug', label: 'Lapor Bug', icon: Bug },
     ],
   },

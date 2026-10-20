@@ -1,8 +1,11 @@
 module pajak
 
-go 1.24
+go 1.24.1
 
-require github.com/jackc/pgx/v5 v5.7.5
+require (
+	github.com/jackc/pgx/v5 v5.7.5
+	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

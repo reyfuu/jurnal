@@ -582,6 +582,109 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
+## Panel Master — tahap 2: lihat sebagai klien & usulan koreksi (20 Okt 2026)
+
+- **Lihat sebagai klien** (izin `lihat_sebagai`): `POST /master/klien/{id}/lihat {alasan}` membuka
+  akses baca 2 jam (memori saja; restart = selesai). Selama aktif, `guard` menjalankan permintaan
+  akun tim ke endpoint data usaha sebagai user sementara ber-role `auth.Lihat` (menu Admin tanpa
+  izin ubah) atas usaha itu. Semua metode selain GET/HEAD → 403; `exporting` menolak (ekspor
+  menggugurkan garansi 7 hari klien). Penugasan & izin dicek ulang tiap request, jadi mencabutnya
+  di Tim & Akses langsung menghentikan akses. Role `lihat` tidak bisa diberikan ke user mana pun.
+- **Usulan koreksi** (izin `usul_koreksi`): `finance.Koreksi` menyimpan potret `Sebelum` + `Usulan`.
+  `TerapkanKoreksi` menolak (`ErrKoreksiBasi`) bila transaksinya sudah berubah/hilang sejak
+  diusulkan → status `kedaluwarsa`, perubahan pemilik tidak tertimpa. `HitungDampak` = laba bersih
+  per bulan sebelum/sesudah (tanpa penyusutan register aset).
+- **Keputusan** hanya Owner (view `usulan-koreksi`): `POST /koreksi/{id}/setujui|tolak {catatan}`.
+  Keputusan klien ikut tercatat di audit log Panel Master (peran "Owner klien").
+- Frontend: dialog Ubah di Transaksi dipakai ulang sebagai form usulan saat lihat-sebagai (alasan
+  wajib, "Usulkan hapus"); `KoreksiCard` dipakai klien & Panel Master; banner jumlah usulan
+  menunggu untuk Owner (`me.koreksi_menunggu`).
+- Postgres: tabel `koreksi` (sebelum/usulan JSONB) + `tenants.next_koreksi_id`; ikut diuji di
+  `TestPostgresSimpanMuatSemuaField` (terbukti gagal bila pemetaan dibuang).
+
+## Panel Master — tahap 3: template COA & benchmark DJP berversi (20 Okt 2026)
+
+- `internal/katalog`: versi template COA per jenis usaha (draft → terbit → arsip) dan versi
+  benchmark (draft → aktif → arsip), plus impor/ekspor Excel (format ekspor = template impor).
+  Versi 1 keduanya = bawaan kode (`coa.Master`, `tax.KLUBenchmarks`) dan **diisi ulang dari kode
+  setiap boot** (`segarkanBawaan`), jadi perbaikan di kode tetap berlaku sampai tim menerbitkan
+  versi sendiri.
+- **Template terbit wajib lolos `coa.ValidateTemplate`**: kode 4 digit unik, kelompok/normal/
+  kondisi dikenal, dan semua `coa.KodeWajib()` (akun yang ditulis langsung di jurnal & laporan +
+  hasil `AutoAccount`) ada. `TestKodeWajib_MencakupKodeDiKode` membaca journal.go/reports.go dan
+  gagal bila ada kode literal baru yang belum masuk `kodeSistem`.
+- **Klien dipatok** (`tenant.coaTemplateID`, kolom `tenants.coa_template`): saat versi baru
+  terbit, usaha berjenis sama yang masih mengikuti versi terbaru dipatok ke versi lama.
+  Daftar Akun klien menampilkan tawaran pembaruan + diff; Owner menerapkan lewat
+  `POST /coa/perbarui` (ditolak bila transaksi masih memakai akun yang dihapus). Ganti jenis usaha
+  di profil = patokan dilepas. Jasa/manufaktur kini bisa punya COA lengkap begitu template terbit.
+- **Benchmark aktif** dipasang lewat `tax.AktifkanBenchmark` (pointer atomik; `FindKLU`, `CekAwal`,
+  daftar KLU onboarding ikut). Aktivasi ditolak (409) bila ada KLU yang dipakai profil klien tidak
+  ada di versi baru — profil itu akan gagal validasi saat disimpan.
+- ponytail: katalog aktif juga pointer atomik global di cmd/server (`katalogAktif`) — satu server
+  per proses; tes server tidak paralel.
+- Postgres: `coa_template`, `benchmark_versi` (tulis ulang semua baris) + `tenants.coa_template`.
+
+## Panel Master — tahap 4: artikel pajak, basis pengetahuan AI, analisa per klien (20 Okt 2026)
+
+- `internal/pengetahuan`: artikel (draft → terbit; `tampil_klien` → Pustaka Pajak klien) dan
+  sumber (manual / Excel / PDF; menunggu → terverifikasi, `dipakai_ai`). **AI hanya membaca
+  artikel terbit + sumber terverifikasi yang dipakai.** Pencarian = BM25 di memori atas potongan
+  ≤900 karakter (ponytail: pindah ke FTS Postgres/pgvector bila >~10 rb potongan atau butuh
+  pencarian makna).
+- PDF dibaca dengan `github.com/ledongthuc/pdf` (BSD, turunan rsc.io/pdf; versi dipatok go.sum),
+  dibungkus `recover` karena pustaka itu bisa panik pada berkas rusak. PDF hasil scan →
+  `ErrPDFKosong` (pesan: ketik ringkasan lewat Tulis manual). Tes membangun PDF minimal sendiri.
+- Izin: `pengetahuan`, `artikel` (draft; bawaan Konsultan), `artikel_terbit` (terbitkan & ubah
+  artikel terbit).
+- **Analisa AI per klien** (`GET /master/klien/{id}/analisa`, izin `lihat_sebagai`, tercatat audit,
+  dijalankan atas tombol): `faktaKlien` menghitung omzet setahun & NPM (`tenant.annualized`) dan
+  membandingkan dengan benchmark KLU aktif lewat `tax.CekAwal`; sumber dicari dengan
+  `ai.QueryKlien`; model (`ai.AnalisaKlien`) hanya menulis penilaian dan **rujukan yang tidak ada
+  di daftar sumber dibuang**. Tanpa `LLM_API_KEY`, fakta & sumber tetap tampil.
+- Klien: menu **Pustaka Pajak** (view `pustaka`, Owner & Admin).
+- Postgres: `artikel`, `sumber_pengetahuan` (tulis ulang semua baris; ponytail di pgstore.go).
+
+## Parameter Pajak & kalkulator perencanaan (20 Okt 2026)
+
+- **Satu sumber angka aturan**: `tax.Parameter` (PTKP, lapisan Pasal 17, biaya jabatan, pengali
+  tanpa NPWP, TER, tarif & batas UMKM, tarif badan & Pasal 31E, dividen, batas PKP, PPN + DPP
+  11/12, batas NPPN, tarif objek potong-pungut, norma NPPN per KLU). Semua hitungan membaca
+  `tax.P()` (versi aktif, atomic pointer); konstanta lama dihapus. `ParameterBawaan()` = angka
+  di kode, juga dipakai laporan PPh final UMKM (`finance.CalculateUMKMTax`).
+- **Panel Master → Parameter Pajak** (izin `parameter_pajak`): versi di `katalog.State.Parameter`
+  (draft → aktif → arsip; arsip bisa diaktifkan lagi). Ubah = salin versi jadi draft → edit →
+  simpan → aktifkan. Validasi penuh di setiap simpan (`Parameter.Validasi`, galat 400). Versi 1
+  diisi ulang dari kode tiap boot (`segarkanBawaan`). Postgres: tabel `parameter_pajak` (isi JSONB).
+- Objek `42-umkm`, `ppn-umum`, `ppn-mewah` **terikat** ke field utama (`Selaraskan`, dipanggil saat
+  simpan & aktifkan) dan terkunci di UI, supaya tarif yang sama tidak hidup di dua tempat.
+- **Norma NPPN**: 1.432 KLU 5 digit, `internal/tax/norma_data.go`, dibangkitkan
+  `scripts/gen_norma_nppn.py` dari sheet "Norma" Tax Planning Calculator V2.1 (salinan PER-17/PJ/2015;
+  hanya XML, makro tidak disentuh). Sel kosong / "-" = -1 (tidak tersedia, kalkulator minta norma
+  manual). KLU 01623 dan 43299 kembar di workbook; baris kedua dibuang (dicetak skrip). Tim
+  mengganti tabel lewat Excel di draft (`POST /master/parameter/{id}/norma`).
+- **Perlu verifikasi tim** (tampil di versi bawaan): workbook menyebut "PP 20/2026" untuk PPh final
+  UMKM — tidak bisa diverifikasi, aplikasi tetap merujuk PP 55/2022 (`dasar_umkm`, bisa diubah);
+  TER masih belum lengkap (sekarang bisa dilengkapi dari Panel Master tanpa deploy).
+- **Kalkulator klien** (menu Kalkulator Pajak, baris "Perencanaan"; isian awal dari Profil Usaha —
+  omzet, PTKP, KLU, kota → wilayah, bentuk usaha):
+  - NPPN (`/kalkulator/nppn`) + cari KLU (`/kalkulator/norma?q=`), pembanding PPh final.
+  - Gross up (`/kalkulator/gross-up`): PPh 23, PPh 4(2), PPh 21 bukan pegawai (DPP 50%, Pasal 17,
+    tanpa NPWP 120%). Bagi dua mencari nilai kontrak terkecil — pembulatan & tarif progresif persis.
+  - PPN & harga jual (`/kalkulator/ppn-harga`): gabungan sheet "PPN Dibebankan vs Ditanggung" dan
+    "Simulasi Pricing PPN" → belum PKP / PKP dibebankan / PKP ditanggung (harga termasuk PPN).
+    Workbook: rumus skema 2 melingkar dan PPN masukan memakai 11% tertulis; di sini memakai parameter.
+  - Beli vs sewa aset (`/kalkulator/beli-sewa`): per tahun selama umur ekonomis; rekomendasi dari
+    **total kas keluar** (harga/sewa + PPh), bukan hanya PPh tahun pertama seperti workbook (sampel
+    workbook: PPh tahun 1 sama persis, rekomendasi berbeda — beli lebih hemat 5,3 jt selama 4 tahun).
+    PPh potong atas sewa ditampilkan sebagai informasi, bukan biaya tambahan.
+- Bentuk usaha & perbandingan entitas tetap di menu Perencanaan Pajak (sekarang ikut parameter).
+- **Saran bentuk usaha** (`tax.SaranBentukUsaha`, sheet "Bentuk Usaha"): skema termurah dari omzet & laba
+  profil + narasi "Anda disarankan memakai … karena …" (alasan, penghematan vs skema sekarang, syarat,
+  konsekuensi ganti OP ↔ badan). Ikut di `CekAwalResult.saran`, tampil di ringkasan sign-up dan
+  Perencanaan Pajak (`CekAwalCard`), juga tanpa KLU. Menggantikan risiko lama "Bentuk usaha belum
+  paling hemat". Badan memakai PTKP TK/0 untuk skema orang pribadi (disebut di catatan).
+
 ## Simulasi & Harga — simulasi usaha + kalkulator per produk (20 Okt 2026)
 
 - `finance/simulasi.go` (TDD; angka uji dari contoh desain pemilik, titik impas Rp47.924.397):
@@ -611,9 +714,8 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
    Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
    berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
    mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
-   Panel Master tahap 2–4 (lihat preview): lihat-sebagai-klien + usulan koreksi yang berlaku
-   setelah klien setuju → template COA & benchmark ke database → artikel pajak, basis
-   pengetahuan AI, analisa AI per klien.
+   Panel Master selesai (tahap 1–4). Lanjutan yang wajar: OCR untuk PDF hasil scan di Basis
+   Pengetahuan (pakai slot OCR poin 5), dan AI chat klien yang ikut merujuk Basis Pengetahuan.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 

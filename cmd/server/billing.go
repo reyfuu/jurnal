@@ -129,6 +129,11 @@ func (s *Server) handleKlaimGaransi(w http.ResponseWriter, r *http.Request) {
 // tanda itu tersimpan, supaya berkas tidak pernah sampai tanpa garansinya ikut gugur.
 func (s *Server) exporting(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Tim yang sedang lihat-sebagai tidak boleh menggugurkan garansi klien lewat ekspor.
+		if sedangLihat(r) {
+			http.Error(w, "ekspor tidak tersedia di mode lihat sebagai klien", http.StatusForbidden)
+			return
+		}
 		buf := &bufferedResponse{header: http.Header{}}
 		h(buf, r)
 		if buf.status == 0 || buf.status == http.StatusOK {
