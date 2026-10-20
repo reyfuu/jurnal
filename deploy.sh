@@ -55,6 +55,11 @@ docker run -d \
   -e MIDTRANS_SERVER_KEY="${MIDTRANS_SERVER_KEY:-}" \
   -e MIDTRANS_CLIENT_KEY="${MIDTRANS_CLIENT_KEY:-}" \
   -e MIDTRANS_PRODUCTION="${MIDTRANS_PRODUCTION:-false}" \
+  -e LLM_API_KEY="${LLM_API_KEY:-}" \
+  -e LLM_BASE_URL="${LLM_BASE_URL:-}" \
+  -e LLM_MODEL="${LLM_MODEL:-}" \
+  -e LLM_TIMEOUT="${LLM_TIMEOUT:-}" \
+  --add-host=host.docker.internal:host-gateway \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"
