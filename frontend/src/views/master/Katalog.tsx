@@ -342,7 +342,7 @@ export function BenchmarkView() {
       )}
       <ImporDialog open={impor} onClose={() => setImpor(false)} judul="Impor benchmark NPM nasional"
         keterangan="Kolom: KLU, Nama, NPM (%), CTTOR (%). Versi baru disimpan sebagai draft; aktifkan setelah diperiksa. KLU yang dipakai klien wajib tetap ada."
-        fields={[{ id: 'nama', label: 'Nama versi', placeholder: 'mis. Buku sektoral DJP 2024 · SPT 2023', wajib: true }, { id: 'sumber', label: 'Sumber (tampil di laporan klien)', placeholder: 'Opsional' }]}
+        fields={[{ id: 'nama', label: 'Nama versi', placeholder: 'mis. Benchmark nasional · data 2023', wajib: true }, { id: 'sumber', label: 'Sumber (tampil di laporan klien)', placeholder: 'Opsional' }]}
         onKirim={async (file, n) => { await imporBenchmark(file, n.nama ?? '', n.sumber ?? ''); setImpor(false); setInfo('Versi baru tersimpan sebagai draft.'); await muat() }} />
     </>
   )

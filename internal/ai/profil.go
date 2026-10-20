@@ -12,7 +12,7 @@ import (
 
 // Laporan AI untuk usaha yang belum punya transaksi (baru daftar / belum berlangganan): satu-
 // satunya data adalah perkiraan di form sign-up, jadi analisisnya sengaja terbatas — posisi
-// margin terhadap DJP, risiko pajak, dan skema pajak paling hemat.
+// margin terhadap rata-rata nasional, risiko pajak, dan skema pajak paling hemat.
 
 type SaranRingkas struct {
 	Judul  string   `json:"judul"`

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { cekAwal, type BusinessProfile, type CekAwal, type SaranBentuk } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-// 2 desimal, sama dengan PDF DJP dan pesan dari server
+// 2 desimal, sama dengan data sumber dan pesan dari server
 const formatPct = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
 
 const STATUS: Record<CekAwal['status'], { label: string; color: string }> = {

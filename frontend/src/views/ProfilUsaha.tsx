@@ -111,7 +111,7 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   )
 }
 
-// KLUPicker: cari bidang usaha (KLU 3 digit DJP); daftar disaring sesuai jenis usaha.
+// KLUPicker: cari bidang usaha (KLU 3 digit); daftar disaring sesuai jenis usaha.
 function KLUPicker({ value, onChange, options, jenis }: { value: string; onChange: (kode: string) => void; options: KLUOption[]; jenis?: string }) {
   const [q, setQ] = useState('')
   const [semua, setSemua] = useState(false)

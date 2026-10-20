@@ -59,11 +59,11 @@ type State struct {
 }
 
 // NewState: data bawaan aplikasi — template perdagangan dari "Daftar COA.xlsx" dan benchmark
-// DJP di internal/tax — sebagai versi 1.
+// nasional di internal/tax — sebagai versi 1.
 func NewState() State {
 	return State{
 		Template:        []Template{{ID: 1, Jenis: "perdagangan", Versi: 1, Status: Terbit, Akun: slices.Clone(coa.Master), Catatan: "Daftar COA.xlsx, review akuntan Master Pajak"}},
-		Benchmark:       []Benchmark{{ID: 1, Nama: "Buku sektoral DJP 2021 · SPT 2020", Sumber: tax.SumberBenchmark, Status: Aktif, Baris: slices.Clone(tax.KLUBenchmarks)}},
+		Benchmark:       []Benchmark{{ID: 1, Nama: "Benchmark nasional · data 2020", Sumber: tax.SumberBenchmark, Status: Aktif, Baris: slices.Clone(tax.KLUBenchmarks)}},
 		Parameter:       []ParameterVersi{{ID: 1, Nama: "Bawaan aplikasi", Dasar: tax.SumberParameterBawaan, Status: Aktif, Isi: tax.ParameterBawaan()}},
 		NextTemplateID:  2,
 		NextBenchmarkID: 2,

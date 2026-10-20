@@ -14,7 +14,7 @@ import (
 
 func faktaContoh() FaktaKlien {
 	return FaktaKlien{Nama: "Kedai Kopi Senja", JenisUsaha: "perdagangan", BentukUsaha: "op", KLU: "563", KLUNama: "Penyediaan Minuman",
-		OmzetSetahun: 312_400_000, NPMBps: 3320, BenchmarkNPMBps: -502, BenchmarkCTTORBps: 39, SumberBenchmark: "DJP 2021", StatusNPM: "wajar"}
+		OmzetSetahun: 312_400_000, NPMBps: 3320, BenchmarkNPMBps: -502, BenchmarkCTTORBps: 39, SumberBenchmark: "Nasional 2020", StatusNPM: "wajar"}
 }
 
 var sumberContoh = []pengetahuan.Potongan{

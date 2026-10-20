@@ -10,7 +10,7 @@ import (
 )
 
 // KLUBenchmark: rata-rata nasional CTTOR (PPh terutang / peredaran usaha) dan NPM (laba sebelum
-// pajak / peredaran usaha) per kelompok KLU 3 digit. Data di klu_data.go, dibuat dari PDF DJP
+// pajak / peredaran usaha) per kelompok KLU 3 digit. Data di klu_data.go, dibuat dari PDF sumber
 // oleh scripts/gen_klu_benchmark.py.
 type KLUBenchmark struct {
 	Kode     string `json:"kode"`
@@ -19,7 +19,7 @@ type KLUBenchmark struct {
 	NPMBps   int64  `json:"npm_bps"`
 }
 
-const SumberBenchmark = "Buku sektoral DJP 2021 (SPT tahun pajak 2020), angka nasional"
+const SumberBenchmark = "Rata-rata nasional per KLU, data tahun pajak 2020"
 
 type benchmarkSet struct {
 	baris  []KLUBenchmark
@@ -27,7 +27,7 @@ type benchmarkSet struct {
 }
 
 // aktif: versi benchmark yang dipakai seluruh aplikasi; diganti dari Panel Master
-// (AktifkanBenchmark). Bawaan = data DJP yang dibangkitkan di klu_data.go.
+// (AktifkanBenchmark). Bawaan = data yang dibangkitkan di klu_data.go.
 var aktif atomic.Pointer[benchmarkSet]
 
 func init() { AktifkanBenchmark(KLUBenchmarks, SumberBenchmark) }
@@ -148,7 +148,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	if in.Laba <= 0 {
 		add("tinggi", "Usaha dilaporkan rugi", "Rugi terus-menerus sering memicu SP2DK. Siapkan bukti biaya dan pembukuan yang rapi.")
 	} else if r.Status == "di_bawah" {
-		add("tinggi", "NPM di bawah rata-rata nasional", fmt.Sprintf("DJP membandingkan SPT dengan rasio sektor. NPM %s di bawah rata-rata nasional %s berpotensi diminta klarifikasi (SP2DK) atau diperiksa.", pct(r.NPMBps), pct(k.NPMBps)))
+		add("tinggi", "NPM di bawah rata-rata nasional", fmt.Sprintf("NPM %s di bawah rata-rata nasional %s. Margin yang jauh di bawah rata-rata sektor berpotensi diminta klarifikasi (SP2DK) atau diperiksa.", pct(r.NPMBps), pct(k.NPMBps)))
 	}
 	pr := P()
 	if in.Omzet > pr.BatasPKP && !in.PKP {

@@ -17,7 +17,7 @@ const FAQ = [
   ['Bagaimana cara berlangganan?', 'Setelah daftar dan mengisi profil usaha, pilih paket bulanan atau tahunan lalu bayar lewat Midtrans. Semua fitur langsung aktif begitu pembayaran berhasil.'],
   ['Ada garansi uang kembali?', 'Ada. Garansi 7 hari uang kembali untuk pembayaran pertama, selama Anda belum mengunduh atau mengekspor data (Excel/PDF). Ajukan dari menu Langganan; akses berhenti dan dana dikembalikan lewat Midtrans dalam 3–7 hari kerja.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans. Anda bisa memilih metode yang tersedia di halaman pembayaran, seperti virtual account bank, QRIS, e-wallet, atau kartu.'],
-  ['Dari mana angka benchmark nasionalnya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU) dari buku sektoral DJP, data SPT tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
+  ['Dari mana angka benchmark nasionalnya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU), data tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
   ['Siapa saja yang bisa memakai akun saya?', 'Owner bisa menambah Admin Keuangan dan Kasir. Tiap peran hanya melihat menu yang sesuai, dan data tiap usaha terpisah dari usaha lain.'],
 ] as const
 

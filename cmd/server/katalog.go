@@ -37,7 +37,7 @@ func pasangKatalog(st katalog.State) {
 	tax.AktifkanParameter(st.ParameterAktif().Isi)
 }
 
-// segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data DJP
+// segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data benchmark
 // di kode tetap berlaku sampai tim menerbitkan versi sendiri.
 func segarkanBawaan(st *katalog.State) {
 	baku := katalog.NewState()
@@ -48,7 +48,8 @@ func segarkanBawaan(st *katalog.State) {
 	}
 	for i := range st.Benchmark {
 		if st.Benchmark[i].ID == 1 {
-			st.Benchmark[i].Baris, st.Benchmark[i].Sumber = baku.Benchmark[0].Baris, baku.Benchmark[0].Sumber
+			b := baku.Benchmark[0]
+			st.Benchmark[i].Nama, st.Benchmark[i].Baris, st.Benchmark[i].Sumber = b.Nama, b.Baris, b.Sumber
 		}
 	}
 	for i := range st.Parameter {
