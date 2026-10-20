@@ -268,3 +268,42 @@ func TestPostgresImporDariJSON(t *testing.T) {
 		t.Fatal("data harus dimuat dari DB")
 	}
 }
+
+// Tim, role, audit, dan status/balasan tiket Panel Master tersimpan utuh di Postgres.
+func TestPostgresPanelMaster(t *testing.T) {
+	pgTest(t)
+	srv, m := serverMaster(t)
+	qa := register(t, srv, registerBody)
+	postBug(srv, qa, map[string]string{"judul": "Bug PG", "deskripsi": "d"}, nil)
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/roles", `{"nama":"Akuntan Senior","izin":["klien_lihat","tiket"]}`); rec.Code != http.StatusCreated {
+		t.Fatalf("role: %d %s", rec.Code, rec.Body)
+	}
+	tambahAnggota(t, srv, m, "budi@masterpajak.id", "akuntan-senior", []int{2})
+	if rec := do(srv, m, http.MethodPut, "/api/v1/master/tiket/1", `{"status":"selesai","balasan":"Sudah diperbaiki."}`); rec.Code != http.StatusOK {
+		t.Fatalf("balas: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"bulanan","alasan":"Transfer"}`); rec.Code != http.StatusOK {
+		t.Fatalf("langganan: %d %s", rec.Code, rec.Body)
+	}
+
+	srv2 := NewServer()
+	if got, want := normJSON(t, srv2.master), normJSON(t, srv.master); got != want {
+		t.Fatalf("Panel Master berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
+	}
+	if got, want := normJSON(t, srv2.bugs.list), normJSON(t, srv.bugs.list); got != want {
+		t.Fatalf("tiket berubah:\n got %s\nwant %s", got, want)
+	}
+	if got, want := authJSON(t, srv2), authJSON(t, srv); got != want {
+		t.Fatalf("user berubah (last_seen / akun tim):\n got %s\nwant %s", got, want)
+	}
+	if st := tenantByEmail(t, srv2, qa).langgananStatus(time.Now()).Status; st != "aktif" {
+		t.Fatalf("aktivasi manual hilang: %s", st)
+	}
+	// Audit baru setelah muat ulang melanjutkan nomor, tidak menimpa.
+	m2 := loginPass(t, srv2, "andi@masterpajak.id", masterPass)
+	do(srv2, m2, http.MethodGet, "/api/v1/master/klien/2", "")
+	srv3 := NewServer()
+	if n, last := len(srv3.master.Audit), srv3.master.Audit[len(srv3.master.Audit)-1]; n != len(srv.master.Audit)+1 || last.ID != n || last.Aksi != "Buka detail klien" {
+		t.Fatalf("audit setelah muat ulang: %d baris, terakhir %+v", n, last)
+	}
+}

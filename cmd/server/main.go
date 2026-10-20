@@ -24,6 +24,7 @@ import (
 	"pajak/internal/auth"
 	"pajak/internal/finance"
 	"pajak/internal/llm"
+	"pajak/internal/master"
 	"pajak/internal/xlsx"
 )
 
@@ -75,6 +76,9 @@ type Server struct {
 	db        *sql.DB // nil = berkas JSON di DATA_DIR (atau memori saja)
 	// bugHook: penerusan laporan bug ke pengembang; nil-aman, tanpa BUG_WEBHOOK_URL mati.
 	bugHook *bugHook
+	// master: tim MasterPajak (role, penugasan klien, audit log) untuk Panel Master.
+	masterMu sync.Mutex
+	master   master.State
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -164,6 +168,7 @@ func NewServer() *Server {
 			s.saveAll()
 		}
 	}
+	s.bootstrapMaster()
 	s.adoptOrphans()
 	s.routes()
 	return s
@@ -173,7 +178,7 @@ func NewServer() *Server {
 // gagal tersimpan), supaya ID itu tidak diberikan ke pendaftar berikutnya (audit C3).
 func (s *Server) adoptOrphans() {
 	for _, u := range s.users.Snapshot().Users {
-		if s.tenants[u.TenantID] == nil {
+		if u.Role != auth.MP && s.tenants[u.TenantID] == nil { // akun tim memang tanpa usaha
 			log.Printf("PERINGATAN: user %d memakai usaha %d yang tidak ada; dibuat kosong", u.ID, u.TenantID)
 			s.tenants[u.TenantID] = newTenant(u.TenantID)
 		}
@@ -199,6 +204,7 @@ func (s *Server) loadFiles() bool {
 	}
 	tenants[1] = demo
 	s.tenants, s.users, s.bugs = tenants, users, loadBugs()
+	s.master = loadMasterFile()
 	return st != nil
 }
 
@@ -360,6 +366,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/bugs/info", s.guard("lapor-bug", s.handleBugInfo))
 	s.mux.HandleFunc("GET /api/v1/bugs/{id}/screenshot", s.guard("lapor-bug", s.handleBugScreenshot))
 
+	s.masterRoutes()
+
 	s.mux.HandleFunc("GET /", s.handleStatic)
 }
 
@@ -396,6 +404,13 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "akses ditolak untuk role ini", http.StatusForbidden)
 			return
 		}
+		// Akun tim tidak punya usaha: selain Panel Master hanya boleh membaca /auth/me.
+		// Tanpa ini endpoint "cukup login" (view "") akan berjalan atas usaha yang tidak ada.
+		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
+			http.Error(w, "akun tim MasterPajak hanya membuka Panel Master", http.StatusForbidden)
+			return
+		}
+		s.users.Touch(u.ID, time.Now())
 		if s.lockedWrite(r, u.TenantID) {
 			http.Error(w, "Langganan belum aktif. Pilih paket di menu Langganan untuk mulai memakai aplikasi.", http.StatusPaymentRequired)
 			return
@@ -424,10 +439,15 @@ type meResp struct {
 	Views     []string        `json:"views"`
 	Langganan langgananStatus `json:"langganan"`
 	Garansi   garansiStatus   `json:"garansi"`
+	Master    *masterInfo     `json:"master,omitempty"` // hanya akun tim MasterPajak
 }
 
 func (s *Server) newMe(u auth.User) meResp {
 	me := meResp{User: u, RoleLabel: auth.Roles[u.Role].Label, Views: auth.Roles[u.Role].Views}
+	if u.Role == auth.MP {
+		me.Master = s.masterInfoFor(u)
+		return me
+	}
 	s.tenantsMu.RLock()
 	t := s.tenants[u.TenantID]
 	s.tenantsMu.RUnlock()
@@ -571,7 +591,10 @@ type usersResp struct {
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, usersResp{Users: s.users.List(currentUser(r).TenantID), Roles: auth.Roles})
+	// Role tim MasterPajak bukan pilihan untuk user usaha (auth menolaknya juga).
+	roles := maps.Clone(auth.Roles)
+	delete(roles, auth.MP)
+	writeJSON(w, usersResp{Users: s.users.List(currentUser(r).TenantID), Roles: roles})
 }
 
 func writeAuthErr(w http.ResponseWriter, err error) {

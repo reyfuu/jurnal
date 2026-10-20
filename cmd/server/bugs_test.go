@@ -157,8 +157,8 @@ func TestBugInfo_TanpaWebhook(t *testing.T) {
 	srv := NewServer()
 	var info bugInfo
 	_ = json.NewDecoder(do(srv, login(t, srv, "kasir@kedaikopisenja.id"), http.MethodGet, "/api/v1/bugs/info", "").Body).Decode(&info)
-	if info.PenerusanAktif || info.PenerusanKe != "" || info.Master {
-		t.Fatalf("tanpa webhook & MASTER_EMAIL: %+v", info)
+	if info.PenerusanAktif || info.PenerusanKe != "" {
+		t.Fatalf("tanpa webhook: %+v", info)
 	}
 	// URL non-HTTP diabaikan, bukan dipakai.
 	t.Setenv("BUG_WEBHOOK_URL", "file:///etc/passwd")
@@ -176,39 +176,21 @@ func TestBugHook_TujuanTidakMembocorkanToken(t *testing.T) {
 	}
 }
 
-// ID Master membaca laporan seluruh usaha; pengguna biasa tetap hanya usahanya sendiri.
-func TestBugMasterLihatSemuaUsaha(t *testing.T) {
+// Owner usaha tidak lagi bisa membaca laporan usaha lain lewat MASTER_EMAIL: akses lintas
+// usaha hanya lewat Panel Master (akun tim MP), lihat master_test.go.
+func TestBugOwnerTetapPerUsahaWalauMasterEmail(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
 	t.Setenv("MASTER_EMAIL", "owner@kedaikopisenja.id")
 	srv := NewServer()
-	kasir := login(t, srv, "kasir@kedaikopisenja.id")
-	postBug(srv, kasir, map[string]string{"judul": "Dari usaha satu", "deskripsi": "Keterangan cukup panjang"}, png1x1)
 	qa := register(t, srv, registerBody)
-	postBug(srv, qa, map[string]string{"judul": "Dari usaha dua", "deskripsi": "Keterangan cukup panjang"}, nil)
-
-	master := login(t, srv, "owner@kedaikopisenja.id")
+	postBug(srv, qa, map[string]string{"judul": "Dari usaha dua", "deskripsi": "Keterangan cukup panjang"}, png1x1)
+	owner := login(t, srv, "owner@kedaikopisenja.id")
 	var list []bugReport
-	_ = json.NewDecoder(do(srv, master, http.MethodGet, "/api/v1/bugs", "").Body).Decode(&list)
-	if len(list) != 2 {
-		t.Fatalf("ID Master harus melihat laporan semua usaha, got %d", len(list))
+	_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/bugs", "").Body).Decode(&list)
+	if len(list) != 0 {
+		t.Fatalf("owner usaha 1 melihat %d laporan usaha lain", len(list))
 	}
-	var info bugInfo
-	_ = json.NewDecoder(do(srv, master, http.MethodGet, "/api/v1/bugs/info", "").Body).Decode(&info)
-	if !info.Master {
-		t.Error("owner yang cocok MASTER_EMAIL harus ditandai master")
-	}
-	// Lampiran usaha lain ikut bisa dibuka ID Master, tapi tidak oleh usaha lain.
-	if rec := do(srv, master, http.MethodGet, "/api/v1/bugs/1/screenshot", ""); rec.Code != http.StatusOK {
-		t.Errorf("ID Master buka screenshot: %d", rec.Code)
-	}
-	if rec := do(srv, qa, http.MethodGet, "/api/v1/bugs/1/screenshot", ""); rec.Code != http.StatusNotFound {
-		t.Errorf("usaha lain tetap 404, got %d", rec.Code)
-	}
-	// Tanpa MASTER_EMAIL, owner yang sama kembali hanya melihat usahanya.
-	t.Setenv("MASTER_EMAIL", "")
-	var biasa []bugReport
-	_ = json.NewDecoder(do(srv, master, http.MethodGet, "/api/v1/bugs", "").Body).Decode(&biasa)
-	if len(biasa) != 1 {
-		t.Fatalf("tanpa MASTER_EMAIL harus kembali per usaha, got %d", len(biasa))
+	if rec := do(srv, owner, http.MethodGet, "/api/v1/bugs/1/screenshot", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("screenshot usaha lain: want 404, got %d", rec.Code)
 	}
 }

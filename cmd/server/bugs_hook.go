@@ -98,19 +98,9 @@ func (h *bugHook) kirim(ctx context.Context, b bugReport) error {
 	return nil
 }
 
-// masterEmail: pemilik "ID Master" (pengembang) yang boleh membaca laporan seluruh usaha.
-// Kosong = tidak ada yang punya akses lintas usaha; laporan tetap tersimpan dan diteruskan.
-func masterEmail() string { return strings.ToLower(strings.TrimSpace(os.Getenv("MASTER_EMAIL"))) }
-
-func isMaster(r *http.Request) bool {
-	m := masterEmail()
-	return m != "" && strings.EqualFold(currentUser(r).Email, m)
-}
-
-// bugInfo menyertai daftar laporan: ke mana laporan dikirim dan apakah yang login ID Master.
+// bugInfo menyertai daftar laporan: ke mana laporan dikirim.
 // Ditampilkan ke pelapor supaya jelas laporannya sampai ke mana — bukan sekadar "terkirim".
 type bugInfo struct {
-	Master bool `json:"master"`
 	// PenerusanAktif false = laporan hanya tersimpan di server ini.
 	PenerusanAktif bool   `json:"penerusan_aktif"`
 	PenerusanKe    string `json:"penerusan_ke"`
