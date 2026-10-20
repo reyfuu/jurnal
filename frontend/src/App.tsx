@@ -287,7 +287,7 @@ export default function App() {
       case 'piutang-utang':
         return <PiutangUtang />
       case 'stok-gudang':
-        return <StokGudang />
+        return <StokGudang bisaUbah={!me!.lihat} />
       case 'produksi-supplier':
         return <ProduksiSupplier />
       case 'invoice':

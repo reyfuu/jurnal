@@ -261,6 +261,9 @@ export interface Tx {
   lunas: boolean
   tanggal_lunas: string
   akun?: string // kode CoA koreksi; kosong = otomatis dari jenis
+  /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
+  stok_id?: number
+  qty_stok?: number
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -983,9 +986,13 @@ export type StokInput = Omit<StokItem, 'id'>
 
 /** Turunan (status, margin, nilai) datang dari server supaya rumusnya satu tempat. */
 export interface StokRow extends StokItem {
-  status: 'Habis' | 'Stok Menipis' | 'Aman'
+  status: 'Habis' | 'Stok Menipis' | 'Aman' | 'Minus'
   margin_bps: number
   nilai: number
+  /** Jumlah per seribu satuan (2500 = 2,5). dilacak: dari kartu stok, bukan diketik. */
+  jumlah_mili: number
+  dilacak: boolean
+  minus: boolean
 }
 
 export interface StokSummary {
@@ -994,7 +1001,43 @@ export interface StokSummary {
   nilai_persediaan: number
   menipis: number
   habis: number
+  /** Titik nol kartu stok (YYYY-MM-DD); kosong = belum dimulai. */
+  mulai: string
+  minus: number
 }
+
+// --- Kartu stok ---
+
+export interface BarisGerak { stok_id: number; qty?: number; fisik?: number; harga_unit?: number }
+export interface GerakStok {
+  id: number; tanggal: string; jenis: 'awal' | 'opname' | 'produksi'; baris: BarisGerak[]
+  produk_id?: number; batch?: number; keterangan?: string; oleh?: string; dibuat: string
+}
+export type JenisKartu = 'awal' | 'beli' | 'produksi_masuk' | 'produksi_pakai' | 'jual' | 'opname'
+export interface BarisKartu {
+  tanggal: string; stok_id: number; jenis: JenisKartu; transaksi_id?: number; gerak_id?: number
+  channel?: string; keterangan?: string; qty: number; nilai: number; koreksi?: number
+  saldo_qty: number; saldo_nilai: number; minus?: boolean
+}
+export interface KartuBarang { barang: StokItem; mulai: string; awal: { qty: number; nilai: number }; baris: BarisKartu[] }
+export interface MutasiItem {
+  stok_id: number; sku: string; nama: string; kategori: string; satuan: string
+  awal_qty: number; awal_nilai: number; beli_qty: number; beli_nilai: number; produksi_qty: number; produksi_nilai: number
+  jual_qty: number; jual_nilai: number; pakai_qty: number; pakai_nilai: number; opname_qty: number; opname_nilai: number
+  koreksi_nilai: number; akhir_qty: number; akhir_nilai: number; minus: boolean
+}
+export interface LaporanMutasi { dari: string; sampai: string; mulai: string; items: MutasiItem[]; total: MutasiItem; hpp_jual: number; selisih_opname: number }
+export interface PilihanBarang { id: number; sku: string; nama: string; kategori: string; satuan: string; jumlah_mili: number; harga_jual: number }
+
+export const stokAwal = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/awal', { method: 'POST', body: b })
+export const stokOpname = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/opname', { method: 'POST', body: b })
+export const stokProduksi = (b: { tanggal: string; produk_id: number; batch: number; keterangan?: string }) => api<GerakStok>('/stok/produksi', { method: 'POST', body: b })
+export const getGerakStok = () => api<GerakStok[]>('/stok/gerak')
+export const hapusGerakStok = (id: number) => api<void>(`/stok/gerak/${id}`, { method: 'DELETE' })
+export const getKartuBarang = (id: number, dari: string, sampai: string) => api<KartuBarang>(`/stok/kartu/${id}?dari=${dari}&sampai=${sampai}`)
+export const getMutasiStok = (dari: string, sampai: string) => api<LaporanMutasi>(`/stok/mutasi?dari=${dari}&sampai=${sampai}`)
+export const mutasiStokXlsxUrl = (dari: string, sampai: string) => `/api/v1/stok/mutasi.xlsx?dari=${dari}&sampai=${sampai}`
+export const getPilihanBarang = () => api<{ mulai: string; barang: PilihanBarang[] }>('/stok/pilihan')
 
 export const getTagihan = () => api<TagihanSummary>('/tagihan')
 export const createTagihan = (t: TagihanInput) => api<Tagihan>('/tagihan', { method: 'POST', body: t })

@@ -69,6 +69,10 @@ type Transaction struct {
 	Lunas        bool   `json:"lunas"`
 	TanggalLunas string `json:"tanggal_lunas"`  // kosong = lunas di tanggal transaksi
 	Akun         string `json:"akun,omitempty"` // kode CoA koreksi user; kosong = otomatis dari jenis
+	// StokID & QtyStok: barang yang dibeli (Beli Bahan / Stok) atau dijual (Penjualan) dan
+	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
+	StokID  int   `json:"stok_id,omitempty"`
+	QtyStok int64 `json:"qty_stok,omitempty"`
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.
@@ -87,6 +91,16 @@ func Validate(t *Transaction) error {
 	}
 	if t.Qty < 0 {
 		return errors.New("jumlah tidak boleh negatif")
+	}
+	if t.StokID == 0 {
+		t.QtyStok = 0
+	} else {
+		if t.Jenis != JenisJual && t.Jenis != JenisBeliStok {
+			return errors.New("barang hanya bisa dipilih untuk Penjualan atau Beli Bahan / Stok")
+		}
+		if t.QtyStok <= 0 {
+			return errors.New("jumlah barang harus lebih dari 0")
+		}
 	}
 	if t.TanggalLunas != "" {
 		if !t.Lunas {

@@ -20,7 +20,8 @@ func (s *tenant) handleListProduksi(w http.ResponseWriter, _ *http.Request) {
 	s.mu.RLock()
 	produk := slices.Clone(s.produk)
 	supplier := slices.Clone(s.supplier)
-	stok := slices.Clone(s.stok)
+	// Setelah titik nol, harga bahan & HPP di stok memakai rata-rata kartu stok.
+	stok := finance.TerapkanKartu(slices.Clone(s.stok), s.kartuLocked())
 	tagihan := slices.Clone(s.tagihan)
 	s.mu.RUnlock()
 	writeJSON(w, finance.SummarizeProduksi(produk, supplier, stok, tagihan))

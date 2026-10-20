@@ -815,6 +815,16 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Urutan: kata kunci dulu (gratis). Bila tidak cocok tapi jelas pertanyaan menu dan LLM aktif → `ai.PilihPanduan` (model memilih kode topik dari daftar, divalidasi; kuota 40/user/24 jam). Pertanyaan analisis (mis. "kondisi arus kas saya") tetap dijawab mesin biasa, plus satu tautan pelengkap.
 - `QueryResponse.tautan`; frontend `AIAgentBubble` menerima `onBuka(view, tab)`; `App.navigate(view, tab)` meneruskan `tabAwal` ke Laporan Keuangan.
 
+## Kartu stok: beli, produksi, jual, opname, laporan mutasi (21 Okt 2026) — PR A, operasional
+
+- **Titik nol**: Stok & Gudang → "Mulai kartu stok" = hitung fisik pertama + harga pokok (`GerakStok` jenis `awal`, satu per usaha). Sebelum titik nol perilaku lama tetap (jumlah diketik).
+- **Sumber pergerakan**: transaksi `Beli Bahan / Stok` & `Penjualan` yang memilih barang (`Transaction.StokID`, `QtyStok` per seribu satuan) + dokumen stok (`gerak_stok`: awal, opname, produksi). Kartu **tidak disimpan**, selalu dihitung ulang (`finance.HitungKartu`), jadi ubah/hapus transaksi otomatis mengoreksi stok. Urutan per hari: awal → beli → produksi → jual → opname.
+- **Nilai**: rata-rata bergerak (`mulDiv`, big.Int). Stok minus dibolehkan (ditandai merah, KPI "Stok Minus"); keluar saat minus dinilai rata-rata terakhir, dan saat ditutup pembelian sisa stok dinilai harga masuk — selisihnya `Koreksi` (koreksi HPP).
+- **Produksi** (Produksi & Supplier → tombol Produksi): bahan resep dari stok keluar `takaran × batch`, barang jadi (StokItem SKU/nama produk; dibuat otomatis bila belum ada) masuk `hasil × batch`. Nilai barang jadi = nilai bahan stok yang terpakai saja; bahan manual, tenaga kerja, overhead tetap biaya saat dibayar (hindari hitung ganda).
+- **Laporan**: tab Laporan mutasi (harian/bulanan; Awal, Beli, Produksi, Terjual, Dipakai produksi, Opname, Akhir, nilai) + Export Excel; kartu per barang (klik nama barang); riwayat dokumen (hapus = stok dihitung ulang; stok awal hanya bisa dihapus bila tidak ada dokumen lain). Barang berriwayat tidak bisa dihapus.
+- Formulir Transaksi: pilih "Barang dari Stok & Gudang" (endpoint ringan `/api/v1/stok/pilihan` juga untuk Kasir). Tanggal bawaan Transaksi & Invoice kini WIB (sebelumnya UTC → sebelum 07.00 jatuh ke kemarin).
+- **Belum** (PR B): laporan keuangan masih memakai cara lama (HPP = belanja bahan, persediaan = saldo awal). Penyambungan HPP terjual, persediaan neraca, arus kas, dan pajak mulai titik nol menyusul.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

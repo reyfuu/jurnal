@@ -145,6 +145,8 @@ type tenantData struct {
 	ArsipAlasan                                          string
 	Catatan                                              []finance.CatatanKonsultan
 	NextCatatanID                                        int
+	Gerak                                                []finance.GerakStok
+	NextGerakID                                          int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -154,7 +156,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID, tn.gerak, tn.nextGerakID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -201,6 +203,10 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.catatan = []finance.CatatanKonsultan{filled[finance.CatatanKonsultan](16)}
 	tn.catatan[0].ID = 1
 	tn.nextCatatanID = 2
+	// Dokumen kartu stok: baris disimpan sebagai JSONB.
+	tn.gerak = []finance.GerakStok{filled[finance.GerakStok](17)}
+	tn.gerak[0].ID = 1
+	tn.nextGerakID = 2
 	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2

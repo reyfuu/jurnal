@@ -44,6 +44,8 @@ type state struct {
 	NextKoreksiID  int                        `json:"next_koreksi_id"`
 	Catatan        []finance.CatatanKonsultan `json:"catatan"`
 	NextCatatanID  int                        `json:"next_catatan_id"`
+	Gerak          []finance.GerakStok        `json:"gerak_stok"`
+	NextGerakID    int                        `json:"next_gerak_id"`
 	CoaTemplate    int                        `json:"coa_template,omitempty"`
 	Arsip          time.Time                  `json:"arsip,omitzero"`
 	ArsipAlasan    string                     `json:"arsip_alasan,omitempty"`
@@ -140,6 +142,7 @@ func (t *tenant) snapshot() state {
 		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
 		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
 		Catatan: slices.Clone(t.catatan), NextCatatanID: t.nextCatatanID,
+		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID,
 		Arsip: t.arsip, ArsipAlasan: t.arsipAlasan,
 	}
 }

@@ -1,13 +1,15 @@
-import { Upload } from 'lucide-react'
+import { ClipboardCheck, Flag, ShoppingCart, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
+import { BeliBahanDialog, KartuBarangDialog, MulaiKartuDialog, MutasiStokPanel, OpnameDialog, RiwayatGerakPanel } from '@/views/KartuStok'
+import { formatQty } from '@/lib/qty'
 import {
   createStok, createTagihan, deleteStok, deleteTagihan, importStok, importTagihan,
   STOK_TEMPLATE_URL, TAGIHAN_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
   type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatJt, formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
@@ -296,13 +298,18 @@ const STOK_KOSONG: StokInput = {
 }
 
 const STATUS_CLS: Record<StokRow['status'], string> = {
+  Minus: 'pill-red',
   Habis: 'pill-red',
   'Stok Menipis': 'pill-amber',
   Aman: 'pill-green',
 }
 
-export function StokGudang() {
+/** bisaUbah: false di mode lihat-sebagai (hanya baca). */
+export function StokGudang({ bisaUbah = true }: { bisaUbah?: boolean }) {
   const [data, setData] = useState<StokSummary | null>(null)
+  const [tab, setTab] = useState<'daftar' | 'mutasi' | 'riwayat'>('daftar')
+  const [dialog, setDialog] = useState<'mulai' | 'opname' | 'beli' | null>(null)
+  const [kartu, setKartu] = useState<StokRow | null>(null)
   const [form, setForm] = useState<StokInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [impor, setImpor] = useState(false)
@@ -348,6 +355,9 @@ export function StokGudang() {
   }
 
   const list = data.items ?? []
+  const mulai = data.mulai
+  const editDilacak = editId !== null && !!list.find((x) => x.id === editId)?.dilacak
+  const selesaiDialog = () => { setDialog(null); muat() }
   const kategoris = [...new Set(list.map((it) => it.kategori))].sort()
   const tampil = list.filter((it) => {
     if (kategoriFilter !== 'ALL' && it.kategori !== kategoriFilter) return false
@@ -359,8 +369,18 @@ export function StokGudang() {
 
   return (
     <>
-      <PageHeader title="Stok & Gudang" subtitle="Daftar bahan baku & produk jadi, nilai persediaan, dan peringatan stok menipis.">
-        <div style={{ display: 'flex', gap: 8 }}>
+      <PageHeader title="Stok & Gudang" subtitle={mulai
+        ? `Kartu stok aktif sejak ${formatTanggal(mulai)}: stok bergerak otomatis dari beli, jual, produksi & opname.`
+        : 'Daftar bahan baku & produk jadi, nilai persediaan, dan peringatan stok menipis.'}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {bisaUbah && mulai && <>
+            <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setDialog('opname')}>
+              <ClipboardCheck size={15} aria-hidden /> Stok opname
+            </button>
+            <button className="btn-cta accent" style={{ padding: '8px 16px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setDialog('beli')} disabled={list.length === 0}>
+              <ShoppingCart size={15} aria-hidden /> Beli bahan
+            </button>
+          </>}
           <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
             <Upload size={15} aria-hidden /> Impor Excel
           </button>
@@ -375,11 +395,39 @@ export function StokGudang() {
 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
 
+      {!mulai && (
+        <div className="card" style={{ padding: 20, marginBottom: 16, borderColor: 'var(--accent-blue)' }}>
+          <div className="flex flex-wrap items-center gap-4">
+            <Flag size={22} style={{ color: BLUE, flexShrink: 0 }} aria-hidden />
+            <div style={{ flex: '1 1 320px' }}>
+              <div className="chart-title">Mulai kartu stok supaya jumlah & nilai stok akurat</div>
+              <div className="chart-subtitle">
+                Sekarang jumlah stok masih diketik manual. Setelah titik nol (hitung fisik pertama), stok bertambah dari pembelian & produksi,
+                berkurang dari penjualan, dan dicocokkan lewat stok opname. Disarankan untuk usaha dagang & produksi; usaha jasa boleh melewatinya.
+              </div>
+            </div>
+            {bisaUbah && <button className="btn-cta" style={{ padding: '9px 18px', fontSize: 13 }} disabled={list.length === 0} onClick={() => setDialog('mulai')}>Mulai kartu stok</button>}
+          </div>
+        </div>
+      )}
+
+      {mulai && (
+        <div className="tabbar" role="tablist" aria-label="Bagian stok" style={{ marginBottom: 12 }}>
+          <button role="tab" className="tab-btn" aria-selected={tab === 'daftar'} onClick={() => setTab('daftar')}>Daftar stok</button>
+          <button role="tab" className="tab-btn" aria-selected={tab === 'mutasi'} onClick={() => setTab('mutasi')}>Laporan mutasi</button>
+          <button role="tab" className="tab-btn" aria-selected={tab === 'riwayat'} onClick={() => setTab('riwayat')}>Riwayat opname & produksi</button>
+        </div>
+      )}
+      {mulai && tab === 'mutasi' && <MutasiStokPanel mulai={mulai} bisaEkspor={bisaUbah} />}
+      {mulai && tab === 'riwayat' && <RiwayatGerakPanel items={list} bisaUbah={bisaUbah} onChanged={muat} />}
+
+      {(!mulai || tab === 'daftar') && <>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 16 }}>
         <Kpi label="Item Tercatat" value={String(data.total_item)} meta={`${tampil.length} tampil sesuai filter`} />
         <Kpi label="Nilai Persediaan" value={formatJt(data.nilai_persediaan)} color={BLUE} meta="jumlah × harga pokok" />
         <Kpi label="Stok Menipis" value={String(data.menipis)} color={data.menipis > 0 ? 'var(--text-warn)' : undefined} meta="sudah di bawah batas minimum" />
         <Kpi label="Stok Habis" value={String(data.habis)} color={data.habis > 0 ? RED : undefined} meta="jumlahnya nol" />
+        {mulai && <Kpi label="Stok Minus" value={String(data.minus)} color={data.minus > 0 ? RED : undefined} meta="keluar lebih banyak dari yang tercatat masuk — cek pembelian/produksi" />}
       </div>
 
       <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
@@ -391,6 +439,7 @@ export function StokGudang() {
           </select>
           <select style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status stok">
             <option value="ALL">Semua Status Stok</option>
+            {mulai && <option value="Minus">Minus</option>}
             <option value="Habis">Habis</option>
             <option value="Stok Menipis">Stok Menipis</option>
             <option value="Aman">Aman</option>
@@ -417,10 +466,10 @@ export function StokGudang() {
                 {['Bahan Baku', 'Produk Jadi', 'Kemasan', 'Barang'].map((k) => <option key={k} value={k} />)}
               </datalist>
             </label>
-            <label>
-              <span className="kpi-label">Jumlah</span>
+            <label title={editDilacak ? 'Jumlah mengikuti kartu stok; ubah lewat stok opname' : undefined}>
+              <span className="kpi-label">Jumlah{editDilacak ? ' (dari kartu stok)' : ''}</span>
               <input
-                className="input-field tabular" placeholder="0" {...angka(form.jumlah, (n) => setForm({ ...form, jumlah: n }))}
+                className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.jumlah, (n) => setForm({ ...form, jumlah: n }))}
               />
             </label>
             <label>
@@ -433,10 +482,10 @@ export function StokGudang() {
                 className="input-field tabular" placeholder="0" {...angka(form.stok_min, (n) => setForm({ ...form, stok_min: n }))}
               />
             </label>
-            <label>
-              <span className="kpi-label">Harga Pokok / Satuan</span>
+            <label title={editDilacak ? 'Harga pokok rata-rata dihitung dari pembelian & produksi' : undefined}>
+              <span className="kpi-label">Harga Pokok / Satuan{editDilacak ? ' (rata-rata)' : ''}</span>
               <input
-                className="input-field tabular" placeholder="0" {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
+                className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
               />
             </label>
             <label>
@@ -457,7 +506,7 @@ export function StokGudang() {
 
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Daftar Stok</div>
-        <div className="chart-subtitle">Bisa diisi sekaligus lewat tombol Impor Excel, atau lewat Pengaturan → Impor Data Awal</div>
+        <div className="chart-subtitle">{mulai ? 'Klik nama barang untuk melihat kartu stoknya (riwayat masuk & keluar).' : 'Bisa diisi sekaligus lewat tombol Impor Excel, atau lewat Pengaturan → Impor Data Awal'}</div>
         <div className="table-scroll">
           <table className="data-table tabular" style={{ minWidth: 940 }}>
             <thead>
@@ -479,9 +528,13 @@ export function StokGudang() {
               {tampil.map((it) => (
                 <tr key={it.id}>
                   <td style={{ color: 'var(--text-muted)' }}>{it.sku || '—'}</td>
-                  <td style={{ fontWeight: 600 }}>{it.nama}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {it.dilacak
+                      ? <button type="button" className="text-left hover:underline" style={{ color: 'var(--link)', fontWeight: 600 }} onClick={() => setKartu(it)}>{it.nama}</button>
+                      : it.nama}
+                  </td>
                   <td>{it.kategori}</td>
-                  <td style={{ textAlign: 'right' }}>{it.jumlah.toLocaleString('id-ID')} {it.satuan}</td>
+                  <td style={{ textAlign: 'right', color: it.minus ? RED : undefined, fontWeight: it.minus ? 700 : undefined }}>{formatQty(it.jumlah_mili)} {it.satuan}</td>
                   <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{it.stok_min > 0 ? it.stok_min.toLocaleString('id-ID') : '—'}</td>
                   <td style={{ textAlign: 'right' }}>{formatRp(it.harga_pokok)}</td>
                   <td style={{ textAlign: 'right' }}>{it.harga_jual > 0 ? formatRp(it.harga_jual) : '—'}</td>
@@ -497,6 +550,13 @@ export function StokGudang() {
           </table>
         </div>
       </div>
+
+      </>}
+
+      {dialog === 'mulai' && <MulaiKartuDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {dialog === 'opname' && <OpnameDialog items={list} mulai={mulai} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {dialog === 'beli' && <BeliBahanDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {kartu && <KartuBarangDialog item={kartu} onClose={() => setKartu(null)} />}
 
       <MenuImportDialog
         open={impor} onOpenChange={setImpor} onImported={muat}

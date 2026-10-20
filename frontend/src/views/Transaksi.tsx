@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  createTransaction, deleteTransaction, getCoA, listTransactions, updateTransaction, usulKoreksi, type CashWarning, type CoAInfo, type JenisInfo, type SavedTx, type Tx, type TxInput,
+  createTransaction, deleteTransaction, getCoA, getPilihanBarang, listTransactions, updateTransaction, usulKoreksi, type CashWarning, type CoAInfo, type JenisInfo,
+  type PilihanBarang, type SavedTx, type Tx, type TxInput,
 } from '@/lib/api'
+import { formatQty, parseQty, qtyKeTeks } from '@/lib/qty'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
 import { MutasiDialog } from '@/views/MutasiDialog'
@@ -19,7 +21,8 @@ import { angka } from '@/lib/angka'
 const PAGE = 100
 const ALL = '__all__' // Radix Select tidak menerima value kosong
 const AUTO = '__auto__' // akun otomatis dari jenis
-const today = () => new Date().toISOString().slice(0, 10)
+// Tanggal hari ini menurut WIB; toISOString() memakai UTC sehingga sebelum pukul 07.00 jatuh ke kemarin.
+const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
 const EMPTY: TxInput = {
   tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
 }
@@ -54,6 +57,10 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
   }, [])
 
   useEffect(() => { getCoA().then(setCoa, () => {}) }, [])
+  // Barang untuk Penjualan / Beli Bahan: stok bergerak otomatis setelah kartu stok dimulai.
+  const [barang, setBarang] = useState<{ mulai: string; barang: PilihanBarang[] }>({ mulai: '', barang: [] })
+  const [qtyTeks, setQtyTeks] = useState('')
+  useEffect(() => { getPilihanBarang().then(setBarang, () => {}) }, [])
   const autoKode = (j: string) => coa?.mapping?.find((m) => m.jenis === j)?.kode ?? ''
   const akunNama = (kode: string) => coa?.accounts?.find((a) => a.kode === kode)?.nama ?? ''
   const akunOf = (t: Pick<Tx, 'jenis' | 'akun'>) => t.akun || autoKode(t.jenis)
@@ -73,6 +80,8 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
 
   function openNew() {
     setError('')
+    setQtyTeks('')
+    getPilihanBarang().then(setBarang, () => {})
     setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false })
   }
   function openEdit(t: Tx) {
@@ -80,6 +89,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
     setError('')
     setAlasan('')
     const { id, ...input } = t
+    setQtyTeks(qtyKeTeks(t.qty_stok ?? 0))
     setEditing({ id, input, confirmDelete: false })
   }
 
@@ -224,7 +234,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
             <tbody>
               {shown.slice(0, limit).map((t) => {
                 const masuk = isMasuk(posOf[t.jenis])
-                const sub = [t.item && (t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
+                const sub = [t.item && (t.qty_stok ? `${t.item} × ${formatQty(t.qty_stok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (
                   <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
@@ -283,7 +293,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
                   <Input id="tx-tanggal" type="date" required value={editing.input.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
                 </Field>
                 <Field id="tx-jenis" label="Jenis transaksi">
-                  <Select value={editing.input.jenis} onValueChange={(v) => set({ jenis: v })}>
+                  <Select value={editing.input.jenis} onValueChange={(v) => set(v === 'Penjualan' || v === 'Beli Bahan / Stok' ? { jenis: v } : { jenis: v, stok_id: undefined, qty_stok: undefined })}>
                     <SelectTrigger id="tx-jenis" className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -325,15 +335,44 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
                 <Field id="tx-ket" label="Keterangan">
                   <Input id="tx-ket" placeholder="Misal: rekap kasir, belanja susu" value={editing.input.keterangan} onChange={(e) => set({ keterangan: e.target.value })} />
                 </Field>
-                <Field id="tx-item" label="Produk / bahan" hint="Penjualan: nama produk. Beli bahan: nama bahan.">
-                  <Input id="tx-item" placeholder="Opsional" value={editing.input.item} onChange={(e) => set({ item: e.target.value })} />
-                </Field>
-                <Field id="tx-qty" label="Jumlah">
-                  <Input
-                    id="tx-qty" placeholder="porsi / unit" className="tabular"
-                    {...angka(editing.input.qty, (n) => set({ qty: n }))}
-                  />
-                </Field>
+                {(() => {
+                  const bolehBarang = (editing.input.jenis === 'Penjualan' || editing.input.jenis === 'Beli Bahan / Stok') && barang.barang.length > 0
+                  const pilih = bolehBarang ? barang.barang.find((b) => b.id === editing.input.stok_id) : undefined
+                  return <>
+                    {bolehBarang && (
+                      <Field id="tx-barang" label="Barang dari Stok & Gudang"
+                        hint={!pilih ? 'Opsional. Pilih supaya stok & HPP ikut bergerak.'
+                          : !barang.mulai ? 'Kartu stok belum dimulai, jadi stok belum bergerak.'
+                            : editing.input.tanggal < barang.mulai ? `Tanggal ini sebelum titik nol stok (${barang.mulai}), jadi stok tidak bergerak.`
+                              : `Stok sekarang ${formatQty(pilih.jumlah_mili)} ${pilih.satuan}.`}>
+                        <select id="tx-barang" className="input-field" value={editing.input.stok_id ?? 0}
+                          onChange={(e) => {
+                            const b = barang.barang.find((x) => x.id === Number(e.target.value))
+                            set(b ? { stok_id: b.id, item: b.nama, qty_stok: parseQty(qtyTeks) } : { stok_id: undefined, qty_stok: undefined })
+                          }}>
+                          <option value={0}>— tidak dari daftar stok —</option>
+                          {barang.barang.map((b) => <option key={b.id} value={b.id}>{b.nama}{b.sku ? ` (${b.sku})` : ''}</option>)}
+                        </select>
+                      </Field>
+                    )}
+                    {pilih ? (
+                      <Field id="tx-qty-stok" label={`Jumlah barang (${pilih.satuan || 'satuan'})`} hint="Boleh desimal, mis. 2,5">
+                        <Input id="tx-qty-stok" required inputMode="decimal" className="tabular" value={qtyTeks}
+                          onChange={(e) => { const v = e.target.value.replace(/[^\d.,]/g, ''); setQtyTeks(v); set({ qty_stok: parseQty(v) }) }} />
+                      </Field>
+                    ) : <>
+                      <Field id="tx-item" label="Produk / bahan" hint="Penjualan: nama produk. Beli bahan: nama bahan.">
+                        <Input id="tx-item" placeholder="Opsional" value={editing.input.item} onChange={(e) => set({ item: e.target.value })} />
+                      </Field>
+                      <Field id="tx-qty" label="Jumlah">
+                        <Input
+                          id="tx-qty" placeholder="porsi / unit" className="tabular"
+                          {...angka(editing.input.qty, (n) => set({ qty: n }))}
+                        />
+                      </Field>
+                    </>}
+                  </>
+                })()}
                 <Field id="tx-channel" label="Channel">
                   <Input id="tx-channel" placeholder="Opsional, misal GoFood" value={editing.input.channel} onChange={(e) => set({ channel: e.target.value })} />
                 </Field>

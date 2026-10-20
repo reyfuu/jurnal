@@ -90,10 +90,8 @@ func (s *tenant) handleDeleteTagihan(w http.ResponseWriter, r *http.Request) {
 // --- Stok ---
 
 func (s *tenant) handleListStok(w http.ResponseWriter, _ *http.Request) {
-	s.mu.RLock()
-	list := slices.Clone(s.stok)
-	s.mu.RUnlock()
-	writeJSON(w, finance.SummarizeStok(list))
+	k, list := s.kartu()
+	writeJSON(w, finance.RingkasStok(list, k))
 }
 
 func decodeStok(w http.ResponseWriter, r *http.Request) (finance.StokItem, bool) {
@@ -154,6 +152,10 @@ func (s *tenant) handleDeleteStok(w http.ResponseWriter, r *http.Request) {
 	i := s.stokIndex(r)
 	if i < 0 {
 		http.Error(w, "barang tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if s.stokDipakai(s.stok[i].ID) {
+		http.Error(w, "barang ini sudah punya riwayat di kartu stok (transaksi, opname, atau produksi); tidak bisa dihapus", http.StatusConflict)
 		return
 	}
 	s.stok = slices.Delete(s.stok, i, i+1)

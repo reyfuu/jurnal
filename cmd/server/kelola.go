@@ -400,4 +400,5 @@ func (s *Server) kelolaRoutes() {
 	m.HandleFunc("GET /api/v1/akses-tim", s.guard("pengguna", s.handleRiwayatAksesTim))
 	s.catatanRoutes()
 	s.jadwalRoutes()
+	s.kartuStokRoutes()
 }
