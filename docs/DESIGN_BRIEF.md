@@ -1,11 +1,11 @@
-# Design Brief — Laporan Bisnis by Akademi Pajak
+# Design Brief — Laporan Bisnis by Master Pajak
 
 > Dokumen ringkas ini mendampingi [BRD.md](file:///home/reyfuu/pajak/docs/BRD.md), [FRD.md](file:///home/reyfuu/pajak/docs/FRD.md), [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md), dan [PRD.md](file:///home/reyfuu/pajak/docs/PRD.md). Spesifikasi sistem desain teknis lengkap tersedia di [DESIGN.md](file:///home/reyfuu/pajak/DESIGN.md).
 
 ---
 
 ## 1. Ringkasan Proyek Desain
-- **Nama Produk**: Laporan Bisnis (`by Akademi Pajak`)
+- **Nama Produk**: Laporan Bisnis (`by Master Pajak`)
 - **Tagline UI**: *"Gambaran seluruh bisnis dalam satu layar"*
 - **Target Pengguna**: Pemilik UMKM Indonesia (FnB seperti *Kedai Kopi Senja*, Ritel, Jasa, Produksi) yang menginginkan kejelasan laba bersih, arus kas, piutang macet, dan pajak UMKM tanpa kerumitan software akuntansi tradisional.
 - **Harga & CTA Utama**: `Beli Rp149.000` (Tombol aksen kuning emas di sudut kanan atas).

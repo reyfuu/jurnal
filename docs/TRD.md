@@ -1,5 +1,5 @@
 # Technical Requirements Document (TRD)
-**Produk**: Laporan Bisnis by Akademi Pajak  
+**Produk**: Laporan Bisnis by Master Pajak  
 **Kapasitas Target**: **100 Active UMKM Tenants** (Early Stage Production)  
 **Kandidat Backend**: **Go (Golang 1.23+)** vs **ElysiaJS (Bun 1.x)**  
 **Prinsip Arsitektur**: *Ponytail (YAGNI, Single-Node Simplicity, Zero Unnecessary Infrastructure)*

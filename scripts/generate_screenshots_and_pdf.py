@@ -87,7 +87,7 @@ class PDFGuide(FPDF):
         if self.page_no() > 1:
             self.set_font("Helvetica", "B", 8)
             self.set_text_color(120, 140, 160)
-            self.cell(0, 8, "PANDUAN APLIKASI LAPORAN BISNIS - BY AKADEMI PAJAK", align="L")
+            self.cell(0, 8, "PANDUAN APLIKASI LAPORAN BISNIS - BY MASTER PAJAK", align="L")
             self.cell(0, 8, f"Hal. {self.page_no()}", align="R", new_x="LMARGIN", new_y="NEXT")
             self.set_draw_color(30, 41, 59)
             self.set_line_width(0.3)
@@ -119,7 +119,7 @@ def build_pdf():
     
     pdf.set_font("Helvetica", "", 13)
     pdf.set_text_color(148, 163, 184) # Slate Muted
-    pdf.cell(0, 8, "by Akademi Pajak", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "by Master Pajak", align="C", new_x="LMARGIN", new_y="NEXT")
 
     pdf.ln(12)
     pdf.set_draw_color(16, 185, 129)
@@ -183,7 +183,7 @@ def build_pdf():
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(51, 65, 85)
     pdf.multi_cell(0, 5.5, 
-        "Aplikasi Laporan Bisnis by Akademi Pajak dirancang khusus untuk memecahkan tiga masalah terbesar pelaku UMKM Indonesia:\n"
+        "Aplikasi Laporan Bisnis by Master Pajak dirancang khusus untuk memecahkan tiga masalah terbesar pelaku UMKM Indonesia:\n"
         "1. Uang tunai sering habis di akhir bulan meskipun omzet terlihat besar (masalah rekonsiliasi kas vs laba).\n"
         "2. Kebingungan saat menetapkan harga jual di kanal ojek online (GoFood/Grab/Shopee) yang menyebabkan margin tergerus komisi 20%.\n"
         "3. Ketakutan terhadap sanksi dan denda pajak akibat minimnya pemahaman aturan PPh Final UMKM PP 55 Tahun 2022.\n\n"
@@ -295,7 +295,7 @@ def build_pdf():
     pdf.cell(0, 8, "Prinsip Rekonsiliasi Kas (Invarian Kas)", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9.5)
     pdf.multi_cell(0, 5,
-        "Formula Kunci Akademi Pajak: Kenaikan Kas = Laba Bersih - Piutang Baru + Utang Baru.\n"
+        "Formula Kunci Master Pajak: Kenaikan Kas = Laba Bersih - Piutang Baru + Utang Baru.\n"
         "Dengan formula ini, pemilik bisnis dapat segera mengetahui kemana laba mereka pergi jika uang kas di bank tidak bertambah sesuai laba bersih."
     )
 
@@ -332,7 +332,7 @@ def build_pdf():
     pdf.cell(0, 9, "7. AI Agent Konsultan Bisnis & Pajak (Floating Bubble)", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9.5)
     pdf.multi_cell(0, 5,
-        "Tombol melayang 'Tanya AI Pajak' di pojok kanan bawah dapat dibuka kapan saja. AI Agent terintegrasi langsung dengan database pembukuan dan engine regulasi perpajakan Akademi Pajak."
+        "Tombol melayang 'Tanya AI Pajak' di pojok kanan bawah dapat dibuka kapan saja. AI Agent terintegrasi langsung dengan database pembukuan dan engine regulasi perpajakan Master Pajak."
     )
 
     # --- PAGE 8: AI AGENT BUBBLE SCREENSHOT & DETAIL ---
@@ -352,7 +352,7 @@ def build_pdf():
         "4. Saran Aksi Cepat: Menyediakan tombol rekomendasi otomatis di akhir setiap jawaban."
     )
 
-    pdf_out_path = os.path.join(os.getcwd(), "docs", "Panduan_Laporan_Bisnis_Akademi_Pajak.pdf")
+    pdf_out_path = os.path.join(os.getcwd(), "docs", "Panduan_Laporan_Bisnis_Master_Pajak.pdf")
     pdf.output(pdf_out_path)
     print("==================================================")
     print("✓ DOKUMEN PDF BERHASIL DIBUAT:")

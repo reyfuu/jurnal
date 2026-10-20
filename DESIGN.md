@@ -1,5 +1,5 @@
 # DESIGN.md — Design Brief & Design System Specification
-**Produk**: Laporan Bisnis by Akademi Pajak  
+**Produk**: Laporan Bisnis by Master Pajak  
 **Aesthetic Persona**: *Navy & Gold* (latar brand navy, permukaan laporan netral gelap)
 **Component Stack**: `shadcn/ui` + `Kokonut UI` + `21st.dev` + Tailwind CSS  
 **Guardrails**: `antislop` · `taste` · `impeccable` · `ui ux pro max` · `ponytail`
@@ -9,7 +9,7 @@
 ## 1. Executive Design Brief (Dari Gambar Referensi)
 
 ### 1.1 Esensi Visual & Mood
-Desain **Laporan Bisnis by Akademi Pajak** memadukan ketenangan visual *dark-mode* kelas eksekutif (seperti Linear / Mercury / Stripe Dark) dengan kehangatan aksen **Warm Gold / Amber (`#EAB308`)** khas identitas Akademi Pajak. Alih-alih menampilkan tabel akuntansi padat yang mengintimidasi pemilik UMKM, antarmuka ini menerjemahkan ribuan transaksi (`4.425 transaksi`) menjadi **satu layar cerita visual yang langsung menjawab 3 pertanyaan pemilik bisnis dalam 5 detik**:
+Desain **Laporan Bisnis by Master Pajak** memadukan ketenangan visual *dark-mode* kelas eksekutif (seperti Linear / Mercury / Stripe Dark) dengan kehangatan aksen **Warm Gold / Amber (`#EAB308`)** khas identitas Master Pajak. Alih-alih menampilkan tabel akuntansi padat yang mengintimidasi pemilik UMKM, antarmuka ini menerjemahkan ribuan transaksi (`4.425 transaksi`) menjadi **satu layar cerita visual yang langsung menjawab 3 pertanyaan pemilik bisnis dalam 5 detik**:
 1. *"Apakah bisnis saya untung dan mencapai target bulan ini?"* → Dijawab oleh **Omzet (`Rp92 jt`)**, **Laba bersih (`Rp25 jt`)**, **Margin (`27%`)**, dan **Target omzet (`108%`)**.
 2. *"Kemana perginya uang kas saya?"* → Dijawab oleh **Saldo kas & bank (`Rp97 jt`)**, grafik **Saldo kas per bulan**, serta kartu **Omzet per channel (`Potongan aplikasi bulan ini Rp4,6 jt`)**.
 3. *"Siapa yang belum bayar tagihan dan apa yang harus segera ditagih?"* → Dijawab oleh kartu **Piutang belum tertagih (`Rp11 jt`)** dengan highlight merah menyala **`Rp9,6 jt lewat 30 hari`**.
@@ -23,7 +23,7 @@ Desain **Laporan Bisnis by Akademi Pajak** memadukan ketenangan visual *dark-mod
 
 ## 2. Color System & Design Tokens
 
-**Keputusan brand — 19 Oktober 2026:** warna utama adalah **navy `#222852`**, dipilih pengguna untuk membangun asosiasi dengan perpajakan/DJP. Ini keputusan warna produk Laporan Bisnis by Akademi Pajak; monogram A dan nama produk tetap menjadi identitasnya. Kedua kode yang diberikan pengguna sama, sehingga aksen emas yang sudah ada (`#F5C428` / `#EAB308`) dipertahankan.
+**Keputusan brand — 19 Oktober 2026:** warna utama adalah **navy `#222852`**, dipilih pengguna untuk membangun asosiasi dengan perpajakan/DJP. Ini keputusan warna produk Laporan Bisnis by Master Pajak; monogram A dan nama produk tetap menjadi identitasnya. Kedua kode yang diberikan pengguna sama, sehingga aksen emas yang sudah ada (`#F5C428` / `#EAB308`) dipertahankan.
 
 Navy dipakai solid pada latar login/onboarding, sidebar, favicon, dan warna tema browser. Logo, CTA, pilihan aktif, serta progres memakai emas. Teks CTA emas menggunakan navy. Kartu dan area laporan memakai permukaan netral di bawah ini; warna laba, kas, dan peringatan mengikuti makna finansialnya. Teks sidebar memakai `#BFC5D8` (sekunder) dan `#AAB1CA` (muted) agar terbaca di atas navy.
 
@@ -66,7 +66,7 @@ Navy dipakai solid pada latar login/onboarding, sidebar, favicon, dan warna tema
 1. **Primary UI & Display Font**: **`Plus Jakarta Sans`** (atau **`Inter`**)
    - Karakter huruf geometris modern yang sangat bersih pada latar gelap dan memiliki keterbacaan angka tinggi untuk nominal Rupiah.
 2. **Sub-Brand Monospace Font**: **`JetBrains Mono`** (atau **`Geist Mono`**)
-   - Digunakan khusus pada teks `by Akademi Pajak` di bawah logo **Laporan Bisnis** dengan `letter-spacing: 0.06em`.
+   - Digunakan khusus pada teks `by Master Pajak` di bawah logo **Laporan Bisnis** dengan `letter-spacing: 0.06em`.
 3. **Skala Tipografi (Type Scale)**:
    - **Page Title (`Dashboard`)**: `24px` (`1.5rem`), `font-weight: 700`, `letter-spacing: -0.025em`.
    - **KPI Hero Value (`Rp92 jt`, `108%`)**: `26px–28px`, `font-weight: 800`, `letter-spacing: -0.03em`, **`font-variant-numeric: tabular-nums`**.
@@ -103,7 +103,7 @@ flowchart TD
 ## 5. Spesifikasi Komponen Detail (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
 ### 5.1 Top Marketing Bar
-- **Kiri**: Ikon monogram segitiga emas (`#F5C428`) + teks vertikal **Laporan Bisnis** (`16px Bold`) dan `by Akademi Pajak` (`11px Monospace Muted`).
+- **Kiri**: Ikon monogram segitiga emas (`#F5C428`) + teks vertikal **Laporan Bisnis** (`16px Bold`) dan `by Master Pajak` (`11px Monospace Muted`).
 - **Kanan**:
   - 4 tautan teks (`Fitur`, `Cara kerja`, `Keamanan data`, `Harga`) — `14px`, `#949BA6`.
   - Tombol `Masuk` — `border-radius: 9999px`, `border: 1px solid rgba(255,255,255,0.14)`, background `#121418`, padding `9px 22px`.
