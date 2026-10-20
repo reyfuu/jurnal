@@ -11,12 +11,15 @@ import (
 // pajak terutang (lebih bayar) dan pedagang dapat mengajukan SKB supaya tidak dipungut.
 
 type MarketplaceInput struct {
-	OmzetMarketplace int64  `json:"omzet_marketplace"` // setahun, lewat marketplace
-	OmzetLain        int64  `json:"omzet_lain"`        // setahun, di luar marketplace
-	NPMBps           int64  `json:"npm_bps"`           // margin laba bersih
-	Bentuk           string `json:"bentuk"`            // op | badan
-	Skema            string `json:"skema"`             // final (PPh final UMKM) | umum (pembukuan)
-	PTKP             string `json:"ptkp"`              // untuk op
+	OmzetMarketplace int64 `json:"omzet_marketplace"` // setahun, lewat marketplace
+	OmzetLain        int64 `json:"omzet_lain"`        // setahun, di luar marketplace
+	NPMBps           int64 `json:"npm_bps"`           // margin laba bersih
+	// Laba: laba bersih setahun dalam rupiah bila pengguna mengisi nominal; bila ada, dipakai
+	// persis (NPMBps hanya untuk keterangan) supaya tidak bergeser karena pembulatan persen.
+	Laba   *int64 `json:"laba,omitempty"`
+	Bentuk string `json:"bentuk"` // op | badan
+	Skema  string `json:"skema"`  // final (PPh final UMKM) | umum (pembukuan)
+	PTKP   string `json:"ptkp"`   // untuk op
 }
 
 type SaranPajak struct {
@@ -53,6 +56,15 @@ func HitungMarketplace(in MarketplaceInput) (MarketplaceResult, error) {
 	case in.NPMBps < -10_000 || in.NPMBps > 10_000:
 		return MarketplaceResult{}, errors.New("margin laba harus di antara -100% dan 100%")
 	}
+	if in.Laba != nil {
+		total := in.OmzetMarketplace + in.OmzetLain
+		if *in.Laba > total || *in.Laba < -total {
+			return MarketplaceResult{}, errors.New("laba bersih tidak boleh melebihi total omzet")
+		}
+		if total > 0 {
+			in.NPMBps = mulDiv(*in.Laba, 10_000, total)
+		}
+	}
 	ptkp := int64(0)
 	if in.Bentuk == "op" {
 		var ok bool
@@ -67,6 +79,9 @@ func HitungMarketplace(in MarketplaceInput) (MarketplaceResult, error) {
 		r.Catatan = append(r.Catatan, fmt.Sprintf("Omzet setahun di atas %s tidak bisa memakai PPh final UMKM, jadi dihitung dengan pembukuan (tarif umum).", rp(pr.BatasOmzetUMKM)))
 	}
 	r.Laba = mulDiv(r.OmzetTotal, in.NPMBps, 10_000)
+	if in.Laba != nil {
+		r.Laba = *in.Laba
+	}
 	tarif := persenBps(int(pr.MarketplaceTarifBps))
 
 	umum := func(laba int64) int64 {

@@ -14,6 +14,14 @@ export function FormMarketplace({ m, profile, onLangganan }: { m: KalkulatorMast
   const [omzet, setOmzet] = useState(omzetProfil || 1_000_000_000)
   const [lain, setLain] = useState(0)
   const [npm, setNpm] = useState(String(Math.round(npmProfil * 10) / 10).replace('.', ','))
+  // Margin bisa diisi rupiah atau persen; yang terakhir diketik jadi acuan, yang lain dihitung
+  // dari total omzet (sama dengan server: laba = total omzet x margin).
+  const [acuan, setAcuan] = useState<'persen' | 'rupiah'>('persen')
+  const [labaRp, setLabaRp] = useState(0)
+  const total = omzet + lain
+  const laba = acuan === 'rupiah' ? labaRp : Math.round((total * keBps(npm)) / 10_000)
+  const npmTampil = acuan === 'persen' ? npm
+    : total > 0 ? String(Math.round((labaRp / total) * 10_000) / 100).replace('.', ',') : '0'
   const [bentuk, setBentuk] = useState<'op' | 'badan'>(!profile || profile.bentuk_usaha === 'op' ? 'op' : 'badan')
   const [skema, setSkema] = useState<'final' | 'umum'>(
     profile && (profile.bentuk_usaha === 'cv' || profile.bentuk_usaha === 'pt') ? 'umum' : 'final')
@@ -27,7 +35,7 @@ export function FormMarketplace({ m, profile, onLangganan }: { m: KalkulatorMast
     setBusy(true)
     setError('')
     try {
-      setR(await hitungMarketplace({ omzet_marketplace: omzet, omzet_lain: lain, npm_bps: keBps(npm), bentuk, skema, ptkp }))
+      setR(await hitungMarketplace({ omzet_marketplace: omzet, omzet_lain: lain, npm_bps: keBps(npmTampil), laba: acuan === 'rupiah' ? labaRp : undefined, bentuk, skema, ptkp }))
     } catch (err) {
       setR(null)
       setError((err as Error).message)
@@ -45,7 +53,15 @@ export function FormMarketplace({ m, profile, onLangganan }: { m: KalkulatorMast
             <div className="chart-subtitle">Marketplace memungut PPh 22 dari omzet penjual. Cek apakah pungutan itu melebihi pajak Anda.</div>
             <Uang label="Omzet lewat marketplace setahun" v={omzet} set={setOmzet} hint="Shopee, Tokopedia, TikTok Shop, dll." />
             <Uang label="Omzet di luar marketplace setahun" v={lain} set={setLain} hint="Toko, reseller, transfer langsung" />
-            <Persen label="Margin laba bersih (%)" v={npm} set={setNpm} hint="Laba bersih ÷ omzet. Margin kecil = pungutan bisa melebihi pajak." />
+            <div className="grid gap-x-3 sm:grid-cols-2">
+              <Uang label="Laba bersih setahun (Rp)" v={laba} set={(n) => { setAcuan('rupiah'); setLabaRp(n) }}
+                hint={acuan === 'persen' ? 'dihitung dari margin %' : 'diisi manual'} />
+              <Persen label="atau margin laba bersih (%)" v={npmTampil} set={(v) => { setAcuan('persen'); setNpm(v) }}
+                hint={acuan === 'rupiah' ? 'dihitung dari laba Rp' : 'Laba bersih ÷ total omzet'} />
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '-4px 0 12px' }}>
+              Isi salah satu, yang lain terisi otomatis dari total omzet {formatRp(total)}. Margin kecil = pungutan bisa melebihi pajak.
+            </p>
             <Pilih label="Usaha terdaftar sebagai" v={bentuk} set={(v) => setBentuk(v as 'op' | 'badan')} opsi={[['op', 'Orang pribadi'], ['badan', 'Badan usaha (PT / CV)']]} />
             <Pilih label="Cara bayar pajak penghasilan" v={skema} set={(v) => setSkema(v as 'final' | 'umum')}
               opsi={[['final', 'PPh final 0,5% dari omzet (UMKM)'], ['umum', 'Pembukuan, pajak dari laba (tarif umum)']]} />

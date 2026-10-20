@@ -107,3 +107,22 @@ func TestParameter_FieldMarketplaceKosongDiisiBawaan(t *testing.T) {
 		t.Fatalf("got %d %d %q", p.MarketplaceTarifBps, p.MarketplaceBebasOP, p.DasarMarketplace)
 	}
 }
+
+func TestMarketplace_LabaRupiahDipakaiPersis(t *testing.T) {
+	// Laba 50.333.333 dari omzet 900 jt (5,5926%) — tidak boleh dibulatkan ke basis poin dulu.
+	laba := int64(50_333_333)
+	r, err := HitungMarketplace(MarketplaceInput{OmzetMarketplace: 900_000_000, Laba: &laba, Bentuk: "badan", Skema: "umum"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Laba != laba {
+		t.Errorf("laba %d, mau %d persis", r.Laba, laba)
+	}
+	if r.Terutang != Pasal31E(900_000_000, laba) {
+		t.Errorf("terutang %d tidak dihitung dari laba rupiah", r.Terutang)
+	}
+	lebih := int64(1_000_000_001)
+	if _, err := HitungMarketplace(MarketplaceInput{OmzetMarketplace: 1_000_000_000, Laba: &lebih, Bentuk: "badan", Skema: "umum"}); err == nil {
+		t.Error("laba melebihi omzet harus ditolak")
+	}
+}
