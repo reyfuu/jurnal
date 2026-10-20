@@ -13,7 +13,7 @@ import (
 
 // Analisa AI per klien di Panel Master. Semua angka dihitung Go (FaktaKlien); model hanya
 // menulis penilaian dan WAJIB merujuk sumber dari daftar yang dikirim — artikel terbit &
-// pengetahuan terverifikasi (pengetahuan.Potongan) plus benchmark DJP (BM-<KLU>).
+// pengetahuan terverifikasi (pengetahuan.Potongan) plus benchmark nasional (BM-<KLU>).
 
 type FaktaKlien struct {
 	Nama              string   `json:"nama"`
@@ -79,7 +79,7 @@ func AnalisaKlien(ctx context.Context, c *llm.Client, f FaktaKlien, sumber []pen
 	if f.KLU != "" && f.SumberBenchmark != "" {
 		ref := "BM-" + f.KLU
 		refs = append(refs, ref)
-		fmt.Fprintf(&daftar, "[%s] Benchmark DJP KLU %s %s (%s): NPM %d bps, CTTOR %d bps\n", ref, f.KLU, f.KLUNama, f.SumberBenchmark, f.BenchmarkNPMBps, f.BenchmarkCTTORBps)
+		fmt.Fprintf(&daftar, "[%s] Benchmark nasional KLU %s %s (%s): NPM %d bps, CTTOR %d bps\n", ref, f.KLU, f.KLUNama, f.SumberBenchmark, f.BenchmarkNPMBps, f.BenchmarkCTTORBps)
 	}
 	for _, p := range sumber {
 		if !slices.Contains(refs, p.Ref) {

@@ -87,7 +87,7 @@ func TestBandingkan(t *testing.T) {
 func TestBenchmark_SimpanAktifkan(t *testing.T) {
 	st := NewState()
 	baris := []tax.KLUBenchmark{{Kode: "563", Nama: "Penyediaan Minuman", CTTORBps: 45, NPMBps: 610}, {Kode: "471", Nama: "Eceran", CTTORBps: 47, NPMBps: 343}}
-	b, err := st.SimpanBenchmark("DJP 2024", "Buku sektoral DJP 2024", baris, "Andi", t0)
+	b, err := st.SimpanBenchmark("Nasional 2024", "Benchmark nasional 2024", baris, "Andi", t0)
 	if err != nil || b.Status != Draft {
 		t.Fatalf("simpan = %+v %v", b, err)
 	}

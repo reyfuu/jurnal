@@ -87,7 +87,7 @@ type Server struct {
 	masterMu sync.Mutex
 	master   master.State
 	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
-	// katalog: template COA & benchmark DJP berversi; versi aktifnya dipasang lewat pasangKatalog.
+	// katalog: template COA & benchmark nasional berversi; versi aktifnya dipasang lewat pasangKatalog.
 	katalogMu sync.Mutex
 	katalog   katalog.State
 	// pengetahuan: artikel pajak & sumber yang dibaca AI (Panel Master, Pustaka Pajak klien).

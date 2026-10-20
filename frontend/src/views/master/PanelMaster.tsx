@@ -31,7 +31,7 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
       { page: 'pengetahuan', label: 'Basis Pengetahuan AI', icon: Brain, izin: 'pengetahuan' },
       { page: 'artikel', label: 'Artikel Pajak', icon: BookOpen, izin: ['artikel', 'artikel_terbit'] },
       { page: 'coa', label: 'Template COA', icon: Network, izin: 'coa_template' },
-      { page: 'benchmark', label: 'Benchmark NPM DJP', icon: Gauge, izin: 'benchmark' },
+      { page: 'benchmark', label: 'Benchmark NPM Nasional', icon: Gauge, izin: 'benchmark' },
       { page: 'parameter', label: 'Parameter Pajak', icon: Percent, izin: 'parameter_pajak' },
     ],
   },

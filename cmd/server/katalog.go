@@ -21,7 +21,7 @@ import (
 	"pajak/internal/xlsx"
 )
 
-// Katalog Panel Master: template COA per jenis usaha & benchmark NPM DJP, berversi. Klien
+// Katalog Panel Master: template COA per jenis usaha & benchmark NPM nasional, berversi. Klien
 // dipatok ke versi template-nya (tenant.coaTemplate) supaya versi baru tidak mengubah pembukuan
 // yang sudah berjalan; Owner memilih kapan memperbarui (POST /coa/perbarui).
 
@@ -29,7 +29,7 @@ import (
 // ponytail: satu server per proses, sama seperti benchmark aktif di internal/tax.
 var katalogAktif atomic.Pointer[katalog.State]
 
-// pasangKatalog memasang st sebagai katalog aktif aplikasi (COA tenant & benchmark DJP).
+// pasangKatalog memasang st sebagai katalog aktif aplikasi (COA tenant & benchmark nasional).
 func pasangKatalog(st katalog.State) {
 	katalogAktif.Store(&st)
 	b := st.BenchmarkAktif()
@@ -37,7 +37,7 @@ func pasangKatalog(st katalog.State) {
 	tax.AktifkanParameter(st.ParameterAktif().Isi)
 }
 
-// segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data DJP
+// segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data benchmark
 // di kode tetap berlaku sampai tim menerbitkan versi sendiri.
 func segarkanBawaan(st *katalog.State) {
 	baku := katalog.NewState()
@@ -48,7 +48,8 @@ func segarkanBawaan(st *katalog.State) {
 	}
 	for i := range st.Benchmark {
 		if st.Benchmark[i].ID == 1 {
-			st.Benchmark[i].Baris, st.Benchmark[i].Sumber = baku.Benchmark[0].Baris, baku.Benchmark[0].Sumber
+			b := baku.Benchmark[0]
+			st.Benchmark[i].Nama, st.Benchmark[i].Baris, st.Benchmark[i].Sumber = b.Nama, b.Baris, b.Sumber
 		}
 	}
 	for i := range st.Parameter {

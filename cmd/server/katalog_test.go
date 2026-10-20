@@ -131,7 +131,7 @@ func TestKatalog_BenchmarkVersiBaru(t *testing.T) {
 	do(srv, qa, http.MethodPut, "/api/v1/business", profilDagang) // KLU 471
 
 	tanpa471 := slices.DeleteFunc(slices.Clone(tax.KLUBenchmarks), func(k tax.KLUBenchmark) bool { return k.Kode == "471" })
-	rec := unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(tanpa471), map[string]string{"nama": "DJP 2024 (uji)"})
+	rec := unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(tanpa471), map[string]string{"nama": "Nasional 2024 (uji)"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("impor benchmark: %d %s", rec.Code, rec.Body)
 	}
@@ -144,7 +144,7 @@ func TestKatalog_BenchmarkVersiBaru(t *testing.T) {
 	naik := slices.Clone(tax.KLUBenchmarks)
 	i := slices.IndexFunc(naik, func(k tax.KLUBenchmark) bool { return k.Kode == "471" })
 	naik[i].NPMBps = 777
-	rec = unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(naik), map[string]string{"nama": "DJP 2024", "sumber": "Buku sektoral DJP 2024"})
+	rec = unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(naik), map[string]string{"nama": "Nasional 2024", "sumber": "Benchmark nasional 2024"})
 	_ = json.NewDecoder(rec.Body).Decode(&b)
 	if rec := do(srv, m, http.MethodPost, "/api/v1/master/benchmark/"+itoa(b.ID)+"/aktifkan", ""); rec.Code != http.StatusOK {
 		t.Fatalf("aktifkan: %d %s", rec.Code, rec.Body)
@@ -154,7 +154,7 @@ func TestKatalog_BenchmarkVersiBaru(t *testing.T) {
 	}
 	var cek tax.CekAwalResult
 	_ = json.NewDecoder(do(srv, qa, http.MethodPost, "/api/v1/business/cek-awal", `{"klu":"471","omzet_tahunan":1000000000,"laba_sebelum_pajak":100000000,"bentuk_usaha":"op"}`).Body).Decode(&cek)
-	if cek.Sumber != "Buku sektoral DJP 2024" || cek.KLU == nil || cek.KLU.NPMBps != 777 {
+	if cek.Sumber != "Benchmark nasional 2024" || cek.KLU == nil || cek.KLU.NPMBps != 777 {
 		t.Errorf("cek awal klien = %+v", cek)
 	}
 	if g := getJSON[katalogBenchmarkResp](t, srv, m, "/api/v1/master/benchmark"); g.KlienPerKLU["471"] != 1 || len(g.Versi) != 3 {
@@ -163,5 +163,15 @@ func TestKatalog_BenchmarkVersiBaru(t *testing.T) {
 	k := tambahAnggota(t, srv, m, "budi@masterpajak.id", "konsultan", []int{2})
 	if rec := do(srv, k, http.MethodGet, "/api/v1/master/benchmark", ""); rec.Code != http.StatusForbidden {
 		t.Errorf("konsultan buka benchmark: %d", rec.Code)
+	}
+}
+
+// Versi 1 benchmark yang tersimpan di DB sebelum penggantian nama ikut memakai nama & sumber dari kode.
+func TestSegarkanBawaan_NamaBenchmarkIkutKode(t *testing.T) {
+	st := katalog.NewState()
+	st.Benchmark[0].Nama, st.Benchmark[0].Sumber = "Buku sektoral lama", "sumber lama"
+	segarkanBawaan(&st)
+	if b := st.Benchmark[0]; b.Nama != "Benchmark nasional · data 2020" || b.Sumber != tax.SumberBenchmark || strings.Contains(b.Nama+b.Sumber, "DJP") {
+		t.Fatalf("benchmark bawaan = %q / %q", b.Nama, b.Sumber)
 	}
 }

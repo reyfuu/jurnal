@@ -14,7 +14,7 @@ import (
 
 func faktaContoh() FaktaKlien {
 	return FaktaKlien{Nama: "Kedai Kopi Senja", JenisUsaha: "perdagangan", BentukUsaha: "op", KLU: "563", KLUNama: "Penyediaan Minuman",
-		OmzetSetahun: 312_400_000, NPMBps: 3320, BenchmarkNPMBps: -502, BenchmarkCTTORBps: 39, SumberBenchmark: "DJP 2021", StatusNPM: "wajar"}
+		OmzetSetahun: 312_400_000, NPMBps: 3320, BenchmarkNPMBps: -502, BenchmarkCTTORBps: 39, SumberBenchmark: "Nasional 2020", StatusNPM: "wajar"}
 }
 
 var sumberContoh = []pengetahuan.Potongan{
@@ -73,7 +73,7 @@ func TestAnalisaKlien_BalasanRusak(t *testing.T) {
 }
 
 func TestQueryKlien(t *testing.T) {
-	q := QueryKlien(faktaContoh(), []string{"NPM di bawah rata-rata DJP"})
+	q := QueryKlien(faktaContoh(), []string{"NPM di bawah rata-rata nasional"})
 	for _, want := range []string{"Penyediaan Minuman", "pph final", "NPM di bawah"} {
 		if !strings.Contains(strings.ToLower(q), strings.ToLower(want)) {
 			t.Errorf("query %q tidak memuat %q", q, want)

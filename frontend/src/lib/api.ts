@@ -516,7 +516,7 @@ export interface BusinessProfile {
   metode_persediaan: '' | 'periodik' | 'perpetual'
   /** Dipilih sekali untuk semua aset (bangunan tetap garis lurus), lalu terkunci. */
   metode_penyusutan?: MetodePenyusutan
-  /** Kelompok KLU 3 digit; pembanding NPM & CTTOR DJP. */
+  /** Kelompok KLU 3 digit; pembanding NPM & CTTOR nasional. */
   klu?: string
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
   omzet_tahunan?: number
@@ -563,9 +563,9 @@ export function getWilayah(provinsi: string): Promise<Kota[]> {
 }
 export const saveBusiness = (p: BusinessProfile) => api<BusinessProfile>('/business', { method: 'PUT', body: p })
 
-/** Hasil tax.CekAwal: NPM vs benchmark DJP dan risiko pajak. */
+/** Hasil tax.CekAwal: NPM vs benchmark nasional dan risiko pajak. */
 export interface CekAwal {
-  /** Rata-rata nasional DJP untuk KLU usaha; null bila KLU belum dipilih. */
+  /** Rata-rata nasional untuk KLU usaha; null bila KLU belum dipilih. */
   klu: { kode: string; nama: string; cttor_bps: number; npm_bps: number } | null
   npm_bps: number
   cttor_bps: number
@@ -727,7 +727,7 @@ export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[]
 export const getCoA = () => api<CoAInfo>('/coa')
 export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
 
-// --- Katalog Panel Master: template COA & benchmark DJP ---
+// --- Katalog Panel Master: template COA & benchmark NPM nasional ---
 
 export type StatusKatalog = 'draft' | 'terbit' | 'aktif' | 'arsip'
 export interface TemplateCOA { id: number; jenis: string; versi: number; status: StatusKatalog; akun: Account[]; catatan?: string; oleh?: string; waktu: string }

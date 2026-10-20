@@ -306,7 +306,7 @@ CREATE TABLE IF NOT EXISTS koreksi (
 	PRIMARY KEY (tenant_id, id)
 );
 
--- Katalog Panel Master (Okt 2026): template COA per jenis usaha & benchmark DJP, berversi.
+-- Katalog Panel Master (Okt 2026): template COA per jenis usaha & benchmark nasional, berversi.
 -- Versi 1 (bawaan) selalu diisi ulang dari kode saat boot. tenants.coa_template = versi template
 -- yang dipatok untuk usaha itu (0 = ikut versi terbaru).
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS coa_template INT NOT NULL DEFAULT 0;

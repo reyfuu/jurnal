@@ -49,7 +49,7 @@ var DaftarIzin = []IzinInfo{
 	{UsulKoreksi, "Usulkan koreksi pembukuan", "Berlaku setelah pemilik usaha menyetujui"},
 	{Langganan, "Atur langganan klien", "Perpanjang trial, aktifkan paket manual"},
 	{COATemplate, "Kelola template COA", "Draft, impor Excel, dan terbitkan versi template per jenis usaha"},
-	{Benchmark, "Kelola benchmark NPM DJP", "Impor versi data baru dan aktifkan"},
+	{Benchmark, "Kelola benchmark NPM nasional", "Impor versi data baru dan aktifkan"},
 	{ParameterPajak, "Kelola parameter pajak", "Tarif, PTKP, batas omzet, norma NPPN; aktifkan versi baru"},
 	{Pengetahuan, "Kelola basis pengetahuan AI", "Tambah sumber (manual, Excel, PDF), verifikasi, pilih yang dipakai AI"},
 	{Artikel, "Tulis artikel pajak", "Simpan draft; terbit setelah diverifikasi"},

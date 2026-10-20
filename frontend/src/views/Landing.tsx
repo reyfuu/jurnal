@@ -17,7 +17,7 @@ const FAQ = [
   ['Bagaimana cara berlangganan?', 'Setelah daftar dan mengisi profil usaha, pilih paket bulanan atau tahunan lalu bayar lewat Midtrans. Semua fitur langsung aktif begitu pembayaran berhasil.'],
   ['Ada garansi uang kembali?', 'Ada. Garansi 7 hari uang kembali untuk pembayaran pertama, selama Anda belum mengunduh atau mengekspor data (Excel/PDF). Ajukan dari menu Langganan; akses berhenti dan dana dikembalikan lewat Midtrans dalam 3–7 hari kerja.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans. Anda bisa memilih metode yang tersedia di halaman pembayaran, seperti virtual account bank, QRIS, e-wallet, atau kartu.'],
-  ['Dari mana angka benchmark DJP-nya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU) dari buku sektoral DJP, data SPT tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
+  ['Dari mana angka benchmark nasionalnya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU), data tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
   ['Siapa saja yang bisa memakai akun saya?', 'Owner bisa menambah Admin Keuangan dan Kasir. Tiap peran hanya melihat menu yang sesuai, dan data tiap usaha terpisah dari usaha lain.'],
 ] as const
 
@@ -150,10 +150,10 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <article className={`overflow-hidden md:col-span-2 md:row-span-2 ${KARTU}`}>
               <div className="p-7">
                 <Ikon icon={ShieldCheck} />
-                <h3 className="mt-4 text-lg font-bold">Cek benchmark DJP & perencanaan pajak</h3>
-                <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-[var(--text-secondary)]">NPM dan CTTOR usaha dibandingkan rata-rata nasional DJP untuk bidang usaha Anda, risiko pemeriksaan ditandai, dan enam skema PPh dibandingkan.</p>
+                <h3 className="mt-4 text-lg font-bold">Cek benchmark nasional & perencanaan pajak</h3>
+                <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-[var(--text-secondary)]">NPM dan CTTOR usaha dibandingkan rata-rata nasional untuk bidang usaha Anda, risiko pemeriksaan ditandai, dan enam skema PPh dibandingkan.</p>
               </div>
-              <img src="/landing/pajak.webp" width={1440} height={900} loading="lazy" alt="Halaman Perencanaan Pajak dengan cek benchmark DJP dan perbandingan skema pajak" className="ml-7 w-[calc(100%-1.75rem)] rounded-tl-[10px] border-l border-t border-[var(--border-subtle)]" />
+              <img src="/landing/pajak.webp" width={1440} height={900} loading="lazy" alt="Halaman Perencanaan Pajak dengan cek benchmark nasional dan perbandingan skema pajak" className="ml-7 w-[calc(100%-1.75rem)] rounded-tl-[10px] border-l border-t border-[var(--border-subtle)]" />
             </article>
             {/* kartu sorotan: navy (pulau gelap), seperti kartu Klinik Master hlm. 24 */}
             <article className="dark rounded-[16px] bg-[var(--navy-700)] p-7 shadow-[var(--shadow-1)]">

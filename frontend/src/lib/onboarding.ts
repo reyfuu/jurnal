@@ -41,7 +41,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   },
   klu: {
     judul: 'Bidang usaha mana yang paling cocok?',
-    alasan: 'Dipakai untuk membandingkan margin laba (NPM) dan rasio pajak (CTTOR) usaha Anda dengan rata-rata nasional DJP untuk bidang yang sama.',
+    alasan: 'Dipakai untuk membandingkan margin laba (NPM) dan rasio pajak (CTTOR) usaha Anda dengan rata-rata nasional untuk bidang yang sama.',
   },
   stok: {
     judul: 'Bagaimana Anda tahu sisa stok barang?',
@@ -57,7 +57,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   },
   laba: {
     judul: 'Kira-kira berapa laba bersih usaha per tahun?',
-    alasan: 'Omzet dikurangi semua biaya usaha. Kami bandingkan dengan rasio benchmark DJP untuk usaha sejenis. Isi 0 bila impas, atau beri tanda minus bila rugi.',
+    alasan: 'Omzet dikurangi semua biaya usaha. Kami bandingkan dengan rasio benchmark nasional untuk usaha sejenis. Isi 0 bila impas, atau beri tanda minus bila rugi.',
   },
   bentuk: {
     judul: 'Usaha Anda terdaftar atas nama siapa?',

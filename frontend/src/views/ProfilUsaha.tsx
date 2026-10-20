@@ -111,7 +111,7 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   )
 }
 
-// KLUPicker: cari bidang usaha (KLU 3 digit DJP); daftar disaring sesuai jenis usaha.
+// KLUPicker: cari bidang usaha (KLU 3 digit); daftar disaring sesuai jenis usaha.
 function KLUPicker({ value, onChange, options, jenis }: { value: string; onChange: (kode: string) => void; options: KLUOption[]; jenis?: string }) {
   const [q, setQ] = useState('')
   const [semua, setSemua] = useState(false)
@@ -174,7 +174,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
       <div className="grid gap-1.5">
         <Label>Bidang usaha (KLU)</Label>
         <KLUPicker value={p.klu ?? ''} onChange={(klu) => set({ klu })} options={info.options.klu} jenis={p.jenis_usaha} />
-        <p className="text-xs text-muted-foreground">Pembanding NPM & CTTOR dengan rata-rata nasional DJP.</p>
+        <p className="text-xs text-muted-foreground">Pembanding NPM & CTTOR dengan rata-rata nasional.</p>
       </div>
       {(p.jenis_usaha === 'perdagangan' || p.jenis_usaha === 'manufaktur') && (
         <div className="grid gap-1.5">
@@ -228,7 +228,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <Label htmlFor="biz-laba">Laba bersih per tahun</Label>
           <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark DJP dan Perencanaan Pajak selama belum ada data transaksi.</p>
+        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional dan Perencanaan Pajak selama belum ada data transaksi.</p>
       </div>
       <label className="flex items-center gap-3 text-sm" htmlFor="biz-pkp">
         <Switch id="biz-pkp" checked={p.pkp} onCheckedChange={(v) => set({ pkp: v })} />
