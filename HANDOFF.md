@@ -582,6 +582,22 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
+## Simulasi & Harga — simulasi usaha + kalkulator per produk (20 Okt 2026)
+
+- `finance/simulasi.go` (TDD; angka uji dari contoh desain pemilik, titik impas Rp47.924.397):
+  dasar = rata-rata 3 bulan terakhir yang ada omzetnya s.d. periode dipilih (`RataRataSimulasi`).
+  Biaya variabel = potongan channel (ikut omzet); biaya tetap = beban operasional kas; penyusutan
+  dipisah dan ikut ditutup titik impas. `Simulasikan` (slider harga/pembeli/modal dalam bps +
+  tambahan biaya tetap), `HitungTitikImpas` (dibulatkan ke atas; per hari = hari kalender),
+  `PorsiBalikModal` (modal dari HPP resep Produksi), `HargaUntukMargin` (mode margin %).
+  Perkalian lewat `math/big` (omzet ratusan miliar aman).
+- `POST /api/v1/simulasi?period=` mengembalikan dasar, hasil skenario, titik impas, dan tabel
+  produk (produk resep + item terjual tanpa resep, modal "–"). `/pricing/simulate` menerima
+  `margin_bps`.
+- Frontend `views/SimulasiHarga.tsx`: kalkulator lama **dipertahankan & di-upgrade** (otomatis
+  tanpa tombol Hitung, pilih produk → HPP resep, pilih saluran → komisi, margin % atau Rp/porsi,
+  titik impas produk di bagian lipat). Slider di-debounce 150 ms, hitungan tetap di server.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
