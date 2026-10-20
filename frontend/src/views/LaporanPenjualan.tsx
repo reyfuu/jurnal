@@ -18,11 +18,11 @@ function TrendChart({ points }: { points: SalesReport['trend'] }) {
     <svg viewBox={`0 0 ${TREND.w} ${TREND.h}`} style={{ width: '100%', height: 210, display: 'block', marginTop: 8 }} role="img" aria-label="Tren omzet penjualan">
       {bars.map((b, i) => (
         <g key={points[i].label}>
-          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={2} fill="#eab308">
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={2} fill="var(--accent-amber)">
             <title>{`${points[i].label}: ${formatRp(points[i].omzet)} (${points[i].count} transaksi)`}</title>
           </rect>
           {i % step === 0 && (
-            <text x={b.cx} y={TREND.h - 6} textAnchor="middle" fill="#616875" fontSize="10">{points[i].label.slice(-5)}</text>
+            <text x={b.cx} y={TREND.h - 6} textAnchor="middle" fill="var(--text-muted)" fontSize="10">{points[i].label.slice(-5)}</text>
           )}
         </g>
       ))}
@@ -44,8 +44,8 @@ function BarList({ title, rows }: { title: string; rows: { name: string; value: 
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
               <span className="tabular" style={{ flexShrink: 0 }}>{formatRp(r.value)}</span>
             </div>
-            <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.05)', marginTop: 4 }}>
-              <div style={{ height: 6, borderRadius: 3, background: '#eab308', width: `${(r.value / max) * 100}%` }} />
+            <div style={{ height: 6, borderRadius: 3, background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)', marginTop: 4 }}>
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--accent-amber)', width: `${(r.value / max) * 100}%` }} />
             </div>
             <div className="kpi-meta-row" style={{ marginBottom: 0, marginTop: 3 }}>{r.meta}</div>
           </div>
@@ -72,7 +72,7 @@ export function LaporanPenjualan({ period, periodLabel }: { period: string; peri
     { label: 'Total Omzet Penjualan', value: formatJt(r.summary.omzet) },
     { label: 'Jumlah Transaksi', value: r.summary.transaksi.toLocaleString('id-ID') },
     { label: 'Rata-rata per Transaksi', value: formatRp(r.summary.rata_rata) },
-    { label: 'Penjualan Belum Lunas', value: formatJt(r.summary.piutang), color: r.summary.piutang > 0 ? '#facc15' : undefined },
+    { label: 'Penjualan Belum Lunas', value: formatJt(r.summary.piutang), color: r.summary.piutang > 0 ? 'var(--text-warn)' : undefined },
   ] : []
 
   return (

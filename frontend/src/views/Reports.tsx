@@ -5,9 +5,9 @@ import { LaporanAI } from '@/views/LaporanAI'
 import type { AssetSummary, BalanceSheet, CashFlow, CashFlowSection, IncomeStatement } from '@/lib/api'
 import { formatJt, formatPct, formatRp, formatSignedJt } from '@/lib/format'
 
-const RED = '#fb7185'
-const GREEN = '#10b981'
-const BLUE = '#38bdf8'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--accent-green)'
+const BLUE = 'var(--accent-blue)'
 
 type Tab = 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset' | 'ai'
 
@@ -86,7 +86,7 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
           Margin laba bersih {formatPct(r.margin_bps)} · basis akrual
         </div>
         <div className="list-rows tabular">
-          <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="#facc15" bold />
+          <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="var(--text-warn)" bold />
           <AmountRow label="Potongan channel / aplikasi" value={formatRp(-r.channel_fees)} color={RED} />
           <AmountRow label="Penjualan bersih" value={formatRp(r.net_sales)} bold />
           <AmountRow label="HPP (bahan baku)" value={formatRp(-r.cogs)} color={RED} />
@@ -173,7 +173,7 @@ function Neraca({ bs }: { bs: BalanceSheet }) {
             value={formatRp(bs.liabilities.total + bs.equity.total)}
             color={BLUE}
             bold
-            style={{ border: '1px solid rgba(56,189,248,0.3)', marginTop: 6 }}
+            style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)', marginTop: 6 }}
           />
         </div>
       </div>
@@ -294,7 +294,7 @@ function ArusKas({ cf, netProfit }: { cf: CashFlow; netProfit: number }) {
               value={formatRp(cf.closing_balance)}
               color={BLUE}
               bold
-              style={{ border: '1px solid rgba(56,189,248,0.3)' }}
+              style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}
             />
           </div>
         </div>

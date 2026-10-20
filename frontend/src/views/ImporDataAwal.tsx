@@ -6,8 +6,8 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
-const RED = '#fb7185'
-const BLUE = '#38bdf8'
+const RED = 'var(--text-danger)'
+const BLUE = 'var(--accent-blue)'
 
 const KOSONG: OpeningBalance = {
   tanggal: '', kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0,
@@ -172,7 +172,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
                 <strong style={{ color: BLUE }}>{formatRp(preview.modal_awal)}</strong>
               </div>
               {preview.selisih_modal !== 0 && (
-                <div className="list-row" style={{ border: '1px solid rgba(251,113,133,0.4)' }}>
+                <div className="list-row" style={{ border: '1px solid color-mix(in srgb, var(--text-danger) 40%, transparent)' }}>
                   <span>Selisih dengan Modal Disetor yang kamu isi</span>
                   <strong style={{ color: RED }}>{formatRp(preview.selisih_modal)}</strong>
                 </div>
@@ -266,7 +266,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
                 <span className="tabular">{formatRp(info.opening![f.key] as number)}</span>
               </div>
             ))}
-            <div className="list-row" style={{ border: '1px solid rgba(56,189,248,0.3)' }}>
+            <div className="list-row" style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
               <span><strong>Modal Awal (hasil hitung)</strong></span>
               <strong style={{ color: BLUE }}>{formatRp(info.modal_awal)}</strong>
             </div>

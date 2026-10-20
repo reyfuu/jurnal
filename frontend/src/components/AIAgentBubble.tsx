@@ -111,7 +111,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="dark fixed bottom-6 right-6 z-50 flex flex-col items-end">
       {/* Panel Chat */}
       {isOpen && (
         <div className="mb-4 w-[430px] max-w-[94vw] h-[580px] max-h-[82vh] rounded-2xl border border-slate-700/80 bg-[#0d131a]/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">

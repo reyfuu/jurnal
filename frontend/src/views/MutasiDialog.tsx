@@ -198,7 +198,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                             )}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatRp(r.nominal)}</td>
-                          <td style={{ color: r.arah === 'masuk' ? '#34d399' : '#fb7185' }}>{r.arah}</td>
+                          <td style={{ color: r.arah === 'masuk' ? 'var(--text-profit)' : 'var(--text-danger)' }}>{r.arah}</td>
                           <td>
                             <select
                               className="input-field" value={r.jenis} aria-label={`Jenis untuk baris ${r.baris}`}

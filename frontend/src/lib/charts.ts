@@ -59,7 +59,7 @@ export function dailyBars(days: DailyOmzet[], target: number) {
     baseY: padT + plotH,
     bars: days.map((d, i) => {
       const bh = (d.omzet / max) * plotH
-      return { x: padL + i * slot, y: padT + plotH - bh, w: barW, h: bh, fill: d.above_target ? '#eab308' : '#785c12' }
+      return { x: padL + i * slot, y: padT + plotH - bh, w: barW, h: bh, fill: d.above_target ? 'var(--accent-amber)' : 'var(--accent-amber-dim)' }
     }),
   }
 }

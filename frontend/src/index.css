@@ -48,21 +48,60 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Navy & Gold (DESIGN.md), dengan permukaan netral untuk data keuangan. */
+/* Navy & Gold (DESIGN.md), dengan permukaan netral untuk data keuangan.
+   :root = tema terang; .dark = tema gelap (default, lihat lib/theme.ts). Sidebar, Landing dan
+   gelembung AI selalu memakai .dark sebagai "pulau gelap" ber-brand navy. */
 :root {
+  color-scheme: light;
   --brand-navy: #222852;
+  --bg-outer: #eef0f4;
+  --bg-shell: #f7f8fa;
+  --bg-sidebar: var(--brand-navy);
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f3f6;
+  --bg-raised: #f1f3f6;
+  --bg-input: #ffffff;
+  --border-subtle: rgba(17, 24, 39, 0.08);
+  --border-shell: rgba(17, 24, 39, 0.12);
+  --border-strong: #d1d5db;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --accent-amber: #ca8a04;
+  --accent-amber-bright: #eab308;
+  --accent-amber-dim: #f0d98a;
+  --accent-amber-soft: rgba(202, 138, 4, 0.12);
+  --accent-green: #059669;
+  --accent-green-soft: rgba(5, 150, 105, 0.12);
+  --accent-blue: #0284c7;
+  --accent-orange: #c2410c;
+  --accent-red: #e11d48;
+  --accent-red-soft: rgba(225, 29, 72, 0.1);
+  --accent-violet: #7c3aed;
+  --text-profit: #047857;
+  --text-danger: #be123c;
+  --text-warn: #a16207;
+  --text-info: #0369a1;
+  --text-violet: #6d28d9;
+}
+
+.dark {
+  color-scheme: dark;
   --bg-outer: #090a0c;
   --bg-shell: #0f1115;
-  --bg-sidebar: var(--brand-navy);
   --bg-card: #15181e;
   --bg-card-hover: #191d24;
+  --bg-raised: #101318;
+  --bg-input: #0d0f13;
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-shell: rgba(255, 255, 255, 0.09);
+  --border-strong: #262c38;
   --text-primary: #f4f5f7;
   --text-secondary: #949ba6;
   --text-muted: #616875;
   --accent-amber: #eab308;
   --accent-amber-bright: #f5c428;
+  --accent-amber-dim: #785c12;
   --accent-amber-soft: rgba(234, 179, 8, 0.14);
   --accent-green: #10b981;
   --accent-green-soft: rgba(16, 185, 129, 0.14);
@@ -70,7 +109,23 @@
   --accent-orange: #d97706;
   --accent-red: #f43f5e;
   --accent-red-soft: rgba(244, 63, 94, 0.14);
+  --accent-violet: #a78bfa;
+  --text-profit: #34d399;
+  --text-danger: #fb7185;
+  --text-warn: #facc15;
+  --text-info: #7dd3fc;
+  --text-violet: #ddd6fe;
+}
 
+/* Teks sidebar lebih terang dari .dark biasa karena latarnya navy. Di luar @layer agar
+   menang atas .dark (aturan tanpa layer selalu menang atas aturan ber-layer). */
+.dark.sidebar {
+  --text-secondary: #bfc5d8;
+  --text-muted: #aab1ca;
+}
+
+/* Alias shadcn didefinisikan ulang di .dark supaya pulau gelap (sidebar dll.) ikut gelap. */
+:root, .dark {
   --background: var(--bg-shell);
   --foreground: var(--text-primary);
   --card: var(--bg-card);
@@ -95,6 +150,9 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  .dark {
+    color: var(--text-primary); /* pulau gelap tidak boleh mewarisi warna teks tema terang */
   }
   html {
     line-height: normal; /* sama dengan web/index.html lama, bukan 1.5 bawaan preflight */
@@ -144,7 +202,6 @@
     height: 18px;
     margin-top: 2px;
     accent-color: var(--accent-amber-bright);
-    color-scheme: dark;
   }
   .profile-choice-label { display: block; font-size: 14px; font-weight: 600; line-height: 1.5; }
   .profile-choice-hint { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
@@ -214,8 +271,6 @@
 
   /* Sidebar */
   .sidebar {
-    --text-secondary: #bfc5d8;
-    --text-muted: #aab1ca;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border-subtle);
     padding: 22px 14px 16px;
@@ -278,12 +333,12 @@
 
   .nav-item:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.03);
+    background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   }
 
   .nav-item.active {
-    background: rgba(234, 179, 8, 0.13);
-    color: #facc15;
+    background: color-mix(in srgb, var(--accent-amber) 13%, transparent);
+    color: var(--text-warn);
     font-weight: 600;
   }
 
@@ -306,7 +361,7 @@
     align-items: center;
     gap: 10px;
     padding: 9px 10px;
-    background: rgba(255,255,255,0.025);
+    background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
   }
@@ -315,8 +370,8 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: rgba(234, 179, 8, 0.2);
-    color: #facc15;
+    background: color-mix(in srgb, var(--accent-amber) 20%, transparent);
+    color: var(--text-warn);
     font-size: 11px;
     font-weight: 700;
     display: flex;
@@ -403,7 +458,7 @@
   }
 
   .card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: color-mix(in srgb, var(--text-primary) 12%, transparent);
   }
 
   .kpi-label {
@@ -435,13 +490,13 @@
     padding: 2px 6px;
     border-radius: 999px;
     background: var(--accent-green-soft);
-    color: #34d399;
+    color: var(--text-profit);
     font-weight: 700;
     font-size: 10.5px;
   }
 
   .pts-up {
-    color: #34d399;
+    color: var(--text-profit);
     font-weight: 700;
   }
 
@@ -454,7 +509,7 @@
   .progress-track {
     width: 100%;
     height: 6px;
-    background: rgba(255,255,255,0.07);
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
     border-radius: 999px;
     overflow: hidden;
     margin-top: 10px;
@@ -462,7 +517,7 @@
 
   .progress-bar {
     height: 100%;
-    background: #22c55e;
+    background: var(--accent-green);
     border-radius: 999px;
   }
 
@@ -548,7 +603,7 @@
     justify-content: space-between;
     font-size: 12.5px;
     padding: 7px 10px;
-    background: rgba(255,255,255,0.02);
+    background: color-mix(in srgb, var(--text-primary) 2%, transparent);
     border-radius: 8px;
   }
 
@@ -577,7 +632,7 @@
   }
 
   .input-field {
-    background: #0d0f13;
+    background: var(--bg-input);
     border: 1px solid var(--border-shell);
     color: var(--text-primary);
     padding: 9px 12px;
@@ -604,17 +659,17 @@
 
   .pill-green {
     background: var(--accent-green-soft);
-    color: #34d399;
+    color: var(--text-profit);
   }
 
   .pill-red {
     background: var(--accent-red-soft);
-    color: #fb7185;
+    color: var(--text-danger);
   }
 
   .pill-amber {
     background: var(--accent-amber-soft);
-    color: #facc15;
+    color: var(--text-warn);
   }
 
 
@@ -660,7 +715,7 @@
 
 @layer components {
   .pill-status-muted {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
     color: var(--text-secondary);
   }
 }
@@ -784,7 +839,7 @@
     cursor: pointer;
   }
   .tx-row:hover td {
-    background: rgba(255, 255, 255, 0.025);
+    background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
   }
 }
 
@@ -824,7 +879,7 @@
     font-weight: 700;
     padding: 1px 5px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.07);
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
     color: var(--text-secondary);
   }
 
@@ -833,7 +888,7 @@
     display: inline-flex;
     gap: 4px;
     padding: 4px;
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--text-primary) 4%, transparent);
     border-radius: 999px;
     border: 1px solid var(--border-subtle);
   }
@@ -852,8 +907,8 @@
     color: var(--text-primary);
   }
   .seg-btn[aria-selected='true'] {
-    background: rgba(56, 189, 248, 0.16);
-    color: #7dd3fc;
+    background: color-mix(in srgb, var(--accent-blue) 16%, transparent);
+    color: var(--text-info);
   }
 
   .report-grid {
@@ -886,18 +941,18 @@
     border-radius: 10px;
     font-size: 11.5px;
     line-height: 1.6;
-    background: rgba(56, 189, 248, 0.07);
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    color: #bae6fd;
+    background: color-mix(in srgb, var(--accent-blue) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-blue) 20%, transparent);
+    color: var(--text-info);
   }
   .note-box.warn {
     background: var(--accent-amber-soft);
-    border-color: rgba(234, 179, 8, 0.25);
-    color: #fde68a;
+    border-color: color-mix(in srgb, var(--accent-amber) 25%, transparent);
+    color: var(--text-warn);
   }
   .note-box.law {
-    background: rgba(167, 139, 250, 0.08);
-    border-color: rgba(167, 139, 250, 0.25);
-    color: #ddd6fe;
+    background: color-mix(in srgb, var(--accent-violet) 8%, transparent);
+    border-color: color-mix(in srgb, var(--accent-violet) 25%, transparent);
+    color: var(--text-violet);
   }
 }

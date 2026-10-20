@@ -4,9 +4,9 @@ import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { coaXlsxUrl, getCoAReport, type CoAReport, type ReportLine } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-const RED = '#fb7185'
-const GREEN = '#10b981'
-const BLUE = '#38bdf8'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--accent-green)'
+const BLUE = 'var(--accent-blue)'
 
 const label = (l: ReportLine) => (l.kode ? <><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>{l.kode}</span>{l.nama}</> : l.nama)
 
@@ -55,7 +55,7 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
           <div className="chart-title">Laporan Laba Rugi</div>
           <div className="list-rows tabular" style={{ marginTop: 12 }}>
             <Lines lines={is.pendapatan} />
-            <AmountRow label="Penjualan bersih" value={formatRp(is.penjualan_bersih)} color="#facc15" bold />
+            <AmountRow label="Penjualan bersih" value={formatRp(is.penjualan_bersih)} color="var(--text-warn)" bold />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan awal</>} value={formatRp(is.persediaan_awal)} />}
             <Lines lines={is.hpp_lines} />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan akhir</>} value={formatRp(-is.persediaan_akhir)} />}
@@ -80,7 +80,7 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
                 <Lines lines={s.lines} />
               </div>
             ))}
-            <AmountRow label="TOTAL ASET" value={formatRp(bs.total_aset)} color={BLUE} bold style={{ border: '1px solid rgba(56,189,248,0.3)' }} />
+            <AmountRow label="TOTAL ASET" value={formatRp(bs.total_aset)} color={BLUE} bold style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }} />
             <div style={{ height: 8 }} />
             {[...bs.liabilitas, bs.ekuitas].map((s) => (
               <div key={s.kelompok}>
@@ -88,7 +88,7 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
                 <Lines lines={s.lines} />
               </div>
             ))}
-            <AmountRow label="TOTAL LIABILITAS + EKUITAS" value={formatRp(bs.total_liabilitas + bs.total_ekuitas)} color={GREEN} bold style={{ border: '1px solid rgba(16,185,129,0.3)' }} />
+            <AmountRow label="TOTAL LIABILITAS + EKUITAS" value={formatRp(bs.total_liabilitas + bs.total_ekuitas)} color={GREEN} bold style={{ border: '1px solid color-mix(in srgb, var(--accent-green) 30%, transparent)' }} />
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getTaxPlanning, type BusinessProfile, type TaxPlanning } from '@/lib/api'
 import { formatJt, formatPct, formatRp } from '@/lib/format'
 
-const fieldClass = 'h-[38px] bg-[#0d0f13] tabular'
+const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
 // skema yang sesuai bentuk usaha saat ini, untuk ditandai "skema Anda sekarang"
 const CURRENT: Record<string, string[]> = {
@@ -84,9 +84,9 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
 
       {bu && best && (
         <>
-          <div className="card" style={{ borderColor: '#10b981' }}>
+          <div className="card" style={{ borderColor: 'var(--accent-green)' }}>
             <div className="kpi-label">Skema paling hemat</div>
-            <div className="kpi-value" style={{ color: '#10b981', fontSize: 22 }}>{best.nama}</div>
+            <div className="kpi-value" style={{ color: 'var(--accent-green)', fontSize: 22 }}>{best.nama}</div>
             <div className="kpi-meta-row">
               Pajak {formatRp(best.pajak)} per tahun · laba bersih {formatJt(bu.laba)} · PTKP {formatJt(bu.ptkp)}
             </div>

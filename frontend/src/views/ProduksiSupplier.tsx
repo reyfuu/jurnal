@@ -9,10 +9,10 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 
-const RED = '#fb7185'
-const GREEN = '#34d399'
-const BLUE = '#38bdf8'
-const AMBER = '#facc15'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--text-profit)'
+const BLUE = 'var(--accent-blue)'
+const AMBER = 'var(--text-warn)'
 
 const aksiBtn = { width: 'auto', padding: '4px 8px', fontSize: 12 } as const
 
@@ -45,7 +45,7 @@ function RincianHPP({ h, satuan }: { h: HPP; satuan: string }) {
     { label: 'Overhead per batch', value: h.overhead },
   ]
   return (
-    <div style={{ background: '#101318', borderRadius: 10, padding: 16 }}>
+    <div style={{ background: 'var(--bg-raised)', borderRadius: 10, padding: 16 }}>
       <table className="data-table tabular" style={{ marginTop: 0 }}>
         <thead>
           <tr>
@@ -80,7 +80,7 @@ function RincianHPP({ h, satuan }: { h: HPP; satuan: string }) {
         <div className="list-row">
           <span>Hasil per batch</span><strong>{h.hasil_per_batch.toLocaleString('id-ID')} {satuan}</strong>
         </div>
-        <div className="list-row" style={{ border: '1px solid rgba(56,189,248,0.3)' }}>
+        <div className="list-row" style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
           <span><strong>HPP per {satuan}</strong></span><strong style={{ color: BLUE }}>{formatRp(h.per_unit)}</strong>
         </div>
         {h.harga_jual > 0 && (

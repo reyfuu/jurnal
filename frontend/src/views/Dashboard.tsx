@@ -24,9 +24,9 @@ export function Dashboard({
 }) {
   const k = d.kpis
   const trend = [
-    { label: 'Omzet', kpi: k.omzet, color: '#eab308', badge: 'badge-up' },
-    { label: 'Laba bersih', kpi: k.laba_bersih, color: '#10b981', badge: 'badge-up' },
-    { label: 'Margin laba', kpi: k.margin_laba, color: '#d4a338', badge: 'pts-up' },
+    { label: 'Omzet', kpi: k.omzet, color: 'var(--accent-amber)', badge: 'badge-up' },
+    { label: 'Laba bersih', kpi: k.laba_bersih, color: 'var(--accent-green)', badge: 'badge-up' },
+    { label: 'Margin laba', kpi: k.margin_laba, color: 'var(--accent-amber)', badge: 'pts-up' },
   ]
   const piutangLink = canSee('piutang-utang')
 
@@ -35,7 +35,7 @@ export function Dashboard({
       <CashWarningBanner warnings={d.cash_warnings} />
       <PageHeader title="Dashboard" subtitle="Gambaran seluruh bisnis dalam satu layar">
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-          <CalendarDays size={14} style={{ position: 'absolute', left: 10, pointerEvents: 'none', color: '#9ba3af' }} />
+          <CalendarDays size={14} style={{ position: 'absolute', left: 10, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
           <select
             className="period-select tabular"
             style={{ appearance: 'none', paddingLeft: 30, paddingRight: 28, cursor: 'pointer' }}
@@ -44,7 +44,7 @@ export function Dashboard({
           >
             {periods && periods.length > 0 ? (
               periods.map((p) => (
-                <option key={p.id} value={p.id} style={{ background: '#101318', color: '#fff' }}>
+                <option key={p.id} value={p.id} style={{ background: 'var(--bg-raised)', color: 'var(--text-primary)' }}>
                   {p.label}
                 </option>
               ))
@@ -52,7 +52,7 @@ export function Dashboard({
               <option value={d.period || '2026-08'}>{d.period_label}</option>
             )}
           </select>
-          <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: '#9ba3af' }} />
+          <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
         </div>
       </PageHeader>
 
@@ -80,7 +80,7 @@ export function Dashboard({
               <div style={{ width: '100%', marginTop: 2 }}>{k.saldo_kas.sub_text}</div>
             </div>
           </div>
-          <Sparkline values={k.saldo_kas.sparkline} color="#38bdf8" />
+          <Sparkline values={k.saldo_kas.sparkline} color="var(--accent-blue)" />
         </div>
 
         <div className="card">
@@ -117,9 +117,9 @@ export function Dashboard({
             <div className="chart-title">Omzet, biaya, dan laba</div>
             <div className="chart-subtitle">11 bulan terakhir</div>
             <div className="legend-row">
-              <span className="legend-item"><Dot color="#eab308" />Omzet</span>
-              <span className="legend-item"><Dot color="#d97706" />Total biaya</span>
-              <span className="legend-item"><Dot color="#10b981" />Laba bersih</span>
+              <span className="legend-item"><Dot color="var(--accent-amber)" />Omzet</span>
+              <span className="legend-item"><Dot color="var(--accent-orange)" />Total biaya</span>
+              <span className="legend-item"><Dot color="var(--accent-green)" />Laba bersih</span>
             </div>
           </div>
           <MainChart points={d.monthly_trend_11m} />
@@ -131,8 +131,8 @@ export function Dashboard({
               <div className="chart-title">Omzet harian {d.period_label}</div>
               <div className="chart-subtitle">Rata-rata Rp3 jt per hari.</div>
               <div className="legend-row" style={{ marginTop: 8, marginBottom: 6 }}>
-                <span className="legend-item"><Dot color="#eab308" />Di atas target</span>
-                <span className="legend-item"><Dot color="#785c12" />Di bawah target</span>
+                <span className="legend-item"><Dot color="var(--accent-amber)" />Di atas target</span>
+                <span className="legend-item"><Dot color="var(--accent-amber-dim)" />Di bawah target</span>
                 <span className="legend-item">— Target harian</span>
               </div>
             </div>
@@ -147,14 +147,14 @@ export function Dashboard({
                 {canSee('laporan-keuangan') && (
                   <>
                     :{' '}
-                    <button onClick={() => onNavigate('laporan-keuangan')} style={{ color: '#94a3b8', textDecoration: 'underline' }}>
+                    <button onClick={() => onNavigate('laporan-keuangan')} style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
                       cek tab Arus Kas di Laporan Keuangan.
                     </button>
                   </>
                 )}
               </div>
               <div className="legend-row" style={{ marginTop: 8, marginBottom: 4 }}>
-                <span className="legend-item"><Dot color="#38bdf8" />Kas akhir bulan</span>
+                <span className="legend-item"><Dot color="var(--accent-blue)" />Kas akhir bulan</span>
               </div>
             </div>
             <CashChart points={d.monthly_trend_11m} />
@@ -176,7 +176,7 @@ export function Dashboard({
                       {p.qty.toLocaleString('id-ID')} terjual · {p.pct}% omzet
                     </div>
                   </div>
-                  <div className="tabular" style={{ fontWeight: 700, color: '#facc15' }}>{formatRp(p.omzet)}</div>
+                  <div className="tabular" style={{ fontWeight: 700, color: 'var(--text-warn)' }}>{formatRp(p.omzet)}</div>
                 </div>
               ))}
             </div>
@@ -186,7 +186,7 @@ export function Dashboard({
         <div className="card" style={{ padding: '18px 20px' }}>
           <div>
             <div className="chart-title">Omzet per channel</div>
-            <div className="chart-subtitle" style={{ color: '#fb7185', fontWeight: 600 }}>{d.total_app_fees_label}</div>
+            <div className="chart-subtitle" style={{ color: 'var(--text-danger)', fontWeight: 600 }}>{d.total_app_fees_label}</div>
             <div className="list-rows">
               {d.channels.map((c) => (
                 <div className="list-row" key={c.name}>

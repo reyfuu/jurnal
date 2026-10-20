@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { getAIReport, type AIReport, type BusinessFacts } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-const AMBER = '#facc15'
-const RED = '#fb7185'
-const GREEN = '#10b981'
-const BLUE = '#38bdf8'
+const AMBER = 'var(--text-warn)'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--accent-green)'
+const BLUE = 'var(--accent-blue)'
 
 const persenBps = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
 
@@ -41,7 +41,7 @@ export function LaporanAI({ period }: { period: string }) {
     <>
       {/* Analisis di atas: itu yang dicari orang saat membuka tab ini. */}
       {a.tersedia ? (
-        <div className="card" style={{ padding: 22, marginBottom: 16, borderColor: 'rgba(56,189,248,0.3)' }}>
+        <div className="card" style={{ padding: 22, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'baseline' }}>
             <div className="chart-title" style={{ color: BLUE }}>Analisis &amp; Rekomendasi AI</div>
             {a.model && <span className="kpi-meta-row">dibaca oleh {a.model}</span>}
@@ -60,7 +60,7 @@ export function LaporanAI({ period }: { period: string }) {
                 {a.rekomendasi.map((k, i) => {
                   const d = DAMPAK[k.dampak] ?? DAMPAK.sedang
                   return (
-                    <div key={i} style={{ border: '1px solid var(--line, #262c38)', borderRadius: 10, padding: '13px 16px' }}>
+                    <div key={i} style={{ border: '1px solid var(--border-strong)', borderRadius: 10, padding: '13px 16px' }}>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{i + 1}. {k.judul}</span>
                         <span className="tab-badge" style={{ color: d.warna }}>{d.label}</span>
@@ -74,7 +74,7 @@ export function LaporanAI({ period }: { period: string }) {
           )}
         </div>
       ) : (
-        <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'rgba(250,204,21,0.3)' }}>
+        <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
           <div className="chart-title" style={{ color: AMBER }}>Analisis AI belum aktif</div>
           <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             {a.alasan ?? r.llm.petunjuk}
@@ -90,7 +90,7 @@ export function LaporanAI({ period }: { period: string }) {
 
       {/* Peringatan: fakta objektif, bukan pendapat model — selalu tampil. */}
       {f.peringatan && f.peringatan.length > 0 && (
-        <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'rgba(251,113,133,0.3)' }}>
+        <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--text-danger) 30%, transparent)' }}>
           <div className="chart-title" style={{ color: RED }}>Perlu diperiksa</div>
           <ul style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 13, lineHeight: 1.8 }}>
             {f.peringatan.map((p, i) => <li key={i}>{p}</li>)}
@@ -273,7 +273,7 @@ function Baris({ l, v, teks, tebal, warna }: { l: string; v?: number; teks?: str
     <div style={{
       display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0',
       fontWeight: tebal ? 700 : 400, fontSize: 13,
-      borderTop: tebal ? '1px solid var(--line, #262c38)' : undefined,
+      borderTop: tebal ? '1px solid var(--border-strong)' : undefined,
       marginTop: tebal ? 4 : undefined,
     }}>
       <span style={{ color: tebal ? undefined : 'var(--text-muted)' }}>{l}</span>

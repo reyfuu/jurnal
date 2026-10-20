@@ -6,9 +6,9 @@ import {
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
-const AMBER = '#facc15'
-const RED = '#fb7185'
-const GREEN = '#10b981'
+const AMBER = 'var(--text-warn)'
+const RED = 'var(--text-danger)'
+const GREEN = 'var(--accent-green)'
 
 /** 1500 → "15%", 175 → "1,75%". */
 const persen = (bps: number) =>
@@ -37,7 +37,7 @@ export function KalkulatorPajak() {
         subtitle="Hitung PPh 21, 22, 23, 4 ayat (2), 15, PPh Badan, PPN, dan PPnBM. Setiap hasil menampilkan langkah perhitungannya."
       />
 
-      <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'rgba(250,204,21,0.3)' }}>
+      <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
           <span style={{ color: AMBER, fontWeight: 600 }}>Alat bantu, bukan pengganti konsultan.</span>{' '}
           Tarif mengikuti ketentuan yang berlaku umum dan setiap objek mencantumkan rujukan aturannya.
@@ -131,7 +131,7 @@ function FormPPh21({ m }: { m: KalkulatorMaster }) {
               Termasuk tambahan {formatRp(r.hasil.tambahan_tanpa_npwp)} karena tanpa NPWP.
             </p>
           )}
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line, #262c38)' }}>
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border-strong)' }}>
             <div className="kpi-label" style={{ marginBottom: 6 }}>Pembanding: TER bulanan (PMK 168/2023)</div>
             {r.ter.tersedia ? (
               <div style={{ fontSize: 13 }}>

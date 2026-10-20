@@ -168,14 +168,14 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
         </div>
         <div className="card">
           <div className="kpi-label">Total masuk (tampil)</div>
-          <div className="kpi-value tabular" style={{ color: '#34d399' }}>{formatRp(sum.masuk)}</div>
+          <div className="kpi-value tabular" style={{ color: 'var(--text-profit)' }}>{formatRp(sum.masuk)}</div>
           <div className="kpi-meta-row">
             <span>Penjualan {formatRp(sum.omzet)}{sum.masuk > sum.omzet && ` · modal, pinjaman, pendapatan lain ${formatRp(sum.masuk - sum.omzet)}`}</span>
           </div>
         </div>
         <div className="card">
           <div className="kpi-label">Total keluar (tampil)</div>
-          <div className="kpi-value tabular" style={{ color: '#fb7185' }}>{formatRp(sum.keluar)}</div>
+          <div className="kpi-value tabular" style={{ color: 'var(--text-danger)' }}>{formatRp(sum.keluar)}</div>
           <div className="kpi-meta-row">
             <span>Modal bahan &amp; biaya {formatRp(sum.biayaUsaha)}{sum.keluar > sum.biayaUsaha && ` · alat, cicilan, ambil pribadi ${formatRp(sum.keluar - sum.biayaUsaha)}`}</span>
           </div>
@@ -216,14 +216,14 @@ export function Transaksi({ onChanged }: { onChanged: () => Promise<void> }) {
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
                     {coa?.supported && (
-                      <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? '#facc15' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
+                      <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-warn)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
                     )}
                     <td>
                       <div style={{ fontWeight: 500 }}>{t.keterangan || '-'}</div>
                       {sub && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{sub}</div>}
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{t.pihak}</td>
-                    <td className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: masuk ? '#34d399' : 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                    <td className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: masuk ? 'var(--text-profit)' : 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {masuk ? '+' : '-'}{formatRp(t.nominal).replace('Rp', '')}
                     </td>
                     <td>
