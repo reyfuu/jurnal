@@ -67,6 +67,19 @@ type Line struct {
 	Kredit  int64  `json:"kredit"`
 }
 
+// PenyesuaianPersediaan: jurnal akhir periode supaya 1301 Persediaan = nilai kartu stok.
+// Lawannya akun HPP: 5102 (periodik) atau 5101 (perpetual).
+func PenyesuaianPersediaan(tanggal string, selisih int64, p finance.BusinessProfile) []Line {
+	hpp := "5102"
+	if perpetual(p) {
+		hpp = "5101"
+	}
+	if selisih >= 0 {
+		return []Line{{Tanggal: tanggal, Kode: "1301", Debit: selisih}, {Tanggal: tanggal, Kode: hpp, Kredit: selisih}}
+	}
+	return []Line{{Tanggal: tanggal, Kode: hpp, Debit: -selisih}, {Tanggal: tanggal, Kode: "1301", Kredit: -selisih}}
+}
+
 // Journal: jurnal berpasangan (double entry) dari transaksi; 2 baris per transaksi.
 func Journal(txs []finance.Transaction, p finance.BusinessProfile) []Line {
 	out := make([]Line, 0, 2*len(txs))

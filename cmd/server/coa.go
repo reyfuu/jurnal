@@ -60,13 +60,32 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	s.mu.RLock()
 	lines := coa.Journal(finance.ForPeriod(s.txs, period), p)
 	opening := s.openingFor(period) // ikut neraca awal onboarding bila sudah diisi
+	sp := s.kartuLocked().Periode(period)
 	s.mu.RUnlock()
+	if sp.Aktif {
+		opening.Inventory = sp.PersediaanAwal
+	}
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
 	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
 	as := s.report(period).Assets
 	lines = append(lines, coa.DepreciationJournal(as, period)...)
-	tb := coa.TrialBalanceFrom(all, active, coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period)), lines)
-	is := coa.IncomeStatement(tb, p)
+	saldoAwal := coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period))
+	tb := coa.TrialBalanceFrom(all, active, saldoAwal, lines)
+	// Kartu stok: sesuaikan 1301 ke nilai persediaan akhir; selisihnya masuk HPP.
+	var penyesuaian int64
+	if sp.Aktif {
+		var saldo1301 int64
+		for _, b := range tb {
+			if b.Kode == "1301" {
+				saldo1301 = b.Saldo
+			}
+		}
+		if penyesuaian = sp.PersediaanAkhir - saldo1301; penyesuaian != 0 {
+			lines = append(lines, coa.PenyesuaianPersediaan(period+"-28", penyesuaian, p)...)
+			tb = coa.TrialBalanceFrom(all, active, saldoAwal, lines)
+		}
+	}
+	is := coa.IncomeStatementKartu(tb, p, sp.Aktif, penyesuaian)
 	bs := coa.BalanceSheet(tb, is.LabaBersih)
 	return coaReport{true, tb, &is, &bs}
 }

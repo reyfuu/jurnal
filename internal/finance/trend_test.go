@@ -7,7 +7,7 @@ import (
 )
 
 func seedHistory(period string) []finance.PeriodSummary {
-	return finance.TrendHistory(finance.SeedTransactions(), finance.SeedAssets(), period, finance.SeedOpening)
+	return finance.TrendHistory(finance.SeedTransactions(), finance.SeedAssets(), period, finance.SeedOpening, nil)
 }
 
 // Inti perbaikan: grafik tren dan KPI harus memakai angka yang sama. Sebelumnya tren memakai

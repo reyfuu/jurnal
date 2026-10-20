@@ -769,7 +769,7 @@ func (s *tenant) openingFor(period string) finance.ReportOpening {
 func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rep := finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+	rep := finance.BuildPeriodReportStok(s.txs, s.assets, period, s.openingFor(period), s.kartuLocked().Periode(period))
 	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
 		saran, seragam := finance.MetodeSeragam(s.assets)
 		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
@@ -821,7 +821,7 @@ func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	finance.ApplyKPIs(&snap, rep.Income, rep.CashFlow, txs, seedN)
 	// Grafik tren & sparkline ikut dihitung ulang supaya tidak bertentangan dengan KPI.
 	s.mu.RLock()
-	history := finance.TrendHistory(s.txs, s.assets, period, s.openingFor)
+	history := finance.TrendHistory(s.txs, s.assets, period, s.openingFor, s.kartuLocked().Periode)
 	s.mu.RUnlock()
 	finance.ApplyTrend(&snap, history)
 	snap.CashWarnings = finance.CashWarnings(txs, rep.CashFlow.OpeningBalance)

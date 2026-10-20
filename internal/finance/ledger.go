@@ -67,6 +67,8 @@ type IncomeStatement struct {
 	NetProfit    int64  `json:"net_profit"`
 	MarginBps    int    `json:"margin_bps"`
 	OpexLines    []Line `json:"opex_lines"`
+	// HPPStok: rincian HPP dari kartu stok (setelah titik nol); nil = HPP = belanja bahan.
+	HPPStok *StokPeriode `json:"hpp_stok,omitempty"`
 }
 
 type Line struct {
@@ -120,6 +122,8 @@ type CashFlow struct {
 	// SetorModal & Prive dipakai neraca untuk menghitung tambahan modal.
 	SetorModal int64 `json:"setor_modal"`
 	Prive      int64 `json:"prive"`
+	// KenaikanPersediaan: nilai persediaan akhir − awal dari kartu stok (0 sebelum titik nol).
+	KenaikanPersediaan int64 `json:"kenaikan_persediaan"`
 
 	OperasiLangsung      CashFlowSection `json:"operasi_langsung"`
 	OperasiTidakLangsung CashFlowSection `json:"operasi_tidak_langsung"`
@@ -185,15 +189,24 @@ func BuildIncomeStatement(entries []LedgerEntry, depreciation, amortization int6
 			}
 		}
 	}
+	is.turunan()
+	return is
+}
+
+// turunan menghitung ulang angka turunan setelah komponen laba rugi berubah.
+func (is *IncomeStatement) turunan() {
 	is.NetSales = is.Omzet - is.ChannelFees
 	is.GrossProfit = is.NetSales - is.COGS
 	is.TotalOpex = is.Opex + is.Depreciation + is.Amortization
 	is.NetProfit = is.GrossProfit - is.TotalOpex + is.OtherIncome
+	is.MarginBps = 0
 	if is.Omzet > 0 {
 		is.MarginBps = int(is.NetProfit * 10000 / is.Omzet)
 	}
-	return is
 }
+
+// catatanPersediaan: keterangan arus kas tidak langsung sebelum kartu stok dimulai.
+const catatanPersediaan = "Perubahan persediaan stok — belum dihitung (mulai kartu stok di Stok & Gudang)"
 
 // BuildCashFlow menyusun arus kas dari entri yang sudah lunas; is dipakai untuk metode
 // tidak langsung (laba bersih dan beban non-kas).
@@ -272,7 +285,7 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
 	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)
 	cf.OperasiTidakLangsung.add("Kenaikan utang usaha", cf.NewPayables)
-	cf.OperasiTidakLangsung.note("Perubahan persediaan stok — belum dihitung per periode")
+	cf.OperasiTidakLangsung.note(catatanPersediaan)
 
 	cf.Investasi.add("Beli alat / aset tetap", -beliAset)
 	cf.Pendanaan.add("Setor modal", modal)
@@ -304,8 +317,8 @@ func (t *tally) lines() []Line { return t.items }
 // BuildBalanceSheet menyusun neraca. Modal awal dihitung dari komposisi saldo awal itu sendiri
 // (aktiva awal − kewajiban awal), sehingga aktiva selalu sama dengan pasiva.
 //
-// ponytail: persediaan masih angka saldo awal, belum dihitung dari mutasi stok; karena itu
-// "perubahan persediaan" di arus kas metode tidak langsung masih Rp 0.
+// Persediaan = saldo awal + kenaikan dari kartu stok; sebelum titik nol kenaikannya 0, jadi
+// persediaan tetap angka saldo awal.
 func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, as AssetSummary, opening ReportOpening) BalanceSheet {
 	var loans int64
 	for _, e := range entries {
@@ -319,7 +332,7 @@ func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, a
 	a := BalanceSheetAssets{
 		Cash:            cf.ClosingBalance,
 		Receivables:     opening.Receivables + cf.NewReceivables + cf.NewReceivablesOther,
-		Inventory:       opening.Inventory,
+		Inventory:       opening.Inventory + cf.KenaikanPersediaan,
 		FixedAssetsCost: as.TotalHargaPerolehan, AccumDepreciation: as.TotalAkumulasi, FixedAssets: as.TotalNilaiBuku,
 	}
 	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets

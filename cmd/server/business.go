@@ -124,10 +124,11 @@ func (s *tenant) annualized() (omzet, marginBps int64) {
 	defer s.mu.RUnlock()
 	var total, laba int64
 	periods := finance.AvailablePeriods()
+	stok := s.kartuLocked()
 	for _, p := range periods {
 		// Laba bersih sudah dikurangi penyusutan & amortisasi, jadi margin yang dipakai
 		// Perencanaan Pajak sama dengan yang tampil di Laporan Keuangan.
-		is := finance.BuildPeriodReport(s.txs, s.assets, p.ID, s.openingFor(p.ID)).Income
+		is := finance.BuildPeriodReportStok(s.txs, s.assets, p.ID, s.openingFor(p.ID), stok.Periode(p.ID)).Income
 		total += is.Omzet
 		laba += is.NetProfit
 	}
