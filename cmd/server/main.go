@@ -26,6 +26,7 @@ import (
 	"pajak/internal/katalog"
 	"pajak/internal/llm"
 	"pajak/internal/master"
+	"pajak/internal/pengetahuan"
 	"pajak/internal/xlsx"
 )
 
@@ -89,6 +90,9 @@ type Server struct {
 	// katalog: template COA & benchmark DJP berversi; versi aktifnya dipasang lewat pasangKatalog.
 	katalogMu sync.Mutex
 	katalog   katalog.State
+	// pengetahuan: artikel pajak & sumber yang dibaca AI (Panel Master, Pustaka Pajak klien).
+	pengetahuanMu sync.Mutex
+	pengetahuan   pengetahuan.State
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -223,6 +227,7 @@ func (s *Server) loadFiles() bool {
 	s.tenants, s.users, s.bugs = tenants, users, loadBugs()
 	s.master = loadMasterFile()
 	s.katalog = loadKatalogFile()
+	s.pengetahuan = loadPengetahuanFile()
 	return st != nil
 }
 
@@ -386,6 +391,7 @@ func (s *Server) routes() {
 
 	s.masterRoutes()
 	s.katalogRoutes()
+	s.pengetahuanRoutes()
 	s.mux.HandleFunc("GET /api/v1/koreksi", s.guard("usulan-koreksi", s.on((*tenant).handleListKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/setujui", s.persisting(s.guard("usulan-koreksi", s.handleSetujuiKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/tolak", s.persisting(s.guard("usulan-koreksi", s.handleTolakKoreksi)))

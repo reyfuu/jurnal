@@ -18,14 +18,17 @@ const (
 	KlienLihat Izin = "klien_lihat"
 	Tiket      Izin = "tiket"
 	// LihatSebagai: membaca laporan klien apa adanya (hanya baca, wajib alasan, tercatat).
-	LihatSebagai Izin = "lihat_sebagai"
-	UsulKoreksi  Izin = "usul_koreksi"
-	COATemplate  Izin = "coa_template"
-	Benchmark    Izin = "benchmark"
-	Langganan    Izin = "langganan"
-	Pembayaran   Izin = "pembayaran"
-	Tim          Izin = "tim"
-	Audit        Izin = "audit"
+	LihatSebagai  Izin = "lihat_sebagai"
+	UsulKoreksi   Izin = "usul_koreksi"
+	COATemplate   Izin = "coa_template"
+	Benchmark     Izin = "benchmark"
+	Pengetahuan   Izin = "pengetahuan"
+	Artikel       Izin = "artikel"
+	ArtikelTerbit Izin = "artikel_terbit"
+	Langganan     Izin = "langganan"
+	Pembayaran    Izin = "pembayaran"
+	Tim           Izin = "tim"
+	Audit         Izin = "audit"
 )
 
 type IzinInfo struct {
@@ -45,6 +48,9 @@ var DaftarIzin = []IzinInfo{
 	{Langganan, "Atur langganan klien", "Perpanjang trial, aktifkan paket manual"},
 	{COATemplate, "Kelola template COA", "Draft, impor Excel, dan terbitkan versi template per jenis usaha"},
 	{Benchmark, "Kelola benchmark NPM DJP", "Impor versi data baru dan aktifkan"},
+	{Pengetahuan, "Kelola basis pengetahuan AI", "Tambah sumber (manual, Excel, PDF), verifikasi, pilih yang dipakai AI"},
+	{Artikel, "Tulis artikel pajak", "Simpan draft; terbit setelah diverifikasi"},
+	{ArtikelTerbit, "Verifikasi & terbitkan artikel", ""},
 	{Pembayaran, "Lihat pembayaran", "Order Midtrans semua klien yang bisa dilihat"},
 	{Tim, "Kelola tim & akses", "Tambah anggota, role, dan penugasan klien"},
 	{Audit, "Lihat audit log", ""},
@@ -72,7 +78,7 @@ func DefaultRoles() []Role {
 	}
 	return []Role{
 		{ID: RoleMaster, Nama: "Master", Kunci: true, Izin: semua},
-		{ID: "konsultan", Nama: "Konsultan", Izin: []Izin{KlienLihat, Tiket, LihatSebagai, UsulKoreksi}},
+		{ID: "konsultan", Nama: "Konsultan", Izin: []Izin{KlienLihat, Tiket, LihatSebagai, UsulKoreksi, Artikel}},
 		{ID: "cs", Nama: "CS / Support", Izin: []Izin{KlienLihat, Tiket}},
 	}
 }

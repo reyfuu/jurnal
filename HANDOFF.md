@@ -625,6 +625,26 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   per proses; tes server tidak paralel.
 - Postgres: `coa_template`, `benchmark_versi` (tulis ulang semua baris) + `tenants.coa_template`.
 
+## Panel Master — tahap 4: artikel pajak, basis pengetahuan AI, analisa per klien (20 Okt 2026)
+
+- `internal/pengetahuan`: artikel (draft → terbit; `tampil_klien` → Pustaka Pajak klien) dan
+  sumber (manual / Excel / PDF; menunggu → terverifikasi, `dipakai_ai`). **AI hanya membaca
+  artikel terbit + sumber terverifikasi yang dipakai.** Pencarian = BM25 di memori atas potongan
+  ≤900 karakter (ponytail: pindah ke FTS Postgres/pgvector bila >~10 rb potongan atau butuh
+  pencarian makna).
+- PDF dibaca dengan `github.com/ledongthuc/pdf` (BSD, turunan rsc.io/pdf; versi dipatok go.sum),
+  dibungkus `recover` karena pustaka itu bisa panik pada berkas rusak. PDF hasil scan →
+  `ErrPDFKosong` (pesan: ketik ringkasan lewat Tulis manual). Tes membangun PDF minimal sendiri.
+- Izin: `pengetahuan`, `artikel` (draft; bawaan Konsultan), `artikel_terbit` (terbitkan & ubah
+  artikel terbit).
+- **Analisa AI per klien** (`GET /master/klien/{id}/analisa`, izin `lihat_sebagai`, tercatat audit,
+  dijalankan atas tombol): `faktaKlien` menghitung omzet setahun & NPM (`tenant.annualized`) dan
+  membandingkan dengan benchmark KLU aktif lewat `tax.CekAwal`; sumber dicari dengan
+  `ai.QueryKlien`; model (`ai.AnalisaKlien`) hanya menulis penilaian dan **rujukan yang tidak ada
+  di daftar sumber dibuang**. Tanpa `LLM_API_KEY`, fakta & sumber tetap tampil.
+- Klien: menu **Pustaka Pajak** (view `pustaka`, Owner & Admin).
+- Postgres: `artikel`, `sumber_pengetahuan` (tulis ulang semua baris; ponytail di pgstore.go).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
@@ -638,7 +658,8 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
    Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
    berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
    mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
-   Panel Master tahap 4 (lihat preview): artikel pajak, basis pengetahuan AI, analisa AI per klien.
+   Panel Master selesai (tahap 1–4). Lanjutan yang wajar: OCR untuk PDF hasil scan di Basis
+   Pengetahuan (pakai slot OCR poin 5), dan AI chat klien yang ikut merujuk Basis Pengetahuan.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 

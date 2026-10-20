@@ -216,6 +216,9 @@ func (s *Server) saveAll() {
 	if err := saveKatalogDB(s.db, s.katalog); err != nil {
 		log.Fatalf("impor katalog: %v", err)
 	}
+	if err := savePengetahuanDB(s.db, s.pengetahuan); err != nil {
+		log.Fatalf("impor basis pengetahuan: %v", err)
+	}
 }
 
 // sessionTenant: usaha milik sesi valid pertama di cookies; ok=false bila tidak ada sesi.

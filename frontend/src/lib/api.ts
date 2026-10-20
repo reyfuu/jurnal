@@ -9,6 +9,7 @@ export type View =
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim MasterPajak: seluruh aplikasi diganti Panel Master
   | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim MasterPajak
+  | 'pustaka' // artikel pajak dari tim MasterPajak
 
 export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
@@ -602,7 +603,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 // --- Panel Master (akun tim MasterPajak) ---
 
 export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
-  | 'pembayaran' | 'tim' | 'audit'
+  | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -1319,3 +1320,40 @@ export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pa
 /** Posisi omzet setahun terhadap batas wajib PKP Rp4,8 M. */
 export interface HasilPKP { omzet: number; batas: number; wajib_pkp: boolean; sisa: number; pemakaian_bps: number; catatan: string[] }
 export const cekPKP = (omzet: number) => api<HasilPKP>('/kalkulator/pkp', { method: 'POST', body: { omzet } })
+
+// --- Artikel pajak, basis pengetahuan AI, analisa AI per klien ---
+
+export const KATEGORI_ARTIKEL = ['PPh Final UMKM', 'PPh 21', 'PPh 23', 'PPh Badan', 'PPN', 'Pembukuan', 'Administrasi'] as const
+export interface Artikel {
+  id: number; judul: string; kategori: string; dasar_hukum?: string; berlaku_sejak?: string; tag: string[]; isi: string
+  status: 'draft' | 'terbit'; tampil_klien: boolean; oleh: string; diverifikasi?: string; waktu: string
+}
+export type ArtikelInput = Pick<Artikel, 'judul' | 'kategori' | 'dasar_hukum' | 'berlaku_sejak' | 'tag' | 'isi' | 'tampil_klien'>
+export interface SumberPengetahuan {
+  id: number; judul: string; jenis: 'manual' | 'excel' | 'pdf'; topik: string[]; status: 'menunggu' | 'terverifikasi'
+  dipakai_ai: boolean; oleh: string; diverifikasi?: string; waktu: string; potongan: number; cuplikan: string
+}
+export interface Potongan { ref: string; judul: string; teks: string; skor?: number }
+export interface FaktaKlien {
+  nama: string; jenis_usaha: string; bentuk_usaha: string; pkp: boolean; klu?: string; klu_nama?: string
+  omzet_setahun: number; npm_bps: number; benchmark_npm_bps?: number; benchmark_cttor_bps?: number; sumber_benchmark?: string
+  status_npm: 'kurang_data' | 'di_bawah' | 'wajar'; risiko?: string[]
+}
+export interface AnalisaKlien {
+  fakta: FaktaKlien; sumber: Potongan[]
+  analisa: { tersedia: boolean; alasan?: string; model?: string; penilaian?: string; poin?: { judul: string; isi: string; sumber: string[] }[] }
+}
+
+export const listArtikel = () => api<Artikel[]>('/master/artikel')
+export const simpanArtikel = (id: number | null, a: ArtikelInput, terbit: boolean) =>
+  api<Artikel>(id ? `/master/artikel/${id}` : '/master/artikel', { method: id ? 'PUT' : 'POST', body: { ...a, terbit } })
+export const listPustaka = () => api<Artikel[]>('/pustaka')
+export const listPengetahuan = () => api<{ sumber: SumberPengetahuan[]; artikel_terbit: number; potongan_dipakai: number }>('/master/pengetahuan')
+export const tulisPengetahuan = (judul: string, isi: string, topik: string[]) =>
+  api<SumberPengetahuan>('/master/pengetahuan', { method: 'POST', body: { judul, isi, topik } })
+export const unggahPengetahuan = (file: File, judul: string, topik: string) => unggah<SumberPengetahuan>('/master/pengetahuan', file, { judul, topik })
+export const verifikasiPengetahuan = (id: number) => api<unknown>(`/master/pengetahuan/${id}/verifikasi`, { method: 'POST' })
+export const pakaiPengetahuan = (id: number, dipakai_ai: boolean) => api<unknown>(`/master/pengetahuan/${id}`, { method: 'PUT', body: { dipakai_ai } })
+export const hapusPengetahuan = (id: number) => api<void>(`/master/pengetahuan/${id}`, { method: 'DELETE' })
+export const cariPengetahuan = (q: string) => api<Potongan[]>(`/master/pengetahuan/cari?q=${encodeURIComponent(q)}`)
+export const analisaKlien = (id: number) => api<AnalisaKlien>(`/master/klien/${id}/analisa`)
