@@ -6,9 +6,10 @@ import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Combobox } from '@/components/ui/combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { saveBusiness, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
+import { getWilayah, saveBusiness, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
@@ -49,7 +50,8 @@ function ChoiceGrid({ name, options, value, onChange }: {
 
 type Lokasi = Partial<Record<(typeof LOKASI_FIELDS)[number], string>>
 
-// LokasiFields: alamat, kecamatan, kota, provinsi — dipakai wizard onboarding dan Profil Usaha.
+// LokasiFields: provinsi → kota/kabupaten → kecamatan (combobox, data Kepmendagri 2025) → alamat.
+// Dipakai wizard onboarding dan Profil Usaha.
 function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   v: Lokasi
   set: (patch: Lokasi) => void
@@ -58,28 +60,51 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   big?: boolean
 }) {
   const cls = big ? 'h-12 px-4 md:text-base' : ''
+  // daftar wilayah milik provinsi terakhir yang dimuat; provinsi lain = belum ada (kosong)
+  const [loaded, setLoaded] = useState<{ provinsi: string; kota: Kota[]; err?: string }>()
+  useEffect(() => {
+    const p = v.provinsi
+    if (!p) return
+    let live = true
+    getWilayah(p).then((kota) => live && setLoaded({ provinsi: p, kota }),
+      () => live && setLoaded({ provinsi: p, kota: [], err: 'Gagal memuat daftar wilayah. Coba muat ulang halaman.' }))
+    return () => { live = false }
+  }, [v.provinsi])
+  const cur = loaded?.provinsi === v.provinsi ? loaded : undefined
+  const kota = cur?.kota ?? []
+  const loadErr = cur?.err ?? ''
+  const kecamatan = kota.find((k) => k.nama === v.kota)?.kecamatan ?? []
+  // nilai lama berupa teks bebas (sebelum ada daftar) harus dipilih ulang
+  const ulang = (x: string | undefined, list: string[]) => (x && list.length > 0 && !list.includes(x) ? `${x} — pilih ulang dari daftar` : '')
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="grid gap-1.5 sm:col-span-2">
-        <Label htmlFor="lok-alamat">Alamat usaha</Label>
-        <Input id="lok-alamat" className={cls} autoComplete="street-address" required={required} value={v.alamat ?? ''} onChange={(e) => set({ alamat: e.target.value })} placeholder="mis. Jl. Senopati Raya No. 45" />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="lok-kecamatan">Kecamatan</Label>
-        <Input id="lok-kecamatan" className={cls} required={required} value={v.kecamatan ?? ''} onChange={(e) => set({ kecamatan: e.target.value })} placeholder="mis. Kebayoran Baru" />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="lok-kota">Kota / kabupaten</Label>
-        <Input id="lok-kota" className={cls} autoComplete="address-level2" required={required} value={v.kota ?? ''} onChange={(e) => set({ kota: e.target.value })} placeholder="mis. Jakarta Selatan" />
-      </div>
-      <div className="grid gap-1.5 sm:col-span-2">
         <Label htmlFor="lok-provinsi">Provinsi</Label>
-        <Select value={v.provinsi ?? ''} onValueChange={(x) => set({ provinsi: x })}>
+        <Select value={v.provinsi ?? ''} onValueChange={(x) => x !== v.provinsi && set({ provinsi: x, kota: '', kecamatan: '' })}>
           <SelectTrigger id="lok-provinsi" className={big ? 'h-12 w-full md:text-base' : 'w-full'}><SelectValue placeholder="Pilih provinsi" /></SelectTrigger>
           <SelectContent>
             {provinsi.map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="lok-kota">Kota / kabupaten</Label>
+        <Combobox id="lok-kota" className={cls} value={v.kota ?? ''} onChange={(x) => x !== v.kota && set({ kota: x, kecamatan: '' })}
+          options={kota.map((k) => k.nama)} disabled={kota.length === 0}
+          placeholder={!v.provinsi ? 'Pilih provinsi dulu' : ulang(v.kota, kota.map((k) => k.nama)) || 'Pilih kota / kabupaten'}
+          searchPlaceholder="Cari, mis. Bandung" empty="Tidak ada kota/kabupaten yang cocok." />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="lok-kecamatan">Kecamatan</Label>
+        <Combobox id="lok-kecamatan" className={cls} value={v.kecamatan ?? ''} onChange={(x) => set({ kecamatan: x })}
+          options={kecamatan} disabled={kecamatan.length === 0}
+          placeholder={!kecamatan.length ? 'Pilih kota / kabupaten dulu' : ulang(v.kecamatan, kecamatan) || 'Pilih kecamatan'}
+          searchPlaceholder="Cari kecamatan" empty="Tidak ada kecamatan yang cocok." />
+      </div>
+      {loadErr && <p className="text-sm text-destructive sm:col-span-2" role="alert">{loadErr}</p>}
+      <div className="grid gap-1.5 sm:col-span-2">
+        <Label htmlFor="lok-alamat">Alamat usaha</Label>
+        <Input id="lok-alamat" className={cls} autoComplete="street-address" required={required} value={v.alamat ?? ''} onChange={(e) => set({ alamat: e.target.value })} placeholder="mis. Jl. Senopati Raya No. 45" />
       </div>
     </div>
   )

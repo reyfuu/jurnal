@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -40,6 +41,16 @@ var kluOptions = func() []map[string]string {
 	return out
 }()
 
+// handleWilayah: kabupaten/kota beserta kecamatannya untuk satu provinsi (combobox lokasi).
+func handleWilayah(w http.ResponseWriter, r *http.Request) {
+	kota := finance.KotaDi(r.URL.Query().Get("provinsi"))
+	if kota == nil {
+		http.Error(w, "provinsi tidak dikenal", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, kota)
+}
+
 func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	prof := s.profile
@@ -73,7 +84,7 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if err := prof.Validate(); err != nil {
+	if err := cmp.Or(prof.Validate(), prof.ValidateWilayah()); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

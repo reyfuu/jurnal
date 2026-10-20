@@ -514,6 +514,19 @@ export interface BusinessInfo {
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
+
+export type Kota = { nama: string; kecamatan: string[] }
+const wilayahCache = new Map<string, Promise<Kota[]>>()
+// getWilayah: kabupaten/kota + kecamatan satu provinsi (Kepmendagri 2025); di-cache per provinsi.
+export function getWilayah(provinsi: string): Promise<Kota[]> {
+  let p = wilayahCache.get(provinsi)
+  if (!p) {
+    p = api<Kota[]>('/wilayah?provinsi=' + encodeURIComponent(provinsi))
+    p.catch(() => wilayahCache.delete(provinsi)) // gagal: boleh dicoba lagi
+    wilayahCache.set(provinsi, p)
+  }
+  return p
+}
 export const saveBusiness = (p: BusinessProfile) => api<BusinessProfile>('/business', { method: 'PUT', body: p })
 
 /** Hasil tax.CekAwal: NPM vs benchmark DJP dan risiko pajak. */
