@@ -268,6 +268,8 @@ export default function App() {
             assets={data!.assets}
             period={period}
             periodLabel={d.period_label}
+            periods={periods}
+            bisaEkspor={!me!.lihat}
             onAssetsChanged={() => { void reload(me!, period); getBusiness().then(setBusiness, fail) }} // metode penyusutan bisa dipilih dari tab Aset
           />
         )

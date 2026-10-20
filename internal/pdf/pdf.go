@@ -47,13 +47,24 @@ var (
 type Doc struct {
 	pages []*bytes.Buffer
 	cur   *bytes.Buffer
+	w, h  float64
 }
 
-func New() *Doc {
-	d := &Doc{}
+// New membuat dokumen A4 tegak.
+func New() *Doc { return newDoc(A4Width, A4Height) }
+
+// NewLandscape membuat dokumen A4 rebah, untuk tabel yang banyak kolomnya.
+func NewLandscape() *Doc { return newDoc(A4Height, A4Width) }
+
+func newDoc(w, h float64) *Doc {
+	d := &Doc{w: w, h: h}
 	d.AddPage()
 	return d
 }
+
+// Width & Height: ukuran halaman dokumen ini dalam titik PDF.
+func (d *Doc) Width() float64  { return d.w }
+func (d *Doc) Height() float64 { return d.h }
 
 func (d *Doc) AddPage() {
 	b := &bytes.Buffer{}
@@ -76,19 +87,19 @@ func (d *Doc) Text(x, y float64, s string, f Font, size float64, c RGB, a Align)
 		x -= Width(s, f, size) / 2
 	}
 	fmt.Fprintf(d.cur, "BT /%s %.2f Tf %.3f %.3f %.3f rg %.2f %.2f Td (%s) Tj ET\n",
-		f, size, c.R, c.G, c.B, x, A4Height-y, escape(winAnsi(s)))
+		f, size, c.R, c.G, c.B, x, d.h-y, escape(winAnsi(s)))
 }
 
 // Rect menggambar kotak terisi; dipakai untuk latar baris header tabel.
 func (d *Doc) Rect(x, y, w, h float64, c RGB) {
 	fmt.Fprintf(d.cur, "%.3f %.3f %.3f rg %.2f %.2f %.2f %.2f re f\n",
-		c.R, c.G, c.B, x, A4Height-y-h, w, h)
+		c.R, c.G, c.B, x, d.h-y-h, w, h)
 }
 
 // HLine menggambar garis mendatar setebal thickness.
 func (d *Doc) HLine(x1, x2, y, thickness float64, c RGB) {
 	fmt.Fprintf(d.cur, "%.3f %.3f %.3f RG %.2f w %.2f %.2f m %.2f %.2f l S\n",
-		c.R, c.G, c.B, thickness, x1, A4Height-y, x2, A4Height-y)
+		c.R, c.G, c.B, thickness, x1, d.h-y, x2, d.h-y)
 }
 
 // Write merangkai seluruh halaman jadi satu berkas PDF.
@@ -109,7 +120,7 @@ func (d *Doc) Write(w io.Writer) error {
 	for i := range d.pages {
 		objs = append(objs, fmt.Sprintf(
 			"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Resources << /Font %s >> /Contents %d 0 R >>",
-			A4Width, A4Height, fontRef, 3+n+i))
+			d.w, d.h, fontRef, 3+n+i))
 	}
 	for _, p := range d.pages {
 		objs = append(objs, fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", p.Len()+1, p.String()))

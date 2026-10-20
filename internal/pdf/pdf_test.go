@@ -195,3 +195,23 @@ func leadingInt(b []byte) (int, bool) {
 	n, err := strconv.Atoi(string(b[:i]))
 	return n, err == nil
 }
+
+func TestLandscapeMediaBoxDanKoordinat(t *testing.T) {
+	d := pdf.NewLandscape()
+	if d.Width() != pdf.A4Height || d.Height() != pdf.A4Width {
+		t.Fatalf("ukuran %vx%v", d.Width(), d.Height())
+	}
+	d.Text(10, 20, "Hai", pdf.Regular, 10, pdf.Black, pdf.Left)
+	var buf bytes.Buffer
+	if err := d.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+	s := buf.String()
+	if !strings.Contains(s, "/MediaBox [0 0 841.89 595.28]") {
+		t.Error("MediaBox bukan lanskap")
+	}
+	// y dihitung dari atas halaman lanskap: 595.28 - 20.
+	if !strings.Contains(s, "10.00 575.28 Td") {
+		t.Error("koordinat y tidak memakai tinggi halaman lanskap")
+	}
+}

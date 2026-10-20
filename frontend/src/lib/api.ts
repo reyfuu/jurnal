@@ -1528,3 +1528,20 @@ export interface PorsiProduk { nama: string; harga: number; modal: number; ada_m
 export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: number; tambah_tetap: number }
 export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
 export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })
+
+// --- Ekspor PDF & perbandingan multi-bulan Laporan Keuangan ---
+
+export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung') =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}`
+export interface BarisBanding {
+  kunci: string; label: string; gaya: 'judul' | 'baris' | 'sub' | 'total'
+  /** Isi kolom Total: jumlah (laba rugi, arus kas), awal (saldo awal), akhir (neraca, saldo akhir). */
+  agregat?: 'jumlah' | 'awal' | 'akhir'
+  nilai: number[]; total: number
+}
+export interface BagianBanding { kode: 'laba-rugi' | 'neraca' | 'arus-kas'; judul: string; baris: BarisBanding[] }
+export interface Banding { kolom: { periode: string; label: string }[]; bagian: BagianBanding[] }
+export const MAKS_BANDING = 12
+export const getBanding = (periode: string[]) => api<Banding>(`/reports/banding?periode=${periode.join(',')}`)
+export const bandingPdfUrl = (periode: string[]) => `/api/v1/reports/banding.pdf?periode=${periode.join(',')}`
