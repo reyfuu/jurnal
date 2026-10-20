@@ -775,6 +775,18 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Perbaikan: `GET /transactions` mengirim `[]` (bukan `null`) — halaman Transaksi usaha baru tanpa
   transaksi sebelumnya crash.
 
+## Mutasi bank dibantu AI (20 Okt 2026)
+
+- Urutan: aturan kata kunci (`finance.TebakJenis`, gratis) dulu; hanya baris berkeyakinan
+  **rendah** yang dikirim ke AI. `MutasiHasil.KelompokRendah` menggabungkan baris dengan keterangan
+  sama (setelah `SamarkanAngka`: deret ≥4 digit → "#") dan arah sama → satu pertanyaan per
+  kelompok. `ai.KelompokkanMutasi`: maks 60 kelompok per panggilan, maks 3 panggilan per unggah,
+  kuota 30 panggilan per usaha per 24 jam (`jatahAI("mutasi|<usaha>")`, memori).
+- `TerapkanSaran`: jenis harus ada di `JenisList` dan searah; baris jadi `keyakinan: "ai"`
+  (label "Saran AI", alasan dari model) dan tidak dihitung "perlu diperiksa"; tetap bisa diganti
+  sebelum disimpan. AI mati / gagal / kuota habis → `ai_pesan`, pratinjau tetap jalan.
+- Kuota saran KLU memakai mekanisme yang sama (`jatahAI("klu|<user>")`).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

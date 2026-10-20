@@ -92,9 +92,10 @@ type Server struct {
 	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
 	// katalog: template COA & benchmark nasional berversi; versi aktifnya dipasang lewat pasangKatalog.
 	katalogMu sync.Mutex
-	// kluAI: waktu pemakaian saran KLU dengan AI per user (kuota harian, lihat klu.go).
+	// kuotaAI: waktu pemakaian fitur AI per kunci (mis. "klu|<user>", "mutasi|<usaha>"),
+	// untuk kuota harian (lihat jatahAI di klu.go).
 	kluMu   sync.Mutex
-	kluAI   map[int][]time.Time
+	kuotaAI map[string][]time.Time
 	katalog katalog.State
 	// pengetahuan: artikel pajak & sumber yang dibaca AI (Panel Master, Pustaka Pajak klien).
 	pengetahuanMu sync.Mutex
@@ -333,7 +334,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
-	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.on((*tenant).handleMutasiPreview)))
+	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi/commit", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleMutasiCommit))))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateTransaction))))
 	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteTransaction))))

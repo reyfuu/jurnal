@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"pajak/internal/ai"
 	"pajak/internal/finance"
 	"pajak/internal/xlsx"
 )
@@ -65,29 +67,73 @@ func csvRows(s string, sep rune) ([][]string, error) {
 	return r.ReadAll()
 }
 
-func (s *tenant) handleMutasiPreview(w http.ResponseWriter, r *http.Request) {
+// maxMutasiAI: panggilan AI pengelompokan mutasi per usaha per 24 jam; maxPanggilanPerUnggah
+// membatasi satu berkas besar (60 kelompok per panggilan).
+const (
+	maxMutasiAI           = 30
+	maxPanggilanPerUnggah = 3
+)
+
+// handleMutasiPreview: tebakan kata kunci, lalu baris yang masih "rendah" dibantu AI (bila aktif
+// & kuota ada). Kegagalan AI tidak menggagalkan pratinjau — baris tetap bisa dipilih manual.
+func (s *Server) handleMutasiPreview(w http.ResponseWriter, r *http.Request) {
+	t := s.tenantOf(r)
+	h, ok := t.mutasiPreview(w, r)
+	if !ok {
+		return
+	}
+	kel := h.KelompokRendah()
+	switch {
+	case len(kel) == 0:
+	case s.llm == nil || !s.llm.Enabled():
+		h.AIPesan = "Bantuan AI belum aktif; pilih jenis baris bertanda Periksa sendiri."
+	default:
+		p := t.currentProfile()
+		usaha := strings.TrimSpace(p.JenisUsaha + " · " + p.NamaUsaha)
+		saran := map[string]finance.SaranJenis{}
+		for i := 0; i < len(kel) && i/ai.MaksKelompokPerPanggilan < maxPanggilanPerUnggah; i += ai.MaksKelompokPerPanggilan {
+			if !s.jatahAI("mutasi|"+strconv.Itoa(t.id), maxMutasiAI) {
+				h.AIPesan = "Kuota bantuan AI hari ini habis; sisa baris bertanda Periksa dipilih sendiri."
+				break
+			}
+			hasil, err := ai.KelompokkanMutasi(r.Context(), s.llm, usaha, kel[i:min(i+ai.MaksKelompokPerPanggilan, len(kel))])
+			if err != nil {
+				h.AIPesan = "Bantuan AI gagal (" + err.Error() + "); pilih jenis baris bertanda Periksa sendiri."
+				break
+			}
+			maps.Copy(saran, hasil)
+		}
+		if len(kel) > ai.MaksKelompokPerPanggilan*maxPanggilanPerUnggah && h.AIPesan == "" {
+			h.AIPesan = "Sebagian baris terlalu banyak untuk dibantu AI sekaligus; sisanya dipilih sendiri."
+		}
+		h.TerapkanSaran(saran)
+	}
+	writeJSON(w, h)
+}
+
+func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.MutasiHasil, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	f, fh, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "unggah berkas mutasi .xlsx atau .csv (maks 5 MB) di field file", http.StatusBadRequest)
-		return
+		return finance.MutasiHasil{}, false
 	}
 	defer f.Close()
 	data, err := io.ReadAll(f)
 	if err != nil {
 		http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
-		return
+		return finance.MutasiHasil{}, false
 	}
 	rows, err := bacaTabel(fh.Filename, data)
 	if err != nil || len(rows) == 0 {
 		http.Error(w, "berkas tidak terbaca; unggah hasil unduhan mutasi dari m-banking dalam format .xlsx atau .csv", http.StatusBadRequest)
-		return
+		return finance.MutasiHasil{}, false
 	}
 	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
 	s.mu.RLock()
 	existing := append([]finance.Transaction(nil), s.txs...)
 	s.mu.RUnlock()
-	writeJSON(w, finance.ParseMutasi(rows, tahun, existing))
+	return finance.ParseMutasi(rows, tahun, existing), true
 }
 
 type mutasiCommitReq struct {

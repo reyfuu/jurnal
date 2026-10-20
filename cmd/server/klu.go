@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,18 +18,24 @@ import (
 const maxSaranKLUAI = 20
 
 func (s *Server) jatahSaranKLU(userID int) bool {
+	return s.jatahAI("klu|"+strconv.Itoa(userID), maxSaranKLUAI)
+}
+
+// jatahAI: memotong satu jatah pemakaian AI untuk kunci dalam 24 jam terakhir; false = habis.
+// ponytail: di memori — restart mengosongkan hitungan; cukup untuk mengerem biaya model.
+func (s *Server) jatahAI(kunci string, maks int) bool {
 	s.kluMu.Lock()
 	defer s.kluMu.Unlock()
-	if s.kluAI == nil {
-		s.kluAI = map[int][]time.Time{}
+	if s.kuotaAI == nil {
+		s.kuotaAI = map[string][]time.Time{}
 	}
 	batas := time.Now().Add(-24 * time.Hour)
-	pakai := slices.DeleteFunc(s.kluAI[userID], func(t time.Time) bool { return t.Before(batas) })
-	if len(pakai) >= maxSaranKLUAI {
-		s.kluAI[userID] = pakai
+	pakai := slices.DeleteFunc(s.kuotaAI[kunci], func(t time.Time) bool { return t.Before(batas) })
+	if len(pakai) >= maks {
+		s.kuotaAI[kunci] = pakai
 		return false
 	}
-	s.kluAI[userID] = append(pakai, time.Now())
+	s.kuotaAI[kunci] = append(pakai, time.Now())
 	return true
 }
 
