@@ -132,6 +132,10 @@ func TestMaster_PenugasanMembatasiKlien(t *testing.T) {
 	if len(milik[0].Penangan) != 1 || milik[0].Penangan[0].Nama != "Anggota konsultan" {
 		t.Errorf("penangan = %+v", milik[0].Penangan)
 	}
+	// Usaha tanpa pembayaran: orders [] (bukan null), supaya layar detail tidak gagal.
+	if body := do(srv, k, http.MethodGet, "/api/v1/master/klien/2", "").Body.String(); !strings.Contains(body, `"orders":[]`) || !strings.Contains(body, `"tiket":[]`) {
+		t.Errorf("detail klien tanpa order: %s", body)
+	}
 	if rec := do(srv, k, http.MethodGet, "/api/v1/master/klien/1", ""); rec.Code != http.StatusNotFound {
 		t.Errorf("detail klien yang tidak ditugaskan: want 404, got %d", rec.Code)
 	}

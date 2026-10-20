@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { bugScreenshotUrl, createBug, getBugInfo, listBugs, type BugInfo, type BugReport } from '@/lib/api'
+import { STATUS_LABEL, STATUS_PILL } from '@/lib/tiket'
 
 // LaporBug: laporan disimpan di server (data/bugs.json); tiap usaha melihat laporannya sendiri.
 export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
@@ -72,9 +73,7 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
     <>
       <PageHeader
         title="Lapor Bug"
-        subtitle={info?.master
-          ? 'Anda masuk sebagai ID Master: daftar di bawah berisi laporan dari semua usaha.'
-          : 'Ceritakan masalah yang Anda temui; tim kami akan menindaklanjuti'}
+        subtitle="Ceritakan masalah yang Anda temui. Status dan balasan tim MasterPajak muncul di daftar laporan di bawah." 
       >
         {info && (
           <span className={'pill-status ' + (info.penerusan_aktif ? 'pill-green' : 'pill-amber')}>
@@ -136,15 +135,23 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
           <ul className="mt-3 grid gap-3">
             {list.map((b) => (
               <li key={b.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
-                <div className="text-sm font-semibold">{b.judul}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold">{b.judul}</span>
+                  <span className={'pill-status ' + STATUS_PILL[b.status ?? 'baru']} style={{ fontSize: 11 }}>{STATUS_LABEL[b.status ?? 'baru']}</span>
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {new Date(b.waktu).toLocaleString('id-ID')} · {b.user_email}{b.halaman && ` · ${b.halaman}`}
-                  {info?.master && b.tenant_id != null && ` · usaha ${b.tenant_id}`}
                   {b.gagal_kirim && (
                     <span className="pill-status pill-amber" style={{ fontSize: 10, marginLeft: 6 }} title={b.gagal_kirim}>belum diteruskan</span>
                   )}
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{b.deskripsi}</p>
+                {b.balasan?.map((r, i) => (
+                  <div key={i} className="mt-2 rounded-lg px-3 py-2 text-sm" style={{ background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)' }}>
+                    <div className="text-xs text-muted-foreground">{r.nama} · Tim MasterPajak · {new Date(r.waktu).toLocaleString('id-ID')}</div>
+                    <p className="mt-0.5 whitespace-pre-wrap">{r.isi}</p>
+                  </div>
+                ))}
                 {b.screenshot && (
                   <a href={bugScreenshotUrl(b.id)} target="_blank" rel="noreferrer" className="mt-2 inline-block">
                     <img src={bugScreenshotUrl(b.id)} alt={`Screenshot: ${b.judul}`} loading="lazy" className="max-h-32 rounded-md border border-border" />

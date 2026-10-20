@@ -523,7 +523,6 @@ sampai ke pengembang**, bukan mengendap di berkas di VPS.
 ```
 BUG_WEBHOOK_URL      kosong = laporan hanya tersimpan di server (tidak ada data keluar)
 BUG_WEBHOOK_TIMEOUT  default 10s
-MASTER_EMAIL         pemilik ID Master: membaca laporan lintas usaha; kosong = tidak ada
 ```
 
 - Penerusan dilakukan **setelah** laporan tersimpan, dan kegagalannya tidak membuat pelaporan
@@ -535,8 +534,8 @@ MASTER_EMAIL         pemilik ID Master: membaca laporan lintas usaha; kosong = t
   pihak luar tanpa itu diperlukan bukan hal yang perlu dilakukan diam-diam.
 - `bugHook.tujuan()` hanya menyebut **host**, tidak URL penuh: webhook Slack/Discord memuat token
   di path-nya, dan nilai ini ditampilkan ke pengguna di halaman Lapor Bug.
-- `MASTER_EMAIL` membuat satu akun melihat laporan seluruh usaha dan membuka lampirannya. Tanpa
-  env itu, tidak ada yang punya akses lintas usaha — dikunci test dua arah.
+- Akses lintas usaha lewat `MASTER_EMAIL` **sudah dihapus** (Okt 2026): tim membaca laporan
+  lewat Panel Master, lihat bagian berikut.
 - `GET /api/v1/bugs/info` sengaja **endpoint terpisah**, bukan digabung ke `/bugs`: bentuk balasan
   `/bugs` sudah dipakai halaman Lapor Bug sebagai array, dan mengubahnya jadi objek akan
   memecahkan pemanggil yang sudah ada.
@@ -552,6 +551,37 @@ tabelnya di `schema.sql`, daftar `{tabel, rows}` di `saveTenantDB`, dan `rowsOf(
 `produk_bahan` jadi tabel anak seperti `invoice_items` — resep adalah daftar di dalam produk, dan
 disimpan per baris dengan kolom `no` sebagai urutannya.
 
+## Panel Master — tahap 1: tim, akses, klien, tiket (20 Okt 2026)
+
+Konsol tim MasterPajak untuk memantau klien. Preview desain yang disetujui pemilik:
+https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dibangun).
+
+- **Akun tim** = user `auth` ber-role `mp`, `tenant_id 0` (tanpa usaha). `guard` menolak akun ini
+  di semua endpoint selain `/api/v1/master/*` dan `/auth/me` — tanpa itu endpoint "cukup login"
+  (view `""`) berjalan atas usaha yang tidak ada. Owner tidak bisa membuat user role `mp`
+  (`auth` menolak role `mp` dengan tenant ≠ 0, dan `/users` menyembunyikan role itu).
+- **Role tim, izin, penugasan, audit** di `internal/master` (murni, ber-test). Role `master`
+  terkunci & selalu punya semua izin; role lain bisa ditambah/diubah di Tim & Akses. Minimal satu
+  Master selalu ada (`ErrMasterTerakhir`). `Akses.BolehKlien` = izin `klien_semua` atau usaha
+  yang ditugaskan; semua endpoint klien/tiket/pembayaran menyaring lewat sini (404 bila tidak boleh).
+- **Izin** tahap 1: `klien_semua, klien_lihat, tiket, langganan, pembayaran, tim, audit`. Izin
+  baru ditambah di `master.DaftarIzin` bersama endpoint yang memeriksanya.
+- **Hanya metadata**: Panel Master tidak mengirim angka keuangan klien (status langganan,
+  terakhir aktif, jumlah transaksi bulan ini, tiket). "Lihat sebagai klien" & usulan koreksi =
+  tahap 2.
+- **Master pertama**: `MASTER_EMAIL` + `MASTER_PASSWORD` (min 8) di `.env`, dipakai sekali saat
+  belum ada anggota ber-role Master. Email yang sudah dipakai akun usaha ditolak (log PERINGATAN).
+  Setelah itu tim dikelola dari Panel Master; env boleh dihapus.
+- **last_seen** dicatat `guard` paling sering tiap 5 menit (`auth.Store.Touch`) dan ikut tersimpan
+  pada penulisan berikutnya (bisa hilang beberapa menit saat server mati — disengaja).
+- **Tiket**: `bug_reports` + kolom `status` (kosong = baru) & `balasan` (JSONB). Balasan terbaca
+  pelapor di Lapor Bug. Tiket usaha tanpa penanggung jawab hanya terlihat oleh yang punya
+  `klien_semua`.
+- **Langganan manual**: order berstatus `manual` (bukan `lunas`) → tidak membuka garansi 7 hari.
+- **Penyimpanan**: JSON `master.json`; Postgres `mp_roles`, `mp_anggota` (tulis ulang) dan
+  `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
+  bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
@@ -565,8 +595,9 @@ disimpan per baris dengan kolom `no` sebagai urutannya.
    Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
    berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
    mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
-   Lapor Bug: alur balasan pengembang (status baru/dibaca/selesai + teks balasan yang terbaca
-   pelapor) belum ada; sekarang ID Master hanya bisa membaca.
+   Panel Master tahap 2–4 (lihat preview): lihat-sebagai-klien + usulan koreksi yang berlaku
+   setelah klien setuju → template COA & benchmark ke database → artikel pajak, basis
+   pengetahuan AI, analisa AI per klien.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 

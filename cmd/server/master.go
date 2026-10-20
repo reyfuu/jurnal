@@ -229,6 +229,18 @@ func paketTerakhir(orders []order) (paket, order, bool) {
 	return paket{}, order{}, false
 }
 
+// namaKlien: nama usaha di Panel Master; profil kosong tetap punya nama yang bisa dikenali.
+// Pemanggil memegang t.mu (nama = profile.NamaUsaha yang sudah dibaca).
+func namaKlien(t *tenant, nama string) string {
+	switch {
+	case nama != "":
+		return nama
+	case t.demo:
+		return "Kedai Kopi Senja (data contoh)"
+	}
+	return fmt.Sprintf("Usaha #%d (belum isi profil)", t.id)
+}
+
 // klienRows: usaha yang boleh dilihat anggota, urut ID.
 func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
 	users := map[int][]auth.User{}
@@ -276,7 +288,7 @@ func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
 			}
 		}
 		t.mu.RUnlock()
-		row.Nama = cmp.Or(row.Nama, fmt.Sprintf("Usaha #%d (belum isi profil)", t.id))
+		row.Nama = namaKlien(t, row.Nama)
 		for _, u := range users[t.id] {
 			row.User++
 			if u.LastSeen.After(row.TerakhirAktif) {
@@ -384,9 +396,9 @@ func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request)
 			d.Klien = k
 		}
 	}
-	d.Users = s.users.List(t.id)
+	d.Users = nonNil(s.users.List(t.id))
 	t.mu.RLock()
-	d.Orders = slices.Clone(t.langganan.Orders)
+	d.Orders = nonNil(slices.Clone(t.langganan.Orders))
 	t.mu.RUnlock()
 	d.Tiket = []tiketRow{}
 	for _, x := range s.tiketRows(ak) {
@@ -535,6 +547,7 @@ func (s *Server) tiketRows(ak master.Akses) []tiketRow {
 		if t.profile != nil {
 			nama[id] = t.profile.NamaUsaha
 		}
+		nama[id] = namaKlien(t, nama[id])
 		t.mu.RUnlock()
 	}
 	s.tenantsMu.RUnlock()
@@ -548,7 +561,7 @@ func (s *Server) tiketRows(ak master.Akses) []tiketRow {
 			continue
 		}
 		rep.Status = cmp.Or(rep.Status, "baru")
-		out = append(out, tiketRow{rep, nomorTiket(rep.ID), cmp.Or(nama[rep.TenantID], fmt.Sprintf("Usaha #%d", rep.TenantID))})
+		out = append(out, tiketRow{rep, nomorTiket(rep.ID), cmp.Or(nama[rep.TenantID], fmt.Sprintf("Usaha #%d", rep.TenantID))}) // usaha sudah dihapus
 	}
 	return out
 }

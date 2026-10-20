@@ -24,6 +24,7 @@ import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
+import { PanelMaster } from '@/views/master/PanelMaster'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -61,6 +62,7 @@ export default function App() {
 
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
+    if (m.views.includes('panel-master')) return // akun tim MasterPajak: tanpa data usaha
     setView(m.views[0])
     getBusiness().then(setBusiness, fail)
     getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
@@ -77,6 +79,15 @@ export default function App() {
       ? <Login key={auth} onLogin={signIn} initialDaftar={auth === 'daftar'} onBack={() => setAuth(null)} />
       : <Landing onMasuk={() => setAuth('masuk')} onDaftar={() => setAuth('daftar')} />
   }
+  async function onLogout() {
+    await logout().catch(() => {})
+    setSession({ status: 'anon' })
+    setData(null)
+    setBusiness(null)
+    setAuth(null)
+  }
+
+  if (me.views.includes('panel-master')) return <PanelMaster me={me} onLogout={onLogout} />
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
@@ -89,14 +100,6 @@ export default function App() {
   const changePeriod = (newP: string) => {
     setPeriod(newP)
     void reload(me, newP)
-  }
-
-  async function onLogout() {
-    await logout().catch(() => {})
-    setSession({ status: 'anon' })
-    setData(null)
-    setBusiness(null)
-    setAuth(null)
   }
 
   const onProfileSaved = (p: NonNullable<BusinessInfo['profile']>) => {
