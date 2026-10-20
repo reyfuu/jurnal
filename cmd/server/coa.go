@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"pajak/internal/coa"
 	"pajak/internal/finance"
@@ -74,6 +75,11 @@ func (s *tenant) handleReportCoA(w http.ResponseWriter, r *http.Request) {
 func rp(n int64) string { return strconv.FormatInt(n, 10) }
 
 func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
+	period := periodOrDefault(r) // masuk ke header Content-Disposition: harus YYYY-MM
+	if _, err := time.Parse("2006-01", period); err != nil {
+		http.Error(w, "period harus YYYY-MM", http.StatusBadRequest)
+		return
+	}
 	rep := s.buildCoAReport(r)
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)
@@ -122,7 +128,7 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	ns = append(ns, []string{"", "TOTAL", rp(d), rp(k)})
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="laporan-keuangan-%s.xlsx"`, periodOrDefault(r)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="laporan-keuangan-%s.xlsx"`, period))
 	_ = xlsx.Write(w, []xlsx.Sheet{{Name: "Laba Rugi", Rows: lr}, {Name: "Neraca", Rows: nr}, {Name: "Neraca Saldo", Rows: ns}})
 }
 

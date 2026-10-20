@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"maps"
+	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -134,8 +135,20 @@ func NewServer() *Server {
 			s.saveAll()
 		}
 	}
+	s.adoptOrphans()
 	s.routes()
 	return s
+}
+
+// adoptOrphans membuat usaha kosong untuk user yang usahanya tidak termuat (mis. berkas usaha
+// gagal tersimpan), supaya ID itu tidak diberikan ke pendaftar berikutnya (audit C3).
+func (s *Server) adoptOrphans() {
+	for _, u := range s.users.Snapshot().Users {
+		if s.tenants[u.TenantID] == nil {
+			log.Printf("PERINGATAN: user %d memakai usaha %d yang tidak ada; dibuat kosong", u.ID, u.TenantID)
+			s.tenants[u.TenantID] = newTenant(u.TenantID)
+		}
+	}
 }
 
 // loadFiles memuat data dari berkas JSON di DATA_DIR (atau seed); true bila state.json ada.
@@ -166,8 +179,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		h.Set("Cache-Control", "no-store") // data usaha tidak boleh disimpan cache CDN/browser
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		// Audit C8: tolak permintaan pengubah dari situs lain (Fetch Metadata). Webhook
+		// Midtrans (server-ke-server) tidak mengirim header ini.
+		if site := r.Header.Get("Sec-Fetch-Site"); site == "cross-site" || site == "same-site" {
+			http.Error(w, "permintaan lintas situs ditolak", http.StatusForbidden)
+			return
+		}
+		mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		// Login & daftar tidak butuh cookie, jadi form HTML lintas situs bisa memakainya di
+		// browser tanpa Fetch Metadata: hanya terima JSON.
+		if (r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/register") && formTypes[mt] {
+			http.Error(w, "kirim sebagai application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+		if mt != "multipart/form-data" { // unggahan punya batas sendiri (5–6 MB)
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		}
+	}
 	s.mux.ServeHTTP(w, r)
 }
+
+// formTypes: Content-Type yang bisa dikirim form HTML lintas situs tanpa preflight CORS.
+var formTypes = map[string]bool{"text/plain": true, "application/x-www-form-urlencoded": true, "multipart/form-data": true}
 
 // Batas brute force login: maxLoginFailures gagal per IP dalam loginWindow → 429.
 const (
@@ -347,13 +384,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	ip := clientIP(r)
-	if s.blocked(ip) {
+	key := "login|" + clientIP(r)
+	if !s.reserveAttempt(key) {
 		http.Error(w, "terlalu banyak percobaan login, coba lagi dalam 15 menit", http.StatusTooManyRequests)
 		return
 	}
 	token, u, err := s.users.Login(req.Email, req.Password)
-	s.recordAttempt(ip, err == nil)
+	if err == nil {
+		s.refundAttempt(key)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -362,27 +401,32 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.newMe(u))
 }
 
-// blocked: IP sudah gagal maxLoginFailures kali dalam loginWindow.
-func (s *Server) blocked(ip string) bool {
+// reserveAttempt memotong satu jatah percobaan untuk key SEBELUM password diperiksa, dalam
+// satu kunci. Permintaan serentak tidak bisa lolos bersama (audit C2). false = jatah habis.
+func (s *Server) reserveAttempt(key string) bool {
 	s.loginMu.Lock()
 	defer s.loginMu.Unlock()
-	f := s.failures[ip]
-	return time.Since(f.since) <= loginWindow && f.count >= maxLoginFailures
-}
-
-func (s *Server) recordAttempt(ip string, ok bool) {
-	s.loginMu.Lock()
-	defer s.loginMu.Unlock()
-	if ok {
-		delete(s.failures, ip)
-		return
-	}
-	f := s.failures[ip]
+	f := s.failures[key]
 	if time.Since(f.since) > loginWindow {
 		f = loginFailure{since: time.Now()}
 	}
+	if f.count >= maxLoginFailures {
+		return false
+	}
 	f.count++
-	s.failures[ip] = f
+	s.failures[key] = f
+	return true
+}
+
+// refundAttempt mengembalikan satu jatah setelah login sukses. Bucket tidak dikosongkan,
+// supaya login sah penyerang tidak mereset hitungan tebakan (audit C4).
+func (s *Server) refundAttempt(key string) {
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	if f := s.failures[key]; f.count > 0 {
+		f.count--
+		s.failures[key] = f
+	}
 }
 
 func setSession(w http.ResponseWriter, r *http.Request, token string) {
@@ -400,8 +444,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	ip := clientIP(r)
-	if s.blocked(ip) {
+	// Setiap pendaftaran memakai satu jatah per IP (tanpa pengembalian): maks 5 akun per 15 menit.
+	if !s.reserveAttempt("register|" + clientIP(r)) {
 		http.Error(w, "terlalu banyak percobaan, coba lagi dalam 15 menit", http.StatusTooManyRequests)
 		return
 	}
@@ -824,7 +868,12 @@ func main() {
 	}
 	srv := NewServer()
 	log.Printf("Laporan Bisnis by Master Pajak listening on http://localhost:%s", port)
-	if err := http.ListenAndServe(":"+port, srv); err != nil {
+	hs := &http.Server{
+		Addr: ":" + port, Handler: srv,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute,
+		WriteTimeout: 3 * time.Minute, IdleTimeout: 2 * time.Minute, // laporan AI bisa lama
+	}
+	if err := hs.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }

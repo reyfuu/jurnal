@@ -37,6 +37,9 @@ type bugStore struct {
 	mem  map[string][]byte // screenshot saat tanpa DATA_DIR (test, dev lokal)
 }
 
+// maxBugsPerDay: kuota laporan bug per usaha dalam 24 jam (audit C1).
+const maxBugsPerDay = 20
+
 // screenshotExt: hanya gambar yang diterima, ditentukan dari isi berkas (bukan nama).
 var screenshotExt = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif"}
 
@@ -92,10 +95,21 @@ func (s *Server) handleCreateBug(w http.ResponseWriter, r *http.Request) {
 	b := s.bugs
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	now := time.Now()
+	recent := 0
+	for _, x := range b.list {
+		if x.TenantID == u.TenantID && now.Sub(x.Waktu) < 24*time.Hour {
+			recent++
+		}
+	}
+	if recent >= maxBugsPerDay {
+		http.Error(w, "kuota laporan bug hari ini sudah habis, coba lagi besok", http.StatusTooManyRequests)
+		return
+	}
 	rep := bugReport{
 		ID: len(b.list) + 1, TenantID: u.TenantID, UserEmail: u.Email,
-		Judul: judul, Deskripsi: deskripsi, Halaman: r.FormValue("halaman"),
-		UserAgent: r.UserAgent(), Waktu: time.Now(),
+		Judul: judul, Deskripsi: deskripsi, Halaman: clip(r.FormValue("halaman"), 200),
+		UserAgent: clip(r.UserAgent(), 512), Waktu: now,
 	}
 	if img != nil {
 		rep.Screenshot = strconv.Itoa(rep.ID) + ext
@@ -164,4 +178,12 @@ func (s *Server) handleListBugs(w http.ResponseWriter, r *http.Request) {
 	}
 	b.mu.Unlock()
 	writeJSON(w, out)
+}
+
+// clip memotong s menjadi maksimal n rune.
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }

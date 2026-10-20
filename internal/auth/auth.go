@@ -193,6 +193,9 @@ func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if (in.Role != Owner || !in.Active) && s.activeOwners(tenantID, id) == 0 {
 		return User{}, ErrLastOwner
 	}
+	if !in.Active || in.Role != r.Role {
+		s.revoke(id) // sesi lama tidak boleh hidup lagi setelah diaktifkan ulang / ganti role
+	}
 	r.Name, r.Email, r.Role, r.Active = in.Name, in.Email, in.Role, in.Active
 	if in.Password != "" {
 		r.hash = hashPassword(in.Password, r.salt)

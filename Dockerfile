@@ -15,6 +15,8 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/laporan-bisnis ./c
 
 FROM scratch
 WORKDIR /app
+# sertifikat CA: image scratch tidak punya, padahal panggilan HTTPS ke Midtrans & LLM butuh
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/laporan-bisnis /app/laporan-bisnis
 COPY --from=web /src/web/dist /app/web/dist
 ENV PORT=8080

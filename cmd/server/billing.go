@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -181,6 +182,10 @@ func (s *Server) handleMidtransNotify(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.applyPayment(st, time.Now()); err != nil {
 		log.Printf("midtrans notify %s: %v", n.OrderID, err)
+		if errors.Is(err, errSimpan) {
+			http.Error(w, "gagal menyimpan", http.StatusServiceUnavailable) // Midtrans akan mengirim ulang
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK) // order tak dikenal tetap 200 supaya Midtrans tidak mengulang terus
 }
@@ -222,8 +227,7 @@ func (s *Server) applyPayment(st midtrans.Notification, now time.Time) error {
 		o.Status = "gagal"
 	}
 	t.mu.Unlock()
-	s.saveFor(t)
-	return nil
+	return s.saveFor(t)
 }
 
 // latest: waktu paling akhir (builtin max tidak menerima time.Time).
