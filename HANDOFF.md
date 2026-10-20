@@ -629,17 +629,45 @@ request, padahal hanya daftar klien & detail klien yang menampilkan kolom "Trans
 Pada skala target `agent.md §3` (1.000 usaha) itu sampai 10 juta baris per request. Halaman
 detail juga membangun baris untuk semua usaha hanya untuk mengambil satu.
 
-Terukur di `BenchmarkKlienRows` (1.000 usaha x 4.000 transaksi/tahun):
+Diukur **di batas HTTP** lewat `srv.ServeHTTP` (termasuk guard, akses, dan serialisasi JSON),
+bukan dengan memanggil fungsi internal. Revisi `5b8fa41` dibandingkan dengan sesudah perbaikan
+memakai **file benchmark yang sama** (`cmd/server/master_http_bench_test.go`, sengaja hanya
+memakai endpoint publik supaya bisa dijalankan apa adanya di kedua revisi).
+1.000 usaha x 4.000 transaksi/tahun:
 
-| Endpoint | Sebelum | Sesudah |
-| --- | --- | --- |
-| Ringkasan / pembayaran / tim | 538 ms | **0,6 ms** |
-| Detail klien | 1,21 s | **0,08 ms** |
-| Daftar klien | 64 ms | 64 ms (kolomnya memang ditampilkan) |
+| Endpoint | Sebelum | Sesudah | |
+| --- | --- | --- | --- |
+| `GET /master/pembayaran` | 80 ms | **0,45 ms** | 179x |
+| `GET /master/tim` | 70 ms | **0,65 ms** | 107x |
+| `GET /master/klien/{id}` | 50 ms | **0,38 ms** | 129x |
+| `GET /master/ringkasan` | 106 ms | **5 ms** | 21x |
+| `GET /master/klien` | 53 ms | 53 ms | tidak berubah, kolomnya memang ditampilkan |
+
+Sisa 5 ms di `/master/ringkasan` **bukan** dari loop itu: balasannya ~388 KB untuk 1.000 usaha
+karena `perlu_perhatian` dan `belum_ditugaskan` memuat baris klien utuh. Itu persoalan terpisah
+yang sudah ada sebelumnya; kalau mau dikecilkan, batasi jumlah barisnya, jangan sentuh `hitungTx`.
+
+Ada dua tingkat benchmark sekarang: `BenchmarkMasterEndpoints` (batas HTTP, angka yang dirasakan
+pengguna — **ini patokan klaim performa**) dan `BenchmarkKlienRows` (fungsi internal, untuk
+menyetel satu fungsi).
+
+**Diverifikasi end-to-end pada server sungguhan** (biner Go + `web/dist` hasil build, port 18410),
+setelah mencatat 3 transaksi bulan berjalan lewat API:
+
+```
+GET /api/v1/master/klien      -> transaksi_bulan_ini = 3   (benar, kolomnya tampil)
+GET /api/v1/master/klien/1    -> transaksi_bulan_ini = 3   (benar, KPI detail)
+GET /api/v1/master/ringkasan  -> transaksi_bulan_ini = 0   (benar, sengaja tidak memindai)
+```
+
+Bundel frontend yang tersaji memang membaca `transaksi_bulan_ini` dan memuat label
+"Transaksi bulan ini", jadi kolom di Panel Master > Klien tetap terisi. `tsc -b` bersih dan
+42 tes Vitest lulus. Pemeriksaan visual lewat browser belum dilakukan karena ekstensi bridge
+browser belum terpasang di Brave.
 
 Perubahannya parameter `hitungTx bool` plus `klienRowsFilter(..., hanyaID int)`.
-`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` mengunci perilakunya, dan
-**diverifikasi gagal lebih dulu** saat ringkasan sengaja dibuat memindai (red-green).
+`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` mengunci perilakunya lewat HTTP,
+dan **diverifikasi gagal lebih dulu** saat ringkasan sengaja dibuat memindai (red-green).
 
 ### Kandidat yang terbukti TIDAK relevan — jangan diulang
 
