@@ -560,6 +560,12 @@ export interface CekAwal {
   cttor_pesan?: string
   sumber: string
   risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
+  /** Kesimpulan sheet "Bentuk Usaha": skema pajak paling hemat + alasan. null bila omzet kosong. */
+  saran: SaranBentuk | null
+}
+export interface SaranBentuk {
+  termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]
+  hemat: number; skema: TaxSkema[]; laba: number; ptkp: number
 }
 export const cekAwal = (p: BusinessProfile) => api<CekAwal>('/business/cek-awal', { method: 'POST', body: p })
 

@@ -679,6 +679,11 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
     workbook: PPh tahun 1 sama persis, rekomendasi berbeda — beli lebih hemat 5,3 jt selama 4 tahun).
     PPh potong atas sewa ditampilkan sebagai informasi, bukan biaya tambahan.
 - Bentuk usaha & perbandingan entitas tetap di menu Perencanaan Pajak (sekarang ikut parameter).
+- **Saran bentuk usaha** (`tax.SaranBentukUsaha`, sheet "Bentuk Usaha"): skema termurah dari omzet & laba
+  profil + narasi "Anda disarankan memakai … karena …" (alasan, penghematan vs skema sekarang, syarat,
+  konsekuensi ganti OP ↔ badan). Ikut di `CekAwalResult.saran`, tampil di ringkasan sign-up dan
+  Perencanaan Pajak (`CekAwalCard`), juga tanpa KLU. Menggantikan risiko lama "Bentuk usaha belum
+  paling hemat". Badan memakai PTKP TK/0 untuk skema orang pribadi (disebut di catatan).
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 

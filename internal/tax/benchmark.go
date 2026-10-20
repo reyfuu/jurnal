@@ -84,6 +84,7 @@ type CekAwalResult struct {
 	CTTORPesan string        `json:"cttor_pesan,omitempty"`
 	Sumber     string        `json:"sumber"`
 	Risiko     []Risiko      `json:"risiko"`
+	Saran      *SaranBentuk  `json:"saran"` // skema pajak paling hemat; nil bila omzet kosong
 }
 
 func pct(bps int64) string {
@@ -119,7 +120,7 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 // CekAwal: NPM & CTTOR usaha vs rata-rata nasional KLU-nya, plus risiko pemeriksaan / bentuk
 // usaha, untuk ringkasan onboarding dan Perencanaan Pajak.
 func CekAwal(in CekAwalInput) CekAwalResult {
-	r := CekAwalResult{Sumber: aktif.Load().sumber, Risiko: []Risiko{}}
+	r := CekAwalResult{Sumber: aktif.Load().sumber, Risiko: []Risiko{}, Saran: SaranBentukUsaha(in.BentukUsaha, in.PTKP, in.Omzet, in.Laba)}
 	if k, ok := FindKLU(in.KLU); ok {
 		r.KLU = &k
 	}
@@ -187,13 +188,6 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 		add("sedang", "CTTOR di bawah rata-rata DJP", fmt.Sprintf("Perbandingan pajak terutang dengan omzet (%s) lebih rendah dari rata-rata nasional KLU %s (%s). Pastikan semua penghasilan tercatat.", pct(r.CTTORBps), k.Kode, pct(k.CTTORBps)))
 	default:
 		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, setara atau di atas rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
-	}
-
-	best := slices.MinFunc(skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
-	if hemat := now.Pajak - best.Pajak; hemat >= 1_000_000 && hemat*10 >= now.Pajak {
-		add("sedang", "Bentuk usaha belum paling hemat",
-			fmt.Sprintf("Skema sekarang (%s) sekitar %s per tahun. %s sekitar %s, hemat %s. Bandingkan di menu Perencanaan Pajak.",
-				now.Nama, rp(now.Pajak), best.Nama, rp(best.Pajak), rp(hemat)))
 	}
 	return r
 }

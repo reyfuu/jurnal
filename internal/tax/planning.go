@@ -99,13 +99,17 @@ type BentukUsahaResult struct {
 // CompareBentukUsaha membandingkan 6 skema pajak setahun dan memilih yang termurah
 // (seri: urutan pertama menang, sama seperti XLOOKUP di template).
 func CompareBentukUsaha(omzet int64, netMarginBps int64, ptkpCode string) (BentukUsahaResult, error) {
+	return compareLaba(omzet, mulDiv(omzet, netMarginBps, 10_000), ptkpCode)
+}
+
+// compareLaba: CompareBentukUsaha dengan laba rupiah langsung (tanpa pembulatan lewat margin).
+func compareLaba(omzet, laba int64, ptkpCode string) (BentukUsahaResult, error) {
 	ptkp, ok := PTKPOf(ptkpCode)
 	if !ok {
 		return BentukUsahaResult{}, fmt.Errorf("status PTKP %q tidak dikenal", ptkpCode)
 	}
 	pr := P()
 	umkm, badan := persenBps(int(pr.UMKMTarifBps)), persenBps(int(pr.BadanTarifBps))
-	laba := mulDiv(omzet, netMarginBps, 10_000)
 	r := BentukUsahaResult{Omzet: omzet, Laba: laba, PTKP: ptkp, Skema: []Skema{
 		{SkemaPPOP, "PPh Final " + umkm + " Orang Pribadi", "Omzet di atas " + rp(pr.UMKMBebasOP) + " x " + umkm, ppFinalOP(omzet), 0},
 		{SkemaPPBadan, "PPh Final " + umkm + " Badan", "Seluruh omzet x " + umkm, omzet * pr.UMKMTarifBps / 10_000, 0},
