@@ -582,6 +582,69 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
+## Tooling morluto & hotspot Panel Master (20 Okt 2026) — PR #33
+
+Melanjutkan pemasangan tooling agent dari [morluto](https://github.com/morluto) yang terhenti
+di sesi sebelumnya (saat itu baru `rea`). Dua tool baru dipasang, lalu dipakai untuk menemukan
+dan **membuktikan** satu hotspot nyata. Branch `perf/panel-master`, basis `5b8fa41`.
+
+**[leantoken](https://github.com/morluto/leantoken)** (`agent.md §1.A` no. 4) — lapisan pencarian
+& pembacaan kode hemat token. MCP global untuk Claude Code & Codex lewat runtime native terpin
+`0.1.28`; `doctor --client claude` melaporkan `registration_health: current` dengan 9 tool.
+Terbukti berguna: `context --task "perhitungan PPh final UMKM 0,5%..."` langsung mengembalikan
+`CalculateUMKMTax` beserta testnya. **Di jcode pakai CLI-nya**: pemanggilan `mcp__leantoken__*`
+gagal dengan `unknown variant resource_link` karena jcode belum menerima content type itu dari
+spec MCP 2025-06-18 (sudah dilaporkan ke maintainer jcode). Cadangan config:
+`~/.claude.json.leantoken.backup`.
+
+**[smokinggun](https://github.com/morluto/smokinggun)** (`agent.md §1.B` no. 11) — pemindai
+hotspot, dipakai lewat `npx` tanpa memasang apa pun ke config agent. 51 temuan, 45 di kode
+aplikasi, semuanya `medium/candidate`.
+
+**flameox sengaja dilewati** (`ponytail`/YAGNI): benchmark Go sudah cukup membuktikan kasus ini,
+profiler runtime belum dibutuhkan.
+
+### Hotspot yang diperbaiki: `klienRows`
+
+`klienRows` di `cmd/server/master.go` memindai **seluruh transaksi setiap usaha** pada tiap
+request, padahal hanya daftar klien & detail klien yang menampilkan kolom "Transaksi bulan ini".
+Pada skala target `agent.md §3` (1.000 usaha) itu sampai 10 juta baris per request. Halaman
+detail juga membangun baris untuk semua usaha hanya untuk mengambil satu.
+
+Terukur di `BenchmarkKlienRows` (1.000 usaha x 4.000 transaksi/tahun):
+
+| Endpoint | Sebelum | Sesudah |
+| --- | --- | --- |
+| Ringkasan / pembayaran / tim | 538 ms | **0,6 ms** |
+| Detail klien | 1,21 s | **0,08 ms** |
+| Daftar klien | 64 ms | 64 ms (kolomnya memang ditampilkan) |
+
+Perubahannya parameter `hitungTx bool` plus `klienRowsFilter(..., hanyaID int)`.
+`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` mengunci perilakunya, dan
+**diverifikasi gagal lebih dulu** saat ringkasan sengaja dibuat memindai (red-green).
+
+### Kandidat yang terbukti TIDAK relevan — jangan diulang
+
+39 kandidat `membership-in-loop` / `nested-or-callback-loop` lain di kode inti terbukti tidak
+bermasalah pada skala target: `coa.Find` berjalan atas 75 akun, `jenisOf` atas 19 jenis. Jalur
+Transaksi → Jurnal → Neraca Saldo hanya **2 ms untuk 10.000 transaksi**
+(`internal/coa/bench_test.go`). Jangan "optimasi" ini tanpa angka baru. Inilah alasan angka
+auditnya dicatat di `agent.md §1.B`: tanpa itu, 39 kandidat `medium` tampak seperti 39 pekerjaan.
+
+Verifikasi: `go test ./...` lulus (11 paket), `go test -race ./cmd/server ./internal/master`
+lulus, `go vet ./...` bersih.
+
+### Catatan lingkungan kerja
+
+Sesi ini dikerjakan di worktree `/home/reyfuu/pajak-perf` karena **ada sesi lain yang aktif**
+mengedit `/home/reyfuu/pajak` (branch `feat/rebrand-masterpajak`). Cek `git status` sebelum
+mengedit working tree utama. Worktree lain: `/home/reyfuu/pajak-e2e` (`test/e2e-playwright`,
+suite Playwright yang belum tuntas — server Go di harness e2e tidak siap dalam 180 detik).
+
+**Perlu dibereskan**: `server` (binary 18 MB) ter-commit di branch rebrand padahal `.gitignore`
+sudah memuat `bin/`. Jalankan `git rm --cached server` dan tambahkan ke `.gitignore` sebelum PR
+itu di-merge.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
