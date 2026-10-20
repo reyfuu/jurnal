@@ -24,14 +24,20 @@ export interface Me {
   role_label: string
   views: View[]
   langganan: LanggananStatus
+  garansi: GaransiStatus
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
 export interface LanggananStatus { status: 'trial' | 'aktif' | 'habis'; sampai?: string }
 export interface Paket { id: string; nama: string; harga: number; hari: number; hemat?: string }
 export interface BillingOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal'; waktu: string }
+/** Garansi 7 hari uang kembali: pembayaran pertama, gugur setelah ekspor data. */
+export interface GaransiStatus { berlaku: boolean; sampai?: string; alasan?: string; order_id?: string }
+export const GARANSI_BELUM_BAYAR = 'belum ada pembayaran'
+
 export interface Billing {
   langganan: LanggananStatus
+  garansi: GaransiStatus
   paket: Paket[]
   orders: BillingOrder[]
   client_key: string
@@ -41,6 +47,7 @@ export interface Billing {
 export const getPlans = () => api<{ paket: Paket[] }>('/billing/plans')
 export const getBilling = () => api<Billing>('/billing')
 export const refreshBilling = () => api<Billing>('/billing/refresh', { method: 'POST' })
+export const klaimGaransi = (alasan: string) => api<Me>('/billing/garansi', { method: 'POST', body: { alasan } })
 export const checkout = (paket: string) => api<{ order_id: string; token: string; redirect_url: string }>('/billing/checkout', { method: 'POST', body: { paket } })
 
 export interface RoleInfo {

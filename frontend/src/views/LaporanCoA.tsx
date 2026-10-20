@@ -2,6 +2,7 @@ import { Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { coaXlsxUrl, getCoAReport, type CoAReport, type ReportLine } from '@/lib/api'
+import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
 
 const RED = '#fb7185'
@@ -44,9 +45,9 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
       <PageHeader title="Laporan Keuangan" subtitle={`${periodLabel} · Laba Rugi & Neraca per akun (CoA perdagangan, metode ${is.metode})`}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span className={'pill-status ' + (bs.seimbang ? 'pill-green' : 'pill-amber')}>{bs.seimbang ? 'Aset = Liabilitas + Ekuitas' : 'Neraca tidak seimbang'}</span>
-          <a className="btn-cta" href={coaXlsxUrl(period)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px' }}>
+          <button className="btn-cta" onClick={() => void ekspor(coaXlsxUrl(period))} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px' }}>
             <Download size={15} aria-hidden /> Unduh Excel
-          </a>
+          </button>
         </div>
       </PageHeader>
 

@@ -4,6 +4,7 @@ import {
   createInvoice, deleteInvoice, getInvoices, invoicePdfUrl, updateInvoice,
   type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow,
 } from '@/lib/api'
+import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
 
 const AMBER = '#facc15'
@@ -280,7 +281,7 @@ export function InvoiceView() {
                   </td>
                   <td style={{ textAlign: 'right', color: r.status === 'lunas' ? GREEN : undefined }}>{formatRp(r.totals.total)}</td>
                   <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <a className="btn-cta" style={{ padding: '6px 12px', fontSize: 12 }} href={invoicePdfUrl(r.id)}>PDF</a>
+                    <button className="btn-cta" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => void ekspor(invoicePdfUrl(r.id))}>PDF</button>
                     <button className="nav-item" style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }} onClick={() => buka(r)}>Ubah</button>
                     <button className="nav-item" style={{ width: 'auto', padding: '4px 8px', fontSize: 12, color: RED }} onClick={() => hapus(r)}>Hapus</button>
                   </td>
