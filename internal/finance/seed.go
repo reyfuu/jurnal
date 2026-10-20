@@ -451,11 +451,10 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 // EmptySnapshot: kerangka dashboard tanpa data contoh untuk usaha baru (hasil register).
 // KPI, tren, dan transaksi terbaru diisi dari transaksi usaha itu oleh ApplyKPIs/ApplyTrend.
 func EmptySnapshot(period string) DashboardSnapshot {
-	seed := SeedKedaiKopiSenja(period)
 	return DashboardSnapshot{
 		Tenant:             TenantInfo{Name: "Usaha Baru", Initials: "UB"},
-		Period:             seed.Period,
-		PeriodLabel:        seed.PeriodLabel,
+		Period:             period,
+		PeriodLabel:        LabelPeriode(period),
 		CashWarnings:       []CashWarning{},
 		MonthlyTrend11M:    []MonthlyTrendPoint{},
 		DailyOmzet:         []DailyOmzetPoint{},

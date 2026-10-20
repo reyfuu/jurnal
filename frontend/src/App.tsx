@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { BEBAS_TERKUNCI, VIEW_LABEL } from '@/lib/nav'
@@ -45,6 +45,9 @@ export default function App() {
   const [auth, setAuth] = useState<'masuk' | 'daftar' | null>(null) // null = landing page
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
+  // Bulan bawaan dari server dipasang sekali per sesi/usaha; signIn ikut berjalan ulang saat
+  // periode berganti, dan pilihan pengguna tidak boleh tertimpa.
+  const periodeAwal = useRef(false)
   const [error, setError] = useState('')
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [layarBayar, setLayarBayar] = useState<'langganan' | 'alat'>('langganan') // usaha belum berlangganan
@@ -77,8 +80,16 @@ export default function App() {
     if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha (kecuali lihat-sebagai)
     setView(m.langganan.status === 'habis' ? 'laporan-ai' : m.views[0]) // belum berlangganan: menu pertama yang terbuka
     getBusiness().then(setBusiness, fail)
-    getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
-    void reload(m)
+    // Butuh sesi: jangan dipanggil sebelum login.
+    getPeriods().then((list) => {
+      setPeriods(list)
+      const b = list.find((x) => x.bawaan)?.id ?? list[0]?.id
+      if (!periodeAwal.current && b) {
+        periodeAwal.current = true
+        setPeriod(b)
+        void reload(m, b)
+      } else void reload(m)
+    }, () => void reload(m))
   }, [reload, fail])
 
   useEffect(() => {
@@ -97,11 +108,12 @@ export default function App() {
     setData(null)
     setBusiness(null)
     setAuth(null)
+    periodeAwal.current = false
     ingatMasuk(false)
   }
 
   // Masuk/keluar lihat-sebagai: muat ulang me; data usaha dibuang supaya tidak tertukar.
-  const gantiMode = () => { setBusiness(null); setData(null); getMe().then(signIn, fail) }
+  const gantiMode = () => { setBusiness(null); setData(null); periodeAwal.current = false; getMe().then(signIn, fail) }
   if (me.views.includes('panel-master')) return <PanelMaster me={me} onLogout={onLogout} onLihat={gantiMode} />
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 

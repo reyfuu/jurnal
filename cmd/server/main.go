@@ -676,10 +676,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.newMe(currentUser(r)))
 }
 
-func (s *Server) handlePeriods(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, finance.AvailablePeriods())
-}
-
 type usersResp struct {
 	Users []auth.User                 `json:"users"`
 	Roles map[auth.Role]auth.RoleInfo `json:"roles"`
@@ -805,11 +801,7 @@ func (s *tenant) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
 func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	period := periodOrDefault(r)
 	s.mu.RLock()
-	snap, ok := s.snapshots[period]
-	if !ok {
-		period = "2026-08"
-		snap = s.snapshots[period]
-	}
+	snap := s.snapshotLocked(period)
 	txs := finance.ForPeriod(s.txs, period)
 	seedN := s.seedTx[period]
 	if s.profile != nil {
@@ -900,15 +892,12 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	period := req.Period
-	if period == "" {
-		period = "2026-08"
+	if !finance.PeriodeSah(period) {
+		period = finance.BulanBerjalan()
 	}
 	t := s.tenantOf(r)
 	t.mu.RLock()
-	snap, ok := t.snapshots[period]
-	if !ok {
-		snap = t.snapshots["2026-08"]
-	}
+	snap := t.snapshotLocked(period)
 	t.mu.RUnlock()
 
 	// Pertanyaan "di mana / bagaimana cara" dijawab panduan menu + tautan sesuai hak akses.
