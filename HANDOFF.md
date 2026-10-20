@@ -651,13 +651,21 @@ Ada dua tingkat benchmark sekarang: `BenchmarkMasterEndpoints` (batas HTTP, angk
 pengguna — **ini patokan klaim performa**) dan `BenchmarkKlienRows` (fungsi internal, untuk
 menyetel satu fungsi).
 
-**Diverifikasi end-to-end pada server sungguhan** (biner Go + `web/dist` hasil build, port 18410),
-setelah mencatat 3 transaksi bulan berjalan lewat API:
+**Diverifikasi end-to-end pada server sungguhan** (biner Go + `web/dist` hasil build), dengan
+**4 usaha berisi jumlah transaksi yang berbeda** supaya tertukar tenant tidak bisa lolos. Tiap
+usaha juga diberi transaksi bulan lain yang tidak boleh ikut dihitung:
 
 ```
-GET /api/v1/master/klien      -> transaksi_bulan_ini = 3   (benar, kolomnya tampil)
-GET /api/v1/master/klien/1    -> transaksi_bulan_ini = 3   (benar, KPI detail)
-GET /api/v1/master/ringkasan  -> transaksi_bulan_ini = 0   (benar, sengaja tidak memindai)
+GET /master/klien      -> id1=0  id2=2  id3=5  id4=9     (tiap baris angkanya sendiri)
+GET /master/klien/2    -> id=2, transaksi_bulan_ini=2
+GET /master/klien/3    -> id=3, transaksi_bulan_ini=5
+GET /master/klien/4    -> id=4, transaksi_bulan_ini=9
+GET /master/ringkasan  -> semua baris 0                   (sengaja tidak memindai)
+
+konsultan yang hanya memegang usaha 3:
+GET /master/klien      -> hanya id=3 dengan 5
+GET /master/klien/3    -> 200, transaksi_bulan_ini=5
+GET /master/klien/2    -> 404                             (penugasan tetap berlaku)
 ```
 
 Bundel frontend yang tersaji memang membaca `transaksi_bulan_ini` dan memuat label
@@ -666,8 +674,23 @@ Bundel frontend yang tersaji memang membaca `transaksi_bulan_ini` dan memuat lab
 browser belum terpasang di Brave.
 
 Perubahannya parameter `hitungTx bool` plus `klienRowsFilter(..., hanyaID int)`.
-`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` mengunci perilakunya lewat HTTP,
-dan **diverifikasi gagal lebih dulu** saat ringkasan sengaja dibuat memindai (red-green).
+`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` dan
+`TestMaster_TransaksiBulanIniPerKlienTidakTertukar` mengunci perilakunya lewat HTTP, yang kedua
+dengan 3 usaha berangka berbeda plus pemeriksaan penugasan & 404.
+
+**Hasil uji mutasi** (tiap perubahan dipastikan punya cek yang menangkapnya):
+
+| Mutasi | Tertangkap oleh |
+| --- | --- |
+| detail klien memakai `hitungTx=false` | test gagal: `transaksi_bulan_ini = 0, want 2/5/9` |
+| daftar klien memakai `hitungTx=false` | test gagal: `transaksi_bulan_ini = 0, want 2/5/9` |
+| ringkasan memakai `hitungTx=true` | test gagal: "ringkasan ikut memindai transaksi" |
+| filter `hanyaID` dilumpuhkan | **benchmark**, bukan test: detail 0,38 ms → 48 ms (126x) |
+
+Baris terakhir penting dipahami: `hanyaID` murni soal performa, karena korektness detail sudah
+dijaga `if k.ID == t.id` di handler-nya. Jadi melumpuhkannya **tidak** membuat test gagal, dan
+memang tidak seharusnya. Penjaganya `BenchmarkMasterEndpoints`. Jangan tambahkan test korektness
+untuk itu; jalankan benchmark-nya.
 
 ### Kandidat yang terbukti TIDAK relevan — jangan diulang
 

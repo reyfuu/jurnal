@@ -337,3 +337,63 @@ func TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya(t *testing.T) 
 		}
 	}
 }
+
+// TestMaster_TransaksiBulanIniPerKlienTidakTertukar: klienRowsFilter menyaring ke satu usaha,
+// jadi detail klien harus melaporkan angka usaha itu sendiri. Tiap usaha diberi jumlah transaksi
+// yang berbeda supaya tertukar tenant tidak bisa lolos, dan tiap usaha juga punya transaksi
+// bulan lain yang tidak boleh ikut dihitung.
+func TestMaster_TransaksiBulanIniPerKlienTidakTertukar(t *testing.T) {
+	srv, m := serverMaster(t)
+	bulan := time.Now().Format("2006-01")
+	lalu := time.Now().AddDate(0, -2, 0).Format("2006-01")
+
+	// usaha 2, 3, 4 dengan 2, 5, dan 9 transaksi bulan ini
+	jumlah := map[int]int{2: 2, 3: 5, 4: 9}
+	for i, n := range []int{2, 5, 9} {
+		email := fmt.Sprintf("qa%d@x.id", i+1)
+		c := register(t, srv, strings.Replace(registerBody, "qa1@x.id", email, 1))
+		aktifkan(t, srv, c)
+		for j := 0; j < n; j++ {
+			tx := fmt.Sprintf(`{"tanggal":"%s-07","jenis":"Penjualan","nominal":%d,"keterangan":"x","lunas":true}`, bulan, 50_000+j)
+			if rec := do(srv, c, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusCreated {
+				t.Fatalf("%s transaksi %d: %d %s", email, j, rec.Code, rec.Body)
+			}
+		}
+		// transaksi bulan lain: tidak boleh ikut terhitung
+		old := fmt.Sprintf(`{"tanggal":"%s-07","jenis":"Penjualan","nominal":77000,"keterangan":"bulan lain","lunas":true}`, lalu)
+		if rec := do(srv, c, http.MethodPost, "/api/v1/transactions", old); rec.Code != http.StatusCreated {
+			t.Fatalf("%s transaksi bulan lain: %d %s", email, rec.Code, rec.Body)
+		}
+	}
+
+	// daftar klien: setiap baris membawa angkanya sendiri
+	for _, k := range getJSON[[]klienRow](t, srv, m, "/api/v1/master/klien") {
+		if want, ada := jumlah[k.ID]; ada && k.TransaksiBulanIni != want {
+			t.Errorf("daftar klien usaha %d: transaksi_bulan_ini = %d, want %d", k.ID, k.TransaksiBulanIni, want)
+		}
+	}
+
+	// detail klien: id yang diminta dan angkanya harus milik usaha itu, bukan usaha lain
+	for id, want := range jumlah {
+		d := getJSON[klienDetail](t, srv, m, fmt.Sprintf("/api/v1/master/klien/%d", id))
+		if d.Klien.ID != id {
+			t.Errorf("detail klien %d mengembalikan usaha %d", id, d.Klien.ID)
+		}
+		if d.Klien.TransaksiBulanIni != want {
+			t.Errorf("detail klien %d: transaksi_bulan_ini = %d, want %d", id, d.Klien.TransaksiBulanIni, want)
+		}
+	}
+
+	// penugasan tetap berlaku: anggota yang hanya memegang usaha 3 melihat angka usaha 3 saja
+	k := tambahAnggota(t, srv, m, "budi@masterpajak.id", "konsultan", []int{3})
+	rows := getJSON[[]klienRow](t, srv, k, "/api/v1/master/klien")
+	if len(rows) != 1 || rows[0].ID != 3 || rows[0].TransaksiBulanIni != 5 {
+		t.Errorf("konsultan usaha 3 melihat %+v", rows)
+	}
+	if d := getJSON[klienDetail](t, srv, k, "/api/v1/master/klien/3"); d.Klien.TransaksiBulanIni != 5 {
+		t.Errorf("detail klien 3 oleh konsultan: %d, want 5", d.Klien.TransaksiBulanIni)
+	}
+	if rec := do(srv, k, http.MethodGet, "/api/v1/master/klien/2", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("detail usaha yang tidak ditugaskan: want 404, got %d", rec.Code)
+	}
+}
