@@ -630,7 +630,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 // --- Panel Master (akun tim Master Pajak) ---
 
 export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
-  | 'parameter_pajak' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
+  | 'parameter_pajak' | 'klien_ubah' | 'pengguna_lihat' | 'pengguna_kelola' | 'pengguna_reset' | 'hapus_permanen' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -643,18 +643,33 @@ export interface KlienRow {
   status: LanggananStatus['status']; sampai?: string; paket?: string
   terakhir_aktif?: string; transaksi_bulan_ini: number; onboarding: boolean; daftar?: string
   penangan: Orang[]; perlu_perhatian: boolean; alasan?: string
+  /** Diarsipkan (soft delete): user usaha ini tidak bisa masuk. */
+  arsip?: string; arsip_alasan?: string
 }
+export interface IdentitasUsaha { nama_usaha: string; alamat?: string; kecamatan?: string; kota?: string; provinsi?: string; npwp?: string; telepon?: string; email?: string }
+export interface PenggunaKlien extends User { role_label: string; usaha: string; kota?: string; alamat?: string; telepon?: string; arsip: boolean; wa?: string; last_seen?: string }
+export const ubahKlien = (id: number, b: IdentitasUsaha) => api<BusinessProfile>(`/master/klien/${id}`, { method: 'PUT', body: b })
+export const arsipKlien = (id: number, alasan: string) => api<void>(`/master/klien/${id}/arsip`, { method: 'POST', body: { alasan } })
+export const pulihkanKlien = (id: number) => api<void>(`/master/klien/${id}/arsip`, { method: 'DELETE' })
+export const hapusKlien = (id: number, konfirmasi: string) => api<void>(`/master/klien/${id}`, { method: 'DELETE', body: { konfirmasi } })
+export const getPenggunaKlien = () => api<PenggunaKlien[]>('/master/pengguna')
+export const ubahPenggunaKlien = (id: number, b: { name: string; email: string; wa: string; aktif: boolean }) => api<User>(`/master/pengguna/${id}`, { method: 'PUT', body: b })
+export const resetPasswordKlien = (id: number) => api<{ password: string }>(`/master/pengguna/${id}/reset-password`, { method: 'POST' })
+export const hapusPenggunaKlien = (id: number, konfirmasi: string) => api<void>(`/master/pengguna/${id}`, { method: 'DELETE', body: { konfirmasi } })
+export const hapusAnggotaTim = (id: number, konfirmasi: string) => api<void>(`/master/tim/${id}`, { method: 'DELETE', body: { konfirmasi } })
 export interface RingkasanMaster {
   klien: number; aktif: number; trial: number; habis: number; mrr?: number; tiket_terbuka: number
   perlu_perhatian: KlienRow[]; belum_ditugaskan?: KlienRow[]; terakhir_aktif: KlienRow[]
 }
 export interface TiketRow extends BugReport { tenant_id: number; status: TiketStatus; nomor: string; klien_nama: string }
 export interface MasterOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal' | 'manual'; waktu: string; dibayar_pada?: string }
-export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[]; koreksi: KoreksiRow[] }
+export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[]; koreksi: KoreksiRow[]; identitas: IdentitasUsaha | null }
 export interface PembayaranRow { klien_id: number; klien_nama: string; order: MasterOrder; garansi?: GaransiStatus }
 export interface AnggotaRow { user: User; role: string; klien: number[] }
 export interface TimData { anggota: AnggotaRow[]; roles: MasterRole[]; izin: IzinInfo[]; klien: Orang[] }
 export interface AuditRow { id: number; waktu: string; user_id: number; nama: string; peran: string; aksi: string; klien_id?: number; keterangan?: string }
+/** Untuk pemilik usaha: semua catatan tim Master Pajak atas usahanya (lihat-sebagai, koreksi, perubahan data). */
+export const getRiwayatAksesTim = () => api<AuditRow[]>('/akses-tim')
 
 export const getRingkasanMaster = () => api<RingkasanMaster>('/master/ringkasan')
 export const listKlien = () => api<KlienRow[]>('/master/klien')
@@ -1435,7 +1450,7 @@ export interface Artikel {
 }
 export type ArtikelInput = Pick<Artikel, 'judul' | 'kategori' | 'dasar_hukum' | 'berlaku_sejak' | 'tag' | 'isi' | 'tampil_klien'>
 export interface SumberPengetahuan {
-  id: number; judul: string; jenis: 'manual' | 'excel' | 'pdf'; topik: string[]; status: 'menunggu' | 'terverifikasi'
+  id: number; judul: string; jenis: 'manual' | 'excel' | 'pdf'; kategori?: KategoriSumber; topik: string[]; status: 'menunggu' | 'terverifikasi'
   dipakai_ai: boolean; oleh: string; diverifikasi?: string; waktu: string; potongan: number; cuplikan: string
 }
 export interface Potongan { ref: string; judul: string; teks: string; skor?: number }
@@ -1454,9 +1469,18 @@ export const simpanArtikel = (id: number | null, a: ArtikelInput, terbit: boolea
   api<Artikel>(id ? `/master/artikel/${id}` : '/master/artikel', { method: id ? 'PUT' : 'POST', body: { ...a, terbit } })
 export const listPustaka = () => api<Artikel[]>('/pustaka')
 export const listPengetahuan = () => api<{ sumber: SumberPengetahuan[]; artikel_terbit: number; potongan_dipakai: number }>('/master/pengetahuan')
-export const tulisPengetahuan = (judul: string, isi: string, topik: string[]) =>
-  api<SumberPengetahuan>('/master/pengetahuan', { method: 'POST', body: { judul, isi, topik } })
-export const unggahPengetahuan = (file: File, judul: string, topik: string) => unggah<SumberPengetahuan>('/master/pengetahuan', file, { judul, topik })
+/** Kategori isi pengetahuan AI: bukan hanya aturan — pengalaman lapangan & pengetahuan umum juga. */
+export type KategoriSumber = 'peraturan' | 'artikel' | 'praktik' | 'umum' | 'lainnya'
+export const KATEGORI_SUMBER: [KategoriSumber, string, string][] = [
+  ['praktik', 'Praktik lapangan', 'Pengalaman tim menangani klien, kebiasaan di KPP, tips yang tidak ada di teori'],
+  ['umum', 'Pengetahuan umum', 'Bisnis, keuangan, operasional UMKM, istilah sehari-hari'],
+  ['peraturan', 'Peraturan & UU', 'UU, PP, PMK, PER, SE'],
+  ['artikel', 'Artikel / teori pajak', 'Penjelasan konsep dan teori'],
+  ['lainnya', 'Lainnya', ''],
+]
+export const tulisPengetahuan = (judul: string, isi: string, topik: string[], kategori: KategoriSumber) =>
+  api<SumberPengetahuan>('/master/pengetahuan', { method: 'POST', body: { judul, isi, topik, kategori } })
+export const unggahPengetahuan = (file: File, judul: string, topik: string, kategori: KategoriSumber) => unggah<SumberPengetahuan>('/master/pengetahuan', file, { judul, topik, kategori })
 export const verifikasiPengetahuan = (id: number) => api<unknown>(`/master/pengetahuan/${id}/verifikasi`, { method: 'POST' })
 export const pakaiPengetahuan = (id: number, dipakai_ai: boolean) => api<unknown>(`/master/pengetahuan/${id}`, { method: 'PUT', body: { dipakai_ai } })
 export const hapusPengetahuan = (id: number) => api<void>(`/master/pengetahuan/${id}`, { method: 'DELETE' })

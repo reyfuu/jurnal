@@ -747,6 +747,34 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   skema dengan % pajak terhadap omzet.
 - Mode terkunci: setelah muat ulang, pengguna belum berlangganan langsung ke Laporan AI.
 
+## Kelola data Panel Master & transparansi lihat-sebagai (20 Okt 2026)
+
+- **Izin baru** (bawaan hanya role Master): `klien_ubah`, `pengguna_lihat`, `pengguna_kelola`,
+  `pengguna_reset`, `hapus_permanen`.
+- **Usaha klien** (`cmd/server/kelola.go`): `PUT /master/klien/{id}` (identitas usaha saja: nama,
+  alamat, NPWP, telepon, email — struktur pajak tetap diubah pemilik); arsipkan (soft delete,
+  `POST|DELETE /master/klien/{id}/arsip`, alasan wajib) → `tenant.arsip`; semua user usaha itu
+  ditolak di `guard` & login (403 `pesanArsip`). Hapus permanen `DELETE /master/klien/{id}
+  {konfirmasi}`: hanya usaha yang sudah diarsip, bukan usaha contoh, konfirmasi = nama usaha;
+  Postgres `DELETE FROM tenants` (cascade), JSON hapus berkas, user usaha ikut dihapus
+  (`auth.HapusUsaha`). Kolom baru `tenants.arsip`, `tenants.arsip_alasan`.
+- **Pengguna Klien** (menu baru): `GET /master/pengguna` (nama, email, WA, usaha, alamat, role,
+  status, terakhir aktif); ubah kontak + aktif/nonaktif (soft delete; owner terakhir tidak bisa
+  dinonaktifkan → arsipkan usaha); reset password = password sementara 12 karakter, tampil sekali,
+  sesi berakhir; hapus permanen hanya akun nonaktif, konfirmasi = email.
+- **Tim & Akses**: nonaktif = soft delete (sudah ada); hapus permanen `DELETE /master/tim/{id}`
+  untuk anggota nonaktif, bukan diri sendiri, bukan Master terakhir.
+- **Lihat sebagai**: tombol di setiap baris daftar Klien. Setiap halaman yang dibuka tercatat sekali
+  per sesi atas nama anggota tim (`catatBukaLihat`). Klien yang belum onboarding → pesan, bukan
+  form onboarding. Pemilik usaha melihat **Riwayat akses tim Master Pajak** (`GET /akses-tim`, di
+  Pengguna & Akses): semua catatan audit atas usahanya, dengan nama & role anggota tim.
+- **Parameter Pajak**: tombol "Ubah parameter" (buat draft) + penjelasan kenapa versi aktif dikunci.
+- **Basis Pengetahuan**: `Sumber.Kategori` (peraturan, artikel, praktik lapangan, pengetahuan umum,
+  lainnya; kosong = umum); label ikut ke potongan AI dan prompt membedakan praktik dari aturan.
+  Kolom `sumber_pengetahuan.kategori`.
+- Perbaikan: `GET /transactions` mengirim `[]` (bukan `null`) — halaman Transaksi usaha baru tanpa
+  transaksi sebelumnya crash.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

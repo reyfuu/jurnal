@@ -20,6 +20,8 @@ type lihatGrant struct {
 	KlienID int
 	Alasan  string
 	Sampai  time.Time
+	// dibuka: halaman yang sudah dicatat di audit selama sesi ini (sekali per halaman).
+	dibuka map[string]bool
 }
 
 // lihatInfo menyertai /auth/me selama mode lihat-sebagai.
@@ -95,11 +97,62 @@ func (s *Server) handleMulaiLihat(w http.ResponseWriter, r *http.Request) {
 		writeMasterErr(w, err)
 		return
 	}
-	g := lihatGrant{t.id, req.Alasan, time.Now().Add(lihatDurasi)}
+	g := lihatGrant{t.id, req.Alasan, time.Now().Add(lihatDurasi), map[string]bool{}}
 	s.masterMu.Lock()
 	s.lihat[currentUser(r).ID] = g
 	s.masterMu.Unlock()
 	writeJSON(w, s.lihatInfoFor(currentUser(r)))
+}
+
+// namaHalaman: label halaman untuk audit lihat-sebagai (sama dengan menu di frontend).
+var namaHalaman = map[string]string{
+	"dashboard": "Dashboard", "laporan-keuangan": "Laporan Keuangan", "laporan-penjualan": "Laporan Penjualan",
+	"transaksi": "Transaksi", "piutang-utang": "Piutang & Utang", "stok-gudang": "Stok & Gudang",
+	"produksi-supplier": "Produksi & Supplier", "invoice": "Invoice", "simulasi-harga": "Simulasi & Harga",
+	"pajak-umkm": "Pajak UMKM", "kalkulator-pajak": "Kalkulator Pajak", "perencanaan-pajak": "Perencanaan Pajak",
+	"karyawan": "Karyawan", "master-data": "Daftar Akun", "profil-usaha": "Profil Usaha", "pengguna": "Pengguna & Akses",
+	"langganan": "Langganan", "impor-data": "Impor Data Awal", "pustaka": "Pustaka Pajak",
+}
+
+// catatBukaLihat: setiap halaman data klien yang dibuka selama lihat-sebagai tercatat sekali
+// per sesi, atas nama anggota tim (bukan klien), dan terlihat juga oleh klien (Riwayat akses tim).
+func (s *Server) catatBukaLihat(u auth.User, view string) {
+	s.masterMu.Lock()
+	g, ok := s.lihat[u.ID]
+	if !ok || g.dibuka == nil || g.dibuka[view] {
+		s.masterMu.Unlock()
+		return
+	}
+	g.dibuka[view] = true
+	peran := "Tim Master Pajak"
+	if ak, ok := s.master.Akses(u.ID); ok {
+		peran = ak.Role.Nama
+	}
+	s.masterMu.Unlock()
+	label := namaHalaman[view]
+	if label == "" {
+		label = view
+	}
+	_ = s.ubahMaster(func(st *master.State) error {
+		st.Catat(master.Catatan{UserID: u.ID, Nama: u.Name, Peran: peran, Aksi: "Membuka " + label + " (lihat sebagai klien, hanya baca)", KlienID: g.KlienID})
+		return nil
+	})
+}
+
+// handleRiwayatAksesTim: untuk pemilik usaha — semua catatan audit tim Master Pajak atas usaha ini
+// (lihat-sebagai, halaman yang dibuka, usulan koreksi, perubahan data oleh Master), terbaru dulu.
+func (s *Server) handleRiwayatAksesTim(w http.ResponseWriter, r *http.Request) {
+	id := s.tenantOf(r).id
+	s.masterMu.Lock()
+	a := s.master.Audit
+	out := []master.Catatan{}
+	for i := len(a) - 1; i >= 0 && len(out) < 200; i-- {
+		if a[i].KlienID == id {
+			out = append(out, a[i])
+		}
+	}
+	s.masterMu.Unlock()
+	writeJSON(w, out)
 }
 
 func (s *Server) handleSelesaiLihat(w http.ResponseWriter, r *http.Request) {

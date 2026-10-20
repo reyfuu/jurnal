@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Brain, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, Brain, Contact, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -11,8 +11,9 @@ import { KoreksiMaster } from './Koreksi'
 import { BenchmarkView, TemplateCOAView } from './Katalog'
 import { ArtikelView, BasisPengetahuan } from './Pengetahuan'
 import { ParameterView } from './Parameter'
+import { PenggunaKlienView } from './PenggunaKlien'
 
-export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pengguna' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
 const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
@@ -21,6 +22,7 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
     items: [
       { page: 'ringkasan', label: 'Ringkasan', icon: LayoutGrid },
       { page: 'klien', label: 'Klien', icon: Users },
+      { page: 'pengguna', label: 'Pengguna Klien', icon: Contact, izin: 'pengguna_lihat' },
       { page: 'koreksi', label: 'Usulan Koreksi', icon: FileCheck2, izin: ['usul_koreksi', 'klien_semua'] },
       { page: 'tiket', label: 'Tiket · Lapor Bug', icon: Ticket, izin: 'tiket' },
     ],
@@ -113,9 +115,11 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
         <section className="workspace">
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
-            ? <KlienList onBuka={buka} />
-            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
+            ? <KlienList onBuka={buka} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} />
+            : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} bisaUbah={bisa('klien_ubah')}
+              bisaHapus={bisa('hapus_permanen')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
           {page === 'koreksi' && <KoreksiMaster />}
+          {page === 'pengguna' && <PenggunaKlienView bisaKelola={bisa('pengguna_kelola')} bisaReset={bisa('pengguna_reset')} bisaHapus={bisa('hapus_permanen')} />}
           {page === 'pengetahuan' && <BasisPengetahuan />}
           {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}
           {page === 'coa' && <TemplateCOAView />}
@@ -123,7 +127,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
           {page === 'parameter' && <ParameterView />}
           {page === 'tiket' && <TiketBoard />}
           {page === 'pembayaran' && <Pembayaran />}
-          {page === 'tim' && <TimAkses selfId={me.user.id} />}
+          {page === 'tim' && <TimAkses selfId={me.user.id} bisaHapus={bisa('hapus_permanen')} />}
           {page === 'audit' && <AuditLog />}
         </section>
       </div>

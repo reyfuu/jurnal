@@ -120,6 +120,17 @@ export default function App() {
     void reload(me!, period) // nama & kategori tenant ikut berubah
   }
 
+  if (!business.profile && me.lihat) { // lihat-sebagai hanya baca: klien yang belum onboarding tidak punya laporan
+    return (
+      <OnboardingShell onLogout={onLogout}>
+        <div className="grid gap-3">
+          <h1 className="text-xl font-bold">{me.lihat.nama} belum mengisi profil usaha</h1>
+          <p className="text-sm text-muted-foreground">Belum ada laporan yang bisa dilihat. Mode lihat sebagai klien hanya baca, jadi profil tidak bisa diisi dari sini.</p>
+          <Button className="justify-self-start rounded-full" onClick={() => void selesaiLihat().finally(gantiMode)}>Kembali ke Panel Master</Button>
+        </div>
+      </OnboardingShell>
+    )
+  }
   if (!business.profile) {
     return <Onboarding canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} provinsi={business.options.provinsi} klu={business.options.klu} />
   }

@@ -153,9 +153,21 @@ export function ParameterView() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="chart-title">{v.nama}</div>
               <Status s={v.status} />
-              {off && <span className="text-sm text-muted-foreground">Hanya baca. Klik ikon salin untuk membuat draft dari versi ini.</span>}
+              {off && (
+                <Button type="button" className="ml-auto" disabled={busy}
+                  onClick={() => void aksi(() => salinParameter(v.id), 'Draft dibuat dari versi ini. Ubah angka atau persentase, Simpan draft, lalu Aktifkan.')}>
+                  Ubah parameter
+                </Button>
+              )}
               {!off && <Button type="submit" className="ml-auto" disabled={busy}>Simpan draft</Button>}
             </div>
+            {off && (
+              <p className="text-sm text-muted-foreground" style={{ marginTop: 8 }}>
+                Versi {v.status === 'aktif' ? 'yang sedang dipakai' : 'arsip'} dikunci supaya hitungan semua klien tidak berubah karena salah ketik.
+                Klik <strong>Ubah parameter</strong>: semua angka & persentase di bawah bisa diedit di draft, lalu <strong>Simpan draft</strong> → <strong>Aktifkan</strong>.
+                Versi lama tetap tersimpan dan bisa diaktifkan lagi.
+              </p>
+            )}
             {!off && (
               <div style={{ ...grid2, marginTop: 12 }}>
                 <label className="grid gap-1.5"><span className="kpi-label">Nama versi</span><Input value={nama} onChange={(e) => setNama(e.target.value)} required /></label>

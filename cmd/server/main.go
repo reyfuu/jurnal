@@ -64,9 +64,12 @@ type tenant struct {
 	nextKoreksiID int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
-	seedTx        map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
-	profile       *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
-	langganan     langganan                // masa coba & pembayaran Midtrans
+	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
+	arsip       time.Time
+	arsipAlasan string
+	seedTx      map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
+	profile     *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
+	langganan   langganan                // masa coba & pembayaran Midtrans
 }
 
 type Server struct {
@@ -162,6 +165,7 @@ func (t *tenant) restore(st *state) {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
 	}
 	t.coaTemplateID = st.CoaTemplate
+	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
 }
 
 func NewServer() *Server {
@@ -449,10 +453,17 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 				http.Error(w, "mode lihat sebagai klien hanya baca", http.StatusForbidden)
 				return
 			}
+			if view != "" {
+				s.catatBukaLihat(u, view)
+			}
 			u, ctx = sebagaiKlien(u, g), context.WithValue(ctx, lihatKey{}, true)
 		}
 		if view != "" && !u.Role.Can(view) {
 			http.Error(w, "akses ditolak untuk role ini", http.StatusForbidden)
+			return
+		}
+		if s.diarsip(u.TenantID) {
+			http.Error(w, pesanArsip, http.StatusForbidden)
 			return
 		}
 		if s.lockedWrite(r, u.TenantID) {
@@ -528,6 +539,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	token, u, err := s.users.Login(req.Email, req.Password)
 	if err == nil {
 		s.refundAttempt(key)
+		if s.diarsip(u.TenantID) {
+			s.users.Logout(token)
+			http.Error(w, pesanArsip, http.StatusForbidden)
+			return
+		}
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -886,7 +902,7 @@ func (s *tenant) handleListTransactions(w http.ResponseWriter, r *http.Request) 
 	s.mu.RLock()
 	txs := slices.Clone(s.txs)
 	s.mu.RUnlock()
-	writeJSON(w, txListResp{Transactions: txs, Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola") && !sedangLihat(r)})
+	writeJSON(w, txListResp{Transactions: nonNil(txs), Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola") && !sedangLihat(r)})
 }
 
 // decodeTx membaca dan memvalidasi body; menulis 400 dan mengembalikan false bila gagal.

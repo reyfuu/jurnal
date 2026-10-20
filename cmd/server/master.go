@@ -215,6 +215,8 @@ type klienRow struct {
 	Penangan          []orang   `json:"penangan"`
 	PerluPerhatian    bool      `json:"perlu_perhatian"`
 	Alasan            string    `json:"alasan,omitempty"`
+	Arsip             time.Time `json:"arsip,omitzero"` // diarsipkan (soft delete)
+	ArsipAlasan       string    `json:"arsip_alasan,omitempty"`
 	mrr               int64     // pendapatan per bulan dari usaha ini (tidak dikirim)
 }
 
@@ -287,6 +289,7 @@ func (s *Server) klienRowsFilter(ak master.Akses, now time.Time, hitungTx bool, 
 		st := t.langgananStatus(now)
 		row := klienRow{ID: t.id, Demo: t.demo, Status: st.Status, Sampai: st.Sampai, Penangan: nonNil(penangan[t.id])}
 		t.mu.RLock()
+		row.Arsip, row.ArsipAlasan = t.arsip, t.arsipAlasan
 		if p := t.profile; p != nil {
 			row.Nama, row.Jenis, row.Kota, row.KLU, row.PKP, row.Onboarding = p.NamaUsaha, p.JenisUsaha, p.Kota, p.KLU, p.PKP, true
 		}
@@ -317,7 +320,7 @@ func (s *Server) klienRowsFilter(ak master.Akses, now time.Time, hitungTx bool, 
 				row.OwnerNama, row.OwnerEmail, row.OwnerWA = u.Name, u.Email, u.WA
 			}
 		}
-		if !t.demo { // usaha contoh milik operator selalu aktif; tidak perlu diawasi
+		if !t.demo && row.Arsip.IsZero() { // usaha contoh milik operator selalu aktif; tidak perlu diawasi
 			row.PerluPerhatian, row.Alasan = master.PerluPerhatian(row.Status, row.Sampai, row.TerakhirAktif, now)
 			if row.Status == "habis" && row.Paket == "" {
 				row.Alasan = "Belum berlangganan"
@@ -399,6 +402,19 @@ type klienDetail struct {
 	Orders  []order      `json:"orders"`
 	Tiket   []tiketRow   `json:"tiket"`
 	Koreksi []koreksiRow `json:"koreksi"`
+	// Identitas usaha untuk diedit tim (tanpa angka keuangan); nil = profil belum diisi.
+	Identitas *identitasUsaha `json:"identitas"`
+}
+
+type identitasUsaha struct {
+	NamaUsaha string `json:"nama_usaha"`
+	Alamat    string `json:"alamat,omitempty"`
+	Kecamatan string `json:"kecamatan,omitempty"`
+	Kota      string `json:"kota,omitempty"`
+	Provinsi  string `json:"provinsi,omitempty"`
+	NPWP      string `json:"npwp,omitempty"`
+	Telepon   string `json:"telepon,omitempty"`
+	Email     string `json:"email,omitempty"`
 }
 
 func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request) {
@@ -416,6 +432,9 @@ func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request)
 	d.Users = nonNil(s.users.List(t.id))
 	t.mu.RLock()
 	d.Orders = nonNil(slices.Clone(t.langganan.Orders))
+	if p := t.profile; p != nil {
+		d.Identitas = &identitasUsaha{p.NamaUsaha, p.Alamat, p.Kecamatan, p.Kota, p.Provinsi, p.NPWP, p.Telepon, p.Email}
+	}
 	t.mu.RUnlock()
 	d.Tiket = []tiketRow{}
 	for _, x := range s.tiketRows(ak) {
@@ -839,6 +858,7 @@ func (s *Server) masterRoutes() {
 	m.HandleFunc("PUT /api/v1/master/roles/{id}", s.guardMP(s.handleMasterSimpanRole, master.Tim))
 	m.HandleFunc("DELETE /api/v1/master/roles/{id}", s.guardMP(s.handleMasterHapusRole, master.Tim))
 	m.HandleFunc("GET /api/v1/master/audit", s.guardMP(s.handleMasterAudit, master.Audit))
+	s.kelolaRoutes()
 	m.HandleFunc("POST /api/v1/master/klien/{id}/lihat", s.guardMP(s.handleMulaiLihat, master.LihatSebagai))
 	m.HandleFunc("DELETE /api/v1/master/lihat", s.guardMP(s.handleSelesaiLihat))
 	m.HandleFunc("POST /api/v1/master/klien/{id}/koreksi", s.guardMP(s.handleUsulKoreksi, master.UsulKoreksi))

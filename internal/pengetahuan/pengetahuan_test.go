@@ -161,3 +161,21 @@ func TestTeksPDF(t *testing.T) {
 		t.Errorf("PDF tanpa teks (hasil scan): err = %v", err)
 	}
 }
+
+func TestSumber_KategoriIsi(t *testing.T) {
+	st := NewState()
+	s, err := st.TambahSumber(Sumber{Judul: "Tips SP2DK", Isi: "Siapkan rekap omzet per bulan.", Jenis: "manual", Kategori: "praktik"}, "Budi", time.Now())
+	if err != nil || s.Kategori != "praktik" {
+		t.Fatalf("praktik: %+v %v", s, err)
+	}
+	if s, _ := st.TambahSumber(Sumber{Judul: "x", Isi: "y", Jenis: "manual"}, "Budi", time.Now()); s.Kategori != "umum" {
+		t.Errorf("kategori kosong = %q, want umum", s.Kategori)
+	}
+	if _, err := st.TambahSumber(Sumber{Judul: "x", Isi: "y", Jenis: "manual", Kategori: "gosip"}, "Budi", time.Now()); err == nil {
+		t.Error("kategori ngawur diterima")
+	}
+	st.Sumber[0].Status, st.Sumber[0].DipakaiAI = Terverifikasi, true
+	if p := st.Potongan(); len(p) == 0 || p[0].Kategori != "Praktik lapangan" {
+		t.Errorf("potongan untuk AI tanpa label kategori: %+v", p)
+	}
+}

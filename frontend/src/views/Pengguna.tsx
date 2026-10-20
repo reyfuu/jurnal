@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
+  getRiwayatAksesTim, type AuditRow,
   createUser, deleteUser, listUsers, updateUser, type Role, type RoleInfo, type User, type UserInput,
 } from '@/lib/api'
 
@@ -243,6 +244,47 @@ export function Pengguna({ currentUserId }: { currentUserId: number }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RiwayatAksesTim />
     </>
+  )
+}
+
+/** Transparansi untuk pemilik usaha: siapa dari tim Master Pajak yang membuka data usaha ini,
+ *  kapan, untuk apa, dan perubahan apa yang mereka lakukan — tercatat atas nama anggota tim. */
+function RiwayatAksesTim() {
+  const [rows, setRows] = useState<AuditRow[] | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { getRiwayatAksesTim().then(setRows, (e: Error) => setError(e.message)) }, [])
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div className="chart-title">Riwayat akses tim Master Pajak</div>
+      <div className="chart-subtitle">
+        Setiap kali tim kami membuka atau mengusulkan perubahan pada data usaha Anda, tercatat di sini atas nama anggota tim tersebut, bukan atas nama Anda.
+        Mode “lihat sebagai” hanya baca; koreksi baru berlaku setelah Anda setujui.
+      </div>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {rows && rows.length === 0 && <p className="text-sm text-muted-foreground" style={{ paddingTop: 10 }}>Belum ada akses dari tim Master Pajak.</p>}
+      {rows && rows.length > 0 && (
+        <div className="table-scroll" style={{ maxHeight: 360, overflowY: 'auto', marginTop: 10 }}>
+          <table className="data-table">
+            <thead><tr><th>Waktu</th><th>Oleh</th><th>Aktivitas</th><th>Keterangan</th></tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="tabular text-sm" style={{ whiteSpace: 'nowrap' }}>{new Date(r.waktu).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                  <td>
+                    {r.peran === 'Owner klien'
+                      ? <div className="font-semibold">Anda (pemilik usaha)</div>
+                      : <><div className="text-xs text-muted-foreground">Tim Master Pajak</div><div className="font-semibold">{r.nama} <span className="font-normal text-muted-foreground">({r.peran})</span></div></>}
+                  </td>
+                  <td style={{ whiteSpace: 'normal' }}>{r.aksi}</td>
+                  <td className="text-sm text-muted-foreground" style={{ whiteSpace: 'normal' }}>{r.keterangan || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 }
