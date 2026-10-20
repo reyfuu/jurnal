@@ -373,7 +373,7 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
 }
 
 // OnboardingShell: layar penuh tanpa sidebar (onboarding & layar bayar langganan).
-export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: () => void; labelledBy?: string; children: React.ReactNode }) {
+export function OnboardingShell({ onLogout, onMasuk, labelledBy, children }: { onLogout: () => void; onMasuk?: () => void; labelledBy?: string; children: React.ReactNode }) {
   return (
     <main className="onboarding-page">
       <div className="onboarding-shell">
@@ -381,6 +381,7 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
           <Logo tinggi={28} />
           <div className="flex items-center gap-1">
             <ThemeToggle className="nav-item size-11 justify-center p-0 text-muted-foreground" />
+            {onMasuk && <Button type="button" variant="outline" className="min-h-11 rounded-full font-semibold" onClick={onMasuk}>Masuk ke aplikasi</Button>}
             <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>
           </div>
         </header>

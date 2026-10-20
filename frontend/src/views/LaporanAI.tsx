@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CekAwalCard } from '@/components/CekAwalCard'
 import { getAIReport, type AIReport, type BusinessFacts } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
@@ -35,59 +36,28 @@ export function LaporanAI({ period }: { period: string }) {
   if (error) return <div className="pill-status pill-red" role="alert">{error}</div>
   if (!r) return <p className="workspace-subtitle">Membaca laporan…</p>
 
-  const f = r.facts
   const a = r.analysis
+  if (r.sumber === 'profil' && r.profil_usaha) {
+    return (
+      <>
+        <div className="card" style={{ padding: '14px 18px', marginBottom: 16, borderColor: 'color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
+          <div className="chart-title">Analisis awal dari data pendaftaran</div>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            Belum ada transaksi tercatat, jadi analisis ini hanya memakai perkiraan omzet dan laba setahun yang Anda isi saat mendaftar.
+            Laba rugi, arus kas, dan neraca dianalisis setelah transaksi dicatat.
+          </p>
+        </div>
+        <AnalisisAI a={a} llm={r.llm} profil />
+        <CekAwalCard profile={r.profil_usaha} />
+      </>
+    )
+  }
+  const f = r.facts!
 
   return (
     <>
       {/* Analisis di atas: itu yang dicari orang saat membuka tab ini. */}
-      {a.tersedia ? (
-        <div className="card" style={{ padding: 22, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'baseline' }}>
-            <div className="chart-title" style={{ color: BLUE }}>Analisis &amp; Rekomendasi AI</div>
-            {a.model && <span className="kpi-meta-row">dibaca oleh {a.model}</span>}
-          </div>
-          {a.ringkasan && <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.7, fontSize: 14.5 }}>{a.ringkasan}</p>}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 22, marginTop: 20 }}>
-            <Daftar judul="Sorotan positif" warna={GREEN} isi={a.sorotan_positif} />
-            <Daftar judul="Perlu diperhatikan" warna={RED} isi={a.perlu_diperhatikan} />
-          </div>
-
-          {a.rekomendasi && a.rekomendasi.length > 0 && (
-            <>
-              <div className="chart-subtitle" style={{ marginTop: 22, marginBottom: 10 }}>Rekomendasi aksi</div>
-              <div style={{ display: 'grid', gap: 10 }}>
-                {a.rekomendasi.map((k, i) => {
-                  const d = DAMPAK[k.dampak] ?? DAMPAK.sedang
-                  return (
-                    <div key={i} style={{ border: '1px solid var(--border-strong)', borderRadius: 10, padding: '13px 16px' }}>
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{i + 1}. {k.judul}</span>
-                        <span className="tab-badge" style={{ color: d.warna }}>{d.label}</span>
-                      </div>
-                      <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>{k.detail}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
-          <div className="chart-title" style={{ color: AMBER }}>Analisis AI belum aktif</div>
-          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-            {a.alasan ?? r.llm.petunjuk}
-          </p>
-          {r.llm.petunjuk && a.alasan && (
-            <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>{r.llm.petunjuk}</p>
-          )}
-          <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-muted)' }}>
-            Rincian laporan di bawah tetap lengkap karena dihitung sendiri oleh aplikasi.
-          </p>
-        </div>
-      )}
+      <AnalisisAI a={a} llm={r.llm} />
 
       {/* Peringatan: fakta objektif, bukan pendapat model — selalu tampil. */}
       {f.peringatan && f.peringatan.length > 0 && (
@@ -280,5 +250,58 @@ function Baris({ l, v, teks, tebal, warna }: { l: string; v?: number; teks?: str
       <span style={{ color: tebal ? undefined : 'var(--text-muted)' }}>{l}</span>
       <span style={{ color: warna, whiteSpace: 'nowrap' }}>{teks ?? formatRp(v ?? 0)}</span>
     </div>
+  )
+}
+
+/** Bagian analisis model: dipakai laporan dari transaksi dan dari data pendaftaran. */
+function AnalisisAI({ a, llm, profil }: { a: AIReport['analysis']; llm: AIReport['llm']; profil?: boolean }) {
+  return (
+    a.tersedia ? (
+          <div className="card" style={{ padding: 22, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'baseline' }}>
+              <div className="chart-title" style={{ color: BLUE }}>Analisis &amp; Rekomendasi AI</div>
+              {a.model && <span className="kpi-meta-row">dibaca oleh {a.model}</span>}
+            </div>
+            {a.ringkasan && <p style={{ marginTop: 12, marginBottom: 0, lineHeight: 1.7, fontSize: 14.5 }}>{a.ringkasan}</p>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: 22, marginTop: 20 }}>
+              <Daftar judul="Sorotan positif" warna={GREEN} isi={a.sorotan_positif} />
+              <Daftar judul="Perlu diperhatikan" warna={RED} isi={a.perlu_diperhatikan} />
+            </div>
+
+            {a.rekomendasi && a.rekomendasi.length > 0 && (
+              <>
+                <div className="chart-subtitle" style={{ marginTop: 22, marginBottom: 10 }}>Rekomendasi aksi</div>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {a.rekomendasi.map((k, i) => {
+                    const d = DAMPAK[k.dampak] ?? DAMPAK.sedang
+                    return (
+                      <div key={i} style={{ border: '1px solid var(--border-strong)', borderRadius: 10, padding: '13px 16px' }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: 14 }}>{i + 1}. {k.judul}</span>
+                          <span className="tab-badge" style={{ color: d.warna }}>{d.label}</span>
+                        </div>
+                        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>{k.detail}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 18, marginBottom: 16, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
+            <div className="chart-title" style={{ color: AMBER }}>Analisis AI belum aktif</div>
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+              {a.alasan ?? llm.petunjuk}
+            </p>
+            {llm.petunjuk && a.alasan && (
+              <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.7 }}>{llm.petunjuk}</p>
+            )}
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-muted)' }}>
+              {profil ? 'Cek awal di bawah tetap lengkap karena dihitung sendiri oleh aplikasi.' : 'Rincian laporan di bawah tetap lengkap karena dihitung sendiri oleh aplikasi.'}
+            </p>
+          </div>
+        )
   )
 }

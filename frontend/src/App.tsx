@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { VIEW_LABEL } from '@/lib/nav'
+import { BEBAS_TERKUNCI, VIEW_LABEL } from '@/lib/nav'
+import { FiturTerkunci } from '@/components/FiturTerkunci'
+import { PageHeader } from '@/components/PageHeader'
+import { LaporanAI } from '@/views/LaporanAI'
 import { LaporBug } from '@/views/LaporBug'
 import { Landing } from '@/views/Landing'
 import { Langganan, statusText } from '@/views/Langganan'
@@ -42,6 +45,9 @@ export default function App() {
   const [error, setError] = useState('')
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [layarBayar, setLayarBayar] = useState<'langganan' | 'alat'>('langganan') // usaha belum berlangganan
+  // Belum berlangganan tapi memilih "Masuk ke aplikasi": workspace dengan menu bergembok.
+  const [masukTerkunci, setMasukTerkunci] = useState(() => { try { return sessionStorage.getItem('masuk-terkunci') === '1' } catch { return false } })
+  const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
 
   const me = session.status === 'in' ? session.me : null
 
@@ -88,6 +94,7 @@ export default function App() {
     setData(null)
     setBusiness(null)
     setAuth(null)
+    ingatMasuk(false)
   }
 
   // Masuk/keluar lihat-sebagai: muat ulang me; data usaha dibuang supaya tidak tertukar.
@@ -96,8 +103,9 @@ export default function App() {
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
   const canSee = (v: View) => me.views.includes(v)
+  const terkunci = me.langganan.status === 'habis'
   const navigate = (v: View) => {
-    if (!canSee(v)) return
+    if (!canSee(v) && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
     if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
     setView(v)
   }
@@ -119,9 +127,9 @@ export default function App() {
   const onPaid = () => getMe().then((m) => { setSession({ status: 'in', me: m }); void reload(m) }, fail)
 
   // Bayar dulu: setelah onboarding, usaha tanpa langganan aktif hanya melihat layar Langganan.
-  if (me.langganan.status === 'habis') {
+  if (terkunci && !masukTerkunci) {
     return (
-      <OnboardingShell onLogout={onLogout}>
+      <OnboardingShell onLogout={onLogout} onMasuk={() => { ingatMasuk(true); setView('laporan-ai') }}>
         {canSee('kalkulator-pajak') && (
           <div className="tabbar" role="tablist" aria-label="Langganan atau alat gratis" style={{ marginBottom: 20 }}>
             <button role="tab" className="tab-btn" aria-selected={layarBayar === 'langganan'} onClick={() => setLayarBayar('langganan')}>Langganan</button>
@@ -142,9 +150,16 @@ export default function App() {
   return (
     <main>
       <div className="app-shell">
-        <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} />
+        <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} terkunci={terkunci} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
+          {terkunci && view !== 'langganan' && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" role="status"
+              style={{ borderColor: 'color-mix(in srgb, var(--accent-orange) 30%, transparent)', background: 'var(--accent-orange-soft)' }}>
+              <span><strong>Anda belum berlangganan.</strong> Yang terbuka: Laporan AI (dari data pendaftaran) dan Alat Gratis. Fitur lain terbuka setelah memilih paket.</span>
+              {canSee('langganan') && <Button size="sm" variant="accent" onClick={() => navigate('langganan')}>Pilih paket</Button>}
+            </div>
+          )}
           {me.lihat && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm" role="status"
               style={{ borderColor: 'var(--accent-amber)', background: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent-amber) 12%, transparent) 0 12px, transparent 12px 24px)' }}>
@@ -200,13 +215,25 @@ export default function App() {
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>
-      {!me.lihat && <AIAgentBubble period={period} />}
+      {!me.lihat && !terkunci && <AIAgentBubble period={period} />}
     </main>
   )
 
   function renderView() {
     const d = data!.dash
+    if (terkunci && !BEBAS_TERKUNCI.includes(view)) {
+      return <FiturTerkunci nama={VIEW_LABEL[view] ?? 'Fitur ini'} onLangganan={canSee('langganan') ? () => navigate('langganan') : undefined} />
+    }
     switch (view) {
+      case 'laporan-ai':
+        return (
+          <>
+            <PageHeader title="Laporan AI" subtitle="Analisis usaha Anda oleh AI. Sebelum ada transaksi, analisis memakai data pendaftaran." />
+            <LaporanAI key={period} period={period} />
+          </>
+        )
+      case 'alat-gratis':
+        return <AlatGratis profile={business!.profile} ptkpCodes={business!.options.ptkp} onLangganan={() => navigate('langganan')} />
       case 'dashboard':
         return <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
       case 'laporan-keuangan':
