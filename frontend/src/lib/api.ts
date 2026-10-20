@@ -337,6 +337,8 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
 export interface PeriodOption {
   id: string
   label: string
+  /** Bulan yang dibuka pertama kali: bulan terakhir yang punya transaksi. */
+  bawaan?: boolean
 }
 
 export const getPeriods = () => api<PeriodOption[]>('/periods')

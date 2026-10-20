@@ -33,10 +33,7 @@ func (s *Server) handleAIReport(t *tenant, w http.ResponseWriter, r *http.Reques
 	rep := t.report(period)
 
 	t.mu.RLock()
-	snap, ok := t.snapshots[period]
-	if !ok {
-		snap = t.snapshots["2026-08"]
-	}
+	snap := t.snapshotLocked(period)
 	invoices := append([]finance.Invoice(nil), t.invoices...)
 	karyawan := append([]finance.Karyawan(nil), t.karyawan...)
 	riwayat := finance.TrendHistory(t.txs, t.assets, period, t.openingFor, t.kartuLocked().Periode)

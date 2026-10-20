@@ -123,7 +123,14 @@ func (s *tenant) annualized() (omzet, marginBps int64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var total, laba int64
-	periods := finance.AvailablePeriods()
+	// Rata-rata bulan yang punya transaksi (bukan daftar periode tetap), supaya usaha yang baru
+	// mulai bulan ini tidak dirata-rata dengan bulan kosong.
+	var periods []finance.PilihanPeriode
+	for _, p := range s.periodeLocked() {
+		if len(finance.ForPeriod(s.txs, p.ID)) > 0 {
+			periods = append(periods, p)
+		}
+	}
 	stok := s.kartuLocked()
 	for _, p := range periods {
 		// Laba bersih sudah dikurangi penyusutan & amortisasi, jadi margin yang dipakai

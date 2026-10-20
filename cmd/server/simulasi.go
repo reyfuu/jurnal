@@ -34,7 +34,10 @@ func hariKalender(period string) int64 {
 
 func (s *tenant) dasarSimulasi(sampai string) finance.DasarSimulasi {
 	var ids []string
-	for _, p := range finance.AvailablePeriods() {
+	s.mu.RLock()
+	daftar := s.periodeLocked()
+	s.mu.RUnlock()
+	for _, p := range daftar {
 		if p.ID <= sampai {
 			ids = append(ids, p.ID)
 		}

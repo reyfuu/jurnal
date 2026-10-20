@@ -49,11 +49,15 @@ func SummarizePeriod(rep PeriodReport) PeriodSummary {
 // ribuan transaksi masih sub-milidetik; pasang cache per tenant bila periode sudah bertahun-tahun.
 // stok: efek kartu stok per periode (nil = tanpa kartu stok).
 func TrendHistory(txs []Transaction, assets []Asset, period string, opening func(string) ReportOpening, stok func(string) StokPeriode) []PeriodSummary {
-	ids := make([]string, 0, 12)
-	for _, p := range AvailablePeriods() {
-		if p.ID <= period {
-			ids = append(ids, p.ID)
+	// Sampai 12 bulan terakhir, mulai dari bulan data paling awal (tanpa bulan kosong di depan).
+	ids := []string{period}
+	data := bulanData(txs)
+	for i := 1; i < 12; i++ {
+		p := geserBulan(period, -i)
+		if len(data) == 0 || p < data[0] {
+			break
 		}
+		ids = append(ids, p)
 	}
 	slices.Sort(ids)
 	out := make([]PeriodSummary, 0, len(ids))

@@ -838,6 +838,13 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - **Laporan CoA**: persediaan awal 1301 = nilai awal kartu; jurnal `coa.PenyesuaianPersediaan` menyamakan 1301 dengan nilai akhir kartu, lawannya 5102 (periodik) / 5101 (perpetual). Laba bersih & HPP CoA = laporan sederhana (diuji kedua metode). 5101 masuk `KodeWajib` (hanya divalidasi saat menerbitkan template baru).
 - UI: Laba Rugi merinci HPP (modal barang terjual, selisih opname, belanja tanpa barang); catatan "persediaan angka tetap / belum dihitung" hanya tampil sebelum titik nol; jembatan laba→kas memuat persediaan.
 
+## Periode laporan dinamis (21 Okt 2026)
+
+- Sebelumnya daftar periode dipatok Januari–Agustus 2026 (data contoh), dan dashboard periode lain diam-diam memakai Agustus. Kini `finance.DaftarPeriode`: dari bulan data paling awal (transaksi, neraca awal, titik nol stok, periode contoh untuk demo) sampai bulan berjalan WIB, terbaru dulu, maks 36 bulan; `bawaan` = bulan terakhir yang punya transaksi. `GET /api/v1/periods` per usaha.
+- Dashboard/AI/Laporan AI memakai `snapshotLocked(period)` (kerangka kosong + angka dari transaksi) — tidak lagi jatuh ke 2026-08. `EmptySnapshot` memakai label periode yang diminta.
+- Tren dashboard: ≤ 12 bulan berakhir di periode dipilih, mulai dari bulan data pertama. Omzet setahun (Perencanaan Pajak) & dasar simulasi memakai bulan yang punya transaksi.
+- Frontend memasang bulan bawaan sekali per sesi/usaha (`periodeAwal` ref) agar pilihan pengguna tidak tertimpa.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
