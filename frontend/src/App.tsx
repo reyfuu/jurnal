@@ -72,7 +72,7 @@ export default function App() {
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
     if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha (kecuali lihat-sebagai)
-    setView(m.views[0])
+    setView(m.langganan.status === 'habis' ? 'laporan-ai' : m.views[0]) // belum berlangganan: menu pertama yang terbuka
     getBusiness().then(setBusiness, fail)
     getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
     void reload(m)

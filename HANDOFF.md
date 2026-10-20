@@ -730,6 +730,23 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - ponytail: kunci menu hanya di frontend; server tetap mengizinkan GET (sudah begitu sejak bayar-dulu)
   dan menolak tulis lewat `lockedWrite`.
 
+## Bantuan memilih KLU & persen penghematan (20 Okt 2026)
+
+- **Contoh kegiatan per KLU**: `tax.ContohKLU` = uraian KBLI 5 digit (tabel norma) di bawah KLU
+  3 digit; ikut di `options.klu[].contoh` dan tampil di tiap baris picker ("Contoh: …"), pencarian
+  manual juga mencocokkan contoh.
+- **"Belum yakin? Ceritakan usaha Anda"** (`POST /business/klu-saran {deskripsi, jenis}`, boleh
+  sebelum berlangganan): `ai.PilihKLU` memberi model daftar lengkap 222 KLU + contoh dan
+  hanya menerima kode dari daftar (kode karangan dibuang), dengan alasan bahasa awam. Tanpa
+  `LLM_API_KEY`, gagal, atau kuota AI habis (`maxSaranKLUAI` = 20/user/24 jam, memori) →
+  `tax.CariKLU`: pencarian kata ber-IDF atas nama + uraian 5 digit, sinonim sehari-hari
+  (laundry→binatu, shopee→media, catering→boga, …), penalti grosir 46x, kandidat < 60% skor teratas
+  dibuang.
+- **Kesimpulan bentuk usaha**: `SaranBentuk.hemat_bps` (hemat ÷ pajak skema sekarang) dan `omzet`;
+  kartu menampilkan "x% lebih kecil", hemat per tahun & per bulan, dan batang perbandingan semua
+  skema dengan % pajak terhadap omzet.
+- Mode terkunci: setelah muat ulang, pengguna belum berlangganan langsung ke Laporan AI.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

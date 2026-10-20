@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Combobox } from '@/components/ui/combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { getWilayah, saveBusiness, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
+import { getWilayah, saranKLU, saveBusiness, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 
@@ -118,24 +118,89 @@ function KLUPicker({ value, onChange, options, jenis }: { value: string; onChang
   const name = useId()
   const cari = q.trim().toLowerCase()
   const list = options.filter((o) =>
-    (semua || cari !== '' || !jenis || o.jenis === jenis) && (cari === '' || o.nama.toLowerCase().includes(cari) || o.kode.startsWith(cari)))
+    (semua || cari !== '' || !jenis || o.jenis === jenis) &&
+    (cari === '' || o.nama.toLowerCase().includes(cari) || o.kode.startsWith(cari) || (o.contoh ?? []).some((c) => c.toLowerCase().includes(cari))))
   const dipilih = options.find((o) => o.kode === value)
   return (
     <div className="grid gap-2">
       {dipilih && <p className="text-sm">Dipilih: <strong>KLU {dipilih.kode}</strong> {dipilih.nama}</p>}
+      <BantuKLU jenis={jenis} value={value} onChange={onChange} />
       <Input type="search" placeholder="Cari, mis. restoran, toko, binatu, konveksi" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari bidang usaha" />
       <div role="radiogroup" aria-label="Bidang usaha (KLU)" className="max-h-72 overflow-y-auto rounded-lg border border-border">
         {list.length === 0 && <p className="p-3 text-sm text-muted-foreground">Tidak ada bidang yang cocok. Coba kata lain.</p>}
         {list.map((o) => (
           <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-accent" data-selected={o.kode === value}>
             <input type="radio" name={name} className="mt-1" checked={o.kode === value} onChange={() => onChange(o.kode)} />
-            <span><span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}</span>
+            <span>
+              <span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}
+              {o.contoh && o.contoh.length > 0 && <span className="block text-xs text-muted-foreground">Contoh: {o.contoh.join(', ').toLowerCase()}</span>}
+            </span>
           </label>
         ))}
       </div>
       {jenis && !semua && cari === '' && (
         <button type="button" className="justify-self-start text-xs text-muted-foreground underline underline-offset-4" onClick={() => setSemua(true)}>Tidak ketemu? Tampilkan semua bidang</button>
       )}
+    </div>
+  )
+}
+
+// BantuKLU: pemilik menceritakan usahanya dengan bahasa sehari-hari, server menyarankan 1–3
+// kategori (AI bila aktif, selain itu pencarian kata) beserta penjelasan & contoh kegiatan.
+function BantuKLU({ jenis, value, onChange }: { jenis?: string; value: string; onChange: (kode: string) => void }) {
+  const [cerita, setCerita] = useState('')
+  const [hasil, setHasil] = useState<{ ai: boolean; saran: SaranKLU[] } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function tanya() {
+    if (cerita.trim().length < 3 || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      setHasil(await saranKLU(cerita, jenis))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-2 rounded-lg border border-border p-3">
+      <label htmlFor="klu-cerita" className="text-sm font-semibold">Belum yakin? Ceritakan usaha Anda</label>
+      <div className="flex flex-wrap gap-2">
+        <Input id="klu-cerita" className="min-w-0 flex-1" style={{ flexBasis: 220 }} value={cerita} maxLength={300}
+          placeholder="mis. jual kopi susu dan roti di kios, juga lewat GoFood"
+          onChange={(e) => setCerita(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void tanya() } }} />
+        <Button type="button" variant="outline" className="rounded-full" disabled={busy || cerita.trim().length < 3} onClick={() => void tanya()}>
+          <Sparkles aria-hidden="true" />{busy ? 'Mencari…' : 'Rekomendasikan'}
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {hasil && (hasil.saran.length === 0
+        ? <p className="text-sm text-muted-foreground">Belum ketemu yang cocok. Coba ceritakan barang/jasa yang dijual dan cara menjualnya.</p>
+        : (
+          <ul className="grid gap-2" aria-label="Rekomendasi bidang usaha">
+            {hasil.saran.map((s, i) => (
+              <li key={s.kode} className="rounded-md border p-3" style={{ borderColor: s.kode === value ? 'var(--text-brand)' : 'var(--border-subtle)' }}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="text-sm">
+                    <span className="tabular text-muted-foreground">{s.kode}</span> <strong>{s.nama}</strong>
+                    {i === 0 && <span className="pill-status pill-green" style={{ marginLeft: 6 }}>Paling cocok</span>}
+                  </div>
+                  <Button type="button" size="sm" variant={s.kode === value ? 'default' : 'outline'} className="rounded-full" onClick={() => onChange(s.kode)}>
+                    {s.kode === value ? 'Dipilih' : 'Pilih ini'}
+                  </Button>
+                </div>
+                {s.alasan && <p className="mt-1 text-sm leading-relaxed">{s.alasan}</p>}
+                {s.contoh.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Termasuk: {s.contoh.join(', ').toLowerCase()}</p>}
+              </li>
+            ))}
+          </ul>
+        ))}
+      {hasil && <p className="text-xs text-muted-foreground">{hasil.ai ? 'Saran AI dari cerita Anda. Pastikan sesuai sebelum memilih.' : 'Saran dari kecocokan kata. Bila kurang pas, cari manual di daftar di bawah.'}</p>}
     </div>
   )
 }

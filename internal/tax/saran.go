@@ -15,7 +15,9 @@ type SaranBentuk struct {
 	Judul    string   `json:"judul"`
 	Alasan   []string `json:"alasan"`
 	Catatan  []string `json:"catatan"`
-	Hemat    int64    `json:"hemat"` // per tahun dibanding skema sekarang
+	Hemat    int64    `json:"hemat"`     // per tahun dibanding skema sekarang
+	HematBps int64    `json:"hemat_bps"` // hemat / pajak skema sekarang (8500 = 85% lebih kecil)
+	Omzet    int64    `json:"omzet"`     // untuk persen pajak terhadap omzet per skema
 	Skema    []Skema  `json:"skema"`
 	Laba     int64    `json:"laba"`
 	PTKP     int64    `json:"ptkp"`
@@ -42,9 +44,12 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 		return bu.Skema[slices.IndexFunc(bu.Skema, func(s Skema) bool { return s.ID == id })]
 	}
 	best, now := cari(bu.Termurah), cari(skemaSaatIni(bentuk, omzet))
-	s := &SaranBentuk{Termurah: best.ID, Sekarang: now.ID, Hemat: now.Pajak - best.Pajak, Skema: bu.Skema, Laba: laba, PTKP: bu.PTKP}
+	s := &SaranBentuk{Termurah: best.ID, Sekarang: now.ID, Hemat: now.Pajak - best.Pajak, Skema: bu.Skema, Laba: laba, PTKP: bu.PTKP, Omzet: omzet}
 	if s.Hemat <= 0 { // seri dengan skema sekarang: tetap di bentuk sekarang
 		s.Termurah, s.Hemat, best = now.ID, 0, now
+	}
+	if now.Pajak > 0 {
+		s.HematBps = s.Hemat * 10_000 / now.Pajak
 	}
 	umkm := persenBps(int(pr.UMKMTarifBps))
 	margin := pct(laba * 10_000 / omzet)
@@ -79,7 +84,7 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 	}
 
 	if s.Termurah != s.Sekarang {
-		s.Alasan = append(s.Alasan, fmt.Sprintf("Dibanding skema Anda sekarang (%s, %s per tahun), Anda bisa hemat %s per tahun.", now.Nama, rp(now.Pajak), rp(s.Hemat)))
+		s.Alasan = append(s.Alasan, fmt.Sprintf("Dibanding skema Anda sekarang (%s, %s per tahun), Anda bisa hemat %s per tahun — pajaknya %s lebih kecil.", now.Nama, rp(now.Pajak), rp(s.Hemat), pct(s.HematBps)))
 		switch {
 		case pribadi && !skemaPribadi(best.ID):
 			s.Alasan = append(s.Alasan, "Artinya usaha dijalankan lewat badan usaha (PT/CV). Pertimbangkan biaya pendirian dan administrasinya.")
@@ -90,7 +95,11 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 		lain := slices.DeleteFunc(slices.Clone(bu.Skema), func(x Skema) bool { return x.ID == best.ID })
 		if len(lain) > 0 {
 			next := slices.MinFunc(lain, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
-			s.Alasan = append(s.Alasan, fmt.Sprintf("Pilihan terdekat berikutnya, %s, %s per tahun (%s lebih mahal).", next.Nama, rp(next.Pajak), rp(next.Pajak-best.Pajak)))
+			lebih := ""
+			if best.Pajak > 0 {
+				lebih = ", " + pct((next.Pajak-best.Pajak)*10_000/best.Pajak)
+			}
+			s.Alasan = append(s.Alasan, fmt.Sprintf("Pilihan terdekat berikutnya, %s, %s per tahun (%s lebih mahal%s).", next.Nama, rp(next.Pajak), rp(next.Pajak-best.Pajak), lebih))
 		}
 	}
 
