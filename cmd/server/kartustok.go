@@ -70,6 +70,10 @@ type gerakBody struct {
 	Baris      []finance.BarisGerak `json:"baris"`
 	ProdukID   int                  `json:"produk_id"`
 	Batch      int64                `json:"batch"`
+	// Produksi aktual (opsional): pemakaian bahan sebenarnya (StokID + Qty positif per seribu)
+	// dan hasil sebenarnya (per seribu). Kosong = sesuai resep × batch.
+	Bahan []finance.BarisGerak `json:"bahan"`
+	Hasil int64                `json:"hasil"`
 }
 
 func bacaGerak(w http.ResponseWriter, r *http.Request) (gerakBody, bool) {
@@ -199,7 +203,8 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := s.produk[pi]
-	var baris []finance.BarisGerak
+	standar := map[int]int64{}
+	var urut []int
 	for _, bh := range p.Bahan {
 		if bh.StokID == 0 {
 			continue // bahan manual tidak dilacak per gudang
@@ -208,7 +213,43 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bahan "+bh.Nama+" sudah tidak ada di Stok & Gudang; perbarui resepnya", http.StatusBadRequest)
 			return
 		}
-		baris = append(baris, finance.BarisGerak{StokID: bh.StokID, Qty: -bh.Takaran * b.Batch})
+		if _, ada := standar[bh.StokID]; !ada {
+			urut = append(urut, bh.StokID)
+		}
+		standar[bh.StokID] += bh.Takaran * b.Batch
+	}
+	// Pemakaian: aktual bila dikirim (boleh beda dari resep & boleh ada bahan tambahan),
+	// selain itu resep × batch.
+	pakai := map[int]int64{}
+	if len(b.Bahan) > 0 {
+		for _, x := range b.Bahan {
+			it, ok := s.stokByID(x.StokID)
+			if !ok {
+				http.Error(w, fmt.Sprintf("bahan #%d tidak ada di Stok & Gudang", x.StokID), http.StatusBadRequest)
+				return
+			}
+			if x.Qty < 0 {
+				http.Error(w, "jumlah bahan "+it.Nama+" tidak boleh negatif", http.StatusBadRequest)
+				return
+			}
+			if _, ada := pakai[x.StokID]; ada {
+				http.Error(w, it.Nama+" diisi dua kali", http.StatusBadRequest)
+				return
+			}
+			pakai[x.StokID] = x.Qty
+			if _, ada := standar[x.StokID]; !ada {
+				urut = append(urut, x.StokID)
+			}
+		}
+	} else {
+		pakai = standar
+	}
+	var baris []finance.BarisGerak
+	for _, id := range urut {
+		if pakai[id] == 0 && standar[id] == 0 {
+			continue
+		}
+		baris = append(baris, finance.BarisGerak{StokID: id, Qty: -pakai[id], Standar: standar[id]})
 	}
 	jadi := slices.IndexFunc(s.stok, func(x finance.StokItem) bool {
 		if p.SKU != "" {
@@ -222,7 +263,13 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 		s.stok = append(s.stok, it)
 		jadi = len(s.stok) - 1
 	}
-	baris = append(baris, finance.BarisGerak{StokID: s.stok[jadi].ID, Qty: p.HasilPerBatch * b.Batch * finance.TakaranSkala})
+	hasilStandar := p.HasilPerBatch * b.Batch * finance.TakaranSkala
+	hasil := cmp.Or(b.Hasil, hasilStandar)
+	if hasil < 0 {
+		http.Error(w, "hasil produksi tidak boleh negatif", http.StatusBadRequest)
+		return
+	}
+	baris = append(baris, finance.BarisGerak{StokID: s.stok[jadi].ID, Qty: hasil, Standar: hasilStandar})
 	ket := cmp.Or(b.Keterangan, fmt.Sprintf("Produksi %s × %d batch", p.Nama, b.Batch))
 	s.simpanGerak(w, r, finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakProduksi, Baris: baris, ProdukID: p.ID, Batch: b.Batch, Keterangan: ket})
 }
@@ -369,10 +416,11 @@ func (s *tenant) handlePilihanBarang(w http.ResponseWriter, _ *http.Request) {
 // --- Laporan produksi ---
 
 type bahanProduksi struct {
-	Nama   string `json:"nama"`
-	Satuan string `json:"satuan"`
-	Qty    int64  `json:"qty"` // per seribu, positif = dipakai
-	Nilai  int64  `json:"nilai"`
+	Nama    string `json:"nama"`
+	Satuan  string `json:"satuan"`
+	Qty     int64  `json:"qty"`     // per seribu, positif = dipakai
+	Standar int64  `json:"standar"` // menurut resep × batch; 0 = di luar resep
+	Nilai   int64  `json:"nilai"`
 }
 
 type barisProduksi struct {
@@ -382,6 +430,7 @@ type barisProduksi struct {
 	Produk     string          `json:"produk"`
 	Batch      int64           `json:"batch"`
 	HasilQty   int64           `json:"hasil_qty"` // per seribu
+	HasilStd   int64           `json:"hasil_standar"`
 	Satuan     string          `json:"satuan"`
 	Nilai      int64           `json:"nilai"`    // nilai barang jadi = nilai bahan terpakai
 	PerUnit    int64           `json:"per_unit"` // nilai / hasil
@@ -428,11 +477,12 @@ func (s *tenant) laporanProduksi(dari, sampai string) laporanProduksi {
 			it := nama[b.StokID]
 			if b.Qty > 0 {
 				r.HasilQty += b.Qty
+				r.HasilStd += b.Standar
 				r.Satuan = it.Satuan
 				r.Nilai += nilai[g.ID][b.StokID]
 				r.Produk = cmp.Or(r.Produk, it.Nama)
 			} else {
-				r.Bahan = append(r.Bahan, bahanProduksi{Nama: it.Nama, Satuan: it.Satuan, Qty: -b.Qty, Nilai: -nilai[g.ID][b.StokID]})
+				r.Bahan = append(r.Bahan, bahanProduksi{Nama: it.Nama, Satuan: it.Satuan, Qty: -b.Qty, Standar: b.Standar, Nilai: -nilai[g.ID][b.StokID]})
 			}
 		}
 		if r.HasilQty > 0 {

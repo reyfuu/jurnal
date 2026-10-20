@@ -122,6 +122,18 @@ func TestKartuStok_AlurLengkap(t *testing.T) {
 		t.Errorf("kasir laporan mutasi: %d", rec.Code)
 	}
 
+	// Produksi aktual: kopi terpakai 0,5 kg (resep 0,9), hasil 48 cup (standar 50).
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/produksi", `{"tanggal":"2026-01-20","produk_id":`+itoa(produk.ID)+`,"batch":1,"hasil":48000,"keterangan":"ada yang tumpah",
+		"bahan":[{"stok_id":`+itoa(kopi.ID)+`,"qty":500}]}`)
+	lp2 := getJSON[laporanProduksi](t, srv, qa, "/api/v1/produksi/laporan?dari=2026-01-20&sampai=2026-01-20")
+	if len(lp2.Baris) != 1 || lp2.Baris[0].HasilQty != 48_000 || lp2.Baris[0].HasilStd != 50_000 ||
+		lp2.Baris[0].Bahan[0].Qty != 500 || lp2.Baris[0].Bahan[0].Standar != 900 || lp2.Baris[0].Keterangan != "ada yang tumpah" {
+		t.Errorf("produksi aktual %+v", lp2.Baris)
+	}
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi", `{"tanggal":"2026-01-20","produk_id":`+itoa(produk.ID)+`,"batch":1,"bahan":[{"stok_id":99,"qty":1}]}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("bahan tak dikenal: %d", rec.Code)
+	}
+
 	rec := do(srv, qa, http.MethodGet, "/api/v1/stok/mutasi.xlsx?dari=2026-01-01&sampai=2026-01-31", "")
 	rows, err := xlsx.Read(rec.Body.Bytes())
 	if rec.Code != http.StatusOK || err != nil || !strings.Contains(strings.Join(rows[4], "|"), "Biji kopi") {

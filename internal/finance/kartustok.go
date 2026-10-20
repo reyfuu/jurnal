@@ -38,6 +38,9 @@ type BarisGerak struct {
 	Qty       int64 `json:"qty,omitempty"`        // produksi: per seribu, + masuk / − keluar
 	Fisik     int64 `json:"fisik,omitempty"`      // awal & opname: hasil hitung fisik (per seribu)
 	HargaUnit int64 `json:"harga_unit,omitempty"` // awal: harga pokok per satuan
+	// Standar: produksi — jumlah menurut resep × batch (per seribu, tanpa tanda), untuk
+	// melihat selisih pemakaian/hasil aktual terhadap resep. 0 = di luar resep.
+	Standar int64 `json:"standar,omitempty"`
 }
 
 type GerakStok struct {
