@@ -81,7 +81,7 @@ func TestLoginSuksesTidakMeresetLimiter(t *testing.T) {
 func TestDaftarDibatasiPerIP(t *testing.T) {
 	srv := NewServer()
 	for i := range maxLoginFailures + 1 {
-		body := `{"name":"QA","email":"qa` + strconv.Itoa(i) + `@x.id","password":"rahasia123"}`
+		body := `{"name":"QA","email":"qa` + strconv.Itoa(i) + `@x.id","password":"rahasia123","wa":"081234567890","setuju_pdp":true}`
 		c := post(srv, "/api/v1/auth/register", body, map[string]string{"X-Real-IP": "198.51.100.9"}).Code
 		if want := http.StatusCreated; i == maxLoginFailures {
 			if c != http.StatusTooManyRequests {
@@ -200,7 +200,7 @@ func TestIDUsahaYatimTidakDipakaiUlang(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv2 := NewServer()
-	b := register(t, srv2, `{"name":"Korban","email":"korban@x.id","password":"rahasia123"}`)
+	b := register(t, srv2, `{"name":"Korban","email":"korban@x.id","password":"rahasia123","wa":"081234567891","setuju_pdp":true}`)
 	var me meResp
 	_ = json.NewDecoder(do(srv2, b, http.MethodGet, "/api/v1/auth/me", "").Body).Decode(&me)
 	if me.User.TenantID == 2 {

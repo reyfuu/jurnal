@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
-const registerBody = `{"name":"QA Satu","email":"qa1@x.id","password":"rahasia123"}`
+const registerBody = `{"name":"QA Satu","email":"qa1@x.id","password":"rahasia123","wa":"0812-3456-7890","setuju_pdp":true}`
 
 // register mendaftarkan akun baru dan mengembalikan cookie sesinya.
 func register(t *testing.T, srv *Server, body string) *http.Cookie {
@@ -91,5 +92,32 @@ func TestRegisteredBusinessSurvivesRestart(t *testing.T) {
 	_ = json.NewDecoder(do(srv2, c, http.MethodGet, "/api/v1/auth/me", "").Body).Decode(&me)
 	if me.User.TenantID != 3 {
 		t.Fatalf("usaha kedua harus id 3, got %d", me.User.TenantID)
+	}
+}
+
+// UU PDP: pendaftaran wajib menyetujui kebijakan privasi dan mencantumkan nomor WA yang sah.
+func TestRegisterWajibWAdanPersetujuanPDP(t *testing.T) {
+	srv := NewServer()
+	for name, body := range map[string]string{
+		"tanpa persetujuan": `{"name":"QA","email":"qa@x.id","password":"rahasia123","wa":"081234567890"}`,
+		"tolak persetujuan": `{"name":"QA","email":"qa@x.id","password":"rahasia123","wa":"081234567890","setuju_pdp":false}`,
+		"tanpa WA":          `{"name":"QA","email":"qa@x.id","password":"rahasia123","setuju_pdp":true}`,
+		"WA tidak sah":      `{"name":"QA","email":"qa@x.id","password":"rahasia123","wa":"12345","setuju_pdp":true}`,
+	} {
+		if rec := do(srv, nil, http.MethodPost, "/api/v1/auth/register", body); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: want 400, got %d %s", name, rec.Code, rec.Body)
+		}
+	}
+	if len(srv.tenants) != 1 {
+		t.Fatalf("pendaftaran gagal tidak boleh membuat usaha, ada %d", len(srv.tenants))
+	}
+
+	var me meResp
+	_ = json.NewDecoder(do(srv, register(t, srv, registerBody), http.MethodGet, "/api/v1/auth/me", "").Body).Decode(&me)
+	if me.User.WA != "6281234567890" {
+		t.Fatalf("WA harus dinormalkan ke 62…, got %q", me.User.WA)
+	}
+	if time.Since(me.User.PersetujuanPDP) > time.Minute || me.User.VersiPDP != versiPDP {
+		t.Fatalf("persetujuan PDP harus tercatat (waktu & versi): %q %q", me.User.PersetujuanPDP, me.User.VersiPDP)
 	}
 }

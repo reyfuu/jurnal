@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { KebijakanPrivasi } from '@/components/KebijakanPrivasi'
 import { BrandMark } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +22,8 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [wa, setWa] = useState('')
+  const [setujuPDP, setSetujuPDP] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -31,7 +34,7 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
     setBusy(true)
     setError('')
     try {
-      onLogin(await (daftar ? register(name, email, password) : login(email, password)))
+      onLogin(await (daftar ? register({ name, email, password, wa, setuju_pdp: setujuPDP }) : login(email, password)))
     } catch (err) {
       setError((err as Error).message)
       setBusy(false)
@@ -71,6 +74,10 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" className="h-11" type="email" autoComplete="username" required autoFocus={!daftar} value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
+              {daftar && <div className="grid gap-1.5">
+                <Label htmlFor="wa">Nomor WhatsApp</Label>
+                <Input id="wa" className="h-11" type="tel" inputMode="tel" autoComplete="tel" placeholder="0812-3456-7890" required value={wa} onChange={(e) => setWa(e.target.value)} />
+              </div>}
               <div className="grid gap-1.5">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
@@ -89,8 +96,18 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
                   </Button>
                 </div>
               </div>
+              {daftar && <label className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" required checked={setujuPDP} onChange={(e) => setSetujuPDP(e.target.checked)} />
+                <span>
+                  Saya menyetujui pemrosesan data pribadi saya sesuai{' '}
+                  <KebijakanPrivasi>
+                    <button type="button" className="font-semibold text-foreground underline underline-offset-4">Kebijakan Privasi</button>
+                  </KebijakanPrivasi>{' '}
+                  (UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi).
+                </span>
+              </label>}
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-              <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy}>
+              <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy || (daftar && !setujuPDP)}>
                 {busy ? 'Memeriksa…' : daftar ? 'Daftar' : 'Masuk'}
               </Button>
             </form>

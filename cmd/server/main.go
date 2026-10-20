@@ -491,12 +491,28 @@ func setSession(w http.ResponseWriter, r *http.Request, token string) {
 	})
 }
 
+// versiPDP: versi Kebijakan Privasi yang disetujui pendaftar (frontend KebijakanPrivasi.tsx).
+// Naikkan bila isi kebijakan berubah, supaya persetujuan lama bisa dibedakan.
+const versiPDP = "2026-10"
+
 // handleRegister: daftar mandiri (terbuka untuk umum). Pendaftar menjadi
 // Owner sebuah usaha baru yang kosong, lalu langsung login dan masuk wizard onboarding.
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
-	var req struct{ Name, Email, Password string }
+	var req struct {
+		Name, Email, Password, WA string
+		SetujuPDP                 bool `json:"setuju_pdp"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if !req.SetujuPDP {
+		http.Error(w, "persetujuan kebijakan privasi (UU PDP) wajib", http.StatusBadRequest)
+		return
+	}
+	wa, err := auth.NormalizeWA(req.WA)
+	if err != nil {
+		http.Error(w, "nomor WhatsApp tidak valid", http.StatusBadRequest)
 		return
 	}
 	// Setiap pendaftaran memakai satu jatah per IP (tanpa pengembalian): maks 5 akun per 15 menit.
@@ -508,7 +524,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	id := slices.Max(slices.Collect(maps.Keys(s.tenants))) + 1
 	s.tenants[id] = newTenant(id)
 	s.tenantsMu.Unlock()
-	if _, err := s.users.Create(auth.Input{Name: req.Name, Email: req.Email, Password: req.Password, Role: auth.Owner, Active: true, TenantID: id}); err != nil {
+	if _, err := s.users.Create(auth.Input{Name: req.Name, Email: req.Email, Password: req.Password, Role: auth.Owner, Active: true, TenantID: id,
+		WA: wa, PersetujuanPDP: time.Now().UTC().Truncate(time.Second), VersiPDP: versiPDP}); err != nil {
 		s.tenantsMu.Lock()
 		delete(s.tenants, id)
 		s.tenantsMu.Unlock()

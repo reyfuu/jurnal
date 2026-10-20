@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, Calculator, ChevronDown, FileSpreadsheet, ReceiptText, ShieldCheck, Sparkles } from 'lucide-react'
+import { KebijakanPrivasi } from '@/components/KebijakanPrivasi'
 import { BrandMark } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { getPlans, type Paket } from '@/lib/api'
@@ -167,7 +168,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Mulai dalam 10 menit.</h2>
             <ol className="grid gap-8">
               {[
-                ['Daftar akun', 'Cukup nama, email, dan password.'],
+                ['Daftar akun', 'Cukup nama, email, nomor WhatsApp, dan password.'],
                 ['Kenalkan usaha Anda', 'Jawab pertanyaan sederhana: jenis dan bidang usaha, lokasi, omzet, dan bentuk usaha. Kami siapkan daftar akun dan cek awal pajaknya.'],
                 ['Pilih paket & bayar', 'Bulanan atau tahunan, bayar lewat Midtrans: virtual account, QRIS, e-wallet, atau kartu.'],
                 ['Catat atau impor transaksi', 'Ketik langsung atau unggah Excel. Laporan dan dashboard langsung terisi.'],
@@ -221,7 +222,12 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
       <footer className="border-t border-white/5">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-[var(--text-secondary)] md:flex-row md:items-center md:justify-between md:px-6">
           <div className="flex items-center gap-2"><BrandMark size={18} /> Laporan Bisnis by Master Pajak</div>
-          <div>© {new Date().getFullYear()} Master Pajak</div>
+          <div className="flex items-center gap-4">
+            <KebijakanPrivasi>
+              <button type="button" className="underline-offset-4 hover:underline">Kebijakan Privasi</button>
+            </KebijakanPrivasi>
+            <span>© {new Date().getFullYear()} Master Pajak</span>
+          </div>
         </div>
       </footer>
     </div>

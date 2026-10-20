@@ -52,7 +52,11 @@ type User struct {
 	Role      Role   `json:"role"`
 	Active    bool   `json:"active"`
 	CreatedAt string `json:"created_at"`
-	TenantID  int    `json:"tenant_id"` // usaha pemilik data; 1 = usaha awal (Kedai Kopi Senja)
+	TenantID  int    `json:"tenant_id"`    // usaha pemilik data; 1 = usaha awal (Kedai Kopi Senja)
+	WA        string `json:"wa,omitempty"` // 628…; wajib saat daftar mandiri, opsional untuk user tambahan
+	// Persetujuan UU PDP (UU 27/2022) saat daftar: waktu (UTC) & versi kebijakan privasi.
+	PersetujuanPDP time.Time `json:"persetujuan_pdp,omitzero"`
+	VersiPDP       string    `json:"versi_pdp,omitempty"`
 }
 
 // Input untuk Create/Update. Password kosong saat Update = tidak diubah.
@@ -63,6 +67,10 @@ type Input struct {
 	Active   bool   `json:"active"`
 	Password string `json:"password"`
 	TenantID int    `json:"-"` // diisi server, bukan dari body request; 0 = usaha 1
+	WA       string `json:"-"` // hanya lewat daftar mandiri; Update tidak mengubahnya
+	// Persetujuan UU PDP, diisi server saat daftar mandiri.
+	PersetujuanPDP time.Time `json:"-"`
+	VersiPDP       string    `json:"-"`
 }
 
 var (
@@ -103,9 +111,9 @@ func NewStore() *Store { return NewStoreWithPassword(DemoPassword) }
 func NewStoreWithPassword(seedPassword string) *Store {
 	s := &Store{users: map[int]*record{}, sessions: map[string]session{}, Now: time.Now}
 	for _, in := range []Input{
-		{"Bu Sari (Pemilik)", "owner@kedaikopisenja.id", Owner, true, seedPassword, 1},
-		{"Dimas (Keuangan)", "admin@kedaikopisenja.id", Admin, true, seedPassword, 1},
-		{"Rani (Kasir)", "kasir@kedaikopisenja.id", Kasir, true, seedPassword, 1},
+		{Name: "Bu Sari (Pemilik)", Email: "owner@kedaikopisenja.id", Role: Owner, Active: true, Password: seedPassword, TenantID: 1},
+		{Name: "Dimas (Keuangan)", Email: "admin@kedaikopisenja.id", Role: Admin, Active: true, Password: seedPassword, TenantID: 1},
+		{Name: "Rani (Kasir)", Email: "kasir@kedaikopisenja.id", Role: Kasir, Active: true, Password: seedPassword, TenantID: 1},
 	} {
 		if _, err := s.Create(in); err != nil {
 			panic(err)
@@ -134,6 +142,19 @@ func validate(in *Input, requirePassword bool) error {
 		return ErrInvalid
 	}
 	return nil
+}
+
+// NormalizeWA mengubah nomor WhatsApp seluler Indonesia (08…, +628…, 628…; spasi, '-' dan
+// '.' diabaikan) ke bentuk 628… yang dipakai API WhatsApp. Panjang akhir 10–15 digit.
+func NormalizeWA(s string) (string, error) {
+	n := strings.NewReplacer(" ", "", "-", "", ".", "", "+", "").Replace(strings.TrimSpace(s))
+	if strings.HasPrefix(n, "08") {
+		n = "62" + n[1:]
+	}
+	if !strings.HasPrefix(n, "628") || len(n) < 10 || len(n) > 15 || strings.Trim(n, "0123456789") != "" {
+		return "", ErrInvalid
+	}
+	return n, nil
 }
 
 // activeOwners menghitung Owner aktif satu usaha, mengabaikan user dengan ID except.
@@ -168,7 +189,8 @@ func (s *Store) Create(in Input) (User, error) {
 	s.nextID++
 	salt := []byte(rand.Text())
 	r := &record{
-		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02"), TenantID: max(in.TenantID, 1)},
+		User: User{ID: s.nextID, Name: in.Name, Email: in.Email, Role: in.Role, Active: in.Active, CreatedAt: time.Now().Format("2006-01-02"), TenantID: max(in.TenantID, 1),
+			WA: in.WA, PersetujuanPDP: in.PersetujuanPDP, VersiPDP: in.VersiPDP},
 		salt: salt,
 		hash: hashPassword(in.Password, salt),
 	}
