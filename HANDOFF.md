@@ -601,8 +601,26 @@ spec MCP 2025-06-18 (sudah dilaporkan ke maintainer jcode). Cadangan config:
 hotspot, dipakai lewat `npx` tanpa memasang apa pun ke config agent. 51 temuan, 45 di kode
 aplikasi, semuanya `medium/candidate`.
 
-**flameox sengaja dilewati** (`ponytail`/YAGNI): benchmark Go sudah cukup membuktikan kasus ini,
-profiler runtime belum dibutuhkan.
+**flameox & gitcontribute: diuji, lalu sengaja tidak dipasang.** Keduanya benar-benar dijalankan,
+bukan ditolak dari bacaan README:
+
+- **`flameox`** (lewat `uvx flameox`; paket npm-nya hanya `setup`/`update`). 26 operasinya untuk
+  trace Perfetto/Chrome, profil CPU Python/Node, PyTorch, dan kernel GPU — **tidak ada pembaca Go
+  pprof**, jadi `go test -bench` tetap jalur yang tepat untuk backend ini.
+- Sebagai efek sampingnya ditemukan bug interop nyata: `flameox analyze
+  inspect_performance_candidates` membaca SARIF dari smokinggun lalu **menolak 51 dari 51 hasil**
+  (`provider confidence is not a 0-to-1 number`) karena smokinggun menulis `confidence:
+  "candidate"`. Dilaporkan ke upstream: [flameox#529](https://github.com/morluto/flameox/issues/529).
+  Jadi rantai smokinggun → flameox belum bisa diandalkan.
+- **`gitcontribute`** — `init` + `index` + `search code` berjalan (235 file terindeks), tapi untuk
+  pencarian kode kalah dari leantoken (hanya nama file, tanpa nomor baris). Gunanya riset sebelum
+  menyumbang ke repo pihak lain. Corpus ujinya sudah dihapus, tidak ada registrasi MCP tertinggal.
+
+**Jebakan `leantoken doctor`**: dijalankan lewat `npx`, doctor melaporkan `registration_health:
+stale` **walaupun registrasinya benar**, karena `matches_current` membandingkan entri terdaftar
+dengan proses doctor yang sedang berjalan. Verifikasi lewat launcher native
+(`~/.local/share/leantoken/runtimes/0.1.28/leantoken doctor --client claude`) → `current`.
+Jangan terjebak menjalankan `setup --refresh` berulang.
 
 ### Hotspot yang diperbaiki: `klienRows`
 

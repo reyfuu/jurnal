@@ -21,7 +21,13 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
    - Gunakan `graphify` (`graphify-out/`) sebagai sumber kebenaran peta arsitektur codebase, relasi antar-modul (Transaksi → Jurnal → Laporan Keuangan → Pajak UMKM), dan deteksi *god nodes* sebelum melakukan refactoring besar.
 4. **`leantoken` ([morluto/leantoken](https://github.com/morluto/leantoken))**
    - **Lapisan pencarian & pembacaan kode pertama** untuk tugas luas (implementasi, debugging, review, arsitektur). Mulai dengan `leantoken.context`, bukan membaca file utuh, supaya konteks token tetap hemat.
-   - Terpasang global sebagai MCP untuk Claude Code & Codex lewat runtime native terpin (`npx leantoken@0.1.28 setup --refresh --private-runtime --yes`; launcher `~/.local/share/leantoken/runtimes/0.1.28/leantoken`, skill di `~/.claude/skills/leantoken/`). Verifikasi: `leantoken doctor --client claude` harus `registration_health: current`.
+   - Terpasang global sebagai MCP untuk Claude Code & Codex lewat runtime native terpin (`npx leantoken@0.1.28 setup --refresh --private-runtime --yes`; launcher `~/.local/share/leantoken/runtimes/0.1.28/leantoken`, skill di `~/.claude/skills/leantoken/`).
+   - **Verifikasi wajib lewat launcher native itu sendiri**, bukan lewat `npx`:
+     `~/.local/share/leantoken/runtimes/0.1.28/leantoken doctor --client claude` → `registration_health: current`.
+     Dijalankan lewat `npx`, `doctor` melaporkan `stale` **walaupun registrasinya benar**, karena
+     `matches_current` membandingkan entri terdaftar dengan proses doctor yang sedang berjalan (lewat npx
+     itu rantai node, bukan launcher native). Jangan terkecoh lalu menjalankan `setup --refresh` berulang;
+     patokan yang benar adalah `launcher_status: healthy` + `registration_health: current` dari launcher native.
    - CLI untuk pemakaian cepat tanpa MCP: `leantoken index`, `context --task "<tugas>"`, `search`, `outline`, `read`. Indeks repo ini: 234 dari 243 file (9 biner dilewati).
    - Pembagian tugas dengan `graphify`: `graphify` untuk peta arsitektur & relasi modul; `leantoken` untuk menemukan potongan kode relevan dalam batas token.
    - Catatan jcode: pemanggilan `mcp__leantoken__*` masih gagal (`unknown variant resource_link`), jadi di jcode pakai CLI-nya. Di Claude Code & Codex MCP-nya normal.
@@ -60,6 +66,10 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
      - **Terbukti nyata & sudah diperbaiki**: `klienRows` di Panel Master memindai seluruh transaksi semua usaha pada tiap request (ringkasan 538 ms → 0,6 ms; detail 1,21 s → 0,08 ms). Lihat `BenchmarkKlienRows` di `cmd/server/master_bench_test.go`.
      - **Terbukti tidak relevan**: `membership-in-loop` di jalur CoA/jurnal (`coa.Find` atas 75 akun, `jenisOf` atas 19 jenis) — Transaksi → Jurnal → Neraca Saldo hanya 2 ms untuk 10.000 transaksi. Lihat `internal/coa/bench_test.go`. Jangan "optimasi" ini tanpa angka baru.
    - Benchmark yang sudah ada wajib dijalankan ulang (`go test ./... -run '^$' -bench .`) sebelum mengubah jalur Transaksi → Jurnal → Laporan atau Panel Master.
+   - **Tool morluto lain yang sudah diuji dan sengaja TIDAK dipasang** (dicatat supaya tidak dievaluasi ulang dari nol):
+     - **`flameox`** ([morluto/flameox](https://github.com/morluto/flameox), dijalankan lewat `uvx flameox`; paket npm-nya hanya `setup`/`update`). 26 operasinya untuk trace Perfetto/Chrome, profil CPU Python/Node (`py-spy`, `pstats`, `cpuprofile`), PyTorch, dan kernel GPU. **Tidak ada pembaca Go pprof**, jadi untuk backend Go di proyek ini `go test -bench` + `pprof` tetap jalur yang tepat. Pasang hanya kalau nanti ada beban Python/Node/GPU.
+     - Jalur SARIF-nya (`inspect_performance_candidates`) **tidak bisa dipakai bersama `smokinggun`**: 51 dari 51 hasil ditolak dengan `provider confidence is not a 0-to-1 number`, karena smokinggun menulis `confidence: "candidate"` (string ordinal). Dilaporkan ke upstream sebagai [flameox#529](https://github.com/morluto/flameox/issues/529). Jangan rancang alur yang mengandalkan rantai smokinggun → flameox sampai itu beres.
+     - **`gitcontribute`** ([morluto/gitcontribute](https://github.com/morluto/gitcontribute)). Sudah diuji: `init` + `index` + `search code` berjalan (235 file terindeks). Gunanya riset sebelum menyumbang ke **repo pihak lain** (panduan kontribusi, pekerjaan terkait, PR serupa), bukan pekerjaan harian di repo sendiri. Untuk pencarian kode ia kalah dari `leantoken`: hanya nama file, tanpa nomor baris atau potongan kode. Butuh checkout bersih (`worktree is not clean` → gagal). Corpus ujinya sudah dihapus; tidak ada registrasi MCP yang ditinggalkan.
 12. **`improve-codebase-architecture` & `setup-matt-pocock-skills`**
    - Struktur modular berbasis **Vertical Slices / Domain Modules** (`dashboard`, `ledger`, `cashflow`, `transactions`, `receivables`, `inventory`, `production`, `invoicing`, `pricing_sim`, `tax_umkm`, `master_data`).
    - *Make illegal states unrepresentable*: gunakan strict schema validation (TypeBox di Elysia / strict structs & sqlc di Go), branded types untuk ID & nominal Rupiah, dan eksplisit error handling.
