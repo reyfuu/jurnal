@@ -1,15 +1,18 @@
 import {
-  ArrowLeftRight, BookOpen, Gift, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
   Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
 
 // Mode terkunci (belum berlangganan): menu yang tetap terbuka, di atas menu lain yang bergembok.
+/** Halaman di luar sidebar (dibuka dari banner), supaya punya label untuk catatan & lapor bug. */
+export const NAV_LAIN = { group: 'Lain', items: [{ view: 'catatan' as View, label: 'Catatan Konsultan', icon: MessageSquareText }] }
+
 export const NAV_COBA = { group: 'Coba gratis', items: [
   { view: 'laporan-ai' as View, label: 'Laporan AI', icon: Sparkles },
   { view: 'alat-gratis' as View, label: 'Alat Gratis', icon: Gift },
 ] }
-export const BEBAS_TERKUNCI: View[] = ['laporan-ai', 'alat-gratis', 'langganan', 'profil-usaha', 'lapor-bug']
+export const BEBAS_TERKUNCI: View[] = ['laporan-ai', 'alat-gratis', 'langganan', 'profil-usaha', 'lapor-bug', 'catatan']
 
 export const NAV: { group: string; items: { view: View; label: string; icon: LucideIcon }[] }[] = [
   { group: 'Ringkasan', items: [{ view: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
@@ -56,4 +59,4 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
   },
 ]
 
-export const VIEW_LABEL = Object.fromEntries([...NAV, NAV_COBA].flatMap((g) => g.items.map((i) => [i.view, i.label]))) as Record<View, string>
+export const VIEW_LABEL = Object.fromEntries([...NAV, NAV_COBA, NAV_LAIN].flatMap((g) => g.items.map((i) => [i.view, i.label]))) as Record<View, string>

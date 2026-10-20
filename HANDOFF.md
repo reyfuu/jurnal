@@ -775,6 +775,15 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Perbaikan: `GET /transactions` mengirim `[]` (bukan `null`) — halaman Transaksi usaha baru tanpa
   transaksi sebelumnya crash.
 
+## Catatan Konsultan + pengingat (20 Okt 2026)
+
+- Konsultan (izin `catatan`) menulis catatan saat **Lihat sebagai klien**: tombol melayang "Tulis catatan" mencatat halaman + periode yang sedang dibuka, tingkat (Info / Perlu diperbaiki / Penting) dan isi (maks 2000 karakter). `POST /api/v1/master/klien/{id}/catatan`, tercatat di log audit dan riwayat akses tim klien.
+- Klien: banner "N catatan dari konsultan Master Pajak", menu **Catatan Konsultan** (juga terbuka di mode terkunci). Owner/Admin hanya bisa **Tandai sudah diperbaiki** (tanpa balasan) → `POST /api/v1/catatan/{id}/selesai`; 409 bila sudah selesai.
+- Pengingat: pop-up di aplikasi untuk catatan terbuka yang sudah lewat interval sejak dibuat/diingatkan terakhir; menutup pop-up memanggil `POST /api/v1/catatan/diingatkan` (menambah `jumlah_pengingat`).
+- Panel Master → Klien → **Catatan Konsultan**: daftar semua catatan (saring belum/sudah diperbaiki, cari) + kartu **Pengingat untuk klien** (aktif, setiap 1–30 hari, mulai tingkat). Ubah hanya dengan izin baru `pengaturan`; berlaku untuk semua klien (`PUT /api/v1/master/pengingat`, disimpan di `mp_pengaturan`). Bawaan: aktif, 3 hari, mulai "Perlu diperbaiki".
+- Kanal saat ini hanya aplikasi; WhatsApp/Email tampil "segera" dan dipaksa `["aplikasi"]` di server sampai integrasinya dibuat.
+- Skema: tabel `catatan_konsultan`, `mp_pengaturan`, kolom `tenants.next_catatan_id` (migrasi otomatis via `schema.sql`).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

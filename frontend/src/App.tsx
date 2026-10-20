@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { BEBAS_TERKUNCI, VIEW_LABEL } from '@/lib/nav'
 import { FiturTerkunci } from '@/components/FiturTerkunci'
+import { CatatanKlienView, PengingatCatatan, TulisCatatanTombol } from '@/components/CatatanKonsultan'
 import { PageHeader } from '@/components/PageHeader'
 import { LaporanAI } from '@/views/LaporanAI'
 import { LaporBug } from '@/views/LaporBug'
@@ -105,7 +106,7 @@ export default function App() {
   const canSee = (v: View) => me.views.includes(v)
   const terkunci = me.langganan.status === 'habis'
   const navigate = (v: View) => {
-    if (!canSee(v) && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
+    if (!canSee(v) && v !== 'catatan' && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
     if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
     setView(v)
   }
@@ -179,6 +180,12 @@ export default function App() {
               <Button size="sm" variant="outline" className="rounded-full" style={{ marginLeft: 'auto' }} onClick={() => void selesaiLihat().finally(gantiMode)}>Kembali ke Panel Master</Button>
             </div>
           )}
+          {!!me.catatan_terbuka && !me.lihat && view !== 'catatan' && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
+              <span><strong>{me.catatan_terbuka} catatan dari konsultan Master Pajak</strong> belum ditandai sudah diperbaiki.</span>
+              <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('catatan')}>Lihat catatan</Button>
+            </div>
+          )}
           {!!me.koreksi_menunggu && view !== 'usulan-koreksi' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
               <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan Master Pajak menunggu keputusan Anda. Pembukuan belum berubah.</span>
@@ -227,6 +234,8 @@ export default function App() {
         </section>
       </div>
       {!me.lihat && !terkunci && <AIAgentBubble period={period} />}
+      {me.lihat && me.master?.izin.includes('catatan') && <TulisCatatanTombol klienId={me.lihat.klien_id} halaman={view} periode={period} />}
+      {!me.lihat && !!me.catatan_ingat && <PengingatCatatan onLihat={() => navigate('catatan')} />}
     </main>
   )
 
@@ -236,6 +245,9 @@ export default function App() {
       return <FiturTerkunci nama={VIEW_LABEL[view] ?? 'Fitur ini'} onLangganan={canSee('langganan') ? () => navigate('langganan') : undefined} />
     }
     switch (view) {
+      case 'catatan':
+        return <CatatanKlienView bisaTindak={me!.user.role === 'owner' || me!.user.role === 'admin'} onBuka={navigate}
+          onBerubah={() => getMe().then((m) => setSession({ status: 'in', me: m }), fail)} />
       case 'laporan-ai':
         return (
           <>

@@ -390,3 +390,30 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS arsip_alasan TEXT;
 
 -- Kategori isi sumber pengetahuan (Okt 2026): peraturan | artikel | praktik | umum | lainnya.
 ALTER TABLE sumber_pengetahuan ADD COLUMN IF NOT EXISTS kategori TEXT;
+
+-- Catatan konsultan (Okt 2026): catatan tim pada laporan klien; klien menandai selesai.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_catatan_id INT NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS catatan_konsultan (
+	tenant_id        INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id               INT NOT NULL,
+	halaman          TEXT,
+	periode          TEXT,
+	tingkat          TEXT NOT NULL,
+	isi              TEXT NOT NULL,
+	transaksi_id     INT,
+	oleh_id          INT NOT NULL,
+	oleh             TEXT,
+	peran            TEXT,
+	dibuat           TIMESTAMPTZ NOT NULL,
+	status           TEXT NOT NULL,
+	selesai_oleh     TEXT,
+	selesai_pada     TIMESTAMPTZ,
+	diingatkan_pada  TIMESTAMPTZ,
+	jumlah_pengingat INT NOT NULL DEFAULT 0,
+	PRIMARY KEY (tenant_id, id)
+);
+-- Pengaturan Panel Master yang berlaku untuk semua klien (kunci → JSON), mis. pengingat.
+CREATE TABLE IF NOT EXISTS mp_pengaturan (
+	kunci TEXT PRIMARY KEY,
+	isi   JSONB NOT NULL
+);

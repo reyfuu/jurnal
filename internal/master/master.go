@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"pajak/internal/finance"
 )
 
 type Izin string
@@ -37,6 +39,10 @@ const (
 	PenggunaKelola Izin = "pengguna_kelola"
 	PenggunaReset  Izin = "pengguna_reset"
 	HapusPermanen  Izin = "hapus_permanen"
+	// Catatan: menulis catatan konsultan pada laporan klien (saat lihat sebagai).
+	CatatanKonsultan Izin = "catatan"
+	// Pengaturan: aturan yang berlaku untuk semua klien, mis. frekuensi pengingat.
+	Pengaturan Izin = "pengaturan"
 	Audit          Izin = "audit"
 )
 
@@ -54,6 +60,7 @@ var DaftarIzin = []IzinInfo{
 	{Tiket, "Lihat & balas tiket", "Laporan bug dari klien yang bisa dilihat"},
 	{LihatSebagai, "Lihat sebagai klien", "Membaca laporan klien, hanya baca; wajib alasan dan tercatat"},
 	{UsulKoreksi, "Usulkan koreksi pembukuan", "Berlaku setelah pemilik usaha menyetujui"},
+	{CatatanKonsultan, "Tulis catatan konsultan", "Catatan pada laporan klien; klien menandai sudah diperbaiki"},
 	{Langganan, "Atur langganan klien", "Perpanjang trial, aktifkan paket manual"},
 	{COATemplate, "Kelola template COA", "Draft, impor Excel, dan terbitkan versi template per jenis usaha"},
 	{Benchmark, "Kelola benchmark NPM nasional", "Impor versi data baru dan aktifkan"},
@@ -68,6 +75,7 @@ var DaftarIzin = []IzinInfo{
 	{PenggunaReset, "Reset password pengguna klien", "Membuat password sementara; semua sesi pengguna berakhir"},
 	{HapusPermanen, "Hapus permanen", "Usaha, pengguna, dan anggota tim yang sudah dinonaktifkan/diarsipkan; tidak bisa dibatalkan"},
 	{Tim, "Kelola tim & akses", "Tambah anggota, role, dan penugasan klien"},
+	{Pengaturan, "Ubah pengaturan semua klien", "Frekuensi pengingat catatan konsultan"},
 	{Audit, "Lihat audit log", ""},
 }
 
@@ -93,7 +101,7 @@ func DefaultRoles() []Role {
 	}
 	return []Role{
 		{ID: RoleMaster, Nama: "Master", Kunci: true, Izin: semua},
-		{ID: "konsultan", Nama: "Konsultan", Izin: []Izin{KlienLihat, Tiket, LihatSebagai, UsulKoreksi, Artikel}},
+		{ID: "konsultan", Nama: "Konsultan", Izin: []Izin{KlienLihat, Tiket, LihatSebagai, UsulKoreksi, CatatanKonsultan, Artikel}},
 		{ID: "cs", Nama: "CS / Support", Izin: []Izin{KlienLihat, Tiket}},
 	}
 }
@@ -123,6 +131,16 @@ type State struct {
 	Anggota     []Anggota `json:"anggota"`
 	Audit       []Catatan `json:"audit"`
 	NextAuditID int       `json:"next_audit_id"`
+	// Pengingat: aturan pengingat catatan konsultan untuk semua klien; nil = bawaan.
+	Pengingat *finance.Pengingat `json:"pengingat,omitempty"`
+}
+
+// AturanPengingat: pengingat yang berlaku (bawaan bila belum pernah diatur).
+func (s State) AturanPengingat() finance.Pengingat {
+	if s.Pengingat == nil {
+		return finance.PengingatBawaan()
+	}
+	return *s.Pengingat
 }
 
 func NewState() State { return State{Roles: DefaultRoles(), NextAuditID: 1} }
@@ -130,6 +148,11 @@ func NewState() State { return State{Roles: DefaultRoles(), NextAuditID: 1} }
 // Clone: salinan dalam supaya perubahan bisa dibatalkan bila penyimpanan gagal.
 func (s State) Clone() State {
 	c := State{Roles: slices.Clone(s.Roles), Anggota: slices.Clone(s.Anggota), Audit: slices.Clone(s.Audit), NextAuditID: s.NextAuditID}
+	if s.Pengingat != nil {
+		p := *s.Pengingat
+		p.Kanal = slices.Clone(p.Kanal)
+		c.Pengingat = &p
+	}
 	for i := range c.Roles {
 		c.Roles[i].Izin = slices.Clone(c.Roles[i].Izin)
 	}

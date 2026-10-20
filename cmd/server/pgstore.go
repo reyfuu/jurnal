@@ -91,6 +91,7 @@ type tenantRow struct {
 	NextProdukID   int       `json:"next_produk_id"`
 	NextSupplierID int       `json:"next_supplier_id"`
 	NextKoreksiID  int       `json:"next_koreksi_id"`
+	NextCatatanID  int       `json:"next_catatan_id"`
 	CoaTemplate    int       `json:"coa_template"`
 	TrialSampai    time.Time `json:"trial_sampai,omitzero"`
 	AktifSampai    time.Time `json:"aktif_sampai,omitzero"`
@@ -144,7 +145,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		return err
 	}
 	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
-		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
+		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.NextCatatanID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
 		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan, st.Arsip, st.ArsipAlasan}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
@@ -166,6 +167,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		{"produk_bahan", bahan},
 		{"supplier", st.Supplier},
 		{"koreksi", st.Koreksi},
+		{"catatan_konsultan", st.Catatan},
 		{"billing_orders", l.Orders},
 	} {
 		if err := insertRows(tx, r.table, t.id, r.rows); err != nil {
@@ -223,8 +225,14 @@ func saveMasterDB(db *sql.DB, st master.State, auditBaru []master.Catatan) error
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM mp_roles; DELETE FROM mp_anggota`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM mp_roles; DELETE FROM mp_anggota; DELETE FROM mp_pengaturan`); err != nil {
 		return err
+	}
+	if st.Pengingat != nil {
+		b, _ := json.Marshal(st.Pengingat)
+		if _, err := tx.Exec(`INSERT INTO mp_pengaturan (kunci, isi) VALUES ('pengingat', $1)`, string(b)); err != nil {
+			return err
+		}
 	}
 	for _, r := range []struct {
 		table string
@@ -254,6 +262,13 @@ func loadMasterDB(db *sql.DB) (master.State, error) {
 	}
 	if len(roles) > 0 { // DB lama tanpa tim: role bawaan
 		st.Roles = roles
+	}
+	var p finance.Pengingat
+	if err := selectJSON(db, &p, `SELECT (SELECT isi FROM mp_pengaturan WHERE kunci = 'pengingat')`); err != nil {
+		return st, err
+	}
+	if p.IntervalHari > 0 {
+		st.Pengingat = &p
 	}
 	for _, c := range st.Audit {
 		st.NextAuditID = max(st.NextAuditID, c.ID+1)
@@ -406,7 +421,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
 		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
-		NextKoreksiID: row.NextKoreksiID, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
+		NextKoreksiID: row.NextKoreksiID, NextCatatanID: row.NextCatatanID, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai,
 			EksporPertama: row.EksporPertama, GaransiDiklaim: row.GaransiDiklaim, GaransiAlasan: row.GaransiAlasan}}
 	var items []invoiceItemRow
@@ -426,6 +441,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 		{&bahan, rowsOf("produk_bahan", "produk_id, no")},
 		{&st.Supplier, rowsOf("supplier", "id")},
 		{&st.Koreksi, rowsOf("koreksi", "id")},
+		{&st.Catatan, rowsOf("catatan_konsultan", "id")},
 		{&st.Langganan.Orders, rowsOf("billing_orders", "waktu, id")},
 	} {
 		if err := selectJSON(db, q.dst, q.query, t.id); err != nil {
