@@ -143,7 +143,7 @@ export function SimulasiHarga({ period }: { period: string }) {
   ]
   const be = res?.break_even
   const results = res ? [
-    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: 'var(--text-warn)' },
+    { label: 'Harga Jual Rekomendasi di Aplikasi', value: formatRp(res.recommended_price), color: 'var(--text-brand)' },
     { label: `Potongan Komisi Aplikasi (${feeShown}%)`, value: formatRp(res.channel_fee), color: 'var(--text-danger)' },
     { label: 'Uang Bersih Diterima (Take Home)', value: formatRp(res.net_take_home), color: 'var(--accent-green)' },
   ] : []
@@ -221,7 +221,7 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
         title="Pajak UMKM (PP 55 Tahun 2022)"
         subtitle="Kalkulasi PPh Final 0,5% & Pemantauan Kuota Bebas Pajak Rp500 Juta/Tahun (WP Orang Pribadi)"
       >
-        <span className="pill-status pill-amber">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500 jt)</span>
+        <span className="pill-status pill-brand">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500 jt)</span>
       </PageHeader>
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

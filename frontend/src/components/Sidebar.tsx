@@ -1,15 +1,8 @@
 import { LogOut } from 'lucide-react'
+import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { NAV } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
-
-export function BrandMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden>
-      <path d="M14 3L25 23H18.5L14 14.2L9.5 23H3L14 3Z" fill="#F5C428" />
-    </svg>
-  )
-}
 
 interface Props {
   me: Me
@@ -25,11 +18,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
     <aside className="sidebar dark">
       <div className="sidebar-main">
         <div className="sidebar-brand">
-          <BrandMark />
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Laporan Bisnis</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>by Master Pajak</div>
-          </div>
+          <Logo tinggi={24} />
         </div>
 
         <nav className="sidebar-nav">

@@ -18,7 +18,7 @@ function TrendChart({ points }: { points: SalesReport['trend'] }) {
     <svg viewBox={`0 0 ${TREND.w} ${TREND.h}`} style={{ width: '100%', height: 210, display: 'block', marginTop: 8 }} role="img" aria-label="Tren omzet penjualan">
       {bars.map((b, i) => (
         <g key={points[i].label}>
-          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={2} fill="var(--accent-amber)">
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={2} fill="var(--chart-1)">
             <title>{`${points[i].label}: ${formatRp(points[i].omzet)} (${points[i].count} transaksi)`}</title>
           </rect>
           {i % step === 0 && (
@@ -45,7 +45,7 @@ function BarList({ title, rows }: { title: string; rows: { name: string; value: 
               <span className="tabular" style={{ flexShrink: 0 }}>{formatRp(r.value)}</span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: 'color-mix(in srgb, var(--text-primary) 5%, transparent)', marginTop: 4 }}>
-              <div style={{ height: 6, borderRadius: 3, background: 'var(--accent-amber)', width: `${(r.value / max) * 100}%` }} />
+              <div style={{ height: 6, borderRadius: 3, background: 'var(--chart-1)', width: `${(r.value / max) * 100}%` }} />
             </div>
             <div className="kpi-meta-row" style={{ marginBottom: 0, marginTop: 3 }}>{r.meta}</div>
           </div>

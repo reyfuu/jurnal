@@ -1,6 +1,6 @@
 # DESIGN.md — Design Brief & Design System Specification
-**Produk**: Laporan Bisnis by Master Pajak  
-**Aesthetic Persona**: *Navy & Gold* (latar brand navy, permukaan laporan netral gelap)
+**Produk**: Master Pajak (PT Master Pajak Indonesia)  
+**Brand**: Brand Guideline Master Pajak v1.0, lihat §2. Tagline: *Jualan lancar, pajak beres.*
 **Component Stack**: `shadcn/ui` + `Kokonut UI` + `21st.dev` + Tailwind CSS  
 **Guardrails**: `antislop` · `taste` · `impeccable` · `ui ux pro max` · `ponytail`
 
@@ -9,7 +9,7 @@
 ## 1. Executive Design Brief (Dari Gambar Referensi)
 
 ### 1.1 Esensi Visual & Mood
-Desain **Laporan Bisnis by Master Pajak** memadukan ketenangan visual *dark-mode* kelas eksekutif (seperti Linear / Mercury / Stripe Dark) dengan kehangatan aksen **Warm Gold / Amber (`#EAB308`)** khas identitas Master Pajak. Alih-alih menampilkan tabel akuntansi padat yang mengintimidasi pemilik UMKM, antarmuka ini menerjemahkan ribuan transaksi (`4.425 transaksi`) menjadi **satu layar cerita visual yang langsung menjawab 3 pertanyaan pemilik bisnis dalam 5 detik**:
+Desain **Master Pajak** memakai permukaan terang dan netral dengan biru DJP sebagai warna brand dan satu aksen kuning per layar (§2). Alih-alih menampilkan tabel akuntansi padat yang mengintimidasi pemilik UMKM, antarmuka ini menerjemahkan ribuan transaksi (`4.425 transaksi`) menjadi **satu layar cerita visual yang langsung menjawab 3 pertanyaan pemilik bisnis dalam 5 detik**:
 1. *"Apakah bisnis saya untung dan mencapai target bulan ini?"* → Dijawab oleh **Omzet (`Rp92 jt`)**, **Laba bersih (`Rp25 jt`)**, **Margin (`27%`)**, dan **Target omzet (`108%`)**.
 2. *"Kemana perginya uang kas saya?"* → Dijawab oleh **Saldo kas & bank (`Rp97 jt`)**, grafik **Saldo kas per bulan**, serta kartu **Omzet per channel (`Potongan aplikasi bulan ini Rp4,6 jt`)**.
 3. *"Siapa yang belum bayar tagihan dan apa yang harus segera ditagih?"* → Dijawab oleh kartu **Piutang belum tertagih (`Rp11 jt`)** dengan highlight merah menyala **`Rp9,6 jt lewat 30 hari`**.
@@ -21,74 +21,84 @@ Desain **Laporan Bisnis by Master Pajak** memadukan ketenangan visual *dark-mode
 
 ---
 
-## 2. Color System & Design Tokens
+## 2. Brand, Warna & Design Tokens
 
-**Keputusan brand — 19 Oktober 2026:** warna utama adalah **navy `#222852`**, dipilih pengguna untuk membangun asosiasi dengan perpajakan/DJP. Ini keputusan warna produk Laporan Bisnis by Master Pajak; monogram A dan nama produk tetap menjadi identitasnya. Kedua kode yang diberikan pengguna sama, sehingga aksen emas yang sudah ada (`#F5C428` / `#EAB308`) dipertahankan.
+**Sumber kebenaran: Brand Guideline Master Pajak v1.0 (Oktober 2026)**, salinan di [`docs/brand/Brand Guideline Master Pajak v1.0.pdf`](docs/brand/Brand%20Guideline%20Master%20Pajak%20v1.0.pdf). Bila dokumen ini berbeda dengan PDF, ikuti PDF. Brand sementara 19 Oktober 2026 (navy `#222852`, emas `#F5C428`, logo segitiga "A", nama "Laporan Bisnis by Master Pajak") sudah tidak berlaku.
 
-Navy dipakai solid pada latar login/onboarding, sidebar, favicon, dan warna tema browser. Logo, CTA, pilihan aktif, serta progres memakai emas. Teks CTA emas menggunakan navy. Kartu dan area laporan memakai permukaan netral di bawah ini; warna laba, kas, dan peringatan mengikuti makna finansialnya. Teks sidebar memakai `#BFC5D8` (sekunder) dan `#AAB1CA` (muted) agar terbaca di atas navy.
+### 2.1 Logo
+- Logo = monogram **M dua warna** (kiri biru, kanan kuning, bertemu di lembah) + wordmark **`masterpajak`** Rubik Bold. Komponen: `frontend/src/components/Logo.tsx` (`<Logo tinggi={24} />`, `<Monogram />`). Konstruksi SVG mengikuti hlm. 8 (grid 100, tebal garis 13, ujung membulat).
+- Warna logo dari token: `--ink` (master + kaki kiri) dan `--logo-pajak` (pajak). Di `:root` = versi **utama** (navy 700 + royal 600); di dalam `.dark` = versi **reverse** (putih + kuning). Jadi logo di sidebar, panel login/onboarding, dan header AI otomatis reverse.
+- Monogram sendiri hanya untuk ikon aplikasi, favicon (`frontend/public/favicon.svg`), dan avatar (header AI). Materi publik selalu monogram + wordmark.
+- Tinggi minimum 24 px di layar. Jangan ubah proporsi, warna, font wordmark, atau menambah efek. Jangan pasang versi utama di latar kuning (bagian kuning hilang).
+- Nama produk di UI: wordmark `masterpajak`; dalam kalimat ditulis "Master Pajak". "Laporan Bisnis" tidak lagi dipakai sebagai nama produk (tetap boleh sebagai nama laporan, misalnya "Ringkasan Laporan Bisnis" di jawaban AI).
+- Footer landing wajib memuat: aplikasi independen milik PT Master Pajak Indonesia, tidak berafiliasi dengan DJP, pelaporan tetap melalui Coretax DJP (warna inti diambil dari logo DJP).
 
-### 2.1 Surface & Background Hierarchy
-| Token | Hex / Nilai CSS | Penggunaan pada Gambar Referensi |
+### 2.2 Palet (hlm. 13–14)
+Skala mentah didefinisikan sekali di `:root` (`frontend/src/index.css`), komponen memakai token semantik di 2.3.
+
+| Skala | Nilai |
+|---|---|
+| `--navy-*` | 50 `#EEF0F7` · 100 `#DDE1EE` · 200 `#B9C0DA` · 300 `#8E99C2` · 500 `#3A4889` · 600 `#26367A` (Biru Royal) · 700 `#212C5F` (Biru DJP) · 800 `#1A234B` · 900 `#131B40` (Biru Tegas) |
+| `--yellow-*` | 50 `#FFFBE6` · 100 `#FFF4C2` · 300 `#FFE466` · 500 `#FED111` (Kuning) · 600 `#E7B220` (Emas) · 700 `#B7860F` |
+| `--neutral-*` | 0 `#FFFFFF` · 50 `#F6F7FB` (Awan) · 100 `#EDEFF5` · 200 `#E1E5EE` · 400 `#98A1B5` · 600 `#5B6478` (Abu Biru) · 900 `#161D3A` (Teks) |
+| Semantik | `--success #2E9B5B` · `--warning #D9822B` · `--error #D64545` · `--info #2F6FD6` |
+
+Proporsi: 60% netral & putih, 30% biru, 7% teks, **kuning maksimal 3%**: satu titik, garis, sorotan, atau satu CTA berbayar per layar. Kuning tidak pernah menjadi teks di latar terang (kontras 1,5).
+
+### 2.3 Token semantik
+**Tema terang adalah default** (Brand Guideline: 60% netral). Kelas `.dark` di `<html>` dipasang hanya bila pengguna memilih gelap (`localStorage.tema === 'gelap'`, lihat `lib/theme.ts`). Mode gelap tidak ada di PDF; nilainya diturunkan dari skala navy.
+
+| Token | Terang | Gelap |
 |---|---|---|
-| `--bg-canvas` | `#090A0C` | Background paling luar (halaman landing & area di luar frame aplikasi). |
-| `--bg-ambient-glow` | `radial-gradient(ellipse at top, rgba(234,179,8,0.08), transparent 65%)` | Pendar hangat tipis di belakang frame aplikasi bagian atas. |
-| `--bg-app-shell` | `#0F1115` | Kanvas utama area kerja Dashboard di sebelah kanan sidebar. |
-| `--bg-sidebar` | `var(--brand-navy)` / `#222852` | Latar belakang sidebar navigasi kiri. |
-| `--bg-card` | `#161920` | Permukaan seluruh kartu KPI dan kartu grafik. |
-| `--bg-card-elevated` | `#1B1F27` | Permukaan dropdown pemilih bulan (`Agustus 2026`), pill profil tenant (`Kedai Kopi Senja`), dan hover state. |
-| `--border-hairline` | `rgba(255, 255, 255, 0.06)` (`#1F232B`) | Garis tepi `1px` pada seluruh kartu KPI, grafik, dan pemisah sidebar. |
-| `--border-frame` | `rgba(255, 255, 255, 0.10)` | Bingkai luar kontainer aplikasi (`border-radius: 20px`). |
-
-### 2.2 Brand & Semantic Financial Colors
-| Token | Hex | Peran Semantik |
-|---|---|---|
-| `--brand-navy` | `#222852` | Warna brand utama: login, onboarding, sidebar, favicon, serta teks tombol emas. |
-| `--brand-gold` | `#F5C428` / `#EAB308` | Logo segitiga **A**, tombol CTA utama `Beli Rp149.000`, kurva & sparkline **Omzet**, bar **Di atas target**. |
-| `--brand-gold-muted` | `#785C12` / `rgba(234, 179, 8, 0.35)` | Bar omzet harian **Di bawah target**, fill area bawah kurva Omzet. |
-| `--brand-gold-pill` | `rgba(234, 179, 8, 0.14)` | Latar belakang menu sidebar aktif (`Dashboard`) dengan teks `#FACC15`. |
-| `--finance-profit` | `#10B981` (Emerald) | Kurva & sparkline **Laba bersih**, progress bar **Target omzet (`108%`)**, teks `+1,7 poin`. |
-| `--finance-profit-pill`| `rgba(16, 185, 129, 0.15)` | Latar badge pertumbuhan positif (`▲ 4%`, `▲ 11%`, `▲ 21%`) dengan teks `#34D399`. |
-| `--finance-cost` | `#D97706` (Warm Orange/Amber) | Kurva tengah **Total biaya** pada grafik 11 bulan terakhir. |
-| `--finance-cash` | `#38BDF8` (Sky Blue) | Sparkline **Saldo kas & bank** dan kurva area **Kas akhir bulan**. |
-| `--finance-danger` | `#F43F5E` (Rose Red) | Teks peringatan jatuh tempo **`Rp9,6 jt lewat 30 hari`** pada kartu Piutang. |
-
-### 2.3 Text Hierarchy
-| Level | Hex | Penggunaan |
-|---|---|---|
-| `--text-primary` | `#F4F5F7` | Judul `Dashboard`, angka KPI (`Rp92 jt`, `27%`, `108%`), judul grafik, link aktif `Masuk`. |
-| `--text-secondary` | `#949BA6` | Subjudul halaman, nama metrik (`Omzet`, `Laba bersih`), item menu sidebar inaktif, nav link atas. |
-| `--text-muted` | `#5E6572` | Label grup sidebar (`RINGKASAN`, `LAPORAN`, dll.), label sumbu X/Y grafik (`Okt 25`, `25 jt`), teks `vs bulan lalu`, `Data contoh tidak disimpan`. |
-
-### 2.4 Tema Terang (Oktober 2026)
-Tabel di atas adalah tema **gelap** (default, kelas `.dark` di `<html>`). Tema **terang** dipilih lewat tombol matahari/bulan di sidebar dan header onboarding, disimpan di `localStorage` (`tema`). Nilainya ada di `:root` pada `frontend/src/index.css`; tokennya sama, nilainya:
-
-| Token | Gelap | Terang |
-|---|---|---|
-| `--bg-outer` / `--bg-shell` / `--bg-card` | `#090A0C` / `#0F1115` / `#15181E` | `#EEF0F4` / `#F7F8FA` / `#FFFFFF` |
-| `--bg-raised` / `--bg-input` / `--border-strong` | `#101318` / `#0D0F13` / `#262C38` | `#F1F3F6` / `#FFFFFF` / `#D1D5DB` |
-| `--text-primary` / `--text-secondary` / `--text-muted` | `#F4F5F7` / `#949BA6` / `#616875` | `#111827` / `#4B5563` / `#6B7280` |
-| `--accent-amber` / `--accent-green` / `--accent-blue` | `#EAB308` / `#10B981` / `#38BDF8` | `#CA8A04` / `#059669` / `#0284C7` |
-| `--text-profit` / `--text-danger` / `--text-warn` | `#34D399` / `#FB7185` / `#FACC15` | `#047857` / `#BE123C` / `#A16207` |
+| `--bg-shell` / `--bg-outer` | neutral 50 / neutral 50 | navy 900 / `#0E1430` |
+| `--bg-card` / `--bg-card-hover` / `--bg-raised` | putih / navy 50 / neutral 100 | navy 800 / navy 700 / `#161F47` |
+| `--bg-sidebar` | navy 700 | `#0E1430` |
+| `--border-subtle` / `--border-shell` / `--border-strong` | neutral 200 / `#D3D8E4` / navy 200 | putih 8% / putih 12% / navy 500 |
+| `--text-primary` / `--text-secondary` / `--text-muted` | `#161D3A` / `#5B6478` / `#687084` | neutral 50 / navy 200 / navy 300 |
+| `--primary` / `--primary-hover` / `--primary-foreground` | navy 700 / navy 900 / putih | kuning 500 / kuning 600 / navy 900 |
+| `--ink` / `--link` / `--text-brand` | navy 700 / navy 600 / navy 600 | putih / navy 200 / kuning 500 |
+| `--chart-1` (omzet) / `--chart-1-dim` | navy 600 / navy 200 | navy 200 / navy 500 |
+| `--chart-2` biaya / `--chart-3` laba / `--chart-4` kas | warning / success / info | versi lebih terang |
+| `--text-profit` / `--text-danger` / `--text-warn` / `--text-info` | `#217A47` / `#B83232` / `#9A5A14` / `#2558B0` | `#6FD49A` / `#FF9090` / `#F5B86E` / `#9CBDF5` |
+| `--ring` | kuning 500 (fokus, hlm. 22) | kuning 500 |
+| `--shadow-1` / `-2` / `-3` | kartu & input / dropdown / modal (hlm. 20) | sama, lebih pekat |
 
 Aturan:
-- Jangan menulis hex di komponen; pakai token (`var(--text-profit)`, dst.). Tint putih transparan ditulis `color-mix(in srgb, var(--text-primary) N%, transparent)` agar ikut tema.
-- Sidebar navy, Landing, header login/onboarding, dan gelembung AI selalu gelap (diberi kelas `dark`) karena berlatar navy.
+- Jangan menulis hex atau kelas palet Tailwind (`bg-slate-*`, `text-emerald-*`) di komponen; pakai token. Pengecualian: `favicon.svg`.
+- `--text-warn` / `.pill-amber` hanya untuk peringatan sungguhan (lewat jatuh tempo, stok menipis, belum lunas, neraca tidak seimbang). Sorotan brand (angka omzet, hasil pajak, periode, peran Owner, "Bentuk usaha Anda") memakai `--text-brand` / `.pill-brand`.
+- Badge status (hlm. 23): `.pill-green` (Cocok/Lunas), `.pill-amber` (Selisih/peringatan), `.pill-red` (Kurang bayar/terlambat), `.pill-status-muted` (Draf), `.pill-brand` (penanda netral).
+- Pulau gelap: sidebar, panel login/onboarding, kartu sorotan navy, dan header AI diberi kelas `dark` karena berlatar navy di kedua tema.
+- Tanpa gradasi, bayangan tebal, atau efek 3D (hlm. 18). Isi area grafik datar dengan opasitas rendah.
+
+### 2.4 Komponen (hlm. 22–24)
+- **Tombol** (`ui/button.tsx`): `default` = primer (satu per layar), `outline` = sekunder bergaris `--ink`, `ghost` = teks, `accent` = kuning **hanya untuk ajakan berbayar/promosi** (bayar paket, aktifkan langganan, CTA daftar di band navy). Tinggi `sm` 32 · `default` 40 · `lg` 48, radius 10, fokus ring kuning 2 px + offset 2.
+- `.btn-cta` = tombol primer lama (navy/kuning sesuai tema); `.btn-cta.accent` = kuning berbayar.
+- **Input/Select/Combobox**: tinggi 40, radius 10, fokus border `--primary` + halo `--primary` 25%.
+- **Kartu**: radius 16, border `--border-subtle`, `--shadow-1`. Dialog radius 16, `--shadow-3`, overlay navy 900 45%.
+- **Navigasi**: item aktif sidebar = kotak navy pekat + teks putih; tab aktif = garis bawah `--primary`; segmented aktif = chip `--primary` terisi.
 
 ---
 
-## 3. Typography & Numeric Rules
+## 3. Tipografi (hlm. 15–16)
 
-1. **Primary UI & Display Font**: **`Plus Jakarta Sans`** (atau **`Inter`**)
-   - Karakter huruf geometris modern yang sangat bersih pada latar gelap dan memiliki keterbacaan angka tinggi untuk nominal Rupiah.
-2. **Sub-Brand Monospace Font**: **`JetBrains Mono`** (atau **`Geist Mono`**)
-   - Digunakan khusus pada teks `by Master Pajak` di bawah logo **Laporan Bisnis** dengan `letter-spacing: 0.06em`.
-3. **Skala Tipografi (Type Scale)**:
-   - **Page Title (`Dashboard`)**: `24px` (`1.5rem`), `font-weight: 700`, `letter-spacing: -0.025em`.
-   - **KPI Hero Value (`Rp92 jt`, `108%`)**: `26px–28px`, `font-weight: 800`, `letter-spacing: -0.03em`, **`font-variant-numeric: tabular-nums`**.
-   - **Card / Chart Header (`Omzet, biaya, dan laba`)**: `15px`, `font-weight: 700`, `letter-spacing: -0.01em`.
-   - **Sidebar Menu Item**: `13px`, `font-weight: 500` (inaktif) / `600` (aktif).
-   - **Subtitle & Card Label**: `11.5px–12.5px`, `font-weight: 500`, color `--text-secondary`.
-   - **Sidebar Group Header (`RINGKASAN`, `OPERASIONAL`)**: `10px`, `font-weight: 700`, `text-transform: uppercase`, `letter-spacing: 0.09em`, color `--text-muted`.
+1. **Rubik** (500, 700): display, judul halaman, `h1`/`h2`, judul kartu/dialog (`font-heading`), wordmark. Token `--font-heading`.
+2. **Public Sans** (400–800): teks, antarmuka, tabel, dan semua angka. Token `--font-sans`. Cadangan: Segoe UI, Roboto, Arial. Dimuat dari Google Fonts di `frontend/index.html`.
+3. Skala:
+   - **display** Rubik Bold 48/56 (hero landing; 40/48 di ponsel).
+   - **h1 / judul halaman** (`.workspace-title`) Rubik Bold 32/40; 24/32 di layar < 760 px.
+   - **h2** Rubik Medium/Bold 24/32.
+   - **h3 / judul kartu** (`.chart-title`) Public Sans Bold 15–18.
+   - **body** Public Sans 16/24 (antarmuka padat 13–14).
+   - **caption** Public Sans 13/18.
+   - **label** (`.label-caps`, header tabel, label grup sidebar) Public Sans Bold 12, spasi 8%, kapital.
+   - **angka** (`.kpi-value`, nominal tabel) Public Sans Bold, **`font-variant-numeric: tabular-nums`**.
+4. Kode inline memakai monospace sistem (`--font-mono`); JetBrains Mono dan Plus Jakarta Sans tidak dipakai lagi.
+
+### 3.1 Tone of voice (hlm. 5–6)
+- Sapaan "kamu/Anda" yang lugas, angka konkret, satu tindakan jelas. Contoh: "Omzet kamu Rp4,3 M. Sisa Rp500 jt sebelum wajib jadi PKP."
+- Kata yang dipakai: beres, rapi, cocok, aman, hemat, didampingi, otomatis.
+- Hindari: sanksi/denda di judul, jargon AI, istilah tanpa penjelasan, kalimat menakut-nakuti ("Awas, salah hitung bisa langsung kena SP2DK!"), bahasa sistem ("Sistem mendeteksi anomali data pada entitas Anda").
+- Jangan menjanjikan bebas pajak atau bebas pemeriksaan.
 
 ---
 
@@ -99,7 +109,7 @@ flowchart TD
     TopNav["1. Top Marketing Header (Height: 64px)\nLogo Kiri | Nav: Fitur · Cara kerja · Keamanan data · Harga | Ghost: Masuk | Pill CTA: Beli Rp149.000"]
     subgraph AppFrame["2. Framed Application Showcase (Max-Width: 1360px, Border-Radius: 20px)"]
         direction LR
-        Sidebar["Left Sidebar (Width: 232px)\n- Logo Laporan Bisnis\n- 5 Grup Navigasi (12 Menu)\n- Footer: KK Kedai Kopi Senja"]
+        Sidebar["Left Sidebar (Width: 232px)\n- Logo masterpajak (reverse)\n- 5 Grup Navigasi (12 Menu)\n- Footer: KK Kedai Kopi Senja"]
         subgraph MainContent["Dashboard Workspace (Padding: 26px 28px)"]
             HeaderRow["Header Row: 'Dashboard' + Subjudul | Period Selector Pill ('Agustus 2026')"]
             KPIRow["Row 1: 6-Column Equal KPI Grid (Gap: 12px)\n[Omzet] [Laba bersih] [Margin laba] [Saldo kas & bank] [Target omzet] [Piutang belum tertagih]"]
@@ -118,45 +128,41 @@ flowchart TD
 ## 5. Spesifikasi Komponen Detail (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
 ### 5.1 Top Marketing Bar
-- **Kiri**: Ikon monogram segitiga emas (`#F5C428`) + teks vertikal **Laporan Bisnis** (`16px Bold`) dan `by Master Pajak` (`11px Monospace Muted`).
-- **Kanan**:
-  - 4 tautan teks (`Fitur`, `Cara kerja`, `Keamanan data`, `Harga`) — `14px`, `#949BA6`.
-  - Tombol `Masuk` — `border-radius: 9999px`, `border: 1px solid rgba(255,255,255,0.14)`, background `#121418`, padding `9px 22px`.
-  - Tombol CTA `Beli Rp149.000` — `border-radius: 9999px`, background `#F5C428`, teks navy `#222852` (`font-weight: 700`), padding `10px 24px`.
+Mengikuti mockup hlm. 25 (`views/Landing.tsx`): header putih, `<Logo tinggi={26} />` kiri, tautan `Fitur` · `Harga` · `FAQ` (`--text-secondary`), tombol sekunder `Masuk` + primer `Daftar sekarang`. Hero berlatar Awan dengan chip, headline tagline, setengah lingkaran navy 50, dan satu titik kuning di sudut screenshot. Band CTA penutup navy dengan tombol `accent`.
 
 ### 5.2 Sidebar Navigasi (5 Grup, 12 Menu)
 - **Lebar Tetap**: `232px`, `border-right: 1px solid rgba(255,255,255,0.06)`.
 - **Struktur Menu & Ikon (Lucide Icons `15px`, stroke `1.75px`)**:
-  1. `RINGKASAN`: `LayoutGrid` **Dashboard** (Active state: background `rgba(234,179,8,0.14)`, teks & ikon `#FACC15`, radius `9px`).
+  1. `RINGKASAN`: `LayoutGrid` **Dashboard** (aktif: kotak navy 900 70% di atas navy 700, teks putih, radius 10).
   2. `LAPORAN`: `FileText` **Laporan Keuangan**, `WalletCards` **Arus Kas**.
   3. `OPERASIONAL`: `ArrowLeftRight` **Transaksi**, `FileSpreadsheet` **Piutang & Utang**, `Package` **Stok & Gudang**, `Factory` **Produksi & Supplier**.
   4. `ALAT`: `Receipt` **Invoice**, `SlidersHorizontal` **Simulasi & Harga**, `ShieldCheck` **Pajak UMKM**.
   5. `PENGATURAN`: `Database` **Master Data**, `BookOpen` **Panduan**.
 - **Sidebar Footer (Tenant Switcher)**:
-  - Kartu berbingkai halus (`border-radius: 12px`, padding `9px 10px`) berisi lingkaran inisial `KK` (latar emas transparan `rgba(234,179,8,0.2)`, teks `#FACC15`), nama bisnis **`Kedai Kopi Senja`**, subteks **`FnB · 4.425 transaksi`**, dan footnote di luar kartu: `Data contoh tidak disimpan`.
+  - Kartu berbingkai halus (`border-radius: 10px`, padding `9px 10px`) berisi lingkaran inisial `KK` (titik kuning 500, teks navy 900), nama bisnis **`Kedai Kopi Senja`**, subteks **`FnB · 4.425 transaksi`**, dan footnote di luar kartu: `Data contoh tidak disimpan`.
 
 ### 5.3 Enam Kartu KPI (Baris 1)
-Seluruh kartu memiliki `border-radius: 14px`, `padding: 15px 16px`, `background: #161920`, dan `border: 1px solid rgba(255,255,255,0.06)`:
-1. **Kartu 1 (`Omzet`)**:Nilai `Rp92 jt` | Pill hijau `▲ 4%` + `vs bulan lalu` | Sparkline SVG kuning `#EAB308` menanjak halus.
-2. **Kartu 2 (`Laba bersih`)**: Nilai `Rp25 jt` | Pill hijau `▲ 11%` + `vs bulan lalu` | Sparkline SVG hijau `#10B981` dengan lembah di tengah (Maret) lalu naik.
-3. **Kartu 3 (`Margin laba`)**: Nilai `27%` | Teks hijau tanpa pill `+1,7 poin` + `vs bulan lalu` | Sparkline SVG kuning-emas `#D4A338`.
-4. **Kartu 4 (`Saldo kas & bank`)**: Nilai `Rp97 jt` | Pill hijau `▲ 21%` + baris baru `sejak awal bulan` | Sparkline SVG biru `#38BDF8` menanjak di ujung kanan.
+Seluruh kartu memakai `.card` (radius 16, padding 16, `--bg-card`, border `--border-subtle`, `--shadow-1`). Warna seri: omzet & margin `--chart-1`, laba `--chart-3`, kas `--chart-4`, progres target `--accent-green`. Warna hex di bawah adalah catatan referensi lama:
+1. **Kartu 1 (`Omzet`)**:Nilai `Rp92 jt` | Pill hijau `▲ 4%` + `vs bulan lalu` | Sparkline `--chart-1` menanjak halus.
+2. **Kartu 2 (`Laba bersih`)**: Nilai `Rp25 jt` | Pill hijau `▲ 11%` + `vs bulan lalu` | Sparkline `--chart-3` dengan lembah di tengah (Maret) lalu naik.
+3. **Kartu 3 (`Margin laba`)**: Nilai `27%` | Teks hijau tanpa pill `+1,7 poin` + `vs bulan lalu` | Sparkline `--chart-1`.
+4. **Kartu 4 (`Saldo kas & bank`)**: Nilai `Rp97 jt` | Pill hijau `▲ 21%` + baris baru `sejak awal bulan` | Sparkline `--chart-4` menanjak di ujung kanan.
 5. **Kartu 5 (`Target omzet`)**: Nilai `108%` | Subteks `Lebih Rp6,8 jt` | Progress bar horizontal penuh berwarna hijau `#22C55E` (`height: 6px`, `border-radius: 999px`).
 6. **Kartu 6 (`Piutang belum tertagih`)**: Nilai `Rp11 jt` | Baris 1: `10 tagihan` (`#949BA6`) | Baris 2: **`Rp9,6 jt lewat 30 hari`** (`#F43F5E` merah terang) | Baris 3: `Utang belum dibayar Rp7,4 jt` (`#5E6572`).
 
 ### 5.4 Tiga Grafik Tengah (Baris 2)
 1. **Grafik Kiri — `Omzet, biaya, dan laba` (`11 bulan terakhir`)**:
-   - **Legenda Horizontal**: `● Omzet` (`#EAB308`), `● Total biaya` (`#D97706`), `● Laba bersih` (`#10B981`).
+   - **Legenda Horizontal**: `● Omzet` (`--chart-1`), `● Total biaya` (`--chart-2`), `● Laba bersih` (`--chart-3`).
    - **Sumbu Y**: `0`, `25 jt`, `50 jt`, `75 jt`, `100 jt` dengan garis bantu horizontal tipis.
    - **Sumbu X**: 11 titik bulan dari `Okt 25`, `Nov 25`, `Des 25`, `Jan 26`, `Feb 26`, `Mar 26`, `Apr 26`, `Mei 26`, `Jun 26`, `Jul 26`, hingga `Agu 26`.
-   - **Visual**: Kurva spline mulus (*monotone cubic interpolation*) dengan gradien vertikal lembut di bawah kurva Omzet (kuning ke transparan) dan Laba bersih (hijau ke transparan), serta titik bulat (`r=3.5`) pada ujung kanan (`Agu 26`).
+   - **Visual**: Kurva spline mulus (*monotone cubic interpolation*) dengan isi datar opasitas 8% di bawah kurva Omzet dan Laba bersih (tanpa gradasi), serta titik bulat (`r=3.5`) pada ujung kanan (`Agu 26`).
 2. **Grafik Kanan Atas — `Omzet harian Agustus 2026`**:
    - **Subjudul**: `Rata-rata Rp3 jt per hari.`
-   - **Legenda**: `● Di atas target` (`#EAB308`), `● Di bawah target` (`#785C12`), `— Target harian`.
+   - **Legenda**: `● Di atas target` (`--chart-1`), `● Di bawah target` (`--chart-1-dim`), `— Target harian`.
    - **Visual**: 31 batang vertikal (tanggal 1–31), garis putus-putus horizontal pada level `3 jt` dengan label `Target harian Rp3 jt`.
 3. **Grafik Kanan Bawah — `Saldo kas per bulan`**:
    - **Subjudul**: `Kas bisa turun walau laba positif: cek halaman Arus Kas.`
-   - **Legenda**: `● Kas akhir bulan` (`#38BDF8`).
+   - **Legenda**: `● Kas akhir bulan` (`--chart-4`).
    - **Visual**: Area chart biru langit dari `Okt 25` s/d `Agu 26` yang memperlihatkan penurunan kas di `Mar 26` lalu naik ke `Rp97 jt` di `Agu 26`.
 
 ### 5.5 Dua Kartu Bawah (Baris 3)
@@ -166,9 +172,9 @@ Seluruh kartu memiliki `border-radius: 14px`, `padding: 15px 16px`, `background:
 ---
 
 ## 6. Anti-Slop Checklist (`antislop` & `impeccable`)
-- ❌ **Dilarang** menggunakan gradien ungu/indigo/neon cyberpunk yang tidak ada di referensi.
+- ❌ **Dilarang** memakai gradasi, warna di luar palet §2.2 (ungu, emerald, teal, dsb.), atau kuning lebih dari satu sorotan per layar.
 - ❌ **Dilarang** menggunakan border putih tebal (`> 1px`) atau *drop shadow* berwarna terang pada kartu dalam.
 - ❌ **Dilarang** menampilkan angka panjang tak terformat di KPI utama (`Rp 92.000.000,00` → wajib disingkat `Rp92 jt` untuk KPI utama).
 - ❌ **Dilarang** memakai emoji di UI, jawaban AI Agent, laporan, dan ekspor. Pakai teks atau ikon `lucide-react` (dijaga oleh `TestAnswer_NoEmoji`).
-- ✅ **Wajib** mempertahankan kepadatan informasi (*information density*) tinggi yang tetap lega berkat kontras tipografi dan *negative space* gelap `#0F1115` / `#161920`.
+- ✅ **Wajib** mempertahankan kepadatan informasi tinggi yang tetap lega berkat kontras tipografi dan ruang kosong; ritme vertikal kelipatan 8 px, lebar konten maks. 1200 px, paragraf maks. 68 karakter (hlm. 21).
 

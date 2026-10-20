@@ -5,9 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-heading: 'Rubik', 'Segoe UI', Roboto, Arial, sans-serif;
+    --font-sans: 'Public Sans', 'Segoe UI', Roboto, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,81 +48,131 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Navy & Gold (DESIGN.md), dengan permukaan netral untuk data keuangan.
-   :root = tema terang; .dark = tema gelap (default, lihat lib/theme.ts). Sidebar, Landing dan
-   gelembung AI selalu memakai .dark sebagai "pulau gelap" ber-brand navy. */
+/* Brand Guideline Master Pajak v1.0 (docs/brand/). :root = tema terang (default, lihat lib/theme.ts);
+   .dark = tema gelap turunan palet. Sidebar dan panel brand login/onboarding selalu memakai .dark
+   sebagai "pulau gelap" navy. Skala mentah hanya di :root; komponen memakai variabel semantik. */
 :root {
+  /* skala (hlm. 14) */
+  --navy-50: #eef0f7; --navy-100: #dde1ee; --navy-200: #b9c0da; --navy-300: #8e99c2;
+  --navy-500: #3a4889; --navy-600: #26367a; --navy-700: #212c5f; --navy-800: #1a234b; --navy-900: #131b40;
+  --yellow-50: #fffbe6; --yellow-100: #fff4c2; --yellow-300: #ffe466;
+  --yellow-500: #fed111; --yellow-600: #e7b220; --yellow-700: #b7860f;
+  --neutral-0: #ffffff; --neutral-50: #f6f7fb; --neutral-100: #edeff5; --neutral-200: #e1e5ee;
+  --neutral-400: #98a1b5; --neutral-600: #5b6478; --neutral-900: #161d3a;
+  --success: #2e9b5b; --warning: #d9822b; --error: #d64545; --info: #2f6fd6;
+  /* elevasi (hlm. 20) */
+  --shadow-1: 0 1px 2px rgba(19, 27, 64, 0.08);
+  --shadow-2: 0 8px 24px rgba(19, 27, 64, 0.12);
+  --shadow-3: 0 16px 40px rgba(19, 27, 64, 0.16);
+
   color-scheme: light;
-  --brand-navy: #222852;
-  --bg-outer: #eef0f4;
-  --bg-shell: #f7f8fa;
-  --bg-sidebar: var(--brand-navy);
-  --bg-card: #ffffff;
-  --bg-card-hover: #f1f3f6;
-  --bg-raised: #f1f3f6;
-  --bg-input: #ffffff;
-  --border-subtle: rgba(17, 24, 39, 0.08);
-  --border-shell: rgba(17, 24, 39, 0.12);
-  --border-strong: #d1d5db;
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
-  --accent-amber: #ca8a04;
-  --accent-amber-bright: #eab308;
-  --accent-amber-dim: #f0d98a;
-  --accent-amber-soft: rgba(202, 138, 4, 0.12);
-  --accent-green: #059669;
-  --accent-green-soft: rgba(5, 150, 105, 0.12);
-  --accent-blue: #0284c7;
-  --accent-orange: #c2410c;
-  --accent-red: #e11d48;
-  --accent-red-soft: rgba(225, 29, 72, 0.1);
-  --accent-violet: #7c3aed;
-  --text-profit: #047857;
-  --text-danger: #be123c;
-  --text-warn: #a16207;
-  --text-info: #0369a1;
-  --text-violet: #6d28d9;
+  --brand-navy: var(--navy-700);
+  --bg-outer: var(--neutral-50);
+  --bg-shell: var(--neutral-50);
+  --bg-sidebar: var(--navy-700);
+  --bg-card: var(--neutral-0);
+  --bg-card-hover: var(--navy-50);
+  --bg-raised: var(--neutral-100);
+  --bg-input: var(--neutral-0);
+  --border-subtle: var(--neutral-200);
+  --border-shell: #d3d8e4;
+  --border-strong: var(--navy-200);
+  --text-primary: var(--neutral-900);
+  --text-secondary: var(--neutral-600);
+  --text-muted: #687084; /* ≥ 4,5:1 di atas putih dan Awan */
+  /* kuning: aksen saja (maks. 3% area), bukan teks di latar terang */
+  --accent-amber: var(--yellow-600);
+  --accent-amber-bright: var(--yellow-500);
+  --accent-amber-dim: var(--yellow-100);
+  --accent-amber-soft: rgba(231, 178, 32, 0.14);
+  --accent-green: var(--success);
+  --accent-green-soft: rgba(46, 155, 91, 0.12);
+  --accent-blue: var(--info);
+  --accent-orange: var(--warning);
+  --accent-orange-soft: rgba(217, 130, 43, 0.14);
+  --accent-red: var(--error);
+  --accent-red-soft: rgba(214, 69, 69, 0.1);
+  --accent-violet: var(--navy-500);
+  /* teks semantik digelapkan agar ≥ 4,5:1 di atas latar soft */
+  --text-profit: #217a47;
+  --text-danger: #b83232;
+  --text-warn: #9a5a14;
+  --text-info: #2558b0;
+  --text-violet: var(--navy-600);
+  /* seri grafik: omzet navy, biaya oranye, laba hijau, kas biru */
+  --chart-1: var(--navy-600);
+  --chart-1-dim: var(--navy-200);
+  --chart-2: var(--warning);
+  --chart-3: var(--success);
+  --chart-4: var(--info);
+  --chart-5: var(--yellow-500);
+
+  --primary: var(--navy-700);
+  --primary-hover: var(--navy-900);
+  --primary-foreground: var(--neutral-0);
+  /* tinta brand: logo utama (master biru + pajak royal, hlm. 9), tombol sekunder, tautan */
+  --ink: var(--navy-700);
+  --logo-pajak: var(--navy-600);
+  --link: var(--navy-600);
+  /* sorotan angka/label brand (bukan peringatan): royal di terang, kuning di gelap */
+  --text-brand: var(--navy-600);
 }
 
 .dark {
   color-scheme: dark;
-  --bg-outer: #090a0c;
-  --bg-shell: #0f1115;
-  --bg-card: #15181e;
-  --bg-card-hover: #191d24;
-  --bg-raised: #101318;
-  --bg-input: #0d0f13;
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-shell: rgba(255, 255, 255, 0.09);
-  --border-strong: #262c38;
-  --text-primary: #f4f5f7;
-  --text-secondary: #949ba6;
-  --text-muted: #616875;
-  --accent-amber: #eab308;
-  --accent-amber-bright: #f5c428;
-  --accent-amber-dim: #785c12;
-  --accent-amber-soft: rgba(234, 179, 8, 0.14);
-  --accent-green: #10b981;
-  --accent-green-soft: rgba(16, 185, 129, 0.14);
-  --accent-blue: #38bdf8;
-  --accent-orange: #d97706;
-  --accent-red: #f43f5e;
-  --accent-red-soft: rgba(244, 63, 94, 0.14);
-  --accent-violet: #a78bfa;
-  --text-profit: #34d399;
-  --text-danger: #fb7185;
-  --text-warn: #facc15;
-  --text-info: #7dd3fc;
-  --text-violet: #ddd6fe;
+  --bg-outer: #0e1430;
+  --bg-shell: var(--navy-900);
+  --bg-sidebar: #0e1430;
+  --bg-card: var(--navy-800);
+  --bg-card-hover: var(--navy-700);
+  --bg-raised: #161f47;
+  --bg-input: #10173a;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-shell: rgba(255, 255, 255, 0.12);
+  --border-strong: var(--navy-500);
+  --text-primary: var(--neutral-50);
+  --text-secondary: var(--navy-200);
+  --text-muted: var(--navy-300);
+  --accent-amber: var(--yellow-500);
+  --accent-amber-bright: var(--yellow-500);
+  --accent-amber-dim: rgba(254, 209, 17, 0.35);
+  --accent-amber-soft: rgba(254, 209, 17, 0.14);
+  --accent-green: #4fbf7f;
+  --accent-green-soft: rgba(79, 191, 127, 0.16);
+  --accent-blue: #6c9bea;
+  --accent-orange: #e9a05a;
+  --accent-orange-soft: rgba(233, 160, 90, 0.16);
+  --accent-red: #f07272;
+  --accent-red-soft: rgba(240, 114, 114, 0.16);
+  --accent-violet: var(--navy-300);
+  --text-profit: #6fd49a;
+  --text-danger: #ff9090;
+  --text-warn: #f5b86e;
+  --text-info: #9cbdf5;
+  --text-violet: var(--navy-200);
+  --chart-1: var(--navy-200);
+  --chart-1-dim: var(--navy-500);
+  --chart-2: #e9a05a;
+  --chart-3: #4fbf7f;
+  --chart-4: #6c9bea;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.45);
+  /* primer di latar navy = kuning dengan teks navy (kontras 9,0) */
+  --primary: var(--yellow-500);
+  --primary-hover: var(--yellow-600);
+  --primary-foreground: var(--navy-900);
+  /* logo reverse: putih + kuning */
+  --ink: var(--neutral-0);
+  --logo-pajak: var(--yellow-500);
+  --link: var(--navy-200);
+  --text-brand: var(--yellow-500);
 }
 
-/* Teks sidebar lebih terang dari .dark biasa karena latarnya navy. Di luar @layer agar
-   menang atas .dark (aturan tanpa layer selalu menang atas aturan ber-layer). */
-.dark.sidebar {
-  --text-secondary: #bfc5d8;
-  --text-muted: #aab1ca;
-}
+/* Sidebar terang = navy 700, gelap = lebih pekat dari shell. Di luar @layer agar menang atas .dark. */
+.sidebar { --bg-sidebar: var(--navy-700); }
+html.dark .sidebar { --bg-sidebar: #0e1430; }
+html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap terlihat di sidebar pekat */
 
 /* Alias shadcn didefinisikan ulang di .dark supaya pulau gelap (sidebar dll.) ikut gelap. */
 :root, .dark {
@@ -132,8 +182,6 @@
   --card-foreground: var(--text-primary);
   --popover: var(--bg-card);
   --popover-foreground: var(--text-primary);
-  --primary: var(--accent-amber-bright);
-  --primary-foreground: var(--brand-navy);
   --secondary: var(--bg-card-hover);
   --secondary-foreground: var(--text-primary);
   --muted: var(--bg-card-hover);
@@ -143,8 +191,16 @@
   --destructive: var(--accent-red);
   --border: var(--border-shell);
   --input: var(--border-shell);
-  --ring: var(--accent-amber);
-  --radius: 0.625rem;
+  --ring: var(--yellow-500); /* fokus kuning (hlm. 22) */
+  --radius: 0.625rem; /* radius.md 10 */
+  --sidebar: var(--bg-sidebar);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--navy-800);
+  --sidebar-accent-foreground: var(--neutral-0);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--ring);
 }
 
 @layer base {
@@ -162,13 +218,18 @@
     color: var(--text-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    accent-color: var(--primary); /* checkbox & radio bawaan ikut warna primer */
     min-height: 100vh;
+  }
+  /* Rubik untuk display dan judul; Public Sans untuk teks, antarmuka, dan angka (hlm. 15-16) */
+  h1, h2, .workspace-title, .font-heading {
+    font-family: var(--font-heading);
   }
 }
 
 /* Kelas tata letak dari web/index.html lama, dipertahankan agar tampilan identik. */
 @layer components {
-  .login-page, .onboarding-page { background: var(--brand-navy); }
+  .login-page, .onboarding-page { background: var(--navy-700); }
 
   .profile-choices {
     display: grid;
@@ -189,11 +250,11 @@
 
   .profile-choice:hover { border-color: var(--text-secondary); }
   .profile-choice[data-selected="true"] {
-    border-color: var(--accent-amber);
-    background: var(--accent-amber-soft);
+    border-color: var(--primary);
+    background: var(--bg-card-hover);
   }
   .profile-choice:has(input:focus-visible) {
-    outline: 2px solid var(--accent-amber-bright);
+    outline: 2px solid var(--ring);
     outline-offset: 3px;
   }
   .profile-choice input {
@@ -201,7 +262,7 @@
     width: 18px;
     height: 18px;
     margin-top: 2px;
-    accent-color: var(--accent-amber-bright);
+    accent-color: var(--primary);
   }
   .profile-choice-label { display: block; font-size: 14px; font-weight: 600; line-height: 1.5; }
   .profile-choice-hint { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
@@ -223,10 +284,10 @@
     border-radius: 16px;
   }
   .onboarding-intro { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border-shell); }
-  .onboarding-intro h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.4; }
+  .onboarding-intro h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.4; }
   .onboarding-intro p, .onboarding-question p { margin-top: 8px; font-size: 14px; color: var(--text-secondary); line-height: 1.65; }
   .onboarding-wizard { display: grid; gap: 24px; }
-  .onboarding-progress-label { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 600; color: var(--accent-amber-bright); }
+  .onboarding-progress-label { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700; color: var(--primary); }
   .onboarding-progress-label span + span { color: var(--text-secondary); }
   .onboarding-progress progress {
     appearance: none;
@@ -238,14 +299,14 @@
     border-radius: 2px;
     overflow: hidden;
     background: var(--border-shell);
-    color: var(--accent-amber);
+    color: var(--primary);
   }
   .onboarding-progress progress::-webkit-progress-bar { background: var(--border-shell); }
-  .onboarding-progress progress::-webkit-progress-value { background: var(--accent-amber); }
-  .onboarding-progress progress::-moz-progress-bar { background: var(--accent-amber); }
+  .onboarding-progress progress::-webkit-progress-value { background: var(--primary); }
+  .onboarding-progress progress::-moz-progress-bar { background: var(--primary); }
   .onboarding-progress p { margin-top: 8px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
-  .onboarding-question h2 { font-size: clamp(22px, 3vw, 26px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.4; overflow-wrap: anywhere; }
-  .onboarding-question h2:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: 6px; border-radius: 2px; }
+  .onboarding-question h2 { font-size: clamp(22px, 3vw, 26px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; overflow-wrap: anywhere; }
+  .onboarding-question h2:focus-visible { outline: 2px solid var(--ring); outline-offset: 6px; border-radius: 2px; }
   .onboarding-wizard .profile-choices { grid-template-columns: 1fr; }
   .onboarding-reason { color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
   .onboarding-reason strong { display: block; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; }
@@ -253,7 +314,7 @@
   .onboarding-summary > div:first-child { padding-top: 0; }
   .onboarding-summary dt { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
   .onboarding-summary dd { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
-  .onboarding-error { padding: 12px 16px; border: 1px solid var(--accent-red); border-radius: 8px; background: var(--accent-red-soft); color: var(--text-primary); font-size: 14px; line-height: 1.6; }
+  .onboarding-error { padding: 12px 16px; border: 1px solid var(--accent-red); border-radius: 10px; background: var(--accent-red-soft); color: var(--text-primary); font-size: 14px; line-height: 1.6; }
   .onboarding-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; }
   .onboarding-primary { margin-left: auto; }
 
@@ -319,8 +380,8 @@
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 8px 10px;
-    border-radius: 9px;
+    padding: 9px 10px;
+    border-radius: 10px;
     border: none;
     background: transparent;
     color: var(--text-secondary);
@@ -334,12 +395,13 @@
 
   .nav-item:hover {
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   }
 
+  /* aktif: kotak navy pekat + teks putih (dasbor hlm. 26) */
   .nav-item.active {
-    background: color-mix(in srgb, var(--accent-amber) 13%, transparent);
-    color: var(--text-warn);
+    background: color-mix(in srgb, var(--navy-900) 70%, transparent);
+    color: var(--neutral-0);
     font-weight: 600;
   }
 
@@ -364,15 +426,15 @@
     padding: 9px 10px;
     background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
+    border-radius: 10px;
   }
 
   .tenant-avatar {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--accent-amber) 20%, transparent);
-    color: var(--text-warn);
+    background: var(--yellow-500); /* satu titik kuning di sidebar */
+    color: var(--navy-900);
     font-size: 11px;
     font-weight: 700;
     display: flex;
@@ -413,14 +475,16 @@
     margin-bottom: 4px;
   }
 
+  /* h1 Rubik Bold 32/40 (hlm. 16); 24/32 di ponsel */
   .workspace-title {
-    font-size: 24px;
+    font-size: 32px;
+    line-height: 40px;
     font-weight: 700;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.01em;
   }
 
   .workspace-subtitle {
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--text-secondary);
     margin-top: 3px;
   }
@@ -450,8 +514,9 @@
   .card {
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    padding: 15px 16px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-1);
+    padding: 16px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -459,19 +524,21 @@
   }
 
   .card:hover {
-    border-color: color-mix(in srgb, var(--text-primary) 12%, transparent);
+    border-color: var(--border-strong);
   }
 
   .kpi-label {
-    font-size: 11.5px;
+    font-size: 13px;
     color: var(--text-secondary);
     font-weight: 500;
   }
 
+  /* angka: Public Sans Bold tabular (hlm. 16) */
   .kpi-value {
     font-size: 25px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
     margin: 6px 0 8px;
   }
 
@@ -604,8 +671,8 @@
     justify-content: space-between;
     font-size: 12.5px;
     padding: 7px 10px;
-    background: color-mix(in srgb, var(--text-primary) 2%, transparent);
-    border-radius: 8px;
+    background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+    border-radius: 10px;
   }
 
   /* Sub-views (Transaksi, Pajak UMKM, Simulasi, dll.) */
@@ -620,11 +687,11 @@
     text-align: left;
     padding: 10px 12px;
     color: var(--text-secondary);
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 1px solid var(--border-shell);
-    font-size: 11.5px;
+    font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
   }
 
   .data-table td {
@@ -637,9 +704,9 @@
     border: 1px solid var(--border-shell);
     color: var(--text-primary);
     padding: 9px 12px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 14px;
     width: 100%;
   }
 
@@ -650,12 +717,13 @@
     margin-top: 12px;
   }
 
+  /* badge status (hlm. 23): latar soft + teks semantik */
   .pill-status {
     display: inline-block;
-    padding: 3px 9px;
+    padding: 3px 10px;
     border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .pill-green {
@@ -669,23 +737,30 @@
   }
 
   .pill-amber {
-    background: var(--accent-amber-soft);
+    background: var(--accent-orange-soft);
     color: var(--text-warn);
   }
 
-
-  .brand-sub {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-secondary);
-    letter-spacing: 0.04em;
+  /* penanda brand netral (periode, peran Owner, pilihan Anda): navy, bukan peringatan */
+  .pill-brand {
+    background: var(--bg-card-hover);
+    color: var(--ink);
   }
 
+  /* label: Public Sans Bold 12, spasi 8%, kapital (hlm. 16) */
+  .label-caps {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* tombol primer (hlm. 22): navy di tema terang, kuning di tema gelap. Satu per layar. */
   .btn-cta {
     padding: 10px 22px;
-    border-radius: 999px;
+    border-radius: 10px;
     border: none;
-    background: var(--accent-amber-bright);
+    background: var(--primary);
     color: var(--primary-foreground);
     font-weight: 700;
     font-size: 14px;
@@ -694,9 +769,15 @@
   }
 
   .btn-cta:hover {
-    filter: brightness(1.06);
-    transform: translateY(-1px);
+    background: var(--primary-hover);
   }
+  .btn-cta:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* aksen kuning: hanya untuk ajakan berbayar atau promosi */
+  .btn-cta.accent { background: var(--yellow-500); color: var(--navy-900); }
+  .btn-cta.accent:hover { background: var(--yellow-600); }
 
   .btn-cta:disabled {
     opacity: 0.6;
@@ -775,8 +856,12 @@
       padding-top: 10px;
     }
     .workspace {
-      padding: 18px 14px 24px;
+      padding: 18px 16px 24px;
       min-width: 0;
+    }
+    .workspace-title {
+      font-size: 24px;
+      line-height: 32px;
     }
     .workspace-header {
       flex-wrap: wrap;
@@ -872,8 +957,8 @@
     color: var(--text-primary);
   }
   .tab-btn[aria-selected='true'] {
-    color: var(--accent-amber-bright);
-    border-bottom-color: var(--accent-amber-bright);
+    color: var(--text-primary);
+    border-bottom-color: var(--primary);
   }
   .tab-badge {
     font-size: 9.5px;
@@ -908,8 +993,8 @@
     color: var(--text-primary);
   }
   .seg-btn[aria-selected='true'] {
-    background: color-mix(in srgb, var(--accent-blue) 16%, transparent);
-    color: var(--text-info);
+    background: var(--primary);
+    color: var(--primary-foreground);
   }
 
   .report-grid {
@@ -940,20 +1025,20 @@
     margin-top: 14px;
     padding: 11px 13px;
     border-radius: 10px;
-    font-size: 11.5px;
+    font-size: 12.5px;
     line-height: 1.6;
-    background: color-mix(in srgb, var(--accent-blue) 7%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent-blue) 20%, transparent);
+    background: color-mix(in srgb, var(--accent-blue) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-blue) 22%, transparent);
     color: var(--text-info);
   }
   .note-box.warn {
-    background: var(--accent-amber-soft);
-    border-color: color-mix(in srgb, var(--accent-amber) 25%, transparent);
+    background: var(--accent-orange-soft);
+    border-color: color-mix(in srgb, var(--accent-orange) 30%, transparent);
     color: var(--text-warn);
   }
   .note-box.law {
-    background: color-mix(in srgb, var(--accent-violet) 8%, transparent);
-    border-color: color-mix(in srgb, var(--accent-violet) 25%, transparent);
+    background: var(--bg-card-hover);
+    border-color: var(--border-strong);
     color: var(--text-violet);
   }
 }

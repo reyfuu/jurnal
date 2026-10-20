@@ -3,7 +3,7 @@ import { createAsset, deleteAsset, updateAsset, type Asset, type AssetInput, typ
 import { formatJt, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
-const AMBER = 'var(--text-warn)'
+const SOROT = 'var(--text-brand)'
 const RED = 'var(--text-danger)'
 const BLUE = 'var(--accent-blue)'
 
@@ -113,7 +113,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
         </div>
         <div className="card">
           <div className="kpi-label">Beban Bulan Ini</div>
-          <div className="kpi-value tabular" style={{ color: AMBER }}>{formatJt(data.beban_total)}</div>
+          <div className="kpi-value tabular" style={{ color: SOROT }}>{formatJt(data.beban_total)}</div>
           <div className="kpi-meta-row">
             <span>Penyusutan {formatJt(data.beban_penyusutan)} + amortisasi {formatJt(data.beban_amortisasi)}</span>
           </div>
@@ -269,7 +269,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                     {a.tak_berwujud && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>amortisasi</div>}
                   </td>
                   <td style={{ textAlign: 'right' }}>{a.draft ? '—' : formatTarif(a.tarif_bps)}</td>
-                  <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(a.beban_bulan_ini)}</td>
+                  <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(a.beban_bulan_ini)}</td>
                   <td style={{ textAlign: 'right', color: RED }}>{formatRp(a.akumulasi)}</td>
                   <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(a.nilai_buku)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
@@ -290,7 +290,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                 <td colSpan={3}>TOTAL — {assets.length} aset</td>
                 <td style={{ textAlign: 'right' }}>{formatRp(data.total_harga_perolehan)}</td>
                 <td colSpan={2} />
-                <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(data.beban_total)}</td>
+                <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(data.beban_total)}</td>
                 <td style={{ textAlign: 'right', color: RED }}>{formatRp(data.total_akumulasi)}</td>
                 <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(data.total_nilai_buku)}</td>
                 <td />
@@ -321,7 +321,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                   <tr key={y.tahun}>
                     <td>{y.tahun}{y.bulan < 12 && <span style={{ color: 'var(--text-muted)' }}> ({y.bulan} bln)</span>}</td>
                     <td style={{ textAlign: 'right' }}>{formatRp(y.dasar_awal)}</td>
-                    <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(y.penyusutan)}</td>
+                    <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(y.penyusutan)}</td>
                     <td style={{ textAlign: 'right', color: y.sisa_akhir === 0 ? 'var(--text-profit)' : BLUE }}>{formatRp(y.sisa_akhir)}</td>
                   </tr>
                 ))}
