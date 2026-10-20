@@ -24,8 +24,8 @@ type KandidatKLU struct {
 var sinonim = map[string][]string{
 	"laundry": {"binatu"}, "londri": {"binatu"}, "cuci": {"binatu", "pencucian"},
 	"cafe": {"kafe", "minuman"}, "kafe": {"minuman"}, "coffee": {"kafe", "minuman"}, "ngopi": {"kafe", "minuman"}, "kopi": {"minuman"},
-	"online": {"media"}, "olshop": {"media"}, "shopee": {"media"}, "tokopedia": {"media"}, "tiktok": {"media"},
-	"lazada": {"media"}, "marketplace": {"media"}, "ecommerce": {"media"},
+	"skincare": {"kosmetik"}, "makeup": {"kosmetik"}, "kosmetika": {"kosmetik"}, "serum": {"kosmetik"},
+	"parfum": {"kosmetik"}, "kecantikan": {"kosmetik"},
 	"catering": {"boga"}, "katering": {"boga", "catering"},
 	"bengkel": {"reparasi"}, "servis": {"reparasi"}, "service": {"reparasi"},
 	"barbershop": {"pangkas", "rambut"}, "barber": {"pangkas", "rambut"}, "potong": {"pangkas"},
@@ -38,6 +38,13 @@ var kataUmum = map[string]bool{
 	"jual": true, "jualan": true, "menjual": true, "usaha": true, "bisnis": true, "kecil": true, "dengan": true,
 	"atau": true, "buat": true, "acara": true, "punya": true, "kiloan": true,
 }
+
+// jualOnline: kata yang langsung menunjuk KLU 479 (eceran melalui media / bukan di toko).
+// Tidak lewat sinonim "media", karena "media" juga ada di "reproduksi media rekaman".
+var jualOnline = []string{"online", "olshop", "shopee", "tokopedia", "tiktok", "lazada", "bukalapak", "marketplace", "ecommerce", "daring", "instagram", "whatsapp"}
+
+// produksi: kata yang membuat KLU industri/pengolahan (golongan 10–33) masuk akal.
+var produksi = []string{"produksi", "pabrik", "bikin", "membuat", "olah", "mengolah", "industri", "konveksi", "jahit", "masak", "roasting", "sangrai", "cetak", "rakit"}
 
 // grosir: kata yang membuat KLU perdagangan besar (46x) masuk akal.
 var grosir = []string{"grosir", "besar", "distributor", "agen", "partai"}
@@ -118,7 +125,8 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 			idf[t] = math.Log(float64(len(docs)) / float64(df))
 		}
 	}
-	mauGrosir := slices.ContainsFunc(istilah, func(t string) bool { return slices.Contains(grosir, t) })
+	ada := func(daftar []string) bool { return slices.ContainsFunc(istilah, func(t string) bool { return slices.Contains(daftar, t) }) }
+	mauGrosir, online, buatSendiri := ada(grosir), ada(jualOnline), ada(produksi)
 
 	var out []KandidatKLU
 	for i, k := range klu {
@@ -131,6 +139,9 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 				skor += idf[t]
 			}
 		}
+		if online && k.Kode == "479" {
+			skor += 4
+		}
 		if skor == 0 {
 			continue
 		}
@@ -139,6 +150,9 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 			skor += 1
 		}
 		if strings.HasPrefix(k.Kode, "46") && !mauGrosir {
+			skor -= 6
+		}
+		if j == "manufaktur" && !buatSendiri && jenis != "manufaktur" {
 			skor -= 3
 		}
 		if skor > 0 {
