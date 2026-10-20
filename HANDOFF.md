@@ -808,6 +808,13 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Tab **Banding**: pilih 2–12 bulan bebas (tidak harus berurutan), kolom per bulan + **Total**. Laba rugi & arus kas dijumlahkan; neraca dan saldo kas akhir memakai posisi bulan terakhir ("Posisi akhir"); saldo kas awal dari bulan pertama. Tepat 2 bulan → kolom Selisih & %. `GET /api/v1/reports/banding?periode=2026-07,2026-08` (JSON) dan `/reports/banding.pdf` (A4 rebah, huruf mengecil otomatis bila kolom banyak).
 - Satu susunan baris (`finance.BagianLabaRugi/Neraca/ArusKas`) dipakai PDF dan Banding; `SusunBanding` menjajarkan baris per `kunci` (beban yang hanya ada di sebagian bulan tetap muncul, 0 di bulan lain). `internal/pdf` kini punya `NewLandscape()`.
 
+## Tanya AI: panduan menu dengan tautan (20 Okt 2026)
+
+- Pertanyaan "di mana / bagaimana cara ..." (mis. "dmn saya bisa isi laporan keuangan") dijawab penjelasan singkat + **tombol ke halaman yang tepat** (bisa langsung ke tab, mis. Laporan Keuangan → Banding/Aset). Katalog topik di `internal/ai/panduan.go` (`daftarTopik`): tambah topik baru di sana saat ada menu baru.
+- Tautan disaring hak akses penanya (`Role.Can`); menu yang tidak bisa dibuka dijelaskan ("minta Owner membukakan akses"), bukan ditautkan.
+- Urutan: kata kunci dulu (gratis). Bila tidak cocok tapi jelas pertanyaan menu dan LLM aktif → `ai.PilihPanduan` (model memilih kode topik dari daftar, divalidasi; kuota 40/user/24 jam). Pertanyaan analisis (mis. "kondisi arus kas saya") tetap dijawab mesin biasa, plus satu tautan pelengkap.
+- `QueryResponse.tautan`; frontend `AIAgentBubble` menerima `onBuka(view, tab)`; `App.navigate(view, tab)` meneruskan `tabAwal` ke Laporan Keuangan.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

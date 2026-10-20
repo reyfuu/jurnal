@@ -41,6 +41,7 @@ export default function App() {
   const [data, setData] = useState<AppData | null>(null)
   const [view, setView] = useState<View>('dashboard')
   const [bugFrom, setBugFrom] = useState<View>('dashboard') // halaman asal saat membuka Lapor Bug
+  const [bukaTab, setBukaTab] = useState<{ tab?: string; n: number }>({ n: 0 })
   const [auth, setAuth] = useState<'masuk' | 'daftar' | null>(null) // null = landing page
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
@@ -106,9 +107,10 @@ export default function App() {
 
   const canSee = (v: View) => me.views.includes(v)
   const terkunci = me.langganan.status === 'habis'
-  const navigate = (v: View) => {
+  const navigate = (v: View, tab?: string) => {
     if (!canSee(v) && v !== 'catatan' && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
     if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
+    setBukaTab({ tab, n: Date.now() }) // tab awal halaman tujuan, mis. dari tautan Tanya AI
     setView(v)
   }
 
@@ -235,7 +237,7 @@ export default function App() {
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>
-      {!me.lihat && !terkunci && <AIAgentBubble period={period} />}
+      {!me.lihat && !terkunci && <AIAgentBubble period={period} onBuka={navigate} />}
       {me.lihat && me.master?.izin.includes('catatan') && <TulisCatatanTombol klienId={me.lihat.klien_id} halaman={view} periode={period} />}
       {!me.lihat && !!me.catatan_ingat && <PengingatCatatan onLihat={() => navigate('catatan')} />}
     </main>
@@ -264,6 +266,8 @@ export default function App() {
       case 'laporan-keuangan':
         return data!.report && data!.balanceSheet && data!.cash && data!.assets && (
           <LaporanKeuangan
+            key={bukaTab.n}
+            tabAwal={bukaTab.tab}
             r={data!.report}
             bs={data!.balanceSheet}
             cf={data!.cash}

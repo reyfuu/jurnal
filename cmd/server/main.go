@@ -904,7 +904,24 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	t.mu.RUnlock()
 
+	// Pertanyaan "di mana / bagaimana cara" dijawab panduan menu + tautan sesuai hak akses.
+	u := currentUser(r)
+	boleh := func(v string) bool { return u.Role.Can(v) || v == "catatan" }
+	panduan, cocok := ai.CariPanduan(req.Query, boleh)
+	if !cocok && ai.TanyaMenu(req.Query) && s.llm != nil && s.llm.Enabled() && s.jatahAI("panduan|"+strconv.Itoa(u.ID), 40) {
+		if p, err := ai.PilihPanduan(r.Context(), s.llm, req.Query, boleh); err == nil {
+			panduan, cocok = p, true
+		}
+	}
+	if cocok && panduan.Kuat {
+		writeJSON(w, ai.QueryResponse{Answer: panduan.Jawaban, Category: "panduan", Tautan: panduan.Tautan, ActionSuggestions: []string{
+			"Di mana saya mencatat transaksi?", "Bagaimana cara impor mutasi bank?", "Ringkas laporan bulan ini"}})
+		return
+	}
 	resp := s.aiEngine.Answer(r.Context(), req, snap, t.report(period))
+	if cocok {
+		resp.Tautan = panduan.Tautan
+	}
 	writeJSON(w, resp)
 }
 
