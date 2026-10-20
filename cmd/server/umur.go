@@ -46,6 +46,10 @@ func (s *tenant) handleLunasi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := s.txs[i]
+	if err := s.cekTerbukaLocked(b.Tanggal); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if t.Lunas {
 		http.Error(w, "transaksi ini sudah lunas", http.StatusConflict)
 		return
@@ -60,6 +64,12 @@ func (s *tenant) handleLunasi(w http.ResponseWriter, r *http.Request) {
 	}
 	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
+}
+
+// tagihanBukuLocked: piutang & utang belum lunas per tanggal dari buku besar. Pemanggil memegang s.mu.
+func (s *tenant) tagihanBukuLocked(per string) []finance.Tagihan {
+	ob := s.bukuAwalLocked()
+	return finance.TagihanDariBuku(finance.UmurSaldo(ob, s.txs, per, true), finance.UmurSaldo(ob, s.txs, per, false))
 }
 
 func (s *Server) umurRoutes() {

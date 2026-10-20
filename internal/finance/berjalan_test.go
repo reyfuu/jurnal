@@ -109,3 +109,43 @@ func TestUmurPiutang(t *testing.T) {
 		t.Errorf("umur utang total %d", utang.Total)
 	}
 }
+
+func TestPelunasanSaldoAwal(t *testing.T) {
+	ob, txs, assets, stok, gerak := skenarioBerjalan()
+	ob.Pelunasan = []PelunasanAwal{{Jenis: "piutang", Tanggal: "2026-02-08", Nominal: 600_000}, {Jenis: "utang", Tanggal: "2026-03-01", Nominal: 500_000}}
+	k := HitungKartu(stok, txs, gerak)
+	feb := BuildLaporanBerjalan(txs, assets, "2026-02", ob, k)
+	mar := BuildLaporanBerjalan(txs, assets, "2026-03", ob, k)
+	// Piutang Februari 1,8 jt − 0,6 jt pelunasan saldo awal; utang Maret 3,3 jt − 0,5 jt.
+	if feb.BalanceSheet.Assets.Receivables != 1_200_000 || mar.BalanceSheet.Liabilities.Payables != 2_800_000 {
+		t.Errorf("piutang feb %d utang mar %d", feb.BalanceSheet.Assets.Receivables, mar.BalanceSheet.Liabilities.Payables)
+	}
+	for _, r := range []PeriodReport{feb, mar} {
+		if !r.BalanceSheet.IsBalanced || r.CashFlow.OperasiLangsung.Net != r.CashFlow.OperasiTidakLangsung.Net || r.CashFlow.ClosingBalance != r.BalanceSheet.Assets.Cash {
+			t.Errorf("%s tidak konsisten", r.Period)
+		}
+	}
+	u := UmurSaldo(ob, txs, "2026-03-31", true)
+	sisaAwal := int64(-1)
+	for _, b := range u.Baris {
+		if b.TransaksiID == 0 {
+			sisaAwal = b.Nilai
+		}
+	}
+	if u.Total != 1_200_000 || sisaAwal != 400_000 {
+		t.Errorf("umur setelah pelunasan saldo awal %+v", u)
+	}
+	if err := ob.TambahPelunasan(PelunasanAwal{Jenis: "piutang", Tanggal: "2026-03-01", Nominal: 500_000}); err == nil {
+		t.Error("pelunasan melebihi sisa saldo awal (0,4 jt) harus ditolak")
+	}
+}
+
+func TestTagihanDariBuku(t *testing.T) {
+	ob, txs, _, _, _ := skenarioBerjalan()
+	p, u := UmurSaldo(ob, txs, "2026-03-31", true), UmurSaldo(ob, txs, "2026-03-31", false)
+	tg := TagihanDariBuku(p, u)
+	r := SummarizeTagihan(tg, mustTgl("2026-03-31"))
+	if r.TotalPiutang != p.Total || r.TotalUtang != u.Total || r.PiutangTerlambat != p.Total {
+		t.Errorf("rekap %+v (piutang %d utang %d)", r, p.Total, u.Total)
+	}
+}

@@ -159,6 +159,13 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	for _, t := range txs {
+		if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+			s.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+	}
 	for i := range txs {
 		txs[i].ID = s.nextTxID
 		s.nextTxID++

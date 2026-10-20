@@ -31,14 +31,16 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
-export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean } }) {
+/** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat). */
+export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [filter, setFilter] = useState({ bulan: '', jenis: '', cari: '', arah: '', channel: '' })
   const [limit, setLimit] = useState(PAGE)
-  const [editing, setEditing] = useState<Editing>(null)
+  const [editing, setEditing] = useState<Editing>(() => aksiAwal?.startsWith('baru')
+    ? { id: null, input: { ...EMPTY, tanggal: today(), jenis: aksiAwal.slice(5) || EMPTY.jenis }, confirmDelete: false } : null)
   const [error, setError] = useState('')
   const [warnings, setWarnings] = useState<CashWarning[] | undefined>()
   const [busy, setBusy] = useState(false)

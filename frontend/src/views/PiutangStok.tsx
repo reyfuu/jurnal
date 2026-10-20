@@ -65,7 +65,9 @@ const TAGIHAN_KOSONG: TagihanInput = {
   nomor: '', pihak: '', jenis: 'RECEIVABLE', jatuh_tempo: '', nominal: 0, lunas: false, keterangan: '',
 }
 
-export function PiutangUtang() {
+/** Daftar tagihan yang diketik manual (versi lama). Tidak masuk laporan keuangan — laporan
+ *  memakai transaksi yang belum lunas (tab Piutang & Utang). */
+export function PiutangUtang({ manual = false }: { manual?: boolean }) {
   const [data, setData] = useState<TagihanSummary | null>(null)
   const [form, setForm] = useState<TagihanInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
@@ -130,7 +132,13 @@ export function PiutangUtang() {
 
   return (
     <>
-      <PageHeader title="Piutang & Utang" subtitle="Pantau tagihan pelanggan dan kewajiban ke supplier supaya arus kas tidak macet.">
+      {manual && (
+        <div className="note-box warn" style={{ marginBottom: 12 }}>
+          Daftar ini diketik terpisah dan <strong>tidak masuk laporan keuangan</strong>. Supaya tercatat di Neraca & arus kas, catat penjualan/pembelian
+          sebagai transaksi dengan status <em>belum lunas</em>, lalu catat pelunasannya di tab Piutang / Utang.
+        </div>
+      )}
+      <PageHeader title={manual ? 'Tagihan manual' : 'Piutang & Utang'} subtitle="Pantau tagihan pelanggan dan kewajiban ke supplier supaya arus kas tidak macet.">
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
             <Upload size={15} aria-hidden /> Impor Excel
@@ -305,10 +313,12 @@ const STATUS_CLS: Record<StokRow['status'], string> = {
 }
 
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
-export function StokGudang({ bisaUbah = true }: { bisaUbah?: boolean }) {
+export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
   const [data, setData] = useState<StokSummary | null>(null)
   const [tab, setTab] = useState<'daftar' | 'mutasi' | 'riwayat'>('daftar')
-  const [dialog, setDialog] = useState<'mulai' | 'opname' | 'beli' | null>(null)
+  // aksi dari tombol + Catat / Langkah memulai: buka dialognya langsung.
+  const [dialog, setDialog] = useState<'mulai' | 'opname' | 'beli' | null>(() =>
+    bisaUbah && (aksi === 'mulai' || aksi === 'opname' || aksi === 'beli') ? aksi : null)
   const [kartu, setKartu] = useState<StokRow | null>(null)
   const [form, setForm] = useState<StokInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
@@ -554,8 +564,11 @@ export function StokGudang({ bisaUbah = true }: { bisaUbah?: boolean }) {
       </>}
 
       {dialog === 'mulai' && <MulaiKartuDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
-      {dialog === 'opname' && <OpnameDialog items={list} mulai={mulai} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
-      {dialog === 'beli' && <BeliBahanDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {dialog === 'opname' && mulai && <OpnameDialog items={list} mulai={mulai} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {dialog === 'beli' && list.length > 0 && <BeliBahanDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {(dialog === 'opname' && !mulai) && (
+        <div className="note-box warn" role="status">Stok opname tersedia setelah kartu stok dimulai. Klik <strong>Mulai kartu stok</strong> di atas.</div>
+      )}
       {kartu && <KartuBarangDialog item={kartu} onClose={() => setKartu(null)} />}
 
       <MenuImportDialog

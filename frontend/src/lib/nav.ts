@@ -1,12 +1,12 @@
 import {
-  ArrowLeftRight, BookOpen, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
   Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
 
 // Mode terkunci (belum berlangganan): menu yang tetap terbuka, di atas menu lain yang bergembok.
 /** Halaman di luar sidebar (dibuka dari banner), supaya punya label untuk catatan & lapor bug. */
-export const NAV_LAIN = { group: 'Lain', items: [{ view: 'catatan' as View, label: 'Catatan Konsultan', icon: MessageSquareText }] }
+export const NAV_LAIN = { group: 'Lain', items: [{ view: 'catatan' as View, label: 'Catatan Konsultan', icon: MessageSquareText }, { view: 'umur-piutang' as View, label: 'Piutang & Utang', icon: Files }] }
 
 export const NAV_COBA = { group: 'Coba gratis', items: [
   { view: 'laporan-ai' as View, label: 'Laporan AI', icon: Sparkles },
@@ -17,32 +17,41 @@ export const BEBAS_TERKUNCI: View[] = ['laporan-ai', 'alat-gratis', 'langganan',
 export const NAV: { group: string; items: { view: View; label: string; icon: LucideIcon }[] }[] = [
   { group: 'Ringkasan', items: [{ view: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
   {
-    group: 'Laporan',
-    items: [
-      { view: 'laporan-keuangan', label: 'Laporan Keuangan', icon: FileText },
-      { view: 'laporan-penjualan', label: 'Laporan Penjualan', icon: ChartColumn },
-      { view: 'umur-piutang', label: 'Umur Piutang & Utang', icon: Hourglass },
-    ],
-  },
-  {
-    group: 'Operasional',
+    // Pekerjaan sehari-hari: semua yang dicatat. Tombol "+ Catat" di atas membuka formulirnya langsung.
+    group: 'Catat Harian',
     items: [
       { view: 'transaksi', label: 'Transaksi', icon: ArrowLeftRight },
-      { view: 'piutang-utang', label: 'Piutang & Utang', icon: Files },
       { view: 'stok-gudang', label: 'Stok & Gudang', icon: Package },
       { view: 'produksi-supplier', label: 'Produksi & Supplier', icon: Factory },
     ],
   },
   {
-    group: 'Alat',
+    group: 'Tagihan',
     items: [
+      { view: 'piutang-utang', label: 'Piutang & Utang', icon: Hourglass },
       { view: 'invoice', label: 'Invoice', icon: Receipt },
-      { view: 'simulasi-harga', label: 'Simulasi & Harga', icon: SlidersVertical },
+    ],
+  },
+  {
+    group: 'Laporan',
+    items: [
+      { view: 'laporan-keuangan', label: 'Laporan Keuangan', icon: FileText },
+      { view: 'laporan-penjualan', label: 'Laporan Penjualan', icon: ChartColumn },
+      { view: 'tutup-buku', label: 'Tutup Buku Bulanan', icon: CalendarCheck },
+    ],
+  },
+  {
+    group: 'Pajak',
+    items: [
       { view: 'pajak-umkm', label: 'Pajak UMKM', icon: Shield },
       { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: SquarePercent },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Target },
       { view: 'pustaka', label: 'Pustaka Pajak', icon: Library },
     ],
+  },
+  {
+    group: 'Alat',
+    items: [{ view: 'simulasi-harga', label: 'Simulasi & Harga', icon: SlidersVertical }],
   },
   {
     group: 'Pengaturan',

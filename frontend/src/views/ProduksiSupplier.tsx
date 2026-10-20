@@ -197,14 +197,14 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
 }
 
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
-export function ProduksiSupplier({ bisaUbah = true }: { bisaUbah?: boolean }) {
+export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
   const [tab, setTab] = useState<'produksi' | 'produk' | 'supplier'>('produksi')
   const [muatUlang, setMuatUlang] = useState(0)
   const [data, setData] = useState<ProduksiSummary | null>(null)
   const [stok, setStok] = useState<StokRow[]>([])
   const [stokMulai, setStokMulai] = useState('')
   // Dialog catat produksi; awal = produk yang dipilih dari baris tabel resep.
-  const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(null)
+  const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(() => (bisaUbah && aksi === 'catat' ? {} : null))
   const [form, setForm] = useState<ProdukInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [supForm, setSupForm] = useState<SupplierInput | null>(null)
@@ -602,7 +602,7 @@ export function ProduksiSupplier({ bisaUbah = true }: { bisaUbah?: boolean }) {
       </div>
       )}
 
-      {produksi && (
+      {produksi && produk.length > 0 && stokMulai && (
         <ProduksiDialog produkList={produk} awal={produksi.awal} stok={stok} mulai={stokMulai} onClose={() => setProduksi(null)}
           onDone={(m) => { setProduksi(null); setPesan(m); setTab('produksi'); setMuatUlang((n) => n + 1); muat() }} />
       )}

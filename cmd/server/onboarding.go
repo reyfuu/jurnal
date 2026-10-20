@@ -90,8 +90,16 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 	}
 
 	s.mu.Lock()
+	if s.tutupBuku != "" {
+		s.mu.Unlock()
+		http.Error(w, "impor data awal tidak bisa dipakai setelah ada bulan yang ditutup bukunya", http.StatusConflict)
+		return
+	}
 	if d.Opening != nil {
 		o := *d.Opening
+		if s.opening != nil {
+			o.Pelunasan = s.opening.Pelunasan
+		}
 		s.opening = &o
 	}
 	// Aset & karyawan hasil impor MENGGANTI register lama (onboarding, bukan tambah data);
@@ -182,6 +190,14 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if s.tutupBuku != "" {
+		s.mu.Unlock()
+		http.Error(w, "saldo awal tidak bisa diubah setelah ada bulan yang ditutup bukunya", http.StatusConflict)
+		return
+	}
+	if s.opening != nil {
+		o.Pelunasan = s.opening.Pelunasan // pelunasan saldo awal yang sudah dicatat tetap ada
+	}
 	s.opening = &o
 	s.mu.Unlock()
 	writeJSON(w, s.openingSummary())

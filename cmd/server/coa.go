@@ -61,6 +61,17 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	// pelunasan transaksi bulan lalu dijurnal di bulan ini.
 	s.mu.RLock()
 	lines := coa.JournalBerjalan(s.txs, period, p)
+	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr 1201, atau Dr 2101 / Cr Kas.
+	for _, pa := range s.bukuAwalLocked().Pelunasan {
+		if len(pa.Tanggal) < 7 || pa.Tanggal[:7] != period {
+			continue
+		}
+		if pa.Jenis == "piutang" {
+			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: "1101", Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: "1201", Kredit: pa.Nominal})
+		} else {
+			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: "2101", Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: "1101", Kredit: pa.Nominal})
+		}
+	}
 	opening := s.openingFor(period)
 	sp := s.kartuLocked().Periode(period)
 	rep := s.reportLocked(period)

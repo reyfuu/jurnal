@@ -92,6 +92,11 @@ func (s *tenant) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if err := s.cekTerbukaLocked(a.TanggalPerolehan); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	a.ID = s.nextAssetID
 	s.nextAssetID++
 	s.assets = append(s.assets, a)
@@ -118,6 +123,10 @@ func (s *tenant) handleUpdateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "aset tidak ditemukan", http.StatusNotFound)
 		return
 	}
+	if err := s.cekTerbukaLocked(s.assets[i].TanggalPerolehan, a.TanggalPerolehan); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	a.ID = s.assets[i].ID
 	s.assets[i] = a
 	writeJSON(w, a)
@@ -129,6 +138,10 @@ func (s *tenant) handleDeleteAsset(w http.ResponseWriter, r *http.Request) {
 	i := s.assetIndex(r)
 	if i < 0 {
 		http.Error(w, "aset tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := s.cekTerbukaLocked(s.assets[i].TanggalPerolehan); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.assets = slices.Delete(s.assets, i, i+1)
