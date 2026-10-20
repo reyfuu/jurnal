@@ -19,8 +19,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function kosong(nomor: string, ppnBps: number): InvoiceInput {
-  const hariIni = new Date().toISOString().slice(0, 10)
-  const tempo = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)
+  // Menurut WIB: toISOString() memakai UTC sehingga sebelum pukul 07.00 jatuh ke kemarin.
+  const hariIni = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
+  const tempo = new Date(Date.now() + 30 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
   return {
     nomor, no_po: '', status: 'draft', tanggal: hariIni, jatuh_tempo: tempo,
     pelanggan_nama: '', pelanggan_alamat: '', pelanggan_npwp: '',

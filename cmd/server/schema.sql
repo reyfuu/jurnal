@@ -417,3 +417,22 @@ CREATE TABLE IF NOT EXISTS mp_pengaturan (
 	kunci TEXT PRIMARY KEY,
 	isi   JSONB NOT NULL
 );
+
+-- Kartu stok (Okt 2026): transaksi Beli Bahan / Stok & Penjualan bisa memilih barang (jumlah
+-- per seribu satuan); dokumen stok = stok awal (titik nol), stok opname, produksi.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS stok_id INT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS qty_stok BIGINT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_gerak_id INT NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS gerak_stok (
+	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id         INT NOT NULL,
+	tanggal    DATE NOT NULL,
+	jenis      TEXT NOT NULL,
+	baris      JSONB NOT NULL,
+	produk_id  INT,
+	batch      BIGINT,
+	keterangan TEXT,
+	oleh       TEXT,
+	dibuat     TIMESTAMPTZ NOT NULL,
+	PRIMARY KEY (tenant_id, id)
+);

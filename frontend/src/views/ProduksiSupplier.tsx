@@ -9,6 +9,7 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
+import { ProduksiDialog } from '@/views/KartuStok'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--text-profit)'
@@ -198,6 +199,8 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
 export function ProduksiSupplier() {
   const [data, setData] = useState<ProduksiSummary | null>(null)
   const [stok, setStok] = useState<StokRow[]>([])
+  const [stokMulai, setStokMulai] = useState('')
+  const [produksi, setProduksi] = useState<ProdukRow | null>(null)
   const [form, setForm] = useState<ProdukInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [supForm, setSupForm] = useState<SupplierInput | null>(null)
@@ -209,7 +212,7 @@ export function ProduksiSupplier() {
 
   const muat = useCallback(() => {
     getProduksi().then(setData, (e: Error) => setError(e.message))
-    getStok().then((s) => setStok(s.items ?? []), () => {})
+    getStok().then((s) => { setStok(s.items ?? []); setStokMulai(s.mulai) }, () => {})
   }, [])
   useEffect(muat, [muat])
 
@@ -327,6 +330,14 @@ export function ProduksiSupplier() {
         </div>
       </div>
 
+      {produksi && (
+        <ProduksiDialog produk={produksi} stok={stok} mulai={stokMulai} onClose={() => setProduksi(null)}
+          onDone={(m) => { setProduksi(null); setPesan(m); muat() }} />
+      )}
+      {!stokMulai && produk.length > 0 && (
+        <div className="note-box" style={{ marginBottom: 12 }}>Untuk mencatat produksi (bahan berkurang, barang jadi bertambah), mulai kartu stok dulu di menu Stok & Gudang.</div>
+      )}
+
       {form && (
         <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpanProduk}>
           <div className="chart-title">{editId === null ? 'Tambah Produk & Resep' : 'Ubah Produk & Resep'}</div>
@@ -429,7 +440,11 @@ export function ProduksiSupplier() {
                     </td>
                     <td style={{ textAlign: 'right' }}>{p.harga_jual > 0 ? `${(p.hpp.margin_bps / 100).toFixed(1).replace('.', ',')}%` : '—'}</td>
                     <td>
-                      {!p.ada_di_stok ? (
+                      {stokMulai ? (
+                        p.ada_di_stok
+                          ? <span style={{ fontSize: 12 }} title="Dari kartu stok (rata-rata bergerak)">Stok {formatRp(p.hpp_stok)}</span>
+                          : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>dibuat saat produksi pertama</span>
+                      ) : !p.ada_di_stok ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>SKU tidak ada di stok</span>
                       ) : p.selisih === 0 ? (
                         <span className="pill-status pill-green" style={{ fontSize: 10 }}>Sama ({formatRp(p.hpp_stok)})</span>
@@ -441,6 +456,7 @@ export function ProduksiSupplier() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
+                        {stokMulai && <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)', fontWeight: 600 }} onClick={() => { setError(''); setPesan(''); setProduksi(p) }}>Produksi</button>}
                         <button className="nav-item" style={aksiBtn} onClick={() => { setError(''); setEditId(p.id); setForm(toProdukInput(p)) }}>Ubah</button>
                         <button className="nav-item" style={{ ...aksiBtn, color: RED }} onClick={() => void hapusProduk(p)}>Hapus</button>
                       </div>

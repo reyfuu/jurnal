@@ -3,6 +3,7 @@ package finance
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -168,6 +169,10 @@ type StokSummary struct {
 	NilaiPersediaan int64     `json:"nilai_persediaan"` // jumlah x harga pokok
 	Menipis         int       `json:"menipis"`
 	Habis           int       `json:"habis"`
+	// Mulai: titik nol kartu stok (kosong = jumlah masih diketik manual). Minus: barang yang
+	// stok sistemnya di bawah nol — pembelian/produksi belum dicatat atau salah jumlah.
+	Mulai string `json:"mulai"`
+	Minus int    `json:"minus"`
 }
 
 // StokRow: satu baris stok beserta turunannya. Turunan dikirim dari sini, bukan dihitung ulang
@@ -177,6 +182,11 @@ type StokRow struct {
 	Status    string `json:"status"`
 	MarginBps int    `json:"margin_bps"`
 	Nilai     int64  `json:"nilai"` // jumlah x harga pokok
+	// JumlahMili: jumlah per seribu satuan (2500 = 2,5). Dilacak: jumlah & nilainya dari
+	// kartu stok, bukan diketik.
+	JumlahMili int64 `json:"jumlah_mili"`
+	Dilacak    bool  `json:"dilacak"`
+	Minus      bool  `json:"minus"`
 }
 
 func SummarizeStok(list []StokItem) StokSummary {
@@ -184,7 +194,7 @@ func SummarizeStok(list []StokItem) StokSummary {
 	for _, it := range list {
 		nilai := it.Jumlah * it.HargaPokok
 		status := it.Status()
-		s.Items = append(s.Items, StokRow{StokItem: it, Status: status, MarginBps: it.MarginBps(), Nilai: nilai})
+		s.Items = append(s.Items, StokRow{StokItem: it, Status: status, MarginBps: it.MarginBps(), Nilai: nilai, JumlahMili: it.Jumlah * TakaranSkala})
 		s.NilaiPersediaan += nilai
 		switch status {
 		case "Stok Menipis":
@@ -264,4 +274,51 @@ func (s TagihanSummary) ToPiutangCard() PiutangCard {
 		PayableUnpaidTotal:   s.TotalUtang,
 		PayableUnpaidDisplay: fmt.Sprintf("Utang supplier %s", FormatJt(s.TotalUtang)),
 	}
+}
+
+// TerapkanKartu: salinan daftar stok dengan jumlah (dibulatkan ke bawah) dan harga pokok
+// rata-rata dari kartu stok. Tanpa titik nol, daftar dikembalikan apa adanya.
+func TerapkanKartu(list []StokItem, k KartuStok) []StokItem {
+	if k.Mulai == "" {
+		return list
+	}
+	out := slices.Clone(list)
+	for i := range out {
+		p := k.Posisi[out[i].ID]
+		out[i].Jumlah = p.Qty / TakaranSkala
+		if p.Qty > 0 {
+			out[i].HargaPokok = mulDiv(p.Nilai, TakaranSkala, p.Qty)
+		}
+	}
+	return out
+}
+
+// RingkasStok: ringkasan Stok & Gudang; setelah titik nol jumlah, nilai, dan status
+// mengikuti kartu stok.
+func RingkasStok(list []StokItem, k KartuStok) StokSummary {
+	if k.Mulai == "" {
+		return SummarizeStok(list)
+	}
+	s := SummarizeStok(TerapkanKartu(list, k))
+	s.Mulai, s.NilaiPersediaan, s.Menipis, s.Habis = k.Mulai, 0, 0, 0
+	for i := range s.Items {
+		r := &s.Items[i]
+		p := k.Posisi[r.ID]
+		r.JumlahMili, r.Nilai, r.Dilacak, r.Minus = p.Qty, p.Nilai, true, p.Qty < 0
+		switch {
+		case p.Qty < 0:
+			r.Status = "Minus"
+			s.Minus++
+		case p.Qty == 0:
+			r.Status = "Habis"
+			s.Habis++
+		case r.StokMin > 0 && p.Qty <= r.StokMin*TakaranSkala:
+			r.Status = "Stok Menipis"
+			s.Menipis++
+		default:
+			r.Status = "Aman"
+		}
+		s.NilaiPersediaan += p.Nilai
+	}
+	return s
 }
