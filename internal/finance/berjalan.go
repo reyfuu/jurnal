@@ -35,7 +35,8 @@ type Posisi struct {
 // PosisiPada menghitung saldo pada akhir tanggal sampai (YYYY-MM-DD; "YYYY-MM-00" = sebelum
 // bulan itu) dari saldo awal ob dan semua transaksi.
 func PosisiPada(ob OpeningBalance, txs []Transaction, sampai string) Posisi {
-	p := Posisi{Kas: ob.Kas, Piutang: ob.Piutang, Utang: ob.Utang, Pinjaman: ob.Pinjaman, PiutangOps: ob.Piutang, UtangOps: ob.Utang}
+	ap, au := ob.sisaAwal(true, sampai), ob.sisaAwal(false, sampai)
+	p := Posisi{Kas: ob.Kas + (ob.Piutang - ap) - (ob.Utang - au), Piutang: ap, Utang: au, Pinjaman: ob.Pinjaman, PiutangOps: ap, UtangOps: au}
 	for _, t := range txs {
 		if t.Tanggal > sampai {
 			continue
@@ -106,6 +107,15 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 	for _, t := range txs {
 		if d := tanggalKas(t); t.Lunas && d[:min(7, len(d))] == period {
 			kas = append(kas, ToLedger([]Transaction{t})...)
+		}
+	}
+	for _, pa := range ob.Pelunasan {
+		if len(pa.Tanggal) >= 7 && pa.Tanggal[:7] == period {
+			if pa.Jenis == "piutang" {
+				kas = append(kas, LedgerEntry{Kind: KindIncome, Category: CatSales, Title: "Pelunasan piutang saldo awal", Channel: "Pelunasan saldo awal", Gross: pa.Nominal, Settled: true})
+			} else {
+				kas = append(kas, LedgerEntry{Kind: KindExpense, Category: CatCOGS, Title: "Pelunasan utang saldo awal", Gross: pa.Nominal, Settled: true})
+			}
 		}
 	}
 	cf := BuildCashFlow(kas, is, p0.Kas)
@@ -220,11 +230,7 @@ func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) U
 		out.Kelompok[b.Kelompok].Jumlah++
 		out.Total += b.Nilai
 	}
-	awal := ob.Utang
-	if piutang {
-		awal = ob.Piutang
-	}
-	if awal > 0 && ob.Tanggal <= per {
+	if awal := ob.sisaAwal(piutang, per); awal > 0 && ob.Tanggal <= per {
 		tambah(BarisUmur{Tanggal: ob.Tanggal, Pihak: "Saldo awal", Keterangan: "Saldo awal pembukuan", Nilai: awal})
 	}
 	for _, t := range txs {

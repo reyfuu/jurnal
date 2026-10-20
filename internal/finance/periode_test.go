@@ -3,6 +3,7 @@ package finance
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func idsDari(p []PilihanPeriode) string {
@@ -56,4 +57,9 @@ func TestEmptySnapshotMemakaiPeriodeDiminta(t *testing.T) {
 	if s.Period != "2026-10" || s.PeriodLabel != "Oktober 2026" {
 		t.Errorf("%s %s", s.Period, s.PeriodLabel)
 	}
+}
+
+func mustTgl(s string) time.Time {
+	t, _ := time.Parse(time.DateOnly, s)
+	return t
 }

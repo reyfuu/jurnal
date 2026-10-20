@@ -16,12 +16,15 @@ import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
+import { TutupBuku } from '@/views/TutupBuku'
+import { CatatCepat } from '@/components/CatatCepat'
+import { LangkahMulaiCard } from '@/components/LangkahMulai'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
 import { KalkulatorPajak } from '@/views/KalkulatorPajak'
 import { PajakUMKM, StokModule } from '@/views/Operations'
 import { SimulasiHarga } from '@/views/SimulasiHarga'
-import { PiutangUtang, StokGudang } from '@/views/PiutangStok'
+import { StokGudang } from '@/views/PiutangStok'
 import { ProduksiSupplier } from '@/views/ProduksiSupplier'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
@@ -224,6 +227,7 @@ export default function App() {
           {data && (
             <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: 'var(--bg-raised)', padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-shell)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {!me.lihat && !terkunci && <CatatCepat boleh={(v) => canSee(v) && (v !== 'transaksi' || canSee('transaksi'))} onPilih={navigate} />}
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Periode Laporan:
                 </span>
@@ -275,7 +279,10 @@ export default function App() {
       case 'alat-gratis':
         return <AlatGratis profile={business!.profile} ptkpCodes={business!.options.ptkp} onLangganan={() => navigate('langganan')} />
       case 'dashboard':
-        return <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
+        return <>
+          {!me!.lihat && !terkunci && <LangkahMulaiCard onBuka={navigate} />}
+          <Dashboard d={d} canSee={canSee} onNavigate={navigate} period={period} periods={periods} onPeriodChange={changePeriod} />
+        </>
       case 'laporan-keuangan':
         return data!.report && data!.balanceSheet && data!.cash && data!.assets && (
           <LaporanKeuangan
@@ -293,18 +300,19 @@ export default function App() {
           />
         )
       case 'umur-piutang':
+      case 'piutang-utang':
         return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} />
+      case 'tutup-buku':
+        return <TutupBuku periods={periods} period={period} bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onBuka={navigate} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'transaksi':
-        return <Transaksi onChanged={() => reload(me!, period)}
+        return <Transaksi key={bukaTab.n} aksiAwal={bukaTab.tab} onChanged={() => reload(me!, period)}
           lihat={me!.lihat && { klienId: me!.lihat.klien_id, bolehUsul: !!me!.master?.izin.includes('usul_koreksi') }} />
-      case 'piutang-utang':
-        return <PiutangUtang />
       case 'stok-gudang':
-        return <StokGudang bisaUbah={!me!.lihat} />
+        return <StokGudang key={bukaTab.n} aksi={bukaTab.tab} bisaUbah={!me!.lihat} />
       case 'produksi-supplier':
-        return <ProduksiSupplier bisaUbah={!me!.lihat} />
+        return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} bisaUbah={!me!.lihat} />
       case 'invoice':
         return <InvoiceView />
       case 'simulasi-harga':

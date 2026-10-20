@@ -131,6 +131,17 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 		http.Error(w, "usulan ini sudah diputuskan", http.StatusConflict)
 		return
 	}
+	if setuju {
+		tgl := tanggalTx(k.Sebelum)
+		if k.Usulan != nil {
+			tgl = append(tgl, tanggalTx(*k.Usulan)...)
+		}
+		if err := t.cekTerbukaLocked(tgl...); err != nil {
+			t.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+	}
 	k.Catatan, k.DiputuskanOleh, k.DiputuskanPada = clip(strings.TrimSpace(req.Catatan), 500), u.Name, now
 	basi := false
 	if setuju {

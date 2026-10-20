@@ -69,6 +69,9 @@ type tenant struct {
 	// & jual berasal dari transaksi bertanda barang; kartu dihitung ulang dari keduanya.
 	gerak       []finance.GerakStok
 	nextGerakID int
+	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
+	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
+	tutupBuku string
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
 	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
@@ -180,6 +183,7 @@ func (t *tenant) restore(st *state) {
 	}
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
+	t.tutupBuku = st.TutupBuku
 }
 
 func NewServer() *Server {
@@ -842,16 +846,20 @@ func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	finance.ApplyTrend(&snap, history)
 	snap.CashWarnings = finance.CashWarnings(txs, rep.CashFlow.OpeningBalance)
 
-	// Daftar Piutang & Utang dan Stok di dashboard dirender dari record tenant — termasuk untuk
-	// usaha demo, yang kini memulai dengan SeedTagihan/SeedStok. Tidak ada cabang "pakai seed
-	// tampilan": dua tempat yang menampilkan tagihan yang sama tidak boleh berbeda angkanya,
-	// dan baris contoh di dashboard harus bisa disunting dari halaman daftarnya.
+	// Piutang & utang di dashboard dari buku besar (transaksi belum lunas + saldo awal), sama
+	// dengan Neraca dan menu Piutang & Utang. Acuan: akhir periode atau hari ini bila lebih awal.
 	s.mu.RLock()
-	tagihan := append([]finance.Tagihan(nil), s.tagihan...)
+	acuan := time.Now()
+	if t, err := time.Parse("2006-01", period); err == nil {
+		if akhir := t.AddDate(0, 1, -1); akhir.Before(acuan) {
+			acuan = akhir
+		}
+	}
+	tagihan := s.tagihanBukuLocked(acuan.Format(time.DateOnly))
 	stok := finance.TerapkanKartu(append([]finance.StokItem(nil), s.stok...), s.kartuLocked())
 	s.mu.RUnlock()
-	rekap := finance.SummarizeTagihan(tagihan, time.Now())
-	snap.Obligations = finance.ToObligations(tagihan, time.Now())
+	rekap := finance.SummarizeTagihan(tagihan, acuan)
+	snap.Obligations = finance.ToObligations(tagihan, acuan)
 	snap.Inventory = finance.ToInventory(stok)
 	// KPI "Piutang belum tertagih" ikut dari rekap yang sama. Tanpa ini kartunya tetap memakai
 	// angka seed bulanan dengan jumlah faktur dipatok 8, dan dashboard menyebut angka yang
@@ -1009,6 +1017,11 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.mu.Lock()
+	if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
@@ -1036,6 +1049,10 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
 		return
 	}
+	if err := s.cekTerbukaLocked(append(tanggalTx(s.txs[i]), tanggalTx(t)...)...); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	t.ID = s.txs[i].ID
 	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
@@ -1047,6 +1064,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	i := s.txIndex(r)
 	if i < 0 {
 		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.txs = slices.Delete(s.txs, i, i+1)
@@ -1092,6 +1113,13 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 	res := importResp{Valid: len(txs), Errors: errs, Sample: txs[:min(5, len(txs))]}
 	if r.URL.Query().Get("commit") == "1" {
 		s.mu.Lock()
+		for _, t := range txs {
+			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+				s.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
 		for _, t := range txs {
 			t.ID = s.nextTxID
 			s.nextTxID++

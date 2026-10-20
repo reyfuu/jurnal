@@ -22,6 +22,52 @@ type OpeningBalance struct {
 	// ModalDisetor opsional: hanya dipakai untuk dicocokkan dengan modal hasil hitung,
 	// supaya salah input ketahuan. Modal yang dipakai laporan selalu hasil hitung.
 	ModalDisetor int64 `json:"modal_disetor"`
+	// Pelunasan: cicilan pelunasan piutang/utang saldo awal (tidak punya transaksi asal).
+	Pelunasan []PelunasanAwal `json:"pelunasan,omitempty"`
+}
+
+// PelunasanAwal: pelanggan melunasi piutang saldo awal (Jenis "piutang") atau usaha membayar
+// utang saldo awal ("utang") pada Tanggal; kas bergerak, laba tidak.
+type PelunasanAwal struct {
+	Jenis      string `json:"jenis"`
+	Tanggal    string `json:"tanggal"`
+	Nominal    int64  `json:"nominal"`
+	Keterangan string `json:"keterangan,omitempty"`
+}
+
+// sisaAwal: piutang/utang saldo awal yang belum dilunasi sampai tanggal itu.
+func (o OpeningBalance) sisaAwal(piutang bool, sampai string) int64 {
+	sisa, jenis := o.Utang, "utang"
+	if piutang {
+		sisa, jenis = o.Piutang, "piutang"
+	}
+	for _, p := range o.Pelunasan {
+		if p.Jenis == jenis && p.Tanggal <= sampai {
+			sisa -= p.Nominal
+		}
+	}
+	return sisa
+}
+
+// TambahPelunasan memvalidasi lalu mencatat pelunasan saldo awal.
+func (o *OpeningBalance) TambahPelunasan(p PelunasanAwal) error {
+	p.Keterangan = strings.TrimSpace(p.Keterangan)
+	switch {
+	case p.Jenis != "piutang" && p.Jenis != "utang":
+		return errors.New("jenis pelunasan harus piutang atau utang")
+	case p.Nominal <= 0:
+		return errors.New("nominal pelunasan harus lebih dari 0")
+	case p.Tanggal < o.Tanggal:
+		return errors.New("tanggal pelunasan tidak boleh sebelum tanggal saldo awal")
+	}
+	if _, err := time.Parse(time.DateOnly, p.Tanggal); err != nil {
+		return errors.New("tanggal pelunasan wajib diisi (YYYY-MM-DD)")
+	}
+	if p.Nominal > o.sisaAwal(p.Jenis == "piutang", "9999-12-31") {
+		return errors.New("nominal melebihi sisa " + p.Jenis + " saldo awal")
+	}
+	o.Pelunasan = append(o.Pelunasan, p)
+	return nil
 }
 
 func ValidateOpeningBalance(o *OpeningBalance) error {

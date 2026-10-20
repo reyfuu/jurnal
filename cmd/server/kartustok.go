@@ -117,6 +117,10 @@ func (s *tenant) cekBarisFisik(baris []finance.BarisGerak) error {
 }
 
 func (s *tenant) simpanGerak(w http.ResponseWriter, r *http.Request, g finance.GerakStok) {
+	if err := s.cekTerbukaLocked(g.Tanggal); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	g.ID = s.nextGerakID
 	s.nextGerakID++
 	g.Oleh, g.Dibuat = currentUser(r).Name, time.Now().UTC()
@@ -291,6 +295,10 @@ func (s *tenant) handleDeleteGerak(w http.ResponseWriter, r *http.Request) {
 	i := slices.IndexFunc(s.gerak, func(g finance.GerakStok) bool { return g.ID == id })
 	if i < 0 {
 		http.Error(w, "dokumen stok tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := s.cekTerbukaLocked(s.gerak[i].Tanggal); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	if s.gerak[i].Jenis == finance.GerakAwal && len(s.gerak) > 1 {

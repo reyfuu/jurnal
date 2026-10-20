@@ -852,7 +852,16 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - **Laba Rugi bertingkat**: laba kotor → beban operasional tunai → **EBITDA** → penyusutan & amortisasi → **EBIT** → pendapatan lain → laba bersih (UI, PDF/Banding, CoA).
 - **CoA berjalan**: saldo awal akun dari posisi akhir bulan lalu (`coa.OpeningBerjalan`, 3201 = laba ditahan) + `coa.JournalBerjalan` (transaksi bulan ini; pelunasan transaksi bulan lalu Dr Kas/Cr 1201 atau Dr 2101/Cr Kas di tanggal bayar). Laba & total aset CoA = ringkas (diuji 3 bulan).
 - **Umur Piutang & Utang** (menu Laporan, view `umur-piutang`): transaksi belum lunas + saldo awal per tanggal, kelompok 0–30/31–60/61–90/>90 hari, per pihak; total = Neraca. **Catat pelunasan** → `POST /api/v1/transactions/{id}/lunas {tanggal}`.
-- Catatan: menu Piutang & Utang (daftar tagihan manual) dan KPI "Piutang belum tertagih" di dashboard masih dari daftar tagihan terpisah, belum dari buku besar — disatukan berikutnya. Baris PPh di laba rugi belum ada.
+- Catatan: baris PPh di laba rugi belum ada.
+
+## Alur kerja: + Catat, Langkah memulai, Tutup buku, Piutang & Utang dari buku besar (21 Okt 2026)
+
+- **Sidebar per pekerjaan**: Ringkasan · Catat Harian (Transaksi, Stok & Gudang, Produksi) · Tagihan (Piutang & Utang, Invoice) · Laporan (Keuangan, Penjualan, Tutup Buku) · Pajak · Alat · Pengaturan.
+- **+ Catat** (bilah atas, `CatatCepat`): Penjualan, Biaya, Beli bahan, Produksi, Pelunasan, Stok opname — membuka halaman tujuan langsung dengan formulirnya lewat `navigate(view, aksi)` (`Transaksi aksiAwal "baru:<jenis>"`, `StokGudang aksi beli|opname|mulai`, `ProduksiSupplier aksi catat`).
+- **Langkah memulai** di Dashboard (`GET /api/v1/mulai`): profil → saldo awal → barang → kartu stok → transaksi pertama → tutup buku; dicentang otomatis, bisa ditutup (localStorage).
+- **Tutup Buku Bulanan** (`/api/v1/tutup-buku` GET/POST/DELETE, view `tutup-buku`): daftar cek (transaksi, piutang/utang > 30 hari, opname, stok minus, penyusutan, kas minus, neraca), lalu kunci bulan (`tenant.tutupBuku`, kolom `tenants.tutup_buku`). Bulan ≤ tutupBuku menolak (409) tambah/ubah/hapus/lunas transaksi, impor & mutasi, dokumen stok, aset, persetujuan koreksi; saldo awal & impor data awal tidak bisa diubah setelah ada bulan ditutup. Hanya Owner yang bisa membuka kembali bulan terakhir.
+- **Piutang & Utang** kini dari buku besar (tab Piutang / Utang = umur + Catat pelunasan) — dashboard (kartu piutang, daftar kewajiban) dan utang per supplier di Produksi memakai `TagihanDariBuku` (jatuh tempo dianggap 30 hari). Daftar tagihan manual lama jadi tab "Tagihan manual (lama)" dengan peringatan tidak masuk laporan.
+- **Pelunasan saldo awal** piutang/utang (`OpeningBalance.Pelunasan`, `POST /api/v1/opening/pelunasan`, kolom `opening_balances.pelunasan`): mengurangi sisa saldo awal, kas bergerak di tanggal bayar, tercatat di arus kas & jurnal CoA; menyimpan ulang saldo awal tidak menghapusnya.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 

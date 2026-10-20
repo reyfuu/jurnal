@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"pajak/internal/finance"
 )
@@ -22,7 +23,8 @@ func (s *tenant) handleListProduksi(w http.ResponseWriter, _ *http.Request) {
 	supplier := slices.Clone(s.supplier)
 	// Setelah titik nol, harga bahan & HPP di stok memakai rata-rata kartu stok.
 	stok := finance.TerapkanKartu(slices.Clone(s.stok), s.kartuLocked())
-	tagihan := slices.Clone(s.tagihan)
+	// Utang per supplier dari buku besar (pembelian belum dibayar), sama dengan Neraca.
+	tagihan := s.tagihanBukuLocked(time.Now().In(finance.WIB).Format(time.DateOnly))
 	s.mu.RUnlock()
 	writeJSON(w, finance.SummarizeProduksi(produk, supplier, stok, tagihan))
 }

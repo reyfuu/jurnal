@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -1640,3 +1640,16 @@ export interface UmurSaldo {
 }
 export const getUmurSaldo = (jenis: 'piutang' | 'utang', per: string) => api<UmurSaldo>(`/reports/umur?jenis=${jenis}&per=${per}`)
 export const lunasiTransaksi = (id: number, tanggal: string) => api<SavedTx>(`/transactions/${id}/lunas`, { method: 'POST', body: { tanggal } })
+
+// --- Alur kerja: tutup buku, langkah memulai, pelunasan saldo awal ---
+export interface CekTutup { kode: string; judul: string; status: 'ok' | 'peringatan' | 'info'; detail: string; view?: View }
+export interface TutupBuku {
+  periode: string; label: string; tutup_sampai: string; terkunci: boolean; bisa_tutup: boolean; bisa_buka: boolean
+  cek: CekTutup[]; laba: number; ebitda: number; penyusutan: number; kas_akhir: number
+}
+export const getTutupBuku = (period: string) => api<TutupBuku>(`/tutup-buku?period=${period}`)
+export const tutupBulan = (periode: string) => api<TutupBuku>('/tutup-buku', { method: 'POST', body: { periode } })
+export const bukaBulan = () => api<TutupBuku>('/tutup-buku', { method: 'DELETE' })
+export interface LangkahMulai { kode: string; judul: string; penjelasan: string; selesai: boolean; view: View; aksi?: string }
+export const getLangkahMulai = () => api<LangkahMulai[]>('/mulai')
+export const pelunasanSaldoAwal = (b: { jenis: 'piutang' | 'utang'; tanggal: string; nominal: number }) => api<unknown>('/opening/pelunasan', { method: 'POST', body: b })

@@ -40,7 +40,7 @@ var financeViews = []string{
 	// "arus-kas" dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 	"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
 	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "kalkulator-pajak", "karyawan", "master-data", "panduan", "pustaka", "lapor-bug",
-	"umur-piutang",
+	"umur-piutang", "tutup-buku",
 }
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.
@@ -51,7 +51,7 @@ var Roles = map[Role]RoleInfo{
 	MP:    {"Tim Master Pajak", "Panel Master sesuai role tim.", []string{"panel-master"}},
 	Lihat: {"Lihat sebagai (tim Master Pajak)", "Membaca data usaha tanpa bisa mengubah.", []string{
 		"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
-		"produksi-supplier", "invoice", "pajak-umkm", "karyawan", "master-data", "profil-usaha", "umur-piutang",
+		"produksi-supplier", "invoice", "pajak-umkm", "karyawan", "master-data", "profil-usaha", "umur-piutang", "tutup-buku",
 	}},
 }
 

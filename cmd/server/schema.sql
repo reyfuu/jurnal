@@ -436,3 +436,7 @@ CREATE TABLE IF NOT EXISTS gerak_stok (
 	dibuat     TIMESTAMPTZ NOT NULL,
 	PRIMARY KEY (tenant_id, id)
 );
+
+-- Tutup buku bulanan & pelunasan saldo awal (Okt 2026).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tutup_buku TEXT;
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS pelunasan JSONB;
