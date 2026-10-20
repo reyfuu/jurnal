@@ -824,6 +824,7 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - **Laporan**: tab Laporan mutasi (harian/bulanan; Awal, Beli, Produksi, Terjual, Dipakai produksi, Opname, Akhir, nilai) + Export Excel; kartu per barang (klik nama barang); riwayat dokumen (hapus = stok dihitung ulang; stok awal hanya bisa dihapus bila tidak ada dokumen lain). Barang berriwayat tidak bisa dihapus.
 - Formulir Transaksi: pilih "Barang dari Stok & Gudang" (endpoint ringan `/api/v1/stok/pilihan` juga untuk Kasir). Tanggal bawaan Transaksi & Invoice kini WIB (sebelumnya UTC → sebelum 07.00 jatuh ke kemarin).
 - Produksi & Supplier kini 3 tab (21 Okt 2026): **Produksi** (tab utama; tombol "Catat produksi" memilih produk + batch, dan Laporan Produksi per bulan `GET /api/v1/produksi/laporan` + `.xlsx`), **Produk & Resep** (master produk, diisi sekali), **Supplier**.
+- Produksi aktual: dialog Catat produksi mengisi bahan & hasil dari resep × batch (standar); pengguna boleh mengubah ke angka sebenarnya & menambah bahan di luar resep. `BarisGerak.Standar` menyimpan angka resep; Laporan Produksi menampilkan selisih (bahan lebih = merah, hasil kurang = merah) + alasan.
 - **Belum** (PR B): laporan keuangan masih memakai cara lama (HPP = belanja bahan, persediaan = saldo awal). Penyambungan HPP terjual, persediaan neraca, arus kas, dan pajak mulai titik nol menyusul.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)

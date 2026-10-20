@@ -1031,7 +1031,7 @@ export interface PilihanBarang { id: number; sku: string; nama: string; kategori
 
 export const stokAwal = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/awal', { method: 'POST', body: b })
 export const stokOpname = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/opname', { method: 'POST', body: b })
-export const stokProduksi = (b: { tanggal: string; produk_id: number; batch: number; keterangan?: string }) => api<GerakStok>('/stok/produksi', { method: 'POST', body: b })
+export const stokProduksi = (b: { tanggal: string; produk_id: number; batch: number; keterangan?: string; bahan?: { stok_id: number; qty: number }[]; hasil?: number }) => api<GerakStok>('/stok/produksi', { method: 'POST', body: b })
 export const getGerakStok = () => api<GerakStok[]>('/stok/gerak')
 export const hapusGerakStok = (id: number) => api<void>(`/stok/gerak/${id}`, { method: 'DELETE' })
 export const getKartuBarang = (id: number, dari: string, sampai: string) => api<KartuBarang>(`/stok/kartu/${id}?dari=${dari}&sampai=${sampai}`)
@@ -1609,8 +1609,8 @@ export const bandingPdfUrl = (periode: string[]) => `/api/v1/reports/banding.pdf
 
 // --- Laporan produksi ---
 export interface BarisProduksi {
-  id: number; tanggal: string; produk_id: number; produk: string; batch: number; hasil_qty: number; satuan: string
-  nilai: number; per_unit: number; bahan: { nama: string; satuan: string; qty: number; nilai: number }[]; keterangan?: string; oleh?: string
+  id: number; tanggal: string; produk_id: number; produk: string; batch: number; hasil_qty: number; hasil_standar: number; satuan: string
+  nilai: number; per_unit: number; bahan: { nama: string; satuan: string; qty: number; standar: number; nilai: number }[]; keterangan?: string; oleh?: string
 }
 export interface LaporanProduksi { dari: string; sampai: string; mulai: string; baris: BarisProduksi[]; total_nilai: number }
 export const getLaporanProduksi = (dari: string, sampai: string) => api<LaporanProduksi>(`/produksi/laporan?dari=${dari}&sampai=${sampai}`)
