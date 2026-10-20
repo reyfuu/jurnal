@@ -1080,6 +1080,9 @@ export interface MutasiHasil {
   perlu_diperiksa: number
   duplikat: number
   format: string
+  /** Jumlah baris per bulan (cek mutasi masuk ke bulan yang benar) dan hal yang perlu dicek. */
+  per_bulan?: { bulan: string; label: string; jumlah: number }[] | null
+  peringatan?: string[] | null
   /** Baris yang jenisnya disarankan AI, dan kenapa AI tidak dipakai (bila ada). */
   dibantu_ai?: number
   ai_pesan?: string

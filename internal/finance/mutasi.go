@@ -1,6 +1,9 @@
 package finance
 
 import (
+	"fmt"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +66,17 @@ type MutasiHasil struct {
 	AIPesan   string `json:"ai_pesan,omitempty"`
 	// Format menyebut kolom apa yang dikenali, supaya jelas berkasnya terbaca sebagai apa.
 	Format string `json:"format"`
+	// PerBulan: jumlah baris per bulan, supaya pengguna bisa memastikan mutasinya masuk ke
+	// bulan yang benar sebelum dibukukan. Peringatan: hal yang perlu dicek (format tanggal
+	// terbalik, tanggal di masa depan, pergantian tahun).
+	PerBulan   []MutasiBulan `json:"per_bulan"`
+	Peringatan []string      `json:"peringatan,omitempty"`
+}
+
+type MutasiBulan struct {
+	Bulan  string `json:"bulan"` // YYYY-MM
+	Label  string `json:"label"`
+	Jumlah int    `json:"jumlah"`
 }
 
 type aturan struct {
@@ -229,13 +243,25 @@ func ParseMutasi(rows [][]string, tahunDefault int, existing []Transaction) Muta
 		return strings.TrimSpace(row[c])
 	}
 
+	// Urutan hari/bulan dibaca dari seluruh berkas: satu tanggal seperti 01/25 sudah cukup
+	// membuktikan formatnya bulan/hari. Tanpa bukti, dianggap hari/bulan (format bank Indonesia).
+	var semuaTanggal []string
+	for i := headerAt + 1; i < len(rows); i++ {
+		semuaTanggal = append(semuaTanggal, get(rows[i], "tanggal"))
+	}
+	bulanDulu := urutanBulanDulu(semuaTanggal)
+	if bulanDulu {
+		h.Peringatan = append(h.Peringatan, "Tanggal di berkas ini berformat bulan/tanggal (mis. 01/25/2026), jadi dibaca sebagai bulan/tanggal. Cek kolom tanggal di bawah.")
+	}
+	tahunDari := tahunUntukBulan(semuaTanggal, tahunDefault, bulanDulu)
+
 	for i := headerAt + 1; i < len(rows); i++ {
 		row := rows[i]
 		noBaris := i + 1
 		if kosong(row) {
 			continue
 		}
-		tgl, ok := parseTanggalMutasi(get(row, "tanggal"), tahunDefault)
+		tgl, ok := parseTanggalMutasi(get(row, "tanggal"), tahunDari, bulanDulu)
 		if !ok {
 			// Baris kaki cetakan ("Saldo Akhir", "Mutasi Kredit") tidak punya tanggal:
 			// dilewati tanpa dilaporkan sebagai kesalahan.
@@ -275,7 +301,83 @@ func ParseMutasi(rows [][]string, tahunDefault int, existing []Transaction) Muta
 		h.Rows = append(h.Rows, r)
 	}
 	h.Ringkasan = rekapMutasi(h.Rows)
+	hariIni := time.Now().Format(time.DateOnly)
+	masaDepan := 0
+	for _, r := range h.Rows {
+		if r.Tanggal > hariIni {
+			masaDepan++
+		}
+		b := r.Tanggal[:7]
+		if n := len(h.PerBulan); n > 0 && h.PerBulan[n-1].Bulan == b {
+			h.PerBulan[n-1].Jumlah++
+			continue
+		}
+		if i := slices.IndexFunc(h.PerBulan, func(x MutasiBulan) bool { return x.Bulan == b }); i >= 0 {
+			h.PerBulan[i].Jumlah++
+			continue
+		}
+		h.PerBulan = append(h.PerBulan, MutasiBulan{Bulan: b, Label: LabelPeriode(b), Jumlah: 1})
+	}
+	slices.SortFunc(h.PerBulan, func(a, b MutasiBulan) int { return strings.Compare(a.Bulan, b.Bulan) })
+	if masaDepan > 0 {
+		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris bertanggal di masa depan — cek isian Tahun mutasi atau format tanggal berkas.", masaDepan))
+	}
 	return h
+}
+
+var polaHariBulan = regexp.MustCompile(`^(\d{1,2})[/-](\d{1,2})(?:[/-]\d{2,4})?$`)
+
+// urutanBulanDulu: true bila ada tanggal yang hanya masuk akal sebagai bulan/hari (bagian
+// kedua > 12) dan tidak ada yang hanya masuk akal sebagai hari/bulan.
+func urutanBulanDulu(tanggal []string) bool {
+	hariDulu, bulanDulu := false, false
+	for _, s := range tanggal {
+		m := polaHariBulan.FindStringSubmatch(strings.TrimSpace(s))
+		if m == nil {
+			continue
+		}
+		a, _ := strconv.Atoi(m[1])
+		b, _ := strconv.Atoi(m[2])
+		hariDulu = hariDulu || a > 12
+		bulanDulu = bulanDulu || b > 12
+	}
+	return bulanDulu && !hariDulu
+}
+
+// tahunUntukBulan: tahun untuk tanggal tanpa tahun. Bila berkas melewati pergantian tahun
+// (ada Desember dan Januari), tahun yang diisi pengguna adalah tahun bagian Januari-nya, jadi
+// bulan Juli–Desember mundur satu tahun.
+func tahunUntukBulan(tanggal []string, tahun int, bulanDulu bool) func(time.Month) int {
+	ada := map[time.Month]bool{}
+	for _, s := range tanggal {
+		if t, ok := tanggalTanpaTahun(s, bulanDulu); ok {
+			ada[t.Month()] = true
+		}
+	}
+	lintas := ada[time.December] && ada[time.January]
+	return func(m time.Month) int {
+		if lintas && m >= time.July {
+			return tahun - 1
+		}
+		return tahun
+	}
+}
+
+func tanggalTanpaTahun(s string, bulanDulu bool) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	layouts := []string{"02/01", "2/1", "02-01", "2-1"}
+	if bulanDulu {
+		layouts = []string{"01/02", "1/2", "01-02", "1-2"}
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	if t, err := time.Parse("02 Jan", s); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
 }
 
 func kosong(row []string) bool {
@@ -330,10 +432,17 @@ func bacaNominal(debet, kredit, mutasi, tanda string) (int64, string) {
 
 // parseTanggalMutasi menerima format umum cetakan bank, termasuk tanggal tanpa tahun
 // ("01/09") dan nama bulan ("01 Sep 2026").
-func parseTanggalMutasi(s string, tahun int) (string, bool) {
+func parseTanggalMutasi(s string, tahunDari func(time.Month) int, bulanDulu bool) (string, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", false
+	}
+	if bulanDulu {
+		for _, layout := range []string{"01/02/2006", "1/2/2006", "01-02-2006", "1-2-2006"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t.Format(time.DateOnly), true
+			}
+		}
 	}
 	if t, ok := parseTanggal(s); ok {
 		return t, true
@@ -343,15 +452,9 @@ func parseTanggalMutasi(s string, tahun int) (string, bool) {
 			return t.Format(time.DateOnly), true
 		}
 	}
-	// Tanpa tahun: "01/09" atau "01-09" — bulanan, tahunnya dari periode berkas.
-	for _, layout := range []string{"02/01", "2/1", "02-01", "2-1"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return time.Date(tahun, t.Month(), t.Day(), 0, 0, 0, 0, time.UTC).Format(time.DateOnly), true
-		}
-	}
-	// "01 SEP" tanpa tahun.
-	if t, err := time.Parse("02 Jan", s); err == nil {
-		return time.Date(tahun, t.Month(), t.Day(), 0, 0, 0, 0, time.UTC).Format(time.DateOnly), true
+	// Tanpa tahun: "01/09", "01-09", "01 SEP" — tahunnya dari isian pengguna.
+	if t, ok := tanggalTanpaTahun(s, bulanDulu); ok {
+		return time.Date(tahunDari(t.Month()), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC).Format(time.DateOnly), true
 	}
 	return "", false
 }
