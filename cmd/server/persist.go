@@ -41,6 +41,7 @@ type state struct {
 	NextSupplierID int                     `json:"next_supplier_id"`
 	Koreksi        []finance.Koreksi       `json:"koreksi"`
 	NextKoreksiID  int                     `json:"next_koreksi_id"`
+	CoaTemplate    int                     `json:"coa_template,omitempty"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
 	Langganan      *langganan              `json:"langganan,omitempty"`
 }
@@ -132,7 +133,7 @@ func (t *tenant) snapshot() state {
 		Stok: slices.Clone(t.stok), NextStokID: t.nextStokID,
 		Produk: slices.Clone(t.produk), NextProdukID: t.nextProdukID,
 		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
-		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID,
+		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
 	}
 }
 
@@ -211,6 +212,9 @@ func (s *Server) saveAll() {
 	}
 	if err := saveMasterDB(s.db, s.master, s.master.Audit); err != nil {
 		log.Fatalf("impor tim MasterPajak: %v", err)
+	}
+	if err := saveKatalogDB(s.db, s.katalog); err != nil {
+		log.Fatalf("impor katalog: %v", err)
 	}
 }
 

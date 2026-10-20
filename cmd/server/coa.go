@@ -27,8 +27,7 @@ type mappingRow struct {
 }
 
 func (s *tenant) handleCoA(w http.ResponseWriter, r *http.Request) {
-	p := s.currentProfile()
-	active := coa.Active(p)
+	_, active, p := s.coaAkun()
 	var mapping []mappingRow
 	if active != nil {
 		for _, j := range finance.JenisList {
@@ -37,7 +36,12 @@ func (s *tenant) handleCoA(w http.ResponseWriter, r *http.Request) {
 			mapping = append(mapping, mappingRow{j.Nama, kode, acc.Nama})
 		}
 	}
-	writeJSON(w, map[string]any{"supported": active != nil, "accounts": active, "mapping": mapping, "kelompok": coa.Kelompoks})
+	out := map[string]any{"supported": active != nil, "accounts": active, "mapping": mapping, "kelompok": coa.Kelompoks}
+	if t, baru := s.pembaruanCOA(p); t.ID != 0 {
+		out["template"] = map[string]any{"id": t.ID, "jenis": t.Jenis, "versi": t.Versi}
+		out["pembaruan"] = baru
+	}
+	writeJSON(w, out)
 }
 
 type coaReport struct {
@@ -48,8 +52,7 @@ type coaReport struct {
 }
 
 func (s *tenant) buildCoAReport(r *http.Request) coaReport {
-	p := s.currentProfile()
-	active := coa.Active(p)
+	all, active, p := s.coaAkun()
 	if active == nil {
 		return coaReport{}
 	}
@@ -62,7 +65,7 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
 	as := s.report(period).Assets
 	lines = append(lines, coa.DepreciationJournal(as, period)...)
-	tb := coa.TrialBalance(active, coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period)), lines)
+	tb := coa.TrialBalanceFrom(all, active, coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period)), lines)
 	is := coa.IncomeStatement(tb, p)
 	bs := coa.BalanceSheet(tb, is.LabaBersih)
 	return coaReport{true, tb, &is, &bs}
@@ -137,6 +140,7 @@ func (s *tenant) validAkun(t finance.Transaction) bool {
 	if t.Akun == "" {
 		return true
 	}
-	_, ok := coa.Find(coa.Active(s.currentProfile()), t.Akun)
+	_, active, _ := s.coaAkun()
+	_, ok := coa.Find(active, t.Akun)
 	return ok
 }

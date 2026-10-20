@@ -601,7 +601,8 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 
 // --- Panel Master (akun tim MasterPajak) ---
 
-export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'pembayaran' | 'tim' | 'audit'
+export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
+  | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -695,9 +696,44 @@ export interface CoAInfo {
   accounts: Account[] | null
   mapping: { jenis: string; kode: string; nama: string }[] | null
   kelompok: string[]
+  /** Versi template COA yang dipakai usaha ini. */
+  template?: { id: number; jenis: string; versi: number }
+  /** Ada versi template lebih baru dari tim MasterPajak; berlaku setelah Owner menerapkannya. */
+  pembaruan?: { id: number; versi: number; diff: DiffAkun } | null
 }
+export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[] }
 
 export const getCoA = () => api<CoAInfo>('/coa')
+export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
+
+// --- Katalog Panel Master: template COA & benchmark DJP ---
+
+export type StatusKatalog = 'draft' | 'terbit' | 'aktif' | 'arsip'
+export interface TemplateCOA { id: number; jenis: string; versi: number; status: StatusKatalog; akun: Account[]; catatan?: string; oleh?: string; waktu: string }
+export interface KLUBenchmark { kode: string; nama: string; cttor_bps: number; npm_bps: number }
+export interface BenchmarkVersi { id: number; nama: string; sumber: string; status: StatusKatalog; baris: KLUBenchmark[]; oleh?: string; waktu: string }
+export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; kode_wajib: string[]; klien_per_template: Record<number, number> }
+
+async function unggah<T>(path: string, file: File, fields: Record<string, string>): Promise<T> {
+  const form = new FormData()
+  form.append('file', file)
+  for (const [k, v] of Object.entries(fields)) form.append(k, v)
+  const res = await fetch('/api/v1' + path, { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
+export const getKatalogCOA = () => api<KatalogCOA>('/master/coa')
+export const simpanDraftCOA = (jenis: string, akun: Account[], catatan: string) =>
+  api<TemplateCOA>('/master/coa/draft', { method: 'POST', body: { jenis, akun, catatan } })
+export const imporDraftCOA = (file: File, jenis: string, catatan: string) => unggah<TemplateCOA>('/master/coa/draft', file, { jenis, catatan })
+export const hapusDraftCOA = (id: number) => api<void>(`/master/coa/${id}`, { method: 'DELETE' })
+export const terbitkanCOA = (id: number) => api<TemplateCOA>(`/master/coa/${id}/terbitkan`, { method: 'POST' })
+export const unduhCOAUrl = (id: number) => `/api/v1/master/coa/${id}/xlsx`
+export const getKatalogBenchmark = () => api<{ versi: BenchmarkVersi[]; klien_per_klu: Record<string, number> }>('/master/benchmark')
+export const imporBenchmark = (file: File, nama: string, sumber: string) => unggah<BenchmarkVersi>('/master/benchmark', file, { nama, sumber })
+export const aktifkanBenchmark = (id: number) => api<BenchmarkVersi>(`/master/benchmark/${id}/aktifkan`, { method: 'POST' })
+export const unduhBenchmarkUrl = (id: number) => `/api/v1/master/benchmark/${id}/xlsx`
 
 export interface ReportLine { kode: string; nama: string; jumlah: number }
 export interface Balance extends Account { debit: number; kredit: number; saldo: number }

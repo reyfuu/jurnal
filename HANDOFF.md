@@ -602,6 +602,29 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Postgres: tabel `koreksi` (sebelum/usulan JSONB) + `tenants.next_koreksi_id`; ikut diuji di
   `TestPostgresSimpanMuatSemuaField` (terbukti gagal bila pemetaan dibuang).
 
+## Panel Master — tahap 3: template COA & benchmark DJP berversi (20 Okt 2026)
+
+- `internal/katalog`: versi template COA per jenis usaha (draft → terbit → arsip) dan versi
+  benchmark (draft → aktif → arsip), plus impor/ekspor Excel (format ekspor = template impor).
+  Versi 1 keduanya = bawaan kode (`coa.Master`, `tax.KLUBenchmarks`) dan **diisi ulang dari kode
+  setiap boot** (`segarkanBawaan`), jadi perbaikan di kode tetap berlaku sampai tim menerbitkan
+  versi sendiri.
+- **Template terbit wajib lolos `coa.ValidateTemplate`**: kode 4 digit unik, kelompok/normal/
+  kondisi dikenal, dan semua `coa.KodeWajib()` (akun yang ditulis langsung di jurnal & laporan +
+  hasil `AutoAccount`) ada. `TestKodeWajib_MencakupKodeDiKode` membaca journal.go/reports.go dan
+  gagal bila ada kode literal baru yang belum masuk `kodeSistem`.
+- **Klien dipatok** (`tenant.coaTemplateID`, kolom `tenants.coa_template`): saat versi baru
+  terbit, usaha berjenis sama yang masih mengikuti versi terbaru dipatok ke versi lama.
+  Daftar Akun klien menampilkan tawaran pembaruan + diff; Owner menerapkan lewat
+  `POST /coa/perbarui` (ditolak bila transaksi masih memakai akun yang dihapus). Ganti jenis usaha
+  di profil = patokan dilepas. Jasa/manufaktur kini bisa punya COA lengkap begitu template terbit.
+- **Benchmark aktif** dipasang lewat `tax.AktifkanBenchmark` (pointer atomik; `FindKLU`, `CekAwal`,
+  daftar KLU onboarding ikut). Aktivasi ditolak (409) bila ada KLU yang dipakai profil klien tidak
+  ada di versi baru — profil itu akan gagal validasi saat disimpan.
+- ponytail: katalog aktif juga pointer atomik global di cmd/server (`katalogAktif`) — satu server
+  per proses; tes server tidak paralel.
+- Postgres: `coa_template`, `benchmark_versi` (tulis ulang semua baris) + `tenants.coa_template`.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
@@ -615,8 +638,7 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
    Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
    berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
    mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
-   Panel Master tahap 3–4 (lihat preview): template COA & benchmark ke database → artikel pajak,
-   basis pengetahuan AI, analisa AI per klien.
+   Panel Master tahap 4 (lihat preview): artikel pajak, basis pengetahuan AI, analisa AI per klien.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 

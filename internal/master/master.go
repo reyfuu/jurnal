@@ -20,6 +20,8 @@ const (
 	// LihatSebagai: membaca laporan klien apa adanya (hanya baca, wajib alasan, tercatat).
 	LihatSebagai Izin = "lihat_sebagai"
 	UsulKoreksi  Izin = "usul_koreksi"
+	COATemplate  Izin = "coa_template"
+	Benchmark    Izin = "benchmark"
 	Langganan    Izin = "langganan"
 	Pembayaran   Izin = "pembayaran"
 	Tim          Izin = "tim"
@@ -41,6 +43,8 @@ var DaftarIzin = []IzinInfo{
 	{LihatSebagai, "Lihat sebagai klien", "Membaca laporan klien, hanya baca; wajib alasan dan tercatat"},
 	{UsulKoreksi, "Usulkan koreksi pembukuan", "Berlaku setelah pemilik usaha menyetujui"},
 	{Langganan, "Atur langganan klien", "Perpanjang trial, aktifkan paket manual"},
+	{COATemplate, "Kelola template COA", "Draft, impor Excel, dan terbitkan versi template per jenis usaha"},
+	{Benchmark, "Kelola benchmark NPM DJP", "Impor versi data baru dan aktifkan"},
 	{Pembayaran, "Lihat pembayaran", "Order Midtrans semua klien yang bisa dilihat"},
 	{Tim, "Kelola tim & akses", "Tambah anggota, role, dan penugasan klien"},
 	{Audit, "Lihat audit log", ""},
