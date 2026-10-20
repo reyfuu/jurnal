@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -61,6 +62,7 @@ type Server struct {
 	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
 	mux       *http.ServeMux
 	bugs      *bugStore
+	db        *sql.DB // nil = berkas JSON di DATA_DIR (atau memori saja)
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -109,6 +111,35 @@ func (t *tenant) restore(st *state) {
 }
 
 func NewServer() *Server {
+	s := &Server{
+		llm:      llm.New(llm.ConfigFromEnv()),
+		failures: map[string]loginFailure{},
+		aiEngine: ai.NewEngine(),
+		mux:      http.NewServeMux(),
+	}
+	loaded := false
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		var err error
+		if s.db, err = openDB(url); err != nil {
+			log.Fatalf("Postgres: %v", err)
+		}
+		if loaded, err = s.loadDB(); err != nil {
+			log.Fatalf("memuat data dari Postgres: %v", err)
+		}
+	}
+	if !loaded {
+		// DB kosong: impor berkas JSON lama (atau seed) lalu simpan. Mode JSON: seed hanya
+		// disimpan bila state.json belum ada; SEED_PASSWORD hanya dipakai saat itu.
+		if fromFiles := s.loadFiles(); s.db != nil || !fromFiles {
+			s.saveAll()
+		}
+	}
+	s.routes()
+	return s
+}
+
+// loadFiles memuat data dari berkas JSON di DATA_DIR (atau seed); true bila state.json ada.
+func (s *Server) loadFiles() bool {
 	demo := demoTenant()
 	users := auth.NewStoreWithPassword(cmp.Or(os.Getenv("SEED_PASSWORD"), auth.DemoPassword))
 	st, err := loadState(demo.file("state"))
@@ -125,21 +156,8 @@ func NewServer() *Server {
 		log.Fatalf("data usaha rusak, perbaiki atau pindahkan dulu: %v", err)
 	}
 	tenants[1] = demo
-
-	s := &Server{
-		tenants:  tenants,
-		users:    users,
-		llm:      llm.New(llm.ConfigFromEnv()),
-		failures: map[string]loginFailure{},
-		aiEngine: ai.NewEngine(),
-		mux:      http.NewServeMux(),
-		bugs:     loadBugs(),
-	}
-	s.routes()
-	if st == nil {
-		s.save() // data awal (seed) langsung tersimpan; SEED_PASSWORD hanya dipakai saat ini
-	}
-	return s
+	s.tenants, s.users, s.bugs = tenants, users, loadBugs()
+	return st != nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +208,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/cashflow", s.guard("laporan-keuangan", s.on((*tenant).handleCashflow)))
 	s.mux.HandleFunc("GET /api/v1/business", s.guard("", s.on((*tenant).handleGetBusiness)))
 	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
-	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.on((*tenant).handlePutBusiness)))
+	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePutBusiness))))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
 	s.mux.HandleFunc("GET /api/v1/kalkulator", s.guard("kalkulator-pajak", s.handleKalkulatorMaster))

@@ -1,0 +1,251 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"os"
+	"reflect"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"pajak/internal/auth"
+	"pajak/internal/finance"
+)
+
+// pgTest: tes Postgres hanya jalan bila TEST_DATABASE_URL di-set; skema dikosongkan dulu.
+func pgTest(t *testing.T) string {
+	t.Helper()
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL tidak di-set")
+	}
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DATA_DIR", "")
+	t.Setenv("DATABASE_URL", url)
+	return url
+}
+
+// fill mengisi semua field dengan nilai bukan-nol, supaya field baru tanpa kolom ketahuan.
+func fill(v reflect.Value, n int) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		v.Set(reflect.New(v.Type().Elem()))
+		fill(v.Elem(), n)
+	case reflect.Struct:
+		if v.Type() == reflect.TypeFor[time.Time]() {
+			v.Set(reflect.ValueOf(time.Date(2026, 10, 20, 8, 30, n, 0, time.UTC)))
+			return
+		}
+		for i := range v.NumField() {
+			f := v.Type().Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			if f.Type.Kind() == reflect.String && (strings.HasPrefix(f.Name, "Tanggal") || f.Name == "JatuhTempo") {
+				v.Field(i).SetString("2026-08-2" + string(rune('0'+n%10)))
+				continue
+			}
+			fill(v.Field(i), n+i)
+		}
+	case reflect.Slice:
+		s := reflect.MakeSlice(v.Type(), 2, 2)
+		fill(s.Index(0), n+1)
+		fill(s.Index(1), n+2)
+		v.Set(s)
+	case reflect.String:
+		v.SetString("isi-" + string(rune('a'+n%26)))
+	case reflect.Int, reflect.Int64:
+		v.SetInt(int64(1000 + n))
+	case reflect.Bool:
+		v.SetBool(true)
+	}
+}
+
+func filled[T any](n int) T {
+	var x T
+	fill(reflect.ValueOf(&x).Elem(), n)
+	return x
+}
+
+func jsonOf(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// normTimes: Postgres menyimpan waktu sampai mikrodetik dan mengembalikan zona sesi.
+func normTimes(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if !v.IsNil() {
+			normTimes(v.Elem())
+		}
+	case reflect.Struct:
+		if tm, ok := v.Interface().(time.Time); ok {
+			v.Set(reflect.ValueOf(tm.UTC().Round(time.Microsecond)))
+			return
+		}
+		for i := range v.NumField() {
+			if v.Type().Field(i).IsExported() {
+				normTimes(v.Field(i))
+			}
+		}
+	case reflect.Slice:
+		for i := range v.Len() {
+			normTimes(v.Index(i))
+		}
+	}
+}
+
+// normJSON: salinan v (lewat JSON, data asli tidak disentuh) dengan waktu dinormalkan.
+func normJSON[T any](t *testing.T, v T) string {
+	t.Helper()
+	var c T
+	if err := json.Unmarshal([]byte(jsonOf(t, v)), &c); err != nil {
+		t.Fatal(err)
+	}
+	normTimes(reflect.ValueOf(&c).Elem())
+	return jsonOf(t, c)
+}
+
+type tenantData struct {
+	Txs                                                  []finance.Transaction
+	Assets                                               []finance.Asset
+	Opening                                              *finance.OpeningBalance
+	Karyawan                                             []finance.Karyawan
+	Invoices                                             []finance.Invoice
+	Profile                                              *finance.BusinessProfile
+	Langganan                                            langganan
+	NextTxID, NextAssetID, NextKaryawanID, NextInvoiceID int
+}
+
+// tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
+func tenantJSON(t *testing.T, tn *tenant) string {
+	t.Helper()
+	tn.mu.RLock()
+	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
+		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID}
+	tn.mu.RUnlock()
+	return normJSON(t, d)
+}
+
+func authJSON(t *testing.T, srv *Server) string {
+	snap := srv.users.Snapshot()
+	slices.SortFunc(snap.Sessions, func(a, b auth.SnapshotSession) int { return strings.Compare(a.Token, b.Token) })
+	return normJSON(t, snap)
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func TestPostgresSimpanMuatSemuaField(t *testing.T) {
+	pgTest(t)
+	srv := NewServer()
+	qa := register(t, srv, registerBody)
+	tn := tenantByEmail(t, srv, qa)
+
+	tn.mu.Lock()
+	tn.txs = []finance.Transaction{filled[finance.Transaction](1), filled[finance.Transaction](2)}
+	tn.txs[0].ID, tn.txs[1].ID = 1, 2
+	tn.assets = []finance.Asset{filled[finance.Asset](3)}
+	tn.karyawan = []finance.Karyawan{filled[finance.Karyawan](4)}
+	tn.invoices = []finance.Invoice{filled[finance.Invoice](5), filled[finance.Invoice](6)}
+	tn.invoices[0].ID, tn.invoices[1].ID = 1, 2
+	tn.opening = ptr(filled[finance.OpeningBalance](7))
+	tn.profile = ptr(filled[finance.BusinessProfile](8))
+	tn.langganan = filled[langganan](9)
+	tn.langganan.Orders[0].ID, tn.langganan.Orders[1].ID = "LB-2-1", "LB-2-2"
+	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
+	tn.mu.Unlock()
+	srv.saveFor(tn)
+	if rec := postBug(srv, qa, map[string]string{"judul": "Bug PG", "deskripsi": "d", "halaman": "dashboard"}, nil); rec.Code != http.StatusCreated {
+		t.Fatalf("lapor bug: %d %s", rec.Code, rec.Body)
+	}
+
+	srv2 := NewServer() // muat ulang dari Postgres
+	if got, want := tenantJSON(t, srv2.tenants[tn.id]), tenantJSON(t, tn); got != want {
+		t.Fatalf("data usaha berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
+	}
+	if got, want := tenantJSON(t, srv2.tenants[1]), tenantJSON(t, srv.tenants[1]); got != want {
+		t.Fatal("data usaha demo berubah setelah simpan-muat")
+	}
+	if got, want := authJSON(t, srv2), authJSON(t, srv); got != want {
+		t.Fatalf("user & sesi berubah:\n got %s\nwant %s", got, want)
+	}
+	if got, want := normJSON(t, srv2.bugs.list), normJSON(t, srv.bugs.list); got != want {
+		t.Fatalf("laporan bug berubah:\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestPostgresLewatAPI(t *testing.T) {
+	pgTest(t)
+	srv := NewServer()
+	qa := register(t, srv, registerBody) // tenant dari cookie respons
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", profileBody); rec.Code != http.StatusOK {
+		t.Fatalf("profil: %d", rec.Code)
+	}
+	aktifkan(t, srv, qa)
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"Punya QA","lunas":true}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create tx: %d %s", rec.Code, rec.Body)
+	}
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-21","jenis":"Penjualan","nominal":7000,"keterangan":"Punya demo","lunas":true}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create tx demo: %d", rec.Code)
+	}
+
+	srv2 := NewServer()
+	body := do(srv2, qa, http.MethodGet, "/api/v1/transactions", "").Body.String()
+	if !strings.Contains(body, "Punya QA") || strings.Contains(body, "Punya demo") {
+		t.Fatalf("transaksi usaha baru salah setelah restart: %s", body)
+	}
+	if !strings.Contains(do(srv2, owner, http.MethodGet, "/api/v1/transactions", "").Body.String(), "Punya demo") {
+		t.Fatal("transaksi usaha demo hilang setelah restart")
+	}
+	if !strings.Contains(do(srv2, qa, http.MethodGet, "/api/v1/business", "").Body.String(), "Kedai Kopi Senja") {
+		t.Fatal("profil usaha hilang setelah restart")
+	}
+	if st := tenantByEmail(t, srv2, qa).langgananStatus(time.Now()).Status; st != "aktif" {
+		t.Fatalf("langganan harus tetap aktif, got %s", st)
+	}
+}
+
+func TestPostgresImporDariJSON(t *testing.T) {
+	url := pgTest(t)
+	dir := t.TempDir()
+	t.Setenv("DATA_DIR", dir)
+	t.Setenv("DATABASE_URL", "") // versi lama: JSON
+	srv := NewServer()
+	qa := register(t, srv, registerBody)
+	aktifkan(t, srv, qa)
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-20","jenis":"Penjualan","nominal":5000,"keterangan":"Dari JSON","lunas":true}`); rec.Code != http.StatusCreated {
+		t.Fatalf("create tx: %d", rec.Code)
+	}
+
+	t.Setenv("DATABASE_URL", url) // deploy versi Postgres: DB kosong → impor
+	srv2 := NewServer()
+	if !strings.Contains(do(srv2, qa, http.MethodGet, "/api/v1/transactions", "").Body.String(), "Dari JSON") {
+		t.Fatal("transaksi tidak terimpor dari JSON")
+	}
+	var n int
+	if err := srv2.db.QueryRow(`SELECT count(*) FROM transactions WHERE tenant_id = 2`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("baris transaksi usaha 2 di DB: %d %v", n, err)
+	}
+
+	t.Setenv("DATA_DIR", t.TempDir()) // JSON tidak dibaca lagi setelah DB terisi
+	srv3 := NewServer()
+	if !strings.Contains(do(srv3, qa, http.MethodGet, "/api/v1/transactions", "").Body.String(), "Dari JSON") {
+		t.Fatal("data harus dimuat dari DB")
+	}
+}

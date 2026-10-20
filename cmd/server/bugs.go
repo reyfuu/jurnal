@@ -109,12 +109,17 @@ func (s *Server) handleCreateBug(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	b.list = append(b.list, rep)
-	if b.path != "" {
-		if err := writeFileAtomic(b.path, b.list); err != nil {
-			b.list = b.list[:len(b.list)-1]
-			http.Error(w, "gagal menyimpan laporan", http.StatusInternalServerError)
-			return
-		}
+	var err error
+	switch {
+	case s.db != nil:
+		err = insertBugDB(s.db, rep)
+	case b.path != "":
+		err = writeFileAtomic(b.path, b.list)
+	}
+	if err != nil {
+		b.list = b.list[:len(b.list)-1]
+		http.Error(w, "gagal menyimpan laporan", http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, rep)

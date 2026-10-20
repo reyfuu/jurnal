@@ -222,7 +222,7 @@ func (s *Server) applyPayment(st midtrans.Notification, now time.Time) error {
 		o.Status = "gagal"
 	}
 	t.mu.Unlock()
-	s.save()
+	s.saveFor(t)
 	return nil
 }
 

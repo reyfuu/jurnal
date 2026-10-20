@@ -101,15 +101,18 @@ func loadState(p string) (*state, error) {
 }
 
 // snapshot menyalin data usaha ke bentuk berkas; Auth diisi pemanggil (hanya usaha 1).
+// Slice disalin di bawah kunci: handler mengubah elemen di tempat (s.txs[i] = ...).
 func (t *tenant) snapshot() state {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+	l := t.langganan
+	l.Orders = slices.Clone(l.Orders)
 	return state{
-		Transactions: t.txs, NextTxID: t.nextTxID,
-		Assets: t.assets, NextAssetID: t.nextAssetID,
-		Opening: t.opening, Karyawan: t.karyawan, NextKaryawanID: t.nextKaryawanID,
-		Invoices: t.invoices, NextInvoiceID: t.nextInvoiceID,
-		Langganan: &t.langganan,
+		Transactions: slices.Clone(t.txs), NextTxID: t.nextTxID,
+		Assets: slices.Clone(t.assets), NextAssetID: t.nextAssetID,
+		Opening: t.opening, Karyawan: slices.Clone(t.karyawan), NextKaryawanID: t.nextKaryawanID,
+		Invoices: slices.Clone(t.invoices), NextInvoiceID: t.nextInvoiceID,
+		Langganan: &l,
 	}
 }
 
@@ -148,13 +151,60 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// saveFor menyimpan usaha t (nil = hanya user & sesi) setelah perubahan. Tanpa Postgres,
+// semua berkas JSON ditulis ulang seperti sebelumnya.
+func (s *Server) saveFor(t *tenant) {
+	if s.db == nil {
+		s.save()
+		return
+	}
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+	if t != nil {
+		if err := saveTenantDB(s.db, t); err != nil {
+			log.Printf("GAGAL menyimpan usaha %d ke Postgres: %v", t.id, err)
+		}
+	}
+	if err := saveAuthDB(s.db, s.users.Snapshot()); err != nil {
+		log.Printf("GAGAL menyimpan user & sesi ke Postgres: %v", err)
+	}
+}
+
+// saveAll menyimpan semua usaha (seed awal atau impor JSON ke Postgres).
+func (s *Server) saveAll() {
+	if s.db == nil {
+		s.save()
+		return
+	}
+	for _, t := range s.tenants {
+		s.saveFor(t)
+	}
+	for _, rep := range s.bugs.list {
+		if err := insertBugDB(s.db, rep); err != nil {
+			log.Fatalf("impor laporan bug %d: %v", rep.ID, err)
+		}
+	}
+}
+
+// changedTenant: usaha milik sesi baru di respons (login, daftar) atau sesi request.
+func (s *Server) changedTenant(r *http.Request, h http.Header) *tenant {
+	for _, c := range append((&http.Response{Header: h}).Cookies(), r.Cookies()...) {
+		if u, ok := s.users.UserBySession(c.Value); ok && c.Name == sessionCookie {
+			s.tenantsMu.RLock()
+			defer s.tenantsMu.RUnlock()
+			return s.tenants[u.TenantID]
+		}
+	}
+	return nil
+}
+
 // persisting menyimpan state setelah handler pengubah data selesai tanpa error.
 func (s *Server) persisting(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		h(rec, r)
 		if rec.status < 400 {
-			s.save()
+			s.saveFor(s.changedTenant(r, rec.Header()))
 		}
 	}
 }

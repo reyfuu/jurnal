@@ -106,6 +106,14 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 - **Profil usaha** (onboarding saat Owner pertama login): jenis usaha perdagangan/jasa/manufaktur, bentuk usaha OP/PT Perorangan/CV/PT, PTKP, PKP. `GET|PUT /api/v1/business`, disimpan di `$DATA_DIR/business.json` (VPS: `/var/www/laporan-bisnis/data`, volume Docker). Menu Pengaturan > Profil Usaha.
 - **Perencanaan Pajak** (`internal/tax`, port inti *Tax_Planning_Calculator_V2.1.xlsm* BSV Consulting): 6 skema (PP 20/2026 OP & Badan, Pasal 17, NPPN 50%, Badan 22%, Pasal 31E) + perbandingan bentuk badan dengan PPh dividen 10%. `POST /api/v1/tax/planning`, default dari transaksi + profil. Backlog dari template: gross-up PPh 21/23/sewa, PPN dibebankan vs ditanggung, beli vs sewa aset, NPPN per KLU (tabel 1.435 norma).
 
+## Penyimpanan PostgreSQL (20 Okt 2026) — menggantikan Fase B di produksi
+- `DATABASE_URL` di-set → data dimuat dari & ditulis ke PostgreSQL 17 ([cmd/server/pgstore.go](file:///home/reyfuu/pajak/cmd/server/pgstore.go), skema [schema.sql](file:///home/reyfuu/pajak/cmd/server/schema.sql), dijalankan tiap boot). Kosong → perilaku lama (JSON di `DATA_DIR` / memori saja, dipakai tes & dev).
+- Data tetap dilayani dari memori; setiap perubahan menulis ulang **satu usaha** (hapus + tulis dalam satu transaksi SQL) plus tabel `users`/`sessions`. Kolom tabel = tag JSON struct Go.
+- DB kosong saat boot + ada `state.json` di `DATA_DIR` → **impor sekali** dari JSON. Berkas JSON lama tidak dihapus; screenshot bug tetap di `DATA_DIR/bugs/`.
+- VPS: container `laporan-bisnis-db` (`postgres:17-alpine`, volume `laporan-bisnis-pg`, `127.0.0.1:5432`), dibuat `deploy.sh`. `.env` wajib `PG_PASSWORD`; `PG_RO_PASSWORD` membuat user baca-saja `dbeaver_ro`. Backup `pg_dump` harian 02:15 ke `/var/backups/laporan-bisnis/` (14 hari).
+- DBeaver: koneksi PostgreSQL dengan tab SSH (host VPS, user root, key `aipreneur_vps`), lalu `localhost:5432`, DB `laporan_bisnis`, user `dbeaver_ro`. Jangan edit data lewat DBeaver: aplikasi tidak membacanya ulang dan akan menimpanya.
+- Tes Postgres: `TEST_DATABASE_URL=postgres://...` lalu `go test ./...` (tanpa variabel itu, tes Postgres di-skip).
+
 ## Fase B — Persistensi Data (Okt 2026)
 - **Keputusan**: snapshot JSON atomik `$DATA_DIR/state.json` (transaksi, user dengan hash password, sesi aktif), bukan SQLite. Alasan: `modernc.org/sqlite` terbaru butuh Go 1.26 + dependensi besar, sementara data 1 usaha muat di memori. Ganti ke database saat multi-tenant.
 - Ditulis ulang setelah setiap request pengubah data yang sukses (middleware `persisting` di `cmd/server/persist.go`): login/logout, CRUD user, CRUD + impor transaksi. Penulisan diserialisasi (`saveMu`), file 0600.
@@ -440,7 +448,7 @@ nominal, jadi lapisannya dipilih manual.
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
-3. Migrasi persistensi PostgreSQL sesuai skema di [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md) saat kebutuhan database relasional diperlukan.
+3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 
 
