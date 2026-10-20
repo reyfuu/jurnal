@@ -143,6 +143,8 @@ type tenantData struct {
 	CoaTemplate                                          int
 	Arsip                                                time.Time
 	ArsipAlasan                                          string
+	Catatan                                              []finance.CatatanKonsultan
+	NextCatatanID                                        int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -152,7 +154,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -196,6 +198,9 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.koreksi = []finance.Koreksi{filled[finance.Koreksi](15)}
 	tn.koreksi[0].ID = 1
 	tn.nextKoreksiID = 2
+	tn.catatan = []finance.CatatanKonsultan{filled[finance.CatatanKonsultan](16)}
+	tn.catatan[0].ID = 1
+	tn.nextCatatanID = 2
 	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
@@ -302,6 +307,9 @@ func TestPostgresPanelMaster(t *testing.T) {
 	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"bulanan","alasan":"Transfer"}`); rec.Code != http.StatusOK {
 		t.Fatalf("langganan: %d %s", rec.Code, rec.Body)
 	}
+	if rec := do(srv, m, http.MethodPut, "/api/v1/master/pengingat", `{"aktif":true,"interval_hari":5,"tingkat_min":"penting"}`); rec.Code != http.StatusOK {
+		t.Fatalf("pengingat: %d %s", rec.Code, rec.Body)
+	}
 
 	srv2 := NewServer()
 	if got, want := normJSON(t, srv2.master), normJSON(t, srv.master); got != want {
@@ -312,6 +320,9 @@ func TestPostgresPanelMaster(t *testing.T) {
 	}
 	if got, want := authJSON(t, srv2), authJSON(t, srv); got != want {
 		t.Fatalf("user berubah (last_seen / akun tim):\n got %s\nwant %s", got, want)
+	}
+	if a := srv2.master.AturanPengingat(); a.IntervalHari != 5 || a.TingkatMin != "penting" {
+		t.Fatalf("pengingat setelah muat ulang = %+v", a)
 	}
 	if st := tenantByEmail(t, srv2, qa).langgananStatus(time.Now()).Status; st != "aktif" {
 		t.Fatalf("aktivasi manual hilang: %s", st)

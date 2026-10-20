@@ -62,6 +62,9 @@ type tenant struct {
 	// koreksi: usulan tim Master Pajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
+	// catatan: catatan konsultan pada laporan usaha ini; klien menandai selesai.
+	catatan       []finance.CatatanKonsultan
+	nextCatatanID int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
 	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
@@ -105,7 +108,7 @@ type Server struct {
 func newTenant(id int) *tenant {
 	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{},
 		nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1, nextTagihanID: 1, nextStokID: 1,
-		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1}
+		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1, nextCatatanID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -117,7 +120,7 @@ func demoTenant() *tenant {
 	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
 		invoices: finance.SeedInvoices(), tagihan: finance.SeedTagihan(), stok: finance.SeedStok(),
 		produk: finance.SeedProduk(), supplier: finance.SeedSupplier(),
-		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1}
+		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1, nextCatatanID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
 	t.nextInvoiceID = len(t.invoices) + 1
 	t.nextTagihanID, t.nextStokID = len(t.tagihan)+1, len(t.stok)+1
@@ -163,6 +166,9 @@ func (t *tenant) restore(st *state) {
 	}
 	if st.NextKoreksiID > 0 {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
+	}
+	if st.NextCatatanID > 0 {
+		t.catatan, t.nextCatatanID = st.Catatan, st.NextCatatanID
 	}
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
@@ -498,6 +504,10 @@ type meResp struct {
 	Lihat     *lihatInfo      `json:"lihat,omitempty"`  // akun tim yang sedang lihat-sebagai
 	// KoreksiMenunggu: usulan koreksi yang menunggu keputusan pemilik usaha.
 	KoreksiMenunggu int `json:"koreksi_menunggu,omitempty"`
+	// CatatanTerbuka: catatan konsultan yang belum ditandai selesai; CatatanIngat: yang jatuh
+	// tempo diingatkan (pop-up pengingat).
+	CatatanTerbuka int `json:"catatan_terbuka,omitempty"`
+	CatatanIngat   int `json:"catatan_ingat,omitempty"`
 }
 
 func (s *Server) newMe(u auth.User) meResp {
@@ -521,6 +531,7 @@ func (s *Server) newMe(u auth.User) meResp {
 		if u.Role.Can("usulan-koreksi") {
 			me.KoreksiMenunggu = t.koreksiMenunggu()
 		}
+		me.CatatanTerbuka, me.CatatanIngat = s.catatanTerbuka(t)
 	}
 	return me
 }

@@ -11,6 +11,7 @@ export type View =
   | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim Master Pajak
   | 'pustaka' // artikel pajak dari tim Master Pajak
   | 'laporan-ai' | 'alat-gratis' // menu mode terkunci (belum berlangganan), hanya di frontend
+  | 'catatan' // catatan konsultan untuk klien, hanya di frontend
 
 export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
@@ -39,6 +40,9 @@ export interface Me {
   lihat?: { klien_id: number; nama: string; alasan: string; sampai: string }
   /** Usulan koreksi yang menunggu keputusan pemilik usaha. */
   koreksi_menunggu?: number
+  /** Catatan konsultan yang belum ditandai selesai, dan yang jatuh tempo diingatkan (pop-up). */
+  catatan_terbuka?: number
+  catatan_ingat?: number
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
@@ -630,7 +634,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 // --- Panel Master (akun tim Master Pajak) ---
 
 export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
-  | 'parameter_pajak' | 'klien_ubah' | 'pengguna_lihat' | 'pengguna_kelola' | 'pengguna_reset' | 'hapus_permanen' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
+  | 'parameter_pajak' | 'klien_ubah' | 'pengguna_lihat' | 'pengguna_kelola' | 'pengguna_reset' | 'hapus_permanen' | 'catatan' | 'pengaturan' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -668,6 +672,24 @@ export interface PembayaranRow { klien_id: number; klien_nama: string; order: Ma
 export interface AnggotaRow { user: User; role: string; klien: number[] }
 export interface TimData { anggota: AnggotaRow[]; roles: MasterRole[]; izin: IzinInfo[]; klien: Orang[] }
 export interface AuditRow { id: number; waktu: string; user_id: number; nama: string; peran: string; aksi: string; klien_id?: number; keterangan?: string }
+// --- Catatan konsultan ---
+
+export type TingkatCatatan = 'info' | 'perbaiki' | 'penting'
+export interface CatatanKonsultan {
+  id: number; halaman: string; periode?: string; tingkat: TingkatCatatan; isi: string; transaksi_id?: number
+  oleh_id: number; oleh: string; peran?: string; dibuat: string; status: 'terbuka' | 'selesai'
+  selesai_oleh?: string; selesai_pada?: string; diingatkan_pada?: string; jumlah_pengingat: number
+}
+export interface Pengingat { aktif: boolean; interval_hari: number; tingkat_min: TingkatCatatan; kanal: string[] }
+export interface CatatanMasterRow extends CatatanKonsultan { klien_id: number; klien_nama: string }
+export const tulisCatatan = (klienId: number, b: { halaman: string; periode: string; tingkat: TingkatCatatan; isi: string }) =>
+  api<CatatanKonsultan>(`/master/klien/${klienId}/catatan`, { method: 'POST', body: b })
+export const getCatatanMaster = () => api<{ catatan: CatatanMasterRow[]; pengingat: Pengingat }>('/master/catatan')
+export const aturPengingat = (p: Pengingat) => api<Pengingat>('/master/pengingat', { method: 'PUT', body: p })
+export const getCatatan = () => api<{ catatan: CatatanKonsultan[]; pengingat: number[]; aturan: Pengingat }>('/catatan')
+export const selesaiCatatan = (id: number) => api<CatatanKonsultan>(`/catatan/${id}/selesai`, { method: 'POST' })
+export const catatanDiingatkan = (ids: number[]) => api<void>('/catatan/diingatkan', { method: 'POST', body: { ids } })
+
 /** Untuk pemilik usaha: semua catatan tim Master Pajak atas usahanya (lihat-sebagai, koreksi, perubahan data). */
 export const getRiwayatAksesTim = () => api<AuditRow[]>('/akses-tim')
 
