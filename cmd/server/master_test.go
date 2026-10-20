@@ -289,3 +289,51 @@ func TestMaster_LastSeenTercatat(t *testing.T) {
 		t.Errorf("last_seen = %v", u.LastSeen)
 	}
 }
+
+// TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya: klienRows memindai seluruh
+// transaksi tiap usaha, jadi hanya daftar klien dan detail klien yang menghitungnya.
+// Ringkasan, pembayaran, dan tim tidak boleh ikut memindai (lihat BenchmarkKlienRows).
+func TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya(t *testing.T) {
+	srv, m := serverMaster(t)
+	qa := register(t, srv, registerBody) // usaha 2
+	aktifkan(t, srv, qa)
+	bulan := time.Now().Format("2006-01")
+	for i := 0; i < 3; i++ {
+		tx := fmt.Sprintf(`{"tanggal":"%s-05","jenis":"Penjualan","nominal":%d,"keterangan":"x","lunas":true}`, bulan, 10_000+i)
+		if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", tx); rec.Code != http.StatusCreated {
+			t.Fatalf("catat transaksi: %d %s", rec.Code, rec.Body)
+		}
+	}
+	// transaksi bulan lain tidak boleh ikut terhitung
+	lalu := time.Now().AddDate(0, -2, 0).Format("2006-01")
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions",
+		fmt.Sprintf(`{"tanggal":"%s-05","jenis":"Penjualan","nominal":7000,"keterangan":"bulan lalu","lunas":true}`, lalu)); rec.Code != http.StatusCreated {
+		t.Fatalf("catat transaksi bulan lalu: %d %s", rec.Code, rec.Body)
+	}
+
+	cari := func(rows []klienRow, id int) klienRow {
+		t.Helper()
+		for _, r := range rows {
+			if r.ID == id {
+				return r
+			}
+		}
+		t.Fatalf("usaha %d tidak ada di %d baris", id, len(rows))
+		return klienRow{}
+	}
+
+	// daftar klien: kolom "Transaksi bulan ini" tampil, jadi harus terisi
+	if got := cari(getJSON[[]klienRow](t, srv, m, "/api/v1/master/klien"), 2).TransaksiBulanIni; got != 3 {
+		t.Errorf("daftar klien: transaksi_bulan_ini = %d, want 3", got)
+	}
+	// detail klien: KPI yang sama
+	if got := getJSON[klienDetail](t, srv, m, "/api/v1/master/klien/2").Klien.TransaksiBulanIni; got != 3 {
+		t.Errorf("detail klien: transaksi_bulan_ini = %d, want 3", got)
+	}
+	// ringkasan: tidak menampilkan kolom itu, jadi tidak memindai transaksi
+	for _, k := range getJSON[ringkasanMaster](t, srv, m, "/api/v1/master/ringkasan").TerakhirAktif {
+		if k.TransaksiBulanIni != 0 {
+			t.Errorf("ringkasan ikut memindai transaksi usaha %d: %d", k.ID, k.TransaksiBulanIni)
+		}
+	}
+}
