@@ -86,7 +86,7 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
           Margin laba bersih {formatPct(r.margin_bps)} · basis akrual
         </div>
         <div className="list-rows tabular">
-          <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="var(--text-warn)" bold />
+          <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="var(--text-brand)" bold />
           <AmountRow label="Potongan channel / aplikasi" value={formatRp(-r.channel_fees)} color={RED} />
           <AmountRow label="Penjualan bersih" value={formatRp(r.net_sales)} bold />
           <AmountRow label="HPP (bahan baku)" value={formatRp(-r.cogs)} color={RED} />

@@ -42,7 +42,7 @@ export function AlatGratis({ profile, ptkpCodes, onLangganan }: { profile: Busin
 
       <div className="note-box flex flex-wrap items-center justify-between gap-3">
         <span>Mau pajak bulanan, laporan keuangan, dan pengingat setor terisi otomatis dari transaksi Anda?</span>
-        <button type="button" className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={onLangganan}>Pilih paket</button>
+        <button type="button" className="btn-cta accent" style={{ padding: '8px 18px', fontSize: 13 }} onClick={onLangganan}>Pilih paket</button>
       </div>
     </div>
   )

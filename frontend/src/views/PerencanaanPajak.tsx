@@ -105,7 +105,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
                     <td>
                       {s.nama}
                       {s.id === bu.termurah && <span className="pill-status pill-green" style={{ marginLeft: 8 }}>Termurah</span>}
-                      {mine.includes(s.id) && <span className="pill-status pill-amber" style={{ marginLeft: 8 }}>Bentuk usaha Anda</span>}
+                      {mine.includes(s.id) && <span className="pill-status pill-brand" style={{ marginLeft: 8 }}>Bentuk usaha Anda</span>}
                     </td>
                     <td style={{ color: 'var(--text-muted)' }}>{s.keterangan}</td>
                     <td style={{ textAlign: 'right' }}>{formatRp(s.pajak)}</td>

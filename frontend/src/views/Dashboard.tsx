@@ -24,9 +24,9 @@ export function Dashboard({
 }) {
   const k = d.kpis
   const trend = [
-    { label: 'Omzet', kpi: k.omzet, color: 'var(--accent-amber)', badge: 'badge-up' },
-    { label: 'Laba bersih', kpi: k.laba_bersih, color: 'var(--accent-green)', badge: 'badge-up' },
-    { label: 'Margin laba', kpi: k.margin_laba, color: 'var(--accent-amber)', badge: 'pts-up' },
+    { label: 'Omzet', kpi: k.omzet, color: 'var(--chart-1)', badge: 'badge-up' },
+    { label: 'Laba bersih', kpi: k.laba_bersih, color: 'var(--chart-3)', badge: 'badge-up' },
+    { label: 'Margin laba', kpi: k.margin_laba, color: 'var(--chart-1)', badge: 'pts-up' },
   ]
   const piutangLink = canSee('piutang-utang')
 
@@ -80,7 +80,7 @@ export function Dashboard({
               <div style={{ width: '100%', marginTop: 2 }}>{k.saldo_kas.sub_text}</div>
             </div>
           </div>
-          <Sparkline values={k.saldo_kas.sparkline} color="var(--accent-blue)" />
+          <Sparkline values={k.saldo_kas.sparkline} color="var(--chart-4)" />
         </div>
 
         <div className="card">
@@ -117,9 +117,9 @@ export function Dashboard({
             <div className="chart-title">Omzet, biaya, dan laba</div>
             <div className="chart-subtitle">11 bulan terakhir</div>
             <div className="legend-row">
-              <span className="legend-item"><Dot color="var(--accent-amber)" />Omzet</span>
-              <span className="legend-item"><Dot color="var(--accent-orange)" />Total biaya</span>
-              <span className="legend-item"><Dot color="var(--accent-green)" />Laba bersih</span>
+              <span className="legend-item"><Dot color="var(--chart-1)" />Omzet</span>
+              <span className="legend-item"><Dot color="var(--chart-2)" />Total biaya</span>
+              <span className="legend-item"><Dot color="var(--chart-3)" />Laba bersih</span>
             </div>
           </div>
           <MainChart points={d.monthly_trend_11m} />
@@ -131,8 +131,8 @@ export function Dashboard({
               <div className="chart-title">Omzet harian {d.period_label}</div>
               <div className="chart-subtitle">Rata-rata Rp3 jt per hari.</div>
               <div className="legend-row" style={{ marginTop: 8, marginBottom: 6 }}>
-                <span className="legend-item"><Dot color="var(--accent-amber)" />Di atas target</span>
-                <span className="legend-item"><Dot color="var(--accent-amber-dim)" />Di bawah target</span>
+                <span className="legend-item"><Dot color="var(--chart-1)" />Di atas target</span>
+                <span className="legend-item"><Dot color="var(--chart-1-dim)" />Di bawah target</span>
                 <span className="legend-item">— Target harian</span>
               </div>
             </div>
@@ -154,7 +154,7 @@ export function Dashboard({
                 )}
               </div>
               <div className="legend-row" style={{ marginTop: 8, marginBottom: 4 }}>
-                <span className="legend-item"><Dot color="var(--accent-blue)" />Kas akhir bulan</span>
+                <span className="legend-item"><Dot color="var(--chart-4)" />Kas akhir bulan</span>
               </div>
             </div>
             <CashChart points={d.monthly_trend_11m} />
@@ -176,7 +176,7 @@ export function Dashboard({
                       {p.qty.toLocaleString('id-ID')} terjual · {p.pct}% omzet
                     </div>
                   </div>
-                  <div className="tabular" style={{ fontWeight: 700, color: 'var(--text-warn)' }}>{formatRp(p.omzet)}</div>
+                  <div className="tabular" style={{ fontWeight: 700, color: 'var(--text-brand)' }}>{formatRp(p.omzet)}</div>
                 </div>
               ))}
             </div>

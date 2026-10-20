@@ -181,7 +181,7 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 
 - Pengguna menetapkan navy **`#222852`** sebagai warna utama agar mengingatkan pada perpajakan/DJP. Kedua kode yang dikirim sama; aksen emas yang sudah ada dipertahankan.
 - Token `--brand-navy` menjadi sumber warna login, onboarding, sidebar, dan teks CTA emas. Favicon dan meta tema browser memakai nilai yang sama. Warna teks sidebar disesuaikan agar terbaca di atas navy; permukaan laporan tetap netral.
-- Pedoman diperbarui di `DESIGN.md`, salinannya `design.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`.
+- Pedoman diperbarui di `DESIGN.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`. (Brand ini digantikan Brand Guideline v1.0 pada 20 Oktober 2026; lihat `DESIGN.md` §2.)
 - Build frontend berhasil. Chromium: login, onboarding mobile, dan dashboard diperiksa; warna terhitung sidebar/login `rgb(34, 40, 82)`. Kontras emas/navy 8,58:1; teks sekunder sidebar/navy 8,16:1; label sidebar/navy 6,60:1. Screenshot di `/tmp/pajak-brand-*.png`. Commit `c82fad5` terkirim setelah PR #1 digabung, sehingga dibawa ke branch lanjutan `feat/login-password-visibility`; belum deploy.
 
 ## Tambahan UX login — 19 Oktober 2026

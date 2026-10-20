@@ -109,7 +109,7 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
         title="Pajak UMKM (PP 55 Tahun 2022)"
         subtitle="Kalkulasi PPh Final 0,5% & Pemantauan Kuota Bebas Pajak Rp500 Juta/Tahun (WP Orang Pribadi)"
       >
-        <span className="pill-status pill-amber">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500 jt)</span>
+        <span className="pill-status pill-brand">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500 jt)</span>
       </PageHeader>
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

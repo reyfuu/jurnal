@@ -56,7 +56,7 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
           <div className="chart-title">Laporan Laba Rugi</div>
           <div className="list-rows tabular" style={{ marginTop: 12 }}>
             <Lines lines={is.pendapatan} />
-            <AmountRow label="Penjualan bersih" value={formatRp(is.penjualan_bersih)} color="var(--text-warn)" bold />
+            <AmountRow label="Penjualan bersih" value={formatRp(is.penjualan_bersih)} color="var(--text-brand)" bold />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan awal</>} value={formatRp(is.persediaan_awal)} />}
             <Lines lines={is.hpp_lines} />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan akhir</>} value={formatRp(-is.persediaan_akhir)} />}

@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { temaDari } from './theme'
 
 describe('temaDari', () => {
-  it('default gelap: pengguna lama tidak melihat perubahan', () => {
-    expect(temaDari(null)).toBe('gelap')
-    expect(temaDari('')).toBe('gelap')
-    expect(temaDari('ngawur')).toBe('gelap')
+  it('default terang sesuai brand guideline (60% netral)', () => {
+    expect(temaDari(null)).toBe('terang')
+    expect(temaDari('')).toBe('terang')
+    expect(temaDari('ngawur')).toBe('terang')
   })
-  it('terang hanya bila dipilih', () => {
-    expect(temaDari('terang')).toBe('terang')
+  it('gelap hanya bila dipilih; pilihan lama tetap dihormati', () => {
     expect(temaDari('gelap')).toBe('gelap')
+    expect(temaDari('terang')).toBe('terang')
   })
 })
