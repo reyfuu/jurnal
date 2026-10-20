@@ -95,3 +95,38 @@ export function AlasanDialog({ open, onClose, judul, teks, tombol, onKirim }: {
     </Dialog>
   )
 }
+
+/** Konfirmasi sederhana untuk aksi yang bisa dibatalkan, mis. nonaktifkan akun (soft delete). */
+export function KonfirmasiDialog({ open, onClose, judul, teks, tombol, onYa }: {
+  open: boolean; onClose: () => void; judul: string; teks: string; tombol: string
+  onYa: () => Promise<void>
+}) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function ya() {
+    setBusy(true)
+    setError('')
+    try {
+      await onYa()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { setError(''); onClose() } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{judul}</DialogTitle>
+          <DialogDescription>{teks}</DialogDescription>
+        </DialogHeader>
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+          <Button type="button" disabled={busy} onClick={() => void ya()}>{busy ? 'Menyimpan…' : tombol}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
