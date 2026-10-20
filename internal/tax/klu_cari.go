@@ -125,7 +125,9 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 			idf[t] = math.Log(float64(len(docs)) / float64(df))
 		}
 	}
-	ada := func(daftar []string) bool { return slices.ContainsFunc(istilah, func(t string) bool { return slices.Contains(daftar, t) }) }
+	ada := func(daftar []string) bool {
+		return slices.ContainsFunc(istilah, func(t string) bool { return slices.Contains(daftar, t) })
+	}
 	mauGrosir, online, buatSendiri := ada(grosir), ada(jualOnline), ada(produksi)
 
 	var out []KandidatKLU
