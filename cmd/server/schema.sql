@@ -330,6 +330,35 @@ CREATE TABLE IF NOT EXISTS benchmark_versi (
 	waktu  TIMESTAMPTZ
 );
 
+-- Pengetahuan (Okt 2026): artikel pajak & sumber yang dibaca AI. Hanya artikel terbit dan sumber
+-- terverifikasi (dipakai_ai) yang dikirim ke model.
+CREATE TABLE IF NOT EXISTS artikel (
+	id            INT PRIMARY KEY,
+	judul         TEXT NOT NULL,
+	kategori      TEXT NOT NULL,
+	dasar_hukum   TEXT,
+	berlaku_sejak TEXT,
+	tag           JSONB,
+	isi           TEXT NOT NULL,
+	status        TEXT NOT NULL,
+	tampil_klien  BOOLEAN NOT NULL,
+	oleh          TEXT,
+	diverifikasi  TEXT,
+	waktu         TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS sumber_pengetahuan (
+	id           INT PRIMARY KEY,
+	judul        TEXT NOT NULL,
+	jenis        TEXT NOT NULL,
+	topik        JSONB,
+	isi          TEXT NOT NULL,
+	status       TEXT NOT NULL,
+	dipakai_ai   BOOLEAN NOT NULL,
+	oleh         TEXT,
+	diverifikasi TEXT,
+	waktu        TIMESTAMPTZ
+);
+
 -- lb_rows: siapkan array JSON untuk jsonb_populate_recordset. String kosong jadi NULL
 -- (kolom DATE menolak ''), dan tenant_id ditempel bila tid tidak NULL.
 CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$

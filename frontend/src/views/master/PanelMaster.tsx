@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, Brain, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -9,8 +9,9 @@ import { TimAkses } from './Tim'
 import { AuditLog, Pembayaran } from './Lainnya'
 import { KoreksiMaster } from './Koreksi'
 import { BenchmarkView, TemplateCOAView } from './Katalog'
+import { ArtikelView, BasisPengetahuan } from './Pengetahuan'
 
-export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'coa' | 'benchmark' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
 const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
@@ -26,6 +27,8 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
   {
     group: 'Pengetahuan',
     items: [
+      { page: 'pengetahuan', label: 'Basis Pengetahuan AI', icon: Brain, izin: 'pengetahuan' },
+      { page: 'artikel', label: 'Artikel Pajak', icon: BookOpen, izin: ['artikel', 'artikel_terbit'] },
       { page: 'coa', label: 'Template COA', icon: Network, izin: 'coa_template' },
       { page: 'benchmark', label: 'Benchmark NPM DJP', icon: Gauge, izin: 'benchmark' },
     ],
@@ -112,6 +115,8 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
             ? <KlienList onBuka={buka} />
             : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
           {page === 'koreksi' && <KoreksiMaster />}
+          {page === 'pengetahuan' && <BasisPengetahuan />}
+          {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}
           {page === 'coa' && <TemplateCOAView />}
           {page === 'benchmark' && <BenchmarkView />}
           {page === 'tiket' && <TiketBoard />}

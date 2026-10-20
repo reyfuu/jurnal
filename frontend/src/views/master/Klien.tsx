@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { KoreksiCard } from '@/components/KoreksiCard'
 import {
-  aturLangganan, getKlien, mulaiLihat, getPlans, getRingkasanMaster, listKlien,
+  analisaKlien, aturLangganan, getKlien, mulaiLihat, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
   type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
 } from '@/lib/api'
 import { formatRelatif, formatRp, formatTanggal } from '@/lib/format'
@@ -240,6 +240,7 @@ export function KlienDetailView({ id, bisaLangganan, bisaLihat, onLihat, onKemba
               </div>
             )}
           </div>
+          {bisaLihat && <AnalisaCard id={k.id} />}
           {d.koreksi.length > 0 && (
             <>
               <div className="chart-title">Usulan koreksi</div>
@@ -372,5 +373,87 @@ function LihatDialog({ open, onClose, klien, tiket, onMulai }: { open: boolean; 
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+const pctBps = (bps: number) => (bps < 0 ? '−' : '') + (Math.abs(bps) / 100).toFixed(2).replace('.', ',') + '%'
+const STATUS_NPM: Record<string, [string, string]> = {
+  wajar: ['pill-green', 'Setara / di atas rata-rata'], di_bawah: ['pill-red', 'Di bawah rata-rata'], kurang_data: ['pill-status-muted', 'Data belum cukup'],
+}
+
+function Ref({ r, judul }: { r: string; judul: string }) {
+  return (
+    <span className="pill-status tabular" title={judul}
+      style={{ fontSize: 11, color: 'var(--accent-blue)', border: '1px solid color-mix(in srgb, var(--accent-blue) 40%, transparent)' }}>{r}</span>
+  )
+}
+
+/** Analisa AI per klien: angka dihitung sistem, AI hanya menulis penilaian bersumber. Dijalankan
+ *  atas permintaan (memanggil model & tercatat di audit log). */
+function AnalisaCard({ id }: { id: number }) {
+  const [a, setA] = useState<AnalisaKlien | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function jalankan() {
+    setBusy(true)
+    setError('')
+    try {
+      setA(await analisaKlien(id))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const f = a?.fakta
+  const judulRef = (r: string) => a?.sumber.find((s) => s.ref === r)?.judul ?? (r.startsWith('BM-') ? `Benchmark DJP ${f?.klu_nama}` : '')
+  return (
+    <div className="card" style={{ padding: 20, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="chart-title">Analisa AI</div>
+        <span className="text-xs text-muted-foreground">Angka dihitung sistem · AI hanya menulis penilaian dan wajib menyebut sumber</span>
+        <Button size="sm" variant="outline" style={{ marginLeft: 'auto' }} disabled={busy} onClick={() => void jalankan()}>{busy ? 'Menganalisa…' : a ? 'Jalankan ulang' : 'Jalankan analisa'}</Button>
+      </div>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {f && (
+        <>
+          <div className="table-scroll">
+            <table className="data-table tabular" style={{ minWidth: 520 }}>
+              <thead><tr><th>Ukuran</th><th style={{ textAlign: 'right' }}>Klien</th><th style={{ textAlign: 'right' }}>Benchmark DJP{f.klu ? ` · KLU ${f.klu}` : ''}</th><th>Sumber</th></tr></thead>
+              <tbody>
+                <tr><td>Margin laba bersih (NPM)</td><td style={{ textAlign: 'right' }}>{pctBps(f.npm_bps)}</td><td style={{ textAlign: 'right' }}>{f.benchmark_npm_bps !== undefined ? pctBps(f.benchmark_npm_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>
+                <tr><td>Beban pajak / omzet (CTTOR)</td><td style={{ textAlign: 'right' }} className="text-muted-foreground">—</td><td style={{ textAlign: 'right' }}>{f.benchmark_cttor_bps !== undefined ? pctBps(f.benchmark_cttor_bps) : '—'}</td><td>{f.klu && <Ref r={`BM-${f.klu}`} judul={judulRef(`BM-${f.klu}`)} />}</td></tr>
+                <tr><td>Omzet setahun (rata-rata × 12)</td><td style={{ textAlign: 'right' }}>{formatRp(f.omzet_setahun)}</td><td /><td /></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={'pill-status ' + STATUS_NPM[f.status_npm][0]}>{STATUS_NPM[f.status_npm][1]}</span>
+            {f.klu_nama && <span className="text-muted-foreground">{f.klu_nama} · {f.sumber_benchmark}</span>}
+            {f.risiko?.map((r) => <span key={r} className="pill-status pill-amber">{r}</span>)}
+          </div>
+          {a!.analisa.tersedia ? (
+            <div className="grid gap-2">
+              <p className="text-sm" style={{ borderLeft: '3px solid var(--accent-blue)', paddingLeft: 10 }}><strong>Penilaian:</strong> {a!.analisa.penilaian}</p>
+              {a!.analisa.poin?.map((p, i) => (
+                <div key={i} className="text-sm">
+                  <strong>{p.judul}</strong> {p.sumber.map((r) => <Ref key={r} r={r} judul={judulRef(r)} />)}
+                  <p className="text-muted-foreground">{p.isi}</p>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Model: {a!.analisa.model}. Penilaian AI bukan nasihat final; hal yang menyangkut SPT diverifikasi tim pajak.</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{a!.analisa.alasan}</p>
+          )}
+          {a!.sumber.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">{a!.sumber.length} sumber yang ditemukan untuk klien ini</summary>
+              <ul className="mt-2 grid gap-1">{a!.sumber.map((s, i) => <li key={i}><Ref r={s.ref} judul={s.judul} /> {s.judul}</li>)}</ul>
+            </details>
+          )}
+        </>
+      )}
+    </div>
   )
 }

@@ -26,6 +26,7 @@ import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
 import { PanelMaster } from '@/views/master/PanelMaster'
 import { UsulanKoreksi } from '@/views/UsulanKoreksi'
+import { Pustaka } from '@/views/Pustaka'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -250,6 +251,8 @@ export default function App() {
         return <KaryawanView />
       case 'langganan':
         return <Langganan onPaid={onPaid} />
+      case 'pustaka':
+        return <Pustaka />
       case 'usulan-koreksi':
         return <UsulanKoreksi onChanged={() => { void reload(me!, period); getMe().then((m) => setSession({ status: 'in', me: m }), fail) }} />
       case 'lapor-bug':

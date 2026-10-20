@@ -341,3 +341,16 @@ func TestPostgresKatalog(t *testing.T) {
 		t.Errorf("benchmark aktif setelah muat ulang = %d baris", n)
 	}
 }
+
+// Artikel & sumber pengetahuan (termasuk status verifikasi & pemakaian AI) tersimpan utuh.
+func TestPostgresPengetahuan(t *testing.T) {
+	pgTest(t)
+	srv, m := serverMaster(t)
+	do(srv, m, http.MethodPost, "/api/v1/master/artikel", `{"judul":"PPh Final","kategori":"PPh Final UMKM","tag":["omzet"],"isi":"Tarif 0,5%.","tampil_klien":true,"terbit":true}`)
+	do(srv, m, http.MethodPost, "/api/v1/master/pengetahuan", `{"judul":"Batas omzet","isi":"OP sampai Rp500 juta.","topik":["PPh Final"]}`)
+	do(srv, m, http.MethodPost, "/api/v1/master/pengetahuan/1/verifikasi", "")
+	srv2 := NewServer()
+	if got, want := normJSON(t, srv2.pengetahuan), normJSON(t, srv.pengetahuan); got != want || len(srv.pengetahuan.Artikel) != 1 {
+		t.Fatalf("pengetahuan berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
+	}
+}

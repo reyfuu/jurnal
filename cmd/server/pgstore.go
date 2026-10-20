@@ -15,6 +15,7 @@ import (
 	"pajak/internal/finance"
 	"pajak/internal/katalog"
 	"pajak/internal/master"
+	"pajak/internal/pengetahuan"
 )
 
 // Penyimpanan PostgreSQL (DATABASE_URL). Data tetap dilayani dari memori; Postgres adalah
@@ -304,6 +305,44 @@ func loadKatalogDB(db *sql.DB) (katalog.State, error) {
 	return st, nil
 }
 
+// savePengetahuanDB menulis ulang artikel & sumber pengetahuan.
+// ponytail: tulis ulang semua baris tiap perubahan; isi PDF bisa ratusan KB per sumber —
+// pindah ke upsert per baris bila sumber melewati ~200 atau simpan terasa lambat.
+func savePengetahuanDB(db *sql.DB, st pengetahuan.State) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM artikel; DELETE FROM sumber_pengetahuan`); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "artikel", nil, st.Artikel); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "sumber_pengetahuan", nil, st.Sumber); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func loadPengetahuanDB(db *sql.DB) (pengetahuan.State, error) {
+	st := pengetahuan.NewState()
+	if err := selectJSON(db, &st.Artikel, `SELECT jsonb_agg(to_jsonb(a) ORDER BY id) FROM artikel a`); err != nil {
+		return st, err
+	}
+	if err := selectJSON(db, &st.Sumber, `SELECT jsonb_agg(to_jsonb(x) ORDER BY id) FROM sumber_pengetahuan x`); err != nil {
+		return st, err
+	}
+	for _, a := range st.Artikel {
+		st.NextArtikelID = max(st.NextArtikelID, a.ID+1)
+	}
+	for _, x := range st.Sumber {
+		st.NextSumberID = max(st.NextSumberID, x.ID+1)
+	}
+	return st, nil
+}
+
 // loadDB memuat semua data; ok=false bila DB masih kosong (belum ada usaha).
 func (s *Server) loadDB() (ok bool, err error) {
 	var ids []int
@@ -338,6 +377,9 @@ func (s *Server) loadDB() (ok bool, err error) {
 	}
 	if s.katalog, err = loadKatalogDB(s.db); err != nil {
 		return false, fmt.Errorf("katalog: %w", err)
+	}
+	if s.pengetahuan, err = loadPengetahuanDB(s.db); err != nil {
+		return false, fmt.Errorf("pengetahuan: %w", err)
 	}
 	return true, selectJSON(s.db, &s.bugs.list, `SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY id), '[]') FROM bug_reports b`)
 }
