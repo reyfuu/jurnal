@@ -8,8 +8,9 @@ export type View =
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim MasterPajak: seluruh aplikasi diganti Panel Master
+  | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim MasterPajak
 
-export type Role = 'owner' | 'admin' | 'kasir' | 'mp'
+export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
 export interface User {
   id: number
@@ -32,6 +33,10 @@ export interface Me {
   garansi: GaransiStatus
   /** Hanya akun tim MasterPajak: role tim dan izin efektifnya. */
   master?: MasterMe
+  /** Akun tim yang sedang "lihat sebagai klien": views berisi menu klien versi baca. */
+  lihat?: { klien_id: number; nama: string; alasan: string; sampai: string }
+  /** Usulan koreksi yang menunggu keputusan pemilik usaha. */
+  koreksi_menunggu?: number
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
@@ -596,7 +601,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 
 // --- Panel Master (akun tim MasterPajak) ---
 
-export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'langganan' | 'pembayaran' | 'tim' | 'audit'
+export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -616,7 +621,7 @@ export interface RingkasanMaster {
 }
 export interface TiketRow extends BugReport { tenant_id: number; status: TiketStatus; nomor: string; klien_nama: string }
 export interface MasterOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal' | 'manual'; waktu: string; dibayar_pada?: string }
-export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[] }
+export interface KlienDetail { klien: KlienRow; users: User[]; orders: MasterOrder[]; tiket: TiketRow[]; koreksi: KoreksiRow[] }
 export interface PembayaranRow { klien_id: number; klien_nama: string; order: MasterOrder; garansi?: GaransiStatus }
 export interface AnggotaRow { user: User; role: string; klien: number[] }
 export interface TimData { anggota: AnggotaRow[]; roles: MasterRole[]; izin: IzinInfo[]; klien: Orang[] }
@@ -640,6 +645,27 @@ export const simpanRole = (r: { id?: string; nama: string; izin: Izin[] }) =>
   r.id ? api<MasterRole>(`/master/roles/${r.id}`, { method: 'PUT', body: r }) : api<MasterRole>('/master/roles', { method: 'POST', body: r })
 export const hapusRole = (id: string) => api<void>(`/master/roles/${id}`, { method: 'DELETE' })
 export const listAudit = () => api<AuditRow[]>('/master/audit')
+export const mulaiLihat = (klien: number, alasan: string) => api<Me['lihat']>(`/master/klien/${klien}/lihat`, { method: 'POST', body: { alasan } })
+export const selesaiLihat = () => api<void>('/master/lihat', { method: 'DELETE' })
+
+// --- Usulan koreksi ---
+
+export type KoreksiStatus = 'menunggu' | 'disetujui' | 'ditolak' | 'kedaluwarsa'
+export interface KoreksiRow {
+  id: number; nomor: string; transaksi_id: number; jenis: 'ubah' | 'hapus'
+  sebelum: Tx; usulan?: Tx
+  alasan: string; oleh: string; waktu: string; status: KoreksiStatus
+  catatan?: string; diputuskan_oleh?: string; diputuskan_pada?: string
+  klien_id: number; klien_nama: string
+  /** Laba bersih per bulan sebelum/sesudah, dihitung server. */
+  dampak: { periode: string; laba_sebelum: number; laba_sesudah: number }[]
+}
+export const usulKoreksi = (klien: number, body: { transaksi_id: number; jenis: 'ubah' | 'hapus'; usulan?: TxInput; alasan: string }) =>
+  api<KoreksiRow>(`/master/klien/${klien}/koreksi`, { method: 'POST', body })
+export const listKoreksiMaster = () => api<KoreksiRow[]>('/master/koreksi')
+export const listKoreksi = () => api<KoreksiRow[]>('/koreksi')
+export const putuskanKoreksi = (id: number, setuju: boolean, catatan: string) =>
+  api<KoreksiRow>(`/koreksi/${id}/${setuju ? 'setujui' : 'tolak'}`, { method: 'POST', body: { catatan } })
 
 export interface TaxSkema { id: string; nama: string; keterangan: string; pajak: number; lebih_mahal_bps: number }
 export interface TaxEntitas { id: string; nama: string; pph: number; dividen: number; total: number; persen_bps: number }

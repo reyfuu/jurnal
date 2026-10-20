@@ -289,3 +289,12 @@ func TestMaster_LastSeenTercatat(t *testing.T) {
 		t.Errorf("last_seen = %v", u.LastSeen)
 	}
 }
+
+func slicesAny[T any](s []T, f func(T) bool) bool {
+	for _, x := range s {
+		if f(x) {
+			return true
+		}
+	}
+	return false
+}

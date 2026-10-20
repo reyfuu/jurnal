@@ -285,6 +285,27 @@ CREATE TABLE IF NOT EXISTS mp_audit (
 	keterangan TEXT
 );
 
+-- Usulan koreksi (Okt 2026): tim mengusulkan, pemilik usaha memutuskan. sebelum = potret
+-- transaksi saat diusulkan; usulan = transaksi pengganti (NULL untuk hapus).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_koreksi_id INT NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS koreksi (
+	tenant_id       INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id              INT NOT NULL,
+	transaksi_id    INT NOT NULL,
+	jenis           TEXT NOT NULL,
+	sebelum         JSONB NOT NULL,
+	usulan          JSONB,
+	alasan          TEXT NOT NULL,
+	oleh_id         INT NOT NULL,
+	oleh            TEXT,
+	waktu           TIMESTAMPTZ NOT NULL,
+	status          TEXT NOT NULL,
+	catatan         TEXT,
+	diputuskan_oleh TEXT,
+	diputuskan_pada TIMESTAMPTZ,
+	PRIMARY KEY (tenant_id, id)
+);
+
 -- lb_rows: siapkan array JSON untuk jsonb_populate_recordset. String kosong jadi NULL
 -- (kolom DATE menolak ''), dan tenant_id ditempel bila tid tidak NULL.
 CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
