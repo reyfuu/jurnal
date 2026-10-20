@@ -34,6 +34,7 @@ func pasangKatalog(st katalog.State) {
 	katalogAktif.Store(&st)
 	b := st.BenchmarkAktif()
 	tax.AktifkanBenchmark(b.Baris, b.Sumber)
+	tax.AktifkanParameter(st.ParameterAktif().Isi)
 }
 
 // segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data DJP
@@ -48,6 +49,11 @@ func segarkanBawaan(st *katalog.State) {
 	for i := range st.Benchmark {
 		if st.Benchmark[i].ID == 1 {
 			st.Benchmark[i].Baris, st.Benchmark[i].Sumber = baku.Benchmark[0].Baris, baku.Benchmark[0].Sumber
+		}
+	}
+	for i := range st.Parameter {
+		if st.Parameter[i].ID == 1 {
+			st.Parameter[i].Isi, st.Parameter[i].Dasar = baku.Parameter[0].Isi, baku.Parameter[0].Dasar
 		}
 	}
 }
@@ -216,7 +222,7 @@ func writeKatalogErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &hilang):
 		http.Error(w, err.Error(), http.StatusConflict)
-	case errors.Is(err, katalog.ErrTidakValid), errors.Is(err, coa.ErrTemplate):
+	case errors.Is(err, katalog.ErrTidakValid), errors.Is(err, coa.ErrTemplate), errors.Is(err, tax.ErrParameter):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
 		writeMasterErr(w, err)
@@ -431,5 +437,6 @@ func (s *Server) katalogRoutes() {
 	m.HandleFunc("POST /api/v1/master/benchmark", s.guardMP(s.handleImporBenchmark, master.Benchmark))
 	m.HandleFunc("POST /api/v1/master/benchmark/{id}/aktifkan", s.guardMP(s.handleAktifkanBenchmark, master.Benchmark))
 	m.HandleFunc("GET /api/v1/master/benchmark/{id}/xlsx", s.guardMP(s.handleUnduhBenchmark, master.Benchmark))
+	s.parameterRoutes()
 	s.mux.HandleFunc("POST /api/v1/coa/perbarui", s.persisting(s.guard("profil-usaha", s.on((*tenant).handlePerbaruiCOA))))
 }

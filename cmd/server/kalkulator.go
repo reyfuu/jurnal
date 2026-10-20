@@ -10,16 +10,22 @@ import (
 // handleKalkulatorMaster menyajikan seluruh jenis & objek pajak yang bisa dihitung, supaya
 // daftar tarif hanya hidup di satu tempat (internal/tax) dan frontend tidak menyalinnya.
 func (s *Server) handleKalkulatorMaster(w http.ResponseWriter, _ *http.Request) {
+	p := tax.P()
 	writeJSON(w, map[string]any{
-		"jenis":      tax.JenisPajakList,
+		"jenis":      p.Objek,
 		"ptkp_codes": tax.PTKPCodes,
-		"ptkp":       tax.PTKP,
+		"ptkp":       p.PTKP,
 		"ter": map[string]any{
-			"kategori":      tax.TERKategori,
-			"lapisan":       tax.TERLapisan,
+			"kategori":      p.TER.Kategori,
+			"lapisan":       p.TER.Lapisan,
 			"belum_lengkap": tax.TERBelumLengkap(),
 		},
-		"tarif_badan_bps": tax.TarifBadanBps,
+		"tarif_badan_bps": p.BadanTarifBps,
+		// angka yang dipakai kalkulator perencanaan, supaya label di layar ikut versi aktif
+		"parameter": map[string]any{
+			"ppn_efektif_bps": p.PPNEfektifBps(), "dasar_umkm": p.DasarUMKM,
+			"batas_nppn": p.BatasNPPN, "batas_pkp": p.BatasPKP,
+		},
 	})
 }
 

@@ -330,6 +330,18 @@ CREATE TABLE IF NOT EXISTS benchmark_versi (
 	waktu  TIMESTAMPTZ
 );
 
+-- Parameter pajak (Okt 2026): tarif, PTKP, batas omzet, TER, objek potong, norma NPPN — berversi.
+-- isi = tax.Parameter utuh (JSONB). Versi 1 (bawaan) diisi ulang dari kode saat boot.
+CREATE TABLE IF NOT EXISTS parameter_pajak (
+	id     INT PRIMARY KEY,
+	nama   TEXT NOT NULL,
+	dasar  TEXT,
+	status TEXT NOT NULL,
+	isi    JSONB NOT NULL,
+	oleh   TEXT,
+	waktu  TIMESTAMPTZ
+);
+
 -- Pengetahuan (Okt 2026): artikel pajak & sumber yang dibaca AI. Hanya artikel terbit dan sumber
 -- terverifikasi (dipakai_ai) yang dikirim ke model.
 CREATE TABLE IF NOT EXISTS artikel (

@@ -103,7 +103,7 @@ func rp(n int64) string {
 
 // skemaSaatIni: skema PPh yang berlaku untuk bentuk usaha sekarang (sama dengan ringkasan onboarding).
 func skemaSaatIni(bentuk string, omzet int64) string {
-	finalOK := omzet <= batasFasilitas
+	finalOK := omzet <= P().BatasOmzetUMKM
 	switch {
 	case bentuk == "op" && finalOK:
 		return SkemaPPOP
@@ -149,14 +149,16 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	} else if r.Status == "di_bawah" {
 		add("tinggi", "NPM di bawah rata-rata DJP", fmt.Sprintf("DJP membandingkan SPT dengan rasio sektor. NPM %s di bawah rata-rata nasional %s berpotensi diminta klarifikasi (SP2DK) atau diperiksa.", pct(r.NPMBps), pct(k.NPMBps)))
 	}
-	if in.Omzet > batasFasilitas {
-		if !in.PKP {
-			add("tinggi", "Wajib menjadi PKP", "Omzet di atas Rp4,8 miliar per tahun wajib dikukuhkan sebagai PKP dan memungut PPN.")
-		}
-		add("tinggi", "Tidak bisa memakai PPh Final 0,5%", "Omzet di atas Rp4,8 miliar tidak memenuhi syarat PPh Final UMKM; wajib pembukuan dan tarif umum.")
+	pr := P()
+	if in.Omzet > pr.BatasPKP && !in.PKP {
+		add("tinggi", "Wajib menjadi PKP", "Omzet di atas "+rp(pr.BatasPKP)+" per tahun wajib dikukuhkan sebagai PKP dan memungut PPN.")
 	}
-	if in.BentukUsaha == "op" && in.Omzet >= batasBebasOP*8/10 && in.Omzet <= batasBebasOP {
-		add("info", "Mendekati batas bebas pajak", "Omzet di atas Rp500 juta per tahun mulai dikenai PPh Final 0,5% atas kelebihannya.")
+	umkm := persenBps(int(pr.UMKMTarifBps))
+	if in.Omzet > pr.BatasOmzetUMKM {
+		add("tinggi", "Tidak bisa memakai PPh Final "+umkm, "Omzet di atas "+rp(pr.BatasOmzetUMKM)+" tidak memenuhi syarat PPh Final UMKM; wajib pembukuan dan tarif umum.")
+	}
+	if in.BentukUsaha == "op" && in.Omzet >= pr.UMKMBebasOP*8/10 && in.Omzet <= pr.UMKMBebasOP {
+		add("info", "Mendekati batas bebas pajak", "Omzet di atas "+rp(pr.UMKMBebasOP)+" per tahun mulai dikenai PPh Final "+umkm+" atas kelebihannya.")
 	}
 
 	ptkp := cmp.Or(in.PTKP, "TK/0")
@@ -168,7 +170,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 		return r
 	}
 	skema := bu.Skema
-	if in.Omzet > batasFasilitas { // PPh Final hanya untuk omzet s.d. 4,8 M
+	if in.Omzet > pr.BatasOmzetUMKM { // PPh final hanya sampai batas omzet UMKM
 		skema = slices.DeleteFunc(slices.Clone(skema), func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
 	}
 	now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet) })]
@@ -179,7 +181,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	final := now.ID == SkemaPPOP || now.ID == SkemaPPBadan
 	switch {
 	case final:
-		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s dengan PPh Final 0,5%%; rata-rata nasional %s. Untuk PPh Final, besarnya pajak ditetapkan dari omzet, jadi perbandingan ini hanya informasi.", pct(r.CTTORBps), pct(k.CTTORBps))
+		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s dengan PPh Final %s; rata-rata nasional %s. Untuk PPh Final, besarnya pajak ditetapkan dari omzet, jadi perbandingan ini hanya informasi.", pct(r.CTTORBps), persenBps(int(pr.UMKMTarifBps)), pct(k.CTTORBps))
 	case r.CTTORBps < k.CTTORBps:
 		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, di bawah rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
 		add("sedang", "CTTOR di bawah rata-rata DJP", fmt.Sprintf("Perbandingan pajak terutang dengan omzet (%s) lebih rendah dari rata-rata nasional KLU %s (%s). Pastikan semua penghasilan tercatat.", pct(r.CTTORBps), k.Kode, pct(k.CTTORBps)))

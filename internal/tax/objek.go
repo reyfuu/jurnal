@@ -9,7 +9,8 @@ import (
 // Objek pajak untuk kalkulator potong-pungut. Satu objek = satu baris tarif yang bisa dipilih
 // pengguna, meniru susunan kalkulator.pajak.go.id.
 //
-// === SATU-SATUNYA TEMPAT MENGOREKSI TARIF ===
+// === TARIF OBJEK BAWAAN ===
+// Daftar ini bawaan versi 1; tarif yang berlaku diubah tim di Panel Master → Parameter Pajak.
 // Tarif ditulis dalam basis poin: 1500 = 15%, 250 = 2,5%, 50 = 0,5%.
 // DasarBps mengatur berapa persen dari nilai bruto yang jadi dasar pengenaan; 10000 = 100%.
 // Kolom Dasar menyebut rujukan aturannya supaya mudah dicek ulang.
@@ -131,11 +132,12 @@ var JenisPajakList = []JenisPajak{
 }
 
 func JenisPajakOf(id string) (JenisPajak, bool) {
-	i := slices.IndexFunc(JenisPajakList, func(j JenisPajak) bool { return j.ID == id })
+	js := P().Objek
+	i := slices.IndexFunc(js, func(j JenisPajak) bool { return j.ID == id })
 	if i < 0 {
 		return JenisPajak{}, false
 	}
-	return JenisPajakList[i], true
+	return js[i], true
 }
 
 // PotongInput: perhitungan satu pemotongan/pemungutan.
@@ -222,9 +224,6 @@ func persenBps(bps int) string {
 
 // ===== PPh Badan =====
 
-// TarifBadanBps: tarif PPh badan 22% (UU HPP Pasal 17 ayat (1) huruf b).
-const TarifBadanBps = 2200
-
 type PPhBadanInput struct {
 	PeredaranBruto       int64 `json:"peredaran_bruto"` // setahun
 	PenghasilanKenaPajak int64 `json:"penghasilan_kena_pajak"`
@@ -240,31 +239,33 @@ type PPhBadanResult struct {
 	Catatan        string    `json:"catatan"`
 }
 
-// HitungPPhBadan memakai tarif 22% dengan fasilitas Pasal 31E: pengurangan 50% atas bagian PKP
-// dari peredaran bruto sampai Rp 4,8 miliar, selama peredaran bruto setahun tidak melebihi
-// Rp 50 miliar.
+// HitungPPhBadan memakai tarif badan dengan fasilitas Pasal 31E: pengurangan tarif atas bagian
+// PKP dari peredaran bruto sampai Batas31EPenuh, selama peredaran bruto setahun tidak melebihi
+// Batas31E (bawaan 22%, 50%, Rp4,8 M, Rp50 M).
 func HitungPPhBadan(in PPhBadanInput) (PPhBadanResult, error) {
 	if in.PeredaranBruto < 0 || in.PenghasilanKenaPajak < 0 {
 		return PPhBadanResult{}, fmt.Errorf("nilai tidak boleh negatif")
 	}
+	pr := P()
 	r := PPhBadanResult{
 		PeredaranBruto: in.PeredaranBruto, PKP: in.PenghasilanKenaPajak,
-		TarifBps: TarifBadanBps, DapatFasilitas: in.PeredaranBruto <= batas31E,
+		TarifBps: int(pr.BadanTarifBps), DapatFasilitas: in.PeredaranBruto <= pr.Batas31E,
 	}
+	badan, efektif := persenBps(int(pr.BadanTarifBps)), persenBps(int(pr.BadanTarifBps*(10_000-pr.Fasilitas31EBps)/10_000))
 	r.PPhTerutang = Pasal31E(in.PeredaranBruto, in.PenghasilanKenaPajak)
 
 	r.Langkah = []Langkah{
 		{"Peredaran bruto setahun", in.PeredaranBruto, ""},
 		{"Penghasilan kena pajak", in.PenghasilanKenaPajak, ""},
-		{"PPh badan terutang", r.PPhTerutang, "tarif 22% (UU HPP Pasal 17)"},
+		{"PPh badan terutang", r.PPhTerutang, "tarif " + badan + " (UU HPP Pasal 17)"},
 	}
 	switch {
-	case in.PeredaranBruto > batas31E:
-		r.Catatan = "Peredaran bruto di atas Rp 50 miliar: tanpa fasilitas Pasal 31E, seluruh PKP dikenakan 22%."
-	case in.PeredaranBruto <= batasFasilitas:
-		r.Catatan = "Peredaran bruto sampai Rp 4,8 miliar: seluruh PKP mendapat pengurangan tarif 50% menjadi efektif 11%."
+	case in.PeredaranBruto > pr.Batas31E:
+		r.Catatan = fmt.Sprintf("Peredaran bruto di atas %s: tanpa fasilitas Pasal 31E, seluruh PKP dikenakan %s.", rp(pr.Batas31E), badan)
+	case in.PeredaranBruto <= pr.Batas31EPenuh:
+		r.Catatan = fmt.Sprintf("Peredaran bruto sampai %s: seluruh PKP mendapat pengurangan tarif %s menjadi efektif %s.", rp(pr.Batas31EPenuh), persenBps(int(pr.Fasilitas31EBps)), efektif)
 	default:
-		r.Catatan = "Bagian PKP dari peredaran bruto sampai Rp 4,8 miliar mendapat pengurangan 50%; sisanya dikenakan 22% penuh."
+		r.Catatan = fmt.Sprintf("Bagian PKP dari peredaran bruto sampai %s mendapat pengurangan %s; sisanya dikenakan %s penuh.", rp(pr.Batas31EPenuh), persenBps(int(pr.Fasilitas31EBps)), badan)
 	}
 	return r, nil
 }

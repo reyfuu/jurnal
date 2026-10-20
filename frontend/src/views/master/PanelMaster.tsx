@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Brain, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, Brain, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { BrandMark } from '@/components/Sidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -10,8 +10,9 @@ import { AuditLog, Pembayaran } from './Lainnya'
 import { KoreksiMaster } from './Koreksi'
 import { BenchmarkView, TemplateCOAView } from './Katalog'
 import { ArtikelView, BasisPengetahuan } from './Pengetahuan'
+import { ParameterView } from './Parameter'
 
-export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
 const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
@@ -31,6 +32,7 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
       { page: 'artikel', label: 'Artikel Pajak', icon: BookOpen, izin: ['artikel', 'artikel_terbit'] },
       { page: 'coa', label: 'Template COA', icon: Network, izin: 'coa_template' },
       { page: 'benchmark', label: 'Benchmark NPM DJP', icon: Gauge, izin: 'benchmark' },
+      { page: 'parameter', label: 'Parameter Pajak', icon: Percent, izin: 'parameter_pajak' },
     ],
   },
   {
@@ -119,6 +121,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
           {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}
           {page === 'coa' && <TemplateCOAView />}
           {page === 'benchmark' && <BenchmarkView />}
+          {page === 'parameter' && <ParameterView />}
           {page === 'tiket' && <TiketBoard />}
           {page === 'pembayaran' && <Pembayaran />}
           {page === 'tim' && <TimAkses selfId={me.user.id} />}
