@@ -366,7 +366,123 @@ func (s *tenant) handlePilihanBarang(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, out)
 }
 
+// --- Laporan produksi ---
+
+type bahanProduksi struct {
+	Nama   string `json:"nama"`
+	Satuan string `json:"satuan"`
+	Qty    int64  `json:"qty"` // per seribu, positif = dipakai
+	Nilai  int64  `json:"nilai"`
+}
+
+type barisProduksi struct {
+	ID         int             `json:"id"`
+	Tanggal    string          `json:"tanggal"`
+	ProdukID   int             `json:"produk_id"`
+	Produk     string          `json:"produk"`
+	Batch      int64           `json:"batch"`
+	HasilQty   int64           `json:"hasil_qty"` // per seribu
+	Satuan     string          `json:"satuan"`
+	Nilai      int64           `json:"nilai"`    // nilai barang jadi = nilai bahan terpakai
+	PerUnit    int64           `json:"per_unit"` // nilai / hasil
+	Bahan      []bahanProduksi `json:"bahan"`
+	Keterangan string          `json:"keterangan,omitempty"`
+	Oleh       string          `json:"oleh,omitempty"`
+}
+
+type laporanProduksi struct {
+	Dari   string          `json:"dari"`
+	Sampai string          `json:"sampai"`
+	Mulai  string          `json:"mulai"`
+	Baris  []barisProduksi `json:"baris"`
+	Total  int64           `json:"total_nilai"`
+}
+
+func (s *tenant) laporanProduksi(dari, sampai string) laporanProduksi {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	k := s.kartuLocked()
+	nama := map[int]finance.StokItem{}
+	for _, it := range s.stok {
+		nama[it.ID] = it
+	}
+	nilai := map[int]map[int]int64{} // gerak → stok → nilai bertanda
+	for _, b := range k.Baris {
+		if b.GerakID > 0 && (b.Jenis == finance.KartuProduksiMasuk || b.Jenis == finance.KartuProduksiPakai) {
+			if nilai[b.GerakID] == nil {
+				nilai[b.GerakID] = map[int]int64{}
+			}
+			nilai[b.GerakID][b.StokID] += b.Nilai
+		}
+	}
+	out := laporanProduksi{Dari: dari, Sampai: sampai, Mulai: k.Mulai, Baris: []barisProduksi{}}
+	for _, g := range s.gerak {
+		if g.Jenis != finance.GerakProduksi || g.Tanggal < dari || g.Tanggal > sampai {
+			continue
+		}
+		r := barisProduksi{ID: g.ID, Tanggal: g.Tanggal, ProdukID: g.ProdukID, Batch: g.Batch, Keterangan: g.Keterangan, Oleh: g.Oleh, Bahan: []bahanProduksi{}}
+		if i := slices.IndexFunc(s.produk, func(p finance.Produk) bool { return p.ID == g.ProdukID }); i >= 0 {
+			r.Produk = s.produk[i].Nama
+		}
+		for _, b := range g.Baris {
+			it := nama[b.StokID]
+			if b.Qty > 0 {
+				r.HasilQty += b.Qty
+				r.Satuan = it.Satuan
+				r.Nilai += nilai[g.ID][b.StokID]
+				r.Produk = cmp.Or(r.Produk, it.Nama)
+			} else {
+				r.Bahan = append(r.Bahan, bahanProduksi{Nama: it.Nama, Satuan: it.Satuan, Qty: -b.Qty, Nilai: -nilai[g.ID][b.StokID]})
+			}
+		}
+		if r.HasilQty > 0 {
+			r.PerUnit = r.Nilai * finance.TakaranSkala / r.HasilQty
+		}
+		out.Total += r.Nilai
+		out.Baris = append(out.Baris, r)
+	}
+	slices.SortStableFunc(out.Baris, func(a, b barisProduksi) int {
+		return cmp.Or(cmp.Compare(b.Tanggal, a.Tanggal), cmp.Compare(b.ID, a.ID))
+	})
+	return out
+}
+
+func (s *tenant) handleLaporanProduksi(w http.ResponseWriter, r *http.Request) {
+	if dari, sampai, ok := rentang(w, r); ok {
+		writeJSON(w, s.laporanProduksi(dari, sampai))
+	}
+}
+
+func (s *tenant) handleLaporanProduksiXlsx(w http.ResponseWriter, r *http.Request) {
+	dari, sampai, ok := rentang(w, r)
+	if !ok {
+		return
+	}
+	l := s.laporanProduksi(dari, sampai)
+	rows := [][]string{
+		{"Laporan Produksi", dari + " s.d. " + sampai},
+		{"Nilai barang jadi = nilai bahan dari stok yang terpakai (rata-rata bergerak)."},
+		{},
+		{"Tanggal", "Produk", "Batch", "Hasil", "Satuan", "Nilai", "Nilai per unit", "Bahan terpakai", "Dicatat oleh"},
+	}
+	for _, b := range l.Baris {
+		var bahan []string
+		for _, x := range b.Bahan {
+			bahan = append(bahan, fmt.Sprintf("%s %s %s", x.Nama, finance.FormatQty(x.Qty), x.Satuan))
+		}
+		rows = append(rows, []string{b.Tanggal, b.Produk, strconv.FormatInt(b.Batch, 10), finance.FormatQty(b.HasilQty), b.Satuan,
+			strconv.FormatInt(b.Nilai, 10), strconv.FormatInt(b.PerUnit, 10), strings.Join(bahan, "; "), b.Oleh})
+	}
+	rows = append(rows, []string{"Total", "", "", "", "", strconv.FormatInt(l.Total, 10)})
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="laporan-produksi-%s-%s.xlsx"`, dari, sampai))
+	_ = xlsx.Write(w, []xlsx.Sheet{{Name: "Produksi", Rows: rows}})
+}
+
 func (s *Server) kartuStokRoutes() {
+	p := func(h http.HandlerFunc) http.HandlerFunc { return s.guard("produksi-supplier", h) }
+	s.mux.HandleFunc("GET /api/v1/produksi/laporan", p(s.on((*tenant).handleLaporanProduksi)))
+	s.mux.HandleFunc("GET /api/v1/produksi/laporan.xlsx", p(s.exporting(s.on((*tenant).handleLaporanProduksiXlsx))))
 	s.mux.HandleFunc("GET /api/v1/stok/pilihan", s.guard("transaksi", s.on((*tenant).handlePilihanBarang)))
 	g := func(h http.HandlerFunc) http.HandlerFunc { return s.guard("stok-gudang", h) }
 	m := s.mux

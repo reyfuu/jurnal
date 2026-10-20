@@ -85,6 +85,15 @@ func TestKartuStok_AlurLengkap(t *testing.T) {
 		t.Errorf("mutasi cup %+v hpp %d", mc, l.HPPJual)
 	}
 
+	lp := getJSON[laporanProduksi](t, srv, qa, "/api/v1/produksi/laporan?dari=2026-01-01&sampai=2026-01-31")
+	if len(lp.Baris) != 1 || lp.Baris[0].Produk != "Kopi Susu" || lp.Baris[0].Batch != 2 || lp.Baris[0].HasilQty != 100_000 ||
+		lp.Baris[0].Nilai != 405_000 || lp.Baris[0].PerUnit != 4_050 || len(lp.Baris[0].Bahan) != 1 || lp.Baris[0].Bahan[0].Qty != 1_800 || lp.Total != 405_000 {
+		t.Errorf("laporan produksi %+v", lp)
+	}
+	if rec := do(srv, qa, http.MethodGet, "/api/v1/produksi/laporan.xlsx?dari=2026-01-01&sampai=2026-01-31", ""); rec.Code != http.StatusOK {
+		t.Errorf("ekspor produksi %d", rec.Code)
+	}
+
 	kartu := getJSON[kartuBarangResp](t, srv, qa, "/api/v1/stok/kartu/"+itoa(kopi.ID)+"?dari=2026-01-02&sampai=2026-01-31")
 	if kartu.Awal.Qty != 10_000 || len(kartu.Baris) != 3 {
 		t.Errorf("kartu kopi awal %+v baris %d", kartu.Awal, len(kartu.Baris))

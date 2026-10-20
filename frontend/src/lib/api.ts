@@ -1606,3 +1606,12 @@ export interface Banding { kolom: { periode: string; label: string }[]; bagian: 
 export const MAKS_BANDING = 12
 export const getBanding = (periode: string[]) => api<Banding>(`/reports/banding?periode=${periode.join(',')}`)
 export const bandingPdfUrl = (periode: string[]) => `/api/v1/reports/banding.pdf?periode=${periode.join(',')}`
+
+// --- Laporan produksi ---
+export interface BarisProduksi {
+  id: number; tanggal: string; produk_id: number; produk: string; batch: number; hasil_qty: number; satuan: string
+  nilai: number; per_unit: number; bahan: { nama: string; satuan: string; qty: number; nilai: number }[]; keterangan?: string; oleh?: string
+}
+export interface LaporanProduksi { dari: string; sampai: string; mulai: string; baris: BarisProduksi[]; total_nilai: number }
+export const getLaporanProduksi = (dari: string, sampai: string) => api<LaporanProduksi>(`/produksi/laporan?dari=${dari}&sampai=${sampai}`)
+export const laporanProduksiXlsxUrl = (dari: string, sampai: string) => `/api/v1/produksi/laporan.xlsx?dari=${dari}&sampai=${sampai}`
