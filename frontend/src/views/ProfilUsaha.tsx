@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { BrandMark } from '@/components/Sidebar'
+import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { PageHeader } from '@/components/PageHeader'
@@ -248,7 +248,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
 
       <FakturFields p={p} set={set} />
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <Button type="submit" size="lg" className="rounded-full font-bold" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
+      <Button type="submit" size="lg" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
     </form>
   )
 }
@@ -378,13 +378,7 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
     <main className="onboarding-page">
       <div className="onboarding-shell">
         <header className="onboarding-brand dark">
-          <div className="flex items-center gap-2.5">
-            <BrandMark size={28} />
-            <div>
-              <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-              <div className="brand-sub">by Master Pajak</div>
-            </div>
-          </div>
+          <Logo tinggi={28} />
           <div className="flex items-center gap-1">
             <ThemeToggle className="nav-item size-11 justify-center p-0 text-muted-foreground" />
             <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>

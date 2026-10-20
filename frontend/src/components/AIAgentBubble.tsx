@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Bot, Sparkles, X, Send, RefreshCw, MessageSquareQuote } from 'lucide-react'
 import { askAIChat, type AIChatResponse } from '../lib/api'
+import { Monogram } from '@/components/Logo'
 
 interface Message {
   id: string
@@ -76,11 +77,11 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
   const renderFormattedText = (raw: string) => {
     const lines = raw.split('\n')
     return (
-      <div className="space-y-1 text-sm leading-relaxed text-slate-200">
+      <div className="space-y-1 text-sm leading-relaxed text-foreground">
         {lines.map((line, idx) => {
           if (line.startsWith('### ')) {
             return (
-              <h4 key={idx} className="font-semibold text-emerald-400 mt-2 mb-1 text-base">
+              <h4 key={idx} className="font-heading font-bold text-[var(--ink)] mt-2 mb-1 text-base">
                 {line.replace('### ', '')}
               </h4>
             )
@@ -89,7 +90,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
             const content = line.replace('- ', '')
             return (
               <div key={idx} className="flex items-start gap-1.5 pl-1">
-                <span className="text-emerald-400 mt-0.5">•</span>
+                <span className="text-[var(--link)] mt-0.5">•</span>
                 <span dangerouslySetInnerHTML={{ __html: formatInline(content) }} />
               </div>
             )
@@ -105,31 +106,25 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
 
   const formatInline = (text: string) => {
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em class="text-slate-300">$1</em>')
-      .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black/40 font-mono text-xs text-amber-300">$1</code>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em class="text-muted-foreground">$1</em>')
+      .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-[var(--bg-raised)] font-mono text-xs">$1</code>')
   }
 
   return (
-    <div className="dark fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       {/* Panel Chat */}
       {isOpen && (
-        <div className="mb-4 w-[430px] max-w-[94vw] h-[580px] max-h-[82vh] rounded-2xl border border-slate-700/80 bg-[#0d131a]/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div className="mb-4 w-[430px] max-w-[94vw] h-[580px] max-h-[82vh] rounded-2xl border border-[var(--border-subtle)] bg-card shadow-[var(--shadow-3)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
-          <div className="px-4 py-3.5 border-b border-slate-800 bg-gradient-to-r from-emerald-950/40 via-slate-900/60 to-teal-950/40 flex items-center justify-between">
+          <div className="dark px-4 py-3.5 bg-[var(--navy-700)] flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <Bot className="w-5 h-5 text-white" />
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0d131a]" />
+              <div className="w-9 h-9 rounded-[10px] bg-[var(--navy-900)] flex items-center justify-center">
+                <Monogram size={16} />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-semibold text-sm text-white">AI Konsultan Pajak & Bisnis</h3>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    Live
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 font-mono">by Master Pajak</p>
+                <h3 className="font-heading font-bold text-sm">AI Konsultan Pajak & Bisnis</h3>
+                <p className="text-[11px] text-muted-foreground">Master Pajak</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -141,14 +136,14 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
                   suggestions: INITIAL_SUGGESTIONS,
                 }])}
                 title="Reset Percakapan"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
                 title="Tutup Panel"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -156,7 +151,7 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
           </div>
 
           {/* Messages list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scrollbar-thin scrollbar-thumb-slate-700">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm scrollbar-thin">
             {messages.map((m) => (
               <div
                 key={m.id}
@@ -165,8 +160,8 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
                 <div
                   className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${
                     m.sender === 'user'
-                      ? 'bg-emerald-600 text-white rounded-br-none'
-                      : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-bl-none'
+                      ? 'bg-[var(--navy-600)] text-white rounded-br-none'
+                      : 'bg-[var(--bg-card-hover)] text-foreground rounded-bl-none'
                   }`}
                 >
                   {m.sender === 'user' ? (
@@ -184,9 +179,9 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
                         key={i}
                         onClick={() => handleSend(sug)}
                         disabled={loading}
-                        className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-emerald-950/60 hover:text-emerald-300 hover:border-emerald-500/40 border border-slate-700/60 text-slate-300 transition text-left flex items-center gap-1.5"
+                        className="text-xs px-2.5 py-1.5 rounded-lg bg-card hover:bg-[var(--bg-card-hover)] hover:text-foreground border border-[var(--border-shell)] text-muted-foreground transition text-left flex items-center gap-1.5"
                       >
-                        <MessageSquareQuote className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <MessageSquareQuote className="w-3 h-3 text-[var(--link)] shrink-0" />
                         <span>{sug}</span>
                       </button>
                     ))}
@@ -196,8 +191,8 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
             ))}
 
             {loading && (
-              <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/60 px-3 py-2 rounded-xl border border-slate-800/80 w-fit">
-                <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-[var(--bg-raised)] px-3 py-2 rounded-xl w-fit">
+                <Sparkles className="w-4 h-4 text-[var(--link)] animate-spin" />
                 <span>AI sedang menganalisis laporan & aturan pajak...</span>
               </div>
             )}
@@ -210,20 +205,21 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
               e.preventDefault()
               handleSend()
             }}
-            className="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center gap-2"
+            className="p-3 border-t border-[var(--border-subtle)] flex items-center gap-2"
           >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Tanya laporan bisnis atau aturan pajak..."
-              className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+              className="flex-1 h-10 bg-[var(--bg-input)] border border-input rounded-lg px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/25 transition"
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white transition shadow-lg shadow-emerald-600/20"
+              aria-label="Kirim"
+              className="size-10 grid place-items-center rounded-lg bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] disabled:opacity-40 transition"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -234,17 +230,17 @@ export const AIAgentBubble: React.FC<{ period?: string }> = ({ period = '2026-08
       {/* Floating Trigger Button */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-medium text-sm shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition border border-emerald-400/30"
+        className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-[var(--navy-700)] text-white text-sm shadow-[var(--shadow-2)] hover:bg-[var(--navy-900)] active:scale-[0.98] transition border border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <div className="relative">
           <Bot className="w-5 h-5 text-white" />
           <span className="absolute -top-1 -right-1 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--yellow-300)] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--yellow-500)]"></span>
           </span>
         </div>
         <span className="font-semibold tracking-wide">Tanya AI Pajak</span>
-        <Sparkles className="w-4 h-4 text-emerald-200 group-hover:rotate-12 transition-transform" />
+        <Sparkles className="w-4 h-4 text-[var(--navy-200)]" />
       </button>
     </div>
   )

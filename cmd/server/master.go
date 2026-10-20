@@ -242,7 +242,18 @@ func namaKlien(t *tenant, nama string) string {
 }
 
 // klienRows: usaha yang boleh dilihat anggota, urut ID.
-func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
+//
+// hitungTx memindai seluruh transaksi tiap usaha, jadi hanya dinyalakan oleh endpoint yang
+// benar-benar menampilkan kolom "Transaksi bulan ini". Pada 1.000 usaha × 10.000 transaksi
+// setahun, memindai tanpa syarat berarti 10 juta baris per request (terukur ~0,5–1,3 detik
+// di BenchmarkKlienRows).
+func (s *Server) klienRows(ak master.Akses, now time.Time, hitungTx bool) []klienRow {
+	return s.klienRowsFilter(ak, now, hitungTx, 0)
+}
+
+// klienRowsFilter: sama seperti klienRows, tetapi hanyaID > 0 membatasi hasil ke satu usaha
+// supaya halaman detail tidak perlu membangun baris seluruh klien.
+func (s *Server) klienRowsFilter(ak master.Akses, now time.Time, hitungTx bool, hanyaID int) []klienRow {
 	users := map[int][]auth.User{}
 	nama := map[int]string{}
 	for _, u := range s.users.Snapshot().Users {
@@ -256,6 +267,9 @@ func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
 	s.tenantsMu.RLock()
 	ts := make([]*tenant, 0, len(s.tenants))
 	for id, t := range s.tenants {
+		if hanyaID != 0 && id != hanyaID {
+			continue
+		}
 		if ak.BolehKlien(id) {
 			ts = append(ts, t)
 			for _, uid := range s.master.Penangan(id) {
@@ -276,9 +290,11 @@ func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
 		if p := t.profile; p != nil {
 			row.Nama, row.Jenis, row.Kota, row.KLU, row.PKP, row.Onboarding = p.NamaUsaha, p.JenisUsaha, p.Kota, p.KLU, p.PKP, true
 		}
-		for _, tx := range t.txs {
-			if strings.HasPrefix(tx.Tanggal, bulan) {
-				row.TransaksiBulanIni++
+		if hitungTx {
+			for _, tx := range t.txs {
+				if strings.HasPrefix(tx.Tanggal, bulan) {
+					row.TransaksiBulanIni++
+				}
 			}
 		}
 		if p, o, ok := paketTerakhir(t.langganan.Orders); ok {
@@ -313,7 +329,7 @@ func (s *Server) klienRows(ak master.Akses, now time.Time) []klienRow {
 }
 
 func (s *Server) handleMasterKlien(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, s.klienRows(aksesOf(r), time.Now()))
+	writeJSON(w, s.klienRows(aksesOf(r), time.Now(), true)) // daftar klien menampilkan kolom transaksi bulan ini
 }
 
 type ringkasanMaster struct {
@@ -330,7 +346,7 @@ type ringkasanMaster struct {
 
 func (s *Server) handleMasterRingkasan(w http.ResponseWriter, r *http.Request) {
 	ak := aksesOf(r)
-	rows := s.klienRows(ak, time.Now())
+	rows := s.klienRows(ak, time.Now(), false) // ringkasan hanya memakai status, MRR, dan keaktifan
 	out := ringkasanMaster{Klien: len(rows), PerluPerhatian: []klienRow{}}
 	var mrr int64
 	for _, k := range rows {
@@ -391,7 +407,7 @@ func (s *Server) handleMasterKlienDetail(w http.ResponseWriter, r *http.Request)
 	}
 	ak := aksesOf(r)
 	var d klienDetail
-	for _, k := range s.klienRows(ak, time.Now()) {
+	for _, k := range s.klienRowsFilter(ak, time.Now(), true, t.id) { // detail menampilkan transaksi bulan ini, satu usaha saja
 		if k.ID == t.id {
 			d.Klien = k
 		}
@@ -505,7 +521,7 @@ type pembayaranRow struct {
 func (s *Server) handleMasterPembayaran(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	out := []pembayaranRow{}
-	for _, k := range s.klienRows(aksesOf(r), now) {
+	for _, k := range s.klienRows(aksesOf(r), now, false) { // pembayaran hanya butuh nama & order
 		s.tenantsMu.RLock()
 		t := s.tenants[k.ID]
 		s.tenantsMu.RUnlock()
@@ -659,7 +675,7 @@ func (s *Server) handleMasterTim(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Anggota = append(out.Anggota, row)
 	}
-	for _, k := range s.klienRows(master.Akses{Role: master.Role{ID: master.RoleMaster}}, time.Now()) {
+	for _, k := range s.klienRows(master.Akses{Role: master.Role{ID: master.RoleMaster}}, time.Now(), false) { // tim hanya butuh id & nama
 		out.Klien = append(out.Klien, orang{k.ID, k.Nama})
 	}
 	writeJSON(w, out)

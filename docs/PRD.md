@@ -1,5 +1,5 @@
 # Product Requirements Document (PRD)
-**Produk**: Laporan Bisnis by Master Pajak  
+**Produk**: Master Pajak  
 **Versi**: 1.0 (MVP Batch 100 User)  
 **Design System**: Navy & Gold, laporan pada permukaan netral gelap (`shadcn/ui` + `Kokonut UI` + `21st.dev`, patuh `antislop` & `impeccable`)
 
@@ -7,7 +7,7 @@
 
 ## 1. Visi Produk & Value Proposition
 **"Gambaran seluruh bisnis dalam satu layar."**  
-Laporan Bisnis by Master Pajak membantu pemilik UMKM melihat kesehatan bisnis secara utuh—bukan sekadar omzet kotor, melainkan **Laba Bersih sesungguhnya**, **Saldo Kas & Bank riil**, **Piutang yang macet lewat 30 hari**, **Potongan komisi aplikasi**, hingga **kewajiban Pajak UMKM 0,5%** tanpa perlu mengerti akuntansi.
+Master Pajak membantu pemilik UMKM melihat kesehatan bisnis secara utuh—bukan sekadar omzet kotor, melainkan **Laba Bersih sesungguhnya**, **Saldo Kas & Bank riil**, **Piutang yang macet lewat 30 hari**, **Potongan komisi aplikasi**, hingga **kewajiban Pajak UMKM 0,5%** tanpa perlu mengerti akuntansi.
 
 ---
 
@@ -26,7 +26,7 @@ Laporan Bisnis by Master Pajak membantu pemilik UMKM melihat kesehatan bisnis se
 ## 3. Spesifikasi UI/UX & Design System (Sesuai Referensi Gambar)
 
 ### 3.1 Palet Warna & Tipografi (`antislop` + `taste` + `impeccable`)
-- **Brand Utama**: Navy `#222852` pada login, onboarding, sidebar, favicon, dan tema browser; aksen emas `#F5C428` / `#EAB308` untuk logo dan CTA, dengan teks tombol navy. Keputusan pengguna 19 Oktober 2026; detail di `DESIGN.md` §2.
+- **Brand**: Brand Guideline Master Pajak v1.0 (Oktober 2026, `docs/brand/`): logo M dua warna + wordmark `masterpajak`, Biru DJP `#212C5F` primer, kuning `#FED111` aksen maks. 3%, Rubik + Public Sans, tema terang default. Detail di `DESIGN.md` §2–3.
 - **Canvas Background**: `#090A0C` (Latar belakang utama luar) / `#0F1115` (Shell aplikasi).
 - **Card Surface**: `#14171D` dengan border `1px solid rgba(255, 255, 255, 0.06)` dan radius `14px` (`rounded-xl`).
 - **Active Sidebar Pill**: `rgba(234, 179, 8, 0.14)` dengan teks `#FACC15` (Amber/Emas).

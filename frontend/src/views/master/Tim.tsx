@@ -55,7 +55,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
 
   return (
     <>
-      <PageHeader title="Tim & Akses" subtitle="Akun tim MasterPajak, role beserta izinnya, dan klien yang ditugaskan ke tiap anggota.">
+      <PageHeader title="Tim & Akses" subtitle="Akun tim Master Pajak, role beserta izinnya, dan klien yang ditugaskan ke tiap anggota.">
         {tab === 'anggota'
           ? <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => { setError(''); setForm({ id: null, nama: '', email: '', password: '', role: 'konsultan', klien: [], aktif: true }) }}><Plus size={16} /> Tambah anggota</button>
           : <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => { setError(''); setRoleBaru({ nama: '', izin: ['klien_lihat'] }) }}><Plus size={16} /> Role baru</button>}
@@ -79,7 +79,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
                       <div className="text-xs text-muted-foreground">{a.user.email}</div>
                     </td>
                     <td>
-                      <span className={'pill-status ' + (a.role === 'master' ? 'pill-amber' : 'pill-status-muted')}>{a.role ? roleNama(a.role) : 'Tanpa role'}</span>
+                      <span className={'pill-status ' + (a.role === 'master' ? 'pill-brand' : 'pill-status-muted')}>{a.role ? roleNama(a.role) : 'Tanpa role'}</span>
                       {!a.user.active && <span className="pill-status pill-red" style={{ marginLeft: 6 }}>nonaktif</span>}
                     </td>
                     <td className="text-sm">{lihatSemua(a.role) ? <span className="text-muted-foreground">Semua klien</span>
@@ -121,7 +121,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
                     {tim.roles.map((r) => (
                       <td key={r.id} style={{ textAlign: 'center' }}>
                         <input type="checkbox" aria-label={`${r.nama}: ${i.label}`} checked={r.kunci || r.izin.includes(i.id)} disabled={r.kunci || busy}
-                          onChange={() => toggleIzin(r, i.id)} style={{ width: 16, height: 16, accentColor: 'var(--accent-amber)' }} />
+                          onChange={() => toggleIzin(r, i.id)} style={{ width: 16, height: 16, accentColor: 'var(--primary)' }} />
                       </td>
                     ))}
                   </tr>
@@ -160,7 +160,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
                   <div className="grid gap-1 rounded-lg border border-border" style={{ maxHeight: 220, overflowY: 'auto', padding: 8 }}>
                     {tim.klien.map((k) => (
                       <label key={k.id} className="flex items-center gap-2 text-sm" style={{ padding: '4px 6px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={form.klien.includes(k.id)} style={{ accentColor: 'var(--accent-amber)' }}
+                        <input type="checkbox" checked={form.klien.includes(k.id)} style={{ accentColor: 'var(--primary)' }}
                           onChange={(e) => set({ klien: e.target.checked ? [...form.klien, k.id] : form.klien.filter((x) => x !== k.id) })} />
                         {k.nama}
                       </label>
@@ -196,7 +196,7 @@ export function TimAkses({ selfId }: { selfId: number }) {
               <div className="grid gap-1 rounded-lg border border-border" style={{ padding: 8 }}>
                 {tim.izin.map((i) => (
                   <label key={i.id} className="flex items-start gap-2 text-sm" style={{ padding: '4px 6px', cursor: 'pointer' }}>
-                    <input type="checkbox" style={{ accentColor: 'var(--accent-amber)', marginTop: 3 }} checked={roleBaru.izin.includes(i.id)}
+                    <input type="checkbox" style={{ accentColor: 'var(--primary)', marginTop: 3 }} checked={roleBaru.izin.includes(i.id)}
                       onChange={(e) => setRoleBaru({ ...roleBaru, izin: e.target.checked ? [...roleBaru.izin, i.id] : roleBaru.izin.filter((x) => x !== i.id) })} />
                     <span><span className="font-semibold">{i.label}</span>{i.keterangan && <span className="block text-xs text-muted-foreground">{i.keterangan}</span>}</span>
                   </label>

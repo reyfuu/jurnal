@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CreditCard, LayoutGrid, LogOut, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
-import { BrandMark } from '@/components/Sidebar'
+import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
 import { KlienDetailView, KlienList, Ringkasan } from './Klien'
@@ -30,7 +30,7 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
   },
 ]
 
-/** Seluruh aplikasi untuk akun tim MasterPajak: hanya metadata klien, tanpa angka keuangan. */
+/** Seluruh aplikasi untuk akun tim Master Pajak: hanya metadata klien, tanpa angka keuangan. */
 export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const izin = me.master?.izin ?? []
   const bisa = (i?: Izin) => (i ? izin.includes(i) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
@@ -43,7 +43,7 @@ export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) 
   if (!me.master) {
     return (
       <main className="onboarding-page" style={{ padding: 32 }}>
-        <p role="alert">Akun ini belum terdaftar di tim MasterPajak. Minta Master menambahkan Anda di Tim &amp; Akses.</p>
+        <p role="alert">Akun ini belum terdaftar di tim Master Pajak. Minta Master menambahkan Anda di Tim &amp; Akses.</p>
         <button className="btn-cta" style={{ marginTop: 16 }} onClick={onLogout}>Keluar</button>
       </main>
     )
@@ -55,10 +55,9 @@ export function PanelMaster({ me, onLogout }: { me: Me; onLogout: () => void }) 
         <aside className="sidebar dark">
           <div className="sidebar-main">
             <div className="sidebar-brand">
-              <BrandMark />
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 700 }}>Laporan Bisnis</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Panel Master</div>
+                <Logo tinggi={24} />
+                <div className="label-caps" style={{ marginTop: 8, fontSize: 10.5, color: 'var(--text-muted)' }}>Panel Master</div>
               </div>
             </div>
             <nav className="sidebar-nav">

@@ -277,6 +277,8 @@ export interface PriceSim {
 export interface PriceSimInput {
   cogs: number
   targetProfit: number
+  /** > 0: harga dihitung dari margin yang diinginkan (persen), targetProfit diabaikan. */
+  marginPct?: number
   feePct: number
   fixedCost?: number // kosong = beban operasional periode berjalan
   monthlyVolume: number
@@ -439,6 +441,7 @@ export const simulatePrice = (period: string, i: PriceSimInput) =>
       cogs: i.cogs,
       target_profit: i.targetProfit,
       fee_bps: Math.round(i.feePct * 100),
+      margin_bps: i.marginPct ? Math.round(i.marginPct * 100) : 0,
       fixed_cost: i.fixedCost,
       monthly_volume: i.monthlyVolume,
       target_net_profit: i.targetNetProfit,
@@ -1267,3 +1270,20 @@ export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pa
 /** Posisi omzet setahun terhadap batas wajib PKP Rp4,8 M. */
 export interface HasilPKP { omzet: number; batas: number; wajib_pkp: boolean; sisa: number; pemakaian_bps: number; catatan: string[] }
 export const cekPKP = (omzet: number) => api<HasilPKP>('/kalkulator/pkp', { method: 'POST', body: { omzet } })
+
+// --- Simulasi usaha (Simulasi & Harga) ---
+
+export interface DasarSimulasi {
+  periode: string[]; omzet: number; modal_bahan: number; biaya_variabel: number; biaya_tetap: number
+  penyusutan: number; pendapatan_lain: number; laba: number; hari_buka: number
+}
+export interface HasilSimulasi {
+  omzet: number; modal_bahan: number; biaya_variabel: number; biaya_tetap: number; penyusutan: number
+  pendapatan_lain: number; laba: number; margin_bps: number
+}
+export interface TitikImpasUsaha { ada: boolean; per_bulan: number; per_hari: number; biaya_tetap: number; sisa_per_100rb: number; di_atas_bps: number }
+export interface PorsiProduk { nama: string; harga: number; modal: number; ada_modal: boolean; variabel: number; sisa: number; porsi_per_hari: number; ada: boolean }
+/** Perubahan dalam basis poin: 500 = +5%. */
+export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: number; tambah_tetap: number }
+export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
+export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })
