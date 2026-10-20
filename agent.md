@@ -69,6 +69,13 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 13. **`agent browser`**
     - Setiap perubahan frontend wajib diverifikasi secara visual menggunakan browser agent untuk memastikan tata letak 6 KPI card atas, 3 grafik tengah, 2 kartu bawah, dan sidebar navigasi presisi di desktop & mobile.
 
+### D. Reverse Engineering (Situasional)
+14. **`rea` ([morluto/rea](https://github.com/morluto/rea) — skill `reverse-engineer-anything` + MCP `rea`)**
+    - Aktif setiap sesi, tetapi **dipakai hanya bila tugasnya memang membedah artefak jadi**: aplikasi web/Electron/JS pihak lain (mis. alur kompetitor atau halaman pembayaran Midtrans), file biner, APK, atau situs. Untuk memahami kode repo ini sendiri pakai `graphify`, bukan REA.
+    - **Hanya untuk target yang sah dianalisis**: milik sendiri, berizin, atau untuk interoperabilitas/riset sesuai hukum. Tidak untuk membobol lisensi, DRM, atau mengambil data pihak lain.
+    - Analisis berjalan lokal; analisis statis JS/.NET tidak menjalankan target. Penangkapan runtime menjalankan target dengan izin user, jadi **minta persetujuan user dulu**.
+    - Terpasang untuk Claude Code lewat `npx rea-agents@6.7.0 setup --client claude_code --yes` (MCP di `~/.claude.json`, cadangan `~/.claude.json.rea.backup`; skill di `~/.claude/skills/reverse-engineer-anything`). Analisis biner native butuh Ghidra/Hopper/IDA, yang belum terpasang; Hopper hanya dipasang dengan persetujuan user. Perbarui dengan `npx rea-agents@latest setup --client claude_code`.
+
 ---
 
 ## 2. Domain Architecture Map (Laporan Bisnis)
