@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -85,7 +86,7 @@ func TestGaransi7Hari(t *testing.T) {
 	}
 
 	// Usaha B: mengekspor laporan → garansi gugur, klaim 409.
-	b := bayarLewatMidtrans(t, srv, status, `{"name":"QA Dua","email":"qa2@x.id","password":"rahasia123"}`)
+	b := bayarLewatMidtrans(t, srv, status, strings.Replace(registerBody, "qa1@", "qa2@", 1))
 	do(srv, b, http.MethodPut, "/api/v1/business", profileBody)
 	if rec := do(srv, b, http.MethodGet, "/api/v1/invoice/99/pdf", ""); rec.Code != http.StatusNotFound || !garansiOf(t, srv, b).Garansi.Berlaku {
 		t.Fatalf("ekspor yang gagal (404) tidak boleh menggugurkan garansi: %d", rec.Code)
