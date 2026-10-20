@@ -399,4 +399,5 @@ func (s *Server) kelolaRoutes() {
 	m.HandleFunc("DELETE /api/v1/master/tim/{id}", s.guardMP(s.handleHapusAnggota, master.HapusPermanen))
 	m.HandleFunc("GET /api/v1/akses-tim", s.guard("pengguna", s.handleRiwayatAksesTim))
 	s.catatanRoutes()
+	s.jadwalRoutes()
 }

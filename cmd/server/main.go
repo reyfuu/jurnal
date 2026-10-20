@@ -512,6 +512,8 @@ type meResp struct {
 	// tempo diingatkan (pop-up pengingat).
 	CatatanTerbuka int `json:"catatan_terbuka,omitempty"`
 	CatatanIngat   int `json:"catatan_ingat,omitempty"`
+	// Jadwal: pengingat tenggat laporan & pajak yang sedang dalam jendela H-n (Panel Master).
+	Jadwal []finance.PengingatJadwal `json:"jadwal,omitempty"`
 }
 
 func (s *Server) newMe(u auth.User) meResp {
@@ -536,6 +538,7 @@ func (s *Server) newMe(u auth.User) meResp {
 			me.KoreksiMenunggu = t.koreksiMenunggu()
 		}
 		me.CatatanTerbuka, me.CatatanIngat = s.catatanTerbuka(t)
+		me.Jadwal = s.jadwalAktif(t)
 	}
 	return me
 }

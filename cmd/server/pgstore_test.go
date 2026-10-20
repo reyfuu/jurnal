@@ -310,6 +310,9 @@ func TestPostgresPanelMaster(t *testing.T) {
 	if rec := do(srv, m, http.MethodPut, "/api/v1/master/pengingat", `{"aktif":true,"interval_hari":5,"tingkat_min":"penting"}`); rec.Code != http.StatusOK {
 		t.Fatalf("pengingat: %d %s", rec.Code, rec.Body)
 	}
+	if rec := do(srv, m, http.MethodPut, "/api/v1/master/jadwal", `{"item":[{"judul":"Tutup buku","frekuensi":"tahunan","tanggal":29,"bulan":2,"hari_sebelum":7,"untuk":"badan","aktif":true}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("jadwal: %d %s", rec.Code, rec.Body)
+	}
 
 	srv2 := NewServer()
 	if got, want := normJSON(t, srv2.master), normJSON(t, srv.master); got != want {
@@ -323,6 +326,9 @@ func TestPostgresPanelMaster(t *testing.T) {
 	}
 	if a := srv2.master.AturanPengingat(); a.IntervalHari != 5 || a.TingkatMin != "penting" {
 		t.Fatalf("pengingat setelah muat ulang = %+v", a)
+	}
+	if j := srv2.master.DaftarJadwal(); len(j.Item) != 1 || j.Item[0].Bulan != 2 || j.Item[0].Untuk != "badan" || j.NextID < 2 {
+		t.Fatalf("jadwal setelah muat ulang = %+v", j)
 	}
 	if st := tenantByEmail(t, srv2, qa).langgananStatus(time.Now()).Status; st != "aktif" {
 		t.Fatalf("aktivasi manual hilang: %s", st)

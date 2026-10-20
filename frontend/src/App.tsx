@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { BEBAS_TERKUNCI, VIEW_LABEL } from '@/lib/nav'
 import { FiturTerkunci } from '@/components/FiturTerkunci'
 import { CatatanKlienView, PengingatCatatan, TulisCatatanTombol } from '@/components/CatatanKonsultan'
+import { PengingatJadwalBanner } from '@/components/PengingatJadwal'
 import { PageHeader } from '@/components/PageHeader'
 import { LaporanAI } from '@/views/LaporanAI'
 import { LaporBug } from '@/views/LaporBug'
@@ -180,6 +181,7 @@ export default function App() {
               <Button size="sm" variant="outline" className="rounded-full" style={{ marginLeft: 'auto' }} onClick={() => void selesaiLihat().finally(gantiMode)}>Kembali ke Panel Master</Button>
             </div>
           )}
+          {!me.lihat && !!me.jadwal?.length && <PengingatJadwalBanner jadwal={me.jadwal} />}
           {!!me.catatan_terbuka && !me.lihat && view !== 'catatan' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
               <span><strong>{me.catatan_terbuka} catatan dari konsultan Master Pajak</strong> belum ditandai sudah diperbaiki.</span>
