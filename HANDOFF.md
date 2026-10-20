@@ -716,6 +716,20 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   di Kalkulator Pajak. **Perlu verifikasi tim**: prosedur SKB & pengembalian kelebihan pungutan
   final mengikuti PMK 37/2025.
 
+## Masuk ke aplikasi sebelum berlangganan (mode terkunci, 20 Okt 2026)
+
+- Layar Langganan / Alat Gratis (usaha `habis`) punya tombol **Masuk ke aplikasi** (header, sebelah
+  Keluar). Pilihan diingat per tab (`sessionStorage` `masuk-terkunci`), dihapus saat keluar.
+- Workspace terkunci: grup **Coba gratis** (Laporan AI, Alat Gratis) di atas sidebar; menu lain tampil
+  bergembok dan membuka `FiturTerkunci` (ajakan pilih paket). Tetap terbuka: Langganan, Profil Usaha,
+  Lapor Bug (`BEBAS_TERKUNCI` di `lib/nav.ts`). Chat AI disembunyikan (POST diblok `lockedWrite`).
+- **Laporan AI tanpa transaksi** (`GET /reports/ai`, `sumber: "profil"`): `ai.FaktaDariProfil` +
+  `ai.AnalisaProfil` memakai perkiraan omzet/laba form sign-up, cek awal DJP, dan saran skema pajak;
+  prompt menyuruh model menyebut analisis ini terbatas. Usaha yang punya transaksi tetap `sumber:
+  "transaksi"`. Halaman menampilkan analisis AI + `CekAwalCard`.
+- ponytail: kunci menu hanya di frontend; server tetap mengizinkan GET (sudah begitu sejak bayar-dulu)
+  dan menolak tulis lewat `lockedWrite`.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

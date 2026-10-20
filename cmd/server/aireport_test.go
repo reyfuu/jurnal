@@ -124,3 +124,38 @@ func TestAIReport_KasirTidakBolehMelihat(t *testing.T) {
 		t.Errorf("Kasir tidak punya hak laporan-keuangan: want 403, got %d", rec.Code)
 	}
 }
+
+// Usaha tanpa transaksi (baru daftar, belum berlangganan): Laporan AI memakai data form sign-up.
+func TestAIReport_TanpaTransaksiPakaiProfil(t *testing.T) {
+	srv := NewServer()
+	qa := register(t, srv, registerBody)
+	do(srv, qa, http.MethodPut, "/api/v1/business", `{"nama_usaha":"Toko QA","jenis_usaha":"perdagangan","bentuk_usaha":"op","ptkp":"K/3","pkp":false,"metode_persediaan":"periodik","klu":"471","omzet_tahunan":2400000000,"laba_sebelum_pajak":168000000}`)
+	rec := do(srv, qa, http.MethodGet, "/api/v1/reports/ai?period=2026-08", "")
+	var body struct {
+		Sumber string `json:"sumber"`
+		Profil struct {
+			OmzetSetahun int64 `json:"omzet_setahun"`
+			Saran        *struct {
+				Judul string `json:"judul"`
+			} `json:"saran_skema_pajak"`
+		} `json:"profil"`
+		ProfilUsaha struct {
+			NamaUsaha string `json:"nama_usaha"`
+		} `json:"profil_usaha"`
+		Analysis struct {
+			Tersedia bool `json:"tersedia"`
+		} `json:"analysis"`
+	}
+	_ = json.NewDecoder(rec.Body).Decode(&body)
+	if rec.Code != http.StatusOK || body.Sumber != "profil" || body.Profil.OmzetSetahun != 2_400_000_000 || body.Profil.Saran == nil || body.ProfilUsaha.NamaUsaha != "Toko QA" {
+		t.Fatalf("laporan AI tanpa transaksi: %d %+v", rec.Code, body)
+	}
+	// usaha dengan transaksi tetap memakai laporan keuangan
+	var demo struct {
+		Sumber string `json:"sumber"`
+	}
+	_ = json.NewDecoder(do(srv, login(t, srv, "owner@kedaikopisenja.id"), http.MethodGet, "/api/v1/reports/ai?period=2026-08", "").Body).Decode(&demo)
+	if demo.Sumber != "transaksi" {
+		t.Errorf("demo: sumber %q", demo.Sumber)
+	}
+}

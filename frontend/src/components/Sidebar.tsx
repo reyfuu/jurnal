@@ -1,7 +1,7 @@
-import { LogOut } from 'lucide-react'
+import { Lock, LogOut } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { NAV } from '@/lib/nav'
+import { BEBAS_TERKUNCI, NAV, NAV_COBA } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
 
 interface Props {
@@ -10,9 +10,11 @@ interface Props {
   view: View
   onNavigate: (v: View) => void
   onLogout: () => void
+  /** Belum berlangganan: menu Coba gratis di atas, menu lain tampil bergembok. */
+  terkunci?: boolean
 }
 
-export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
+export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Props) {
   const initials = me.user.name.replace(/\(.*?\)/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
     <aside className="sidebar dark">
@@ -22,18 +24,23 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout }: Props) {
         </div>
 
         <nav className="sidebar-nav">
-        {NAV.map((g) => {
-          const items = g.items.filter((i) => me.views.includes(i.view))
+        {(terkunci ? [NAV_COBA, ...NAV] : NAV).map((g) => {
+          const items = g.items.filter((i) => me.views.includes(i.view) || (terkunci && g === NAV_COBA))
           if (items.length === 0) return null
           return (
             <div className="nav-group" key={g.group}>
               <div className="nav-group-label">{g.group}</div>
-              {items.map(({ view: v, label, icon: Icon }) => (
-                <button key={v} className={'nav-item' + (v === view ? ' active' : '')} onClick={() => onNavigate(v)}>
-                  <Icon className="nav-icon" strokeWidth={2} />
-                  {label}
-                </button>
-              ))}
+              {items.map(({ view: v, label, icon: Icon }) => {
+                const gembok = terkunci && !BEBAS_TERKUNCI.includes(v)
+                return (
+                  <button key={v} className={'nav-item' + (v === view ? ' active' : '')} onClick={() => onNavigate(v)}
+                    style={gembok ? { opacity: 0.6 } : undefined} aria-label={gembok ? `${label} (terkunci)` : undefined}>
+                    <Icon className="nav-icon" strokeWidth={2} />
+                    {label}
+                    {gembok && <Lock size={13} style={{ marginLeft: 'auto' }} aria-hidden="true" />}
+                  </button>
+                )
+              })}
             </div>
           )
         })}

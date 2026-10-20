@@ -14,6 +14,22 @@ import (
 // hanya bagian analisis yang kosong.
 func (s *Server) handleAIReport(t *tenant, w http.ResponseWriter, r *http.Request) {
 	period := periodOrDefault(r)
+	// Belum ada transaksi (baru daftar / belum berlangganan): satu-satunya data adalah perkiraan
+	// form sign-up, jadi analisis memakai profil — terbatas, dan halaman menyebutnya.
+	t.mu.RLock()
+	kosong := len(t.txs) == 0
+	t.mu.RUnlock()
+	if p := t.currentProfile(); kosong && p.NamaUsaha != "" {
+		f := ai.FaktaDariProfil(p)
+		writeJSON(w, map[string]any{
+			"sumber":       "profil",
+			"profil":       f,
+			"profil_usaha": p,
+			"analysis":     ai.AnalisaProfil(r.Context(), s.llm, f),
+			"llm":          ai.Status(s.llm),
+		})
+		return
+	}
 	rep := t.report(period)
 
 	t.mu.RLock()
@@ -29,6 +45,7 @@ func (s *Server) handleAIReport(t *tenant, w http.ResponseWriter, r *http.Reques
 	facts := finance.CollectFacts(rep, snap, t.currentProfile(), invoices, karyawan, riwayat)
 
 	writeJSON(w, map[string]any{
+		"sumber":   "transaksi",
 		"facts":    facts,
 		"analysis": ai.Analyze(r.Context(), s.llm, facts),
 		"llm":      ai.Status(s.llm),

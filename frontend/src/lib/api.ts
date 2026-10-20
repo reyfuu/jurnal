@@ -10,6 +10,7 @@ export type View =
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
   | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim Master Pajak
   | 'pustaka' // artikel pajak dari tim Master Pajak
+  | 'laporan-ai' | 'alat-gratis' // menu mode terkunci (belum berlangganan), hanya di frontend
 
 export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
@@ -1272,7 +1273,10 @@ export interface AIAnalysis {
 }
 
 export interface AIReport {
-  facts: BusinessFacts
+  /** transaksi = laporan keuangan periode; profil = belum ada transaksi, dari data pendaftaran. */
+  sumber: 'transaksi' | 'profil'
+  facts?: BusinessFacts
+  profil_usaha?: BusinessProfile
   analysis: AIAnalysis
   llm: { aktif: boolean; model?: string; base_url?: string; petunjuk?: string }
 }
