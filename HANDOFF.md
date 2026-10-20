@@ -181,7 +181,7 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 
 - Pengguna menetapkan navy **`#222852`** sebagai warna utama agar mengingatkan pada perpajakan/DJP. Kedua kode yang dikirim sama; aksen emas yang sudah ada dipertahankan.
 - Token `--brand-navy` menjadi sumber warna login, onboarding, sidebar, dan teks CTA emas. Favicon dan meta tema browser memakai nilai yang sama. Warna teks sidebar disesuaikan agar terbaca di atas navy; permukaan laporan tetap netral.
-- Pedoman diperbarui di `DESIGN.md`, salinannya `design.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`.
+- Pedoman diperbarui di `DESIGN.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`. (Brand ini digantikan Brand Guideline v1.0 pada 20 Oktober 2026; lihat `DESIGN.md` §2.)
 - Build frontend berhasil. Chromium: login, onboarding mobile, dan dashboard diperiksa; warna terhitung sidebar/login `rgb(34, 40, 82)`. Kontras emas/navy 8,58:1; teks sekunder sidebar/navy 8,16:1; label sidebar/navy 6,60:1. Screenshot di `/tmp/pajak-brand-*.png`. Commit `c82fad5` terkirim setelah PR #1 digabung, sehingga dibawa ke branch lanjutan `feat/login-password-visibility`; belum deploy.
 
 ## Tambahan UX login — 19 Oktober 2026
@@ -582,139 +582,21 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
-## Tooling morluto & hotspot Panel Master (20 Okt 2026) — PR #33
+## Simulasi & Harga — simulasi usaha + kalkulator per produk (20 Okt 2026)
 
-Melanjutkan pemasangan tooling agent dari [morluto](https://github.com/morluto) yang terhenti
-di sesi sebelumnya (saat itu baru `rea`). Dua tool baru dipasang, lalu dipakai untuk menemukan
-dan **membuktikan** satu hotspot nyata. Branch `perf/panel-master`, basis `5b8fa41`.
-
-**[leantoken](https://github.com/morluto/leantoken)** (`agent.md §1.A` no. 4) — lapisan pencarian
-& pembacaan kode hemat token. MCP global untuk Claude Code & Codex lewat runtime native terpin
-`0.1.28`; `doctor --client claude` melaporkan `registration_health: current` dengan 9 tool.
-Terbukti berguna: `context --task "perhitungan PPh final UMKM 0,5%..."` langsung mengembalikan
-`CalculateUMKMTax` beserta testnya. **Di jcode pakai CLI-nya**: pemanggilan `mcp__leantoken__*`
-gagal dengan `unknown variant resource_link` karena jcode belum menerima content type itu dari
-spec MCP 2025-06-18 (sudah dilaporkan ke maintainer jcode). Cadangan config:
-`~/.claude.json.leantoken.backup`.
-
-**[smokinggun](https://github.com/morluto/smokinggun)** (`agent.md §1.B` no. 11) — pemindai
-hotspot, dipakai lewat `npx` tanpa memasang apa pun ke config agent. 51 temuan, 45 di kode
-aplikasi, semuanya `medium/candidate`.
-
-**flameox & gitcontribute: diuji, lalu sengaja tidak dipasang.** Keduanya benar-benar dijalankan,
-bukan ditolak dari bacaan README:
-
-- **`flameox`** (lewat `uvx flameox`; paket npm-nya hanya `setup`/`update`). 26 operasinya untuk
-  trace Perfetto/Chrome, profil CPU Python/Node, PyTorch, dan kernel GPU — **tidak ada pembaca Go
-  pprof**, jadi `go test -bench` tetap jalur yang tepat untuk backend ini.
-- Sebagai efek sampingnya ditemukan bug interop nyata: `flameox analyze
-  inspect_performance_candidates` membaca SARIF dari smokinggun lalu **menolak 51 dari 51 hasil**
-  (`provider confidence is not a 0-to-1 number`) karena smokinggun menulis `confidence:
-  "candidate"`. Dilaporkan ke upstream: [flameox#529](https://github.com/morluto/flameox/issues/529).
-  Jadi rantai smokinggun → flameox belum bisa diandalkan.
-- **`gitcontribute`** — `init` + `index` + `search code` berjalan (235 file terindeks), tapi untuk
-  pencarian kode kalah dari leantoken (hanya nama file, tanpa nomor baris). Gunanya riset sebelum
-  menyumbang ke repo pihak lain. Corpus ujinya sudah dihapus, tidak ada registrasi MCP tertinggal.
-
-**Jebakan `leantoken doctor`**: dijalankan lewat `npx`, doctor melaporkan `registration_health:
-stale` **walaupun registrasinya benar**, karena `matches_current` membandingkan entri terdaftar
-dengan proses doctor yang sedang berjalan. Verifikasi lewat launcher native
-(`~/.local/share/leantoken/runtimes/0.1.28/leantoken doctor --client claude`) → `current`.
-Jangan terjebak menjalankan `setup --refresh` berulang.
-
-### Hotspot yang diperbaiki: `klienRows`
-
-`klienRows` di `cmd/server/master.go` memindai **seluruh transaksi setiap usaha** pada tiap
-request, padahal hanya daftar klien & detail klien yang menampilkan kolom "Transaksi bulan ini".
-Pada skala target `agent.md §3` (1.000 usaha) itu sampai 10 juta baris per request. Halaman
-detail juga membangun baris untuk semua usaha hanya untuk mengambil satu.
-
-Diukur **di batas HTTP** lewat `srv.ServeHTTP` (termasuk guard, akses, dan serialisasi JSON),
-bukan dengan memanggil fungsi internal. Revisi `5b8fa41` dibandingkan dengan sesudah perbaikan
-memakai **file benchmark yang sama** (`cmd/server/master_http_bench_test.go`, sengaja hanya
-memakai endpoint publik supaya bisa dijalankan apa adanya di kedua revisi).
-1.000 usaha x 4.000 transaksi/tahun:
-
-| Endpoint | Sebelum | Sesudah | |
-| --- | --- | --- | --- |
-| `GET /master/pembayaran` | 80 ms | **0,45 ms** | 179x |
-| `GET /master/tim` | 70 ms | **0,65 ms** | 107x |
-| `GET /master/klien/{id}` | 50 ms | **0,38 ms** | 129x |
-| `GET /master/ringkasan` | 106 ms | **5 ms** | 21x |
-| `GET /master/klien` | 53 ms | 53 ms | tidak berubah, kolomnya memang ditampilkan |
-
-Sisa 5 ms di `/master/ringkasan` **bukan** dari loop itu: balasannya ~388 KB untuk 1.000 usaha
-karena `perlu_perhatian` dan `belum_ditugaskan` memuat baris klien utuh. Itu persoalan terpisah
-yang sudah ada sebelumnya; kalau mau dikecilkan, batasi jumlah barisnya, jangan sentuh `hitungTx`.
-
-Ada dua tingkat benchmark sekarang: `BenchmarkMasterEndpoints` (batas HTTP, angka yang dirasakan
-pengguna — **ini patokan klaim performa**) dan `BenchmarkKlienRows` (fungsi internal, untuk
-menyetel satu fungsi).
-
-**Diverifikasi end-to-end pada server sungguhan** (biner Go + `web/dist` hasil build), dengan
-**4 usaha berisi jumlah transaksi yang berbeda** supaya tertukar tenant tidak bisa lolos. Tiap
-usaha juga diberi transaksi bulan lain yang tidak boleh ikut dihitung:
-
-```
-GET /master/klien      -> id1=0  id2=2  id3=5  id4=9     (tiap baris angkanya sendiri)
-GET /master/klien/2    -> id=2, transaksi_bulan_ini=2
-GET /master/klien/3    -> id=3, transaksi_bulan_ini=5
-GET /master/klien/4    -> id=4, transaksi_bulan_ini=9
-GET /master/ringkasan  -> semua baris 0                   (sengaja tidak memindai)
-
-konsultan yang hanya memegang usaha 3:
-GET /master/klien      -> hanya id=3 dengan 5
-GET /master/klien/3    -> 200, transaksi_bulan_ini=5
-GET /master/klien/2    -> 404                             (penugasan tetap berlaku)
-```
-
-Bundel frontend yang tersaji memang membaca `transaksi_bulan_ini` dan memuat label
-"Transaksi bulan ini", jadi kolom di Panel Master > Klien tetap terisi. `tsc -b` bersih dan
-42 tes Vitest lulus. Pemeriksaan visual lewat browser belum dilakukan karena ekstensi bridge
-browser belum terpasang di Brave.
-
-Perubahannya parameter `hitungTx bool` plus `klienRowsFilter(..., hanyaID int)`.
-`TestMaster_TransaksiBulanIniHanyaDiHalamanYangMenampilkannya` dan
-`TestMaster_TransaksiBulanIniPerKlienTidakTertukar` mengunci perilakunya lewat HTTP, yang kedua
-dengan 3 usaha berangka berbeda plus pemeriksaan penugasan & 404.
-
-**Hasil uji mutasi** (tiap perubahan dipastikan punya cek yang menangkapnya):
-
-| Mutasi | Tertangkap oleh |
-| --- | --- |
-| detail klien memakai `hitungTx=false` | test gagal: `transaksi_bulan_ini = 0, want 2/5/9` |
-| daftar klien memakai `hitungTx=false` | test gagal: `transaksi_bulan_ini = 0, want 2/5/9` |
-| ringkasan memakai `hitungTx=true` | test gagal: "ringkasan ikut memindai transaksi" |
-| filter `hanyaID` dilumpuhkan | **benchmark**, bukan test: detail 0,38 ms → 48 ms (126x) |
-
-Baris terakhir penting dipahami: `hanyaID` murni soal performa, karena korektness detail sudah
-dijaga `if k.ID == t.id` di handler-nya. Jadi melumpuhkannya **tidak** membuat test gagal, dan
-memang tidak seharusnya. Penjaganya `BenchmarkMasterEndpoints`. Jangan tambahkan test korektness
-untuk itu; jalankan benchmark-nya.
-
-### Kandidat yang terbukti TIDAK relevan — jangan diulang
-
-39 kandidat `membership-in-loop` / `nested-or-callback-loop` lain di kode inti terbukti tidak
-bermasalah pada skala target: `coa.Find` berjalan atas 75 akun, `jenisOf` atas 19 jenis. Jalur
-Transaksi → Jurnal → Neraca Saldo hanya **2 ms untuk 10.000 transaksi**
-(`internal/coa/bench_test.go`). Jangan "optimasi" ini tanpa angka baru. Inilah alasan angka
-auditnya dicatat di `agent.md §1.B`: tanpa itu, 39 kandidat `medium` tampak seperti 39 pekerjaan.
-
-Verifikasi: `go test ./...` lulus (11 paket), `go test -race ./cmd/server ./internal/master`
-lulus, `go vet ./...` bersih.
-
-### Catatan lingkungan kerja
-
-Sesi ini dikerjakan di worktree `/home/reyfuu/pajak-perf` karena **ada sesi lain yang aktif**
-mengedit `/home/reyfuu/pajak` (branch `feat/rebrand-masterpajak`). Cek `git status` sebelum
-mengedit working tree utama. Worktree lain: `/home/reyfuu/pajak-e2e` (`test/e2e-playwright`,
-suite Playwright yang belum tuntas — server Go di harness e2e tidak siap dalam 180 detik).
-
-**Biner `server` sudah dikeluarkan dari repo** (ikut PR ini). Berkas 17,6 MB itu masuk lewat
-PR #27 dan ternyata Mach-O **arm64 (macOS)** — tidak bisa dipakai di mana pun selain mesin yang
-membuatnya, dan tidak dirujuk apa pun karena Dockerfile membangun sendiri ke
-`/out/laporan-bisnis`. `.gitignore` sudah memuat `bin/` tapi tidak pola ini, jadi `/server`
-ditambahkan. Berkas lokalnya tidak dihapus.
+- `finance/simulasi.go` (TDD; angka uji dari contoh desain pemilik, titik impas Rp47.924.397):
+  dasar = rata-rata 3 bulan terakhir yang ada omzetnya s.d. periode dipilih (`RataRataSimulasi`).
+  Biaya variabel = potongan channel (ikut omzet); biaya tetap = beban operasional kas; penyusutan
+  dipisah dan ikut ditutup titik impas. `Simulasikan` (slider harga/pembeli/modal dalam bps +
+  tambahan biaya tetap), `HitungTitikImpas` (dibulatkan ke atas; per hari = hari kalender),
+  `PorsiBalikModal` (modal dari HPP resep Produksi), `HargaUntukMargin` (mode margin %).
+  Perkalian lewat `math/big` (omzet ratusan miliar aman).
+- `POST /api/v1/simulasi?period=` mengembalikan dasar, hasil skenario, titik impas, dan tabel
+  produk (produk resep + item terjual tanpa resep, modal "–"). `/pricing/simulate` menerima
+  `margin_bps`.
+- Frontend `views/SimulasiHarga.tsx`: kalkulator lama **dipertahankan & di-upgrade** (otomatis
+  tanpa tombol Hitung, pilih produk → HPP resep, pilih saluran → komisi, margin % atau Rp/porsi,
+  titik impas produk di bagian lipat). Slider di-debounce 150 ms, hitungan tetap di server.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 

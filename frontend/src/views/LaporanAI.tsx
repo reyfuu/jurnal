@@ -3,6 +3,7 @@ import { getAIReport, type AIReport, type BusinessFacts } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
 const AMBER = 'var(--text-warn)'
+const SOROT = 'var(--text-brand)'
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
 const BLUE = 'var(--accent-blue)'
@@ -122,7 +123,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginBottom: 14 }}>
         <KPI label="Omzet" v={lr.omzet} banding={lr.omzet_sebelumnya} />
         <KPI label="Laba Bersih" v={lr.laba_bersih} banding={lr.laba_sebelumnya} warna={lr.laba_bersih >= 0 ? GREEN : RED} />
-        <KPI label="Margin Laba" teks={persenBps(lr.margin_bps)} warna={AMBER} />
+        <KPI label="Margin Laba" teks={persenBps(lr.margin_bps)} warna={SOROT} />
         <KPI label="Saldo Kas Akhir" v={f.arus_kas.saldo_akhir} warna={BLUE} />
       </div>
 
@@ -162,7 +163,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
           <Baris l="Harga perolehan" v={f.aset.harga_perolehan} />
           <Baris l="Akumulasi penyusutan" v={-f.aset.akumulasi} />
           <Baris l="Nilai buku" v={f.aset.nilai_buku} tebal warna={BLUE} />
-          <Baris l="Beban periode ini" v={f.aset.beban_bulan_ini} warna={AMBER} />
+          <Baris l="Beban periode ini" v={f.aset.beban_bulan_ini} warna={SOROT} />
         </Kartu>
 
         <Kartu judul="Pajak" sub={f.pajak.bentuk_badan}>
@@ -170,7 +171,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
           <Baris l="Batas bebas pajak" v={f.pajak.batas_bebas_pajak} />
           <Baris l="Sisa batas bebas" v={f.pajak.sisa_batas_bebas} />
           <Baris l="Dasar kena pajak" v={f.pajak.dasar_kena_pajak} />
-          <Baris l="PPh final terutang" v={f.pajak.pajak_terutang} tebal warna={AMBER} />
+          <Baris l="PPh final terutang" v={f.pajak.pajak_terutang} tebal warna={SOROT} />
         </Kartu>
 
         <Kartu judul="Tagihan">

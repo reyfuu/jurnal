@@ -1,6 +1,6 @@
 # AGENT.md — Laporan Bisnis (by Master Pajak)
 
-> **Project**: Laporan Bisnis by Master Pajak — SaaS Pembukuan, Operasional & Pajak UMKM ("Gambaran seluruh bisnis dalam satu layar")  
+> **Project**: Master Pajak (repo `laporan-bisnis`) — SaaS Pembukuan, Operasional & Pajak UMKM ("Gambaran seluruh bisnis dalam satu layar")  
 > **Target Scale**: 1.000 Active UMKM Tenants (~4.000–10.000 transaksi/tenant/tahun), di-host di server lokal (on-premise)  
 > **Core Stack**: **Go (Golang)** atau **ElysiaJS (Bun)** + PostgreSQL + Next.js/React (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
@@ -80,13 +80,13 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 ### C. UI/UX, Visual Craft & Verification
 13. **`antislop`, `taste`, & `impeccable`**
     - **DILARANG KERAS** membuat UI generik "AI slop" (gradien ungu-biru murahan, bayangan berlebihan, kartu tanpa hierarki, teks placeholder asal-asalan).
-    - Ikuti estetika referensi **Laporan Bisnis by Master Pajak**:
-      - **Dark Obsidian Theme**: Background utama `#0B0C0E`, surface kartu `#121418`, border halus `#1F2229` (`1px solid rgba(255,255,255,0.06)`).
-      - **Brand Utama**: Navy `#222852` pada login/onboarding, sidebar, favicon, dan tema browser (keputusan pengguna 19 Oktober 2026; lihat `DESIGN.md` §2).
-      - **Brand Accent**: Amber/Gold `#EAB308` / `#F5C428` untuk logo, metrik utama, CTA, dan active nav state; teks tombol emas menggunakan navy `#222852`.
-      - **Semantic Financial Colors**: Emerald `#10B981` (Laba Bersih / tren positif), Sky Blue `#38BDF8` (Saldo Kas & Bank), Rose/Coral `#F43F5E` (peringatan piutang lewat 30 hari).
-      - **Typography**: Angka finansial wajib menggunakan `font-variant-numeric: tabular-nums` agar sejajar sempurna.
-14. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
+    - Ikuti **Brand Guideline Master Pajak v1.0** (`docs/brand/`, ringkasan teknis di `DESIGN.md` §2–3):
+      - **Logo**: monogram M dua warna + wordmark `masterpajak` lewat komponen `Logo.tsx`; jangan menggambar ulang logo.
+      - **Warna**: Biru DJP `#212C5F` (primer), Biru Royal `#26367A` (tautan, kata pajak), Kuning `#FED111` (aksen maks. 3%: satu titik/sorotan/CTA berbayar per layar), Biru Tegas `#131B40` (latar gelap). Semantik: sukses `#2E9B5B`, peringatan `#D9822B`, galat `#D64545`, info `#2F6FD6`. Di komponen selalu lewat token CSS, bukan hex.
+      - **Tema**: terang default, gelap opsional (turunan palet navy).
+      - **Typography**: Rubik untuk judul & wordmark, Public Sans untuk teks dan angka; angka finansial wajib `font-variant-numeric: tabular-nums`.
+      - **Tone**: lugas, angka konkret, tanpa menakut-nakuti atau jargon AI (`DESIGN.md` §3.1).
+12. **`ui ux pro max`, `21dev` (`21st.dev`), `shadcn/ui`, & `kokonut ui`**
     - Gunakan primitif `shadcn/ui` (Radix + Tailwind) yang diperkaya dengan komponen finansial dari `Kokonut UI` dan micro-interactions dari `21st.dev`.
     - Setiap KPI card di Dashboard wajib menampilkan:
       1. Label metrik yang jelas (`Omzet`, `Laba bersih`, `Margin laba`, `Saldo kas & bank`, `Target omzet`, `Piutang belum tertagih`).
@@ -106,7 +106,7 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 
 ## 2. Domain Architecture Map (Laporan Bisnis)
 
-Sesuai referensi desain produk **Laporan Bisnis by Master Pajak**, sistem terdiri dari 5 grup navigasi utama:
+Sesuai referensi desain produk **Master Pajak**, sistem terdiri dari 5 grup navigasi utama:
 
 1. **RINGKASAN**
    - `Dashboard`: Ringkasan 6 KPI utama, grafik tren 11 bulan (`Omzet, biaya, dan laba`), grafik bar `Omzet harian` vs target harian, grafik area `Saldo kas per bulan`, `Omzet per produk` (Top 5), dan `Omzet per channel` (termasuk potongan aplikasi).

@@ -13,7 +13,8 @@ import { LaporanKeuangan } from '@/views/Reports'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
 import { KalkulatorPajak } from '@/views/KalkulatorPajak'
-import { PajakUMKM, SimulasiHarga, StokModule } from '@/views/Operations'
+import { PajakUMKM, StokModule } from '@/views/Operations'
+import { SimulasiHarga } from '@/views/SimulasiHarga'
 import { PiutangUtang, StokGudang } from '@/views/PiutangStok'
 import { ProduksiSupplier } from '@/views/ProduksiSupplier'
 import { Transaksi } from '@/views/Transaksi'
@@ -62,7 +63,7 @@ export default function App() {
 
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
-    if (m.views.includes('panel-master')) return // akun tim MasterPajak: tanpa data usaha
+    if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha
     setView(m.views[0])
     getBusiness().then(setBusiness, fail)
     getPeriods().then(setPeriods).catch(() => {}) // butuh sesi: jangan dipanggil sebelum login
@@ -143,13 +144,13 @@ export default function App() {
           {me.langganan.status === 'trial' && view !== 'langganan' && ( // usaha lama yang masih masa coba
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--border-shell)' }} role="status">
               <span>{statusText(me.langganan)}</span>
-              {canSee('langganan') && <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
+              {canSee('langganan') && <Button size="sm" variant="accent" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
             </div>
           )}
           {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'color-mix(in srgb, var(--accent-amber) 8%, transparent)' }} role="status">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--accent-orange) 30%, transparent)', background: 'var(--accent-orange-soft)' }} role="status">
               <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata DJP.</span>
-              <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
+              <Button size="sm" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
             </div>
           )}
           {data && (
@@ -158,7 +159,7 @@ export default function App() {
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Periode Laporan:
                 </span>
-                <span className="pill-status pill-amber" style={{ fontSize: 12 }}>
+                <span className="pill-status pill-brand" style={{ fontSize: 12 }}>
                   {data.dash.period_label}
                 </span>
               </div>

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { KebijakanPrivasi } from '@/components/KebijakanPrivasi'
-import { BrandMark } from '@/components/Sidebar'
+import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -49,15 +49,11 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
             <ArrowLeft aria-hidden="true" /> Kembali ke beranda
           </Button>
         )}
-        <div className="dark mb-6 flex items-center justify-center gap-2.5">
-          <BrandMark size={28} />
-          <div>
-            <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-            <div className="brand-sub">by Master Pajak</div>
-          </div>
+        <div className="dark mb-6 flex justify-center">
+          <Logo tinggi={32} />
         </div>
 
-        <Card className="border-[var(--border-shell)] bg-[var(--bg-shell)]">
+        <Card>
           <CardHeader>
             <CardTitle className="text-xl">{daftar ? 'Daftar' : 'Masuk'}</CardTitle>
             <CardDescription>
@@ -107,7 +103,7 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
                 </span>
               </label>}
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-              <Button type="submit" size="lg" className="w-full rounded-full font-bold" disabled={busy || (daftar && !setujuPDP)}>
+              <Button type="submit" size="lg" className="w-full" disabled={busy || (daftar && !setujuPDP)}>
                 {busy ? 'Memeriksa…' : daftar ? 'Daftar' : 'Masuk'}
               </Button>
             </form>

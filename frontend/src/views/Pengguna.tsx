@@ -13,7 +13,7 @@ import {
 } from '@/lib/api'
 
 const ROLE_ORDER: Role[] = ['owner', 'admin', 'kasir']
-const ROLE_PILL: Record<Role, string> = { owner: 'pill-amber', admin: 'pill-green', kasir: 'pill-status-muted', mp: 'pill-status-muted' }
+const ROLE_PILL: Record<Role, string> = { owner: 'pill-brand', admin: 'pill-green', kasir: 'pill-status-muted', mp: 'pill-status-muted' }
 // Izin di luar menu sidebar (dicek server lewat guard yang sama).
 const EXTRA_PERMISSIONS = [{ view: 'transaksi-kelola', label: 'Ubah & hapus transaksi' }] as const
 

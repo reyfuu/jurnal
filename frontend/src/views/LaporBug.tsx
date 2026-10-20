@@ -73,7 +73,7 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
     <>
       <PageHeader
         title="Lapor Bug"
-        subtitle="Ceritakan masalah yang Anda temui. Status dan balasan tim MasterPajak muncul di daftar laporan di bawah." 
+        subtitle="Ceritakan masalah yang Anda temui. Status dan balasan tim Master Pajak muncul di daftar laporan di bawah." 
       >
         {info && (
           <span className={'pill-status ' + (info.penerusan_aktif ? 'pill-green' : 'pill-amber')}>
@@ -148,7 +148,7 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{b.deskripsi}</p>
                 {b.balasan?.map((r, i) => (
                   <div key={i} className="mt-2 rounded-lg px-3 py-2 text-sm" style={{ background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)' }}>
-                    <div className="text-xs text-muted-foreground">{r.nama} · Tim MasterPajak · {new Date(r.waktu).toLocaleString('id-ID')}</div>
+                    <div className="text-xs text-muted-foreground">{r.nama} · Tim Master Pajak · {new Date(r.waktu).toLocaleString('id-ID')}</div>
                     <p className="mt-0.5 whitespace-pre-wrap">{r.isi}</p>
                   </div>
                 ))}

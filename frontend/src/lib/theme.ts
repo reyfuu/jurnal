@@ -1,10 +1,10 @@
-// Tema tampilan. Kelas `dark` di <html> = gelap (default); script di index.html memasangnya
-// sebelum React jalan supaya tidak berkedip. Pilihan disimpan per peramban di localStorage.
+// Tema tampilan. Default terang (Brand Guideline v1.0); kelas `dark` di <html> = gelap, dipasang
+// script di index.html sebelum React jalan supaya tidak berkedip. Pilihan disimpan di localStorage.
 export type Tema = 'gelap' | 'terang'
 
 const KUNCI = 'tema'
 
-export const temaDari = (simpanan: string | null): Tema => (simpanan === 'terang' ? 'terang' : 'gelap')
+export const temaDari = (simpanan: string | null): Tema => (simpanan === 'gelap' ? 'gelap' : 'terang')
 
 export const temaSekarang = (): Tema => (document.documentElement.classList.contains('dark') ? 'gelap' : 'terang')
 
