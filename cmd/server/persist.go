@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"maps"
@@ -116,20 +119,24 @@ func (t *tenant) snapshot() state {
 	}
 }
 
+// errSimpan: perubahan sudah di memori tapi gagal disimpan permanen (audit C9).
+var errSimpan = errors.New("gagal menyimpan data")
+
 // save menulis semua usaha (user & sesi ikut state.json usaha 1); dipanggil setelah setiap
 // perubahan yang berhasil.
 //
-// ponytail: tulis ulang semua berkas usaha tiap perubahan; cukup untuk puluhan usaha QA/pilot,
-// ganti ke database (roadmap multi-tenant) sebelum ratusan usaha.
-func (s *Server) save() {
+// ponytail: tulis ulang semua berkas usaha tiap perubahan; cukup untuk puluhan usaha QA/pilot.
+// Produksi memakai Postgres (pgstore.go), yang hanya menulis usaha yang berubah.
+func (s *Server) save() error {
 	if dataPath("") == "" {
-		return
+		return nil
 	}
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
 	s.tenantsMu.RLock()
 	tenants := slices.Collect(maps.Values(s.tenants))
 	s.tenantsMu.RUnlock()
+	var errs error
 	for _, t := range tenants {
 		st := t.snapshot()
 		if t.id == 1 {
@@ -137,47 +144,48 @@ func (s *Server) save() {
 		}
 		if err := writeFileAtomic(t.file("state"), st); err != nil {
 			log.Printf("GAGAL menyimpan state ke %s: %v", t.file("state"), err)
+			errs = errors.Join(errs, err)
 		}
 	}
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
+	return errs
 }
 
 // saveFor menyimpan usaha t (nil = hanya user & sesi) setelah perubahan. Tanpa Postgres,
 // semua berkas JSON ditulis ulang seperti sebelumnya.
-func (s *Server) saveFor(t *tenant) {
+func (s *Server) saveFor(t *tenant) error {
+	var errs error
 	if s.db == nil {
-		s.save()
-		return
-	}
-	s.saveMu.Lock()
-	defer s.saveMu.Unlock()
-	if t != nil {
-		if err := saveTenantDB(s.db, t); err != nil {
-			log.Printf("GAGAL menyimpan usaha %d ke Postgres: %v", t.id, err)
+		errs = s.save()
+	} else {
+		s.saveMu.Lock()
+		defer s.saveMu.Unlock()
+		if t != nil {
+			if err := saveTenantDB(s.db, t); err != nil {
+				log.Printf("GAGAL menyimpan usaha %d ke Postgres: %v", t.id, err)
+				errs = err
+			}
+		}
+		if err := saveAuthDB(s.db, s.users.Snapshot()); err != nil {
+			log.Printf("GAGAL menyimpan user & sesi ke Postgres: %v", err)
+			errs = errors.Join(errs, err)
 		}
 	}
-	if err := saveAuthDB(s.db, s.users.Snapshot()); err != nil {
-		log.Printf("GAGAL menyimpan user & sesi ke Postgres: %v", err)
+	if errs != nil {
+		return fmt.Errorf("%w: %w", errSimpan, errs)
 	}
+	return nil
 }
 
 // saveAll menyimpan semua usaha (seed awal atau impor JSON ke Postgres).
 func (s *Server) saveAll() {
 	if s.db == nil {
-		s.save()
+		_ = s.save() // gagal sudah dicatat di log; mode JSON tetap jalan seperti sebelumnya
 		return
 	}
 	for _, t := range s.tenants {
-		s.saveFor(t)
+		if err := s.saveFor(t); err != nil {
+			log.Fatalf("impor usaha %d ke Postgres: %v", t.id, err)
+		}
 	}
 	for _, rep := range s.bugs.list {
 		if err := insertBugDB(s.db, rep); err != nil {
@@ -186,25 +194,57 @@ func (s *Server) saveAll() {
 	}
 }
 
-// changedTenant: usaha milik sesi baru di respons (login, daftar) atau sesi request.
-func (s *Server) changedTenant(r *http.Request, h http.Header) *tenant {
-	for _, c := range append((&http.Response{Header: h}).Cookies(), r.Cookies()...) {
+// sessionTenant: usaha milik sesi valid pertama di cookies; ok=false bila tidak ada sesi.
+func (s *Server) sessionTenant(cookies []*http.Cookie) (*tenant, bool) {
+	for _, c := range cookies {
 		if u, ok := s.users.UserBySession(c.Value); ok && c.Name == sessionCookie {
 			s.tenantsMu.RLock()
 			defer s.tenantsMu.RUnlock()
-			return s.tenants[u.TenantID]
+			return s.tenants[u.TenantID], true
 		}
 	}
-	return nil
+	return nil, false
 }
 
-// persisting menyimpan state setelah handler pengubah data selesai tanpa error.
+// bufferedResponse menahan respons handler sampai data tersimpan.
+type bufferedResponse struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (b *bufferedResponse) Header() http.Header { return b.header }
+func (b *bufferedResponse) WriteHeader(code int) {
+	if b.status == 0 {
+		b.status = code
+	}
+}
+func (b *bufferedResponse) Write(p []byte) (int, error) {
+	b.WriteHeader(http.StatusOK)
+	return b.body.Write(p)
+}
+
+func (b *bufferedResponse) flush(w http.ResponseWriter) {
+	maps.Copy(w.Header(), b.header)
+	w.WriteHeader(cmp.Or(b.status, http.StatusOK))
+	_, _ = w.Write(b.body.Bytes())
+}
+
+// persisting menyimpan state setelah handler pengubah data selesai tanpa error. Respons baru
+// dikirim setelah simpan berhasil; gagal simpan → 503 supaya klien tidak mengira data aman
+// (audit C9). Permintaan tanpa sesi sebelum maupun sesudahnya tidak menulis apa pun (C5).
 func (s *Server) persisting(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		h(rec, r)
-		if rec.status < 400 {
-			s.saveFor(s.changedTenant(r, rec.Header()))
+		before, hadSession := s.sessionTenant(r.Cookies())
+		buf := &bufferedResponse{header: http.Header{}}
+		h(buf, r)
+		after, newSession := s.sessionTenant((&http.Response{Header: buf.header}).Cookies())
+		if buf.status < 400 && (hadSession || newSession) {
+			if err := s.saveFor(cmp.Or(after, before)); err != nil {
+				http.Error(w, "Gagal menyimpan data, coba lagi sebentar lagi.", http.StatusServiceUnavailable)
+				return
+			}
 		}
+		buf.flush(w)
 	}
 }

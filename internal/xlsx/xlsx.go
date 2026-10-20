@@ -103,6 +103,20 @@ func Write(w io.Writer, sheets []Sheet) error {
 // ErrNotXLSX: berkas bukan workbook .xlsx yang bisa dibaca.
 var ErrNotXLSX = errors.New("berkas bukan Excel .xlsx")
 
+// ErrTooLarge: isi workbook melewati batas baca (mencegah zip bomb & indeks raksasa).
+var ErrTooLarge = errors.New("berkas Excel terlalu besar (maks 100.000 baris dan 200 kolom)")
+
+// Batas baca. Berkas unggahan dibatasi 5 MB, tapi isi zip & nomor baris/kolom ditentukan
+// pembuat berkas, jadi setiap tahap ekspansi dibatasi sendiri.
+const (
+	maxEntryBytes = 20 << 20 // isi satu entri zip setelah dekompresi
+	maxTotalBytes = 50 << 20 // seluruh entri yang dibaca
+	maxRows       = 100_000
+	maxCols       = 200
+	maxCells      = 1_000_000
+	maxCellRunes  = 32_767 // batas isi sel Excel
+)
+
 // Read mengembalikan isi sheet pertama sebagai teks.
 func Read(data []byte) ([][]string, error) {
 	sheets, err := ReadAll(data)
@@ -123,13 +137,19 @@ func ReadAll(data []byte) ([]Sheet, error) {
 	if err != nil {
 		return nil, ErrNotXLSX
 	}
+	total := 0
 	open := func(name string) ([]byte, error) {
 		f, err := zr.Open(name)
 		if err != nil {
 			return nil, err
 		}
 		defer f.Close()
-		return io.ReadAll(f)
+		b, err := io.ReadAll(io.LimitReader(f, maxEntryBytes+1)) // ukuran di header zip bisa bohong
+		total += len(b)
+		if len(b) > maxEntryBytes || total > maxTotalBytes {
+			return nil, ErrTooLarge
+		}
+		return b, err
 	}
 
 	var wb struct {
@@ -162,14 +182,22 @@ func ReadAll(data []byte) ([]Sheet, error) {
 		} `xml:"r"`
 	}
 	text := func(rt richText) string {
-		s := rt.T
+		var sb strings.Builder
+		sb.WriteString(rt.T)
 		for _, r := range rt.R {
-			s += r.T
+			if sb.Len() >= 4*maxCellRunes { // sudah pasti melewati batas rune
+				break
+			}
+			sb.WriteString(r.T)
 		}
-		return s
+		return truncate(sb.String())
 	}
 	var shared []string
-	if b, err := open("xl/sharedStrings.xml"); err == nil {
+	b, err = open("xl/sharedStrings.xml")
+	if errors.Is(err, ErrTooLarge) {
+		return nil, err
+	}
+	if err == nil {
 		var sst struct {
 			SI []richText `xml:"si"`
 		}
@@ -187,6 +215,9 @@ func ReadAll(data []byte) ([]Sheet, error) {
 			sheetPath = fmt.Sprintf("xl/worksheets/sheet%d.xml", i+1)
 		}
 		rows, err := readSheet(open, sheetPath, shared, text)
+		if errors.Is(err, ErrTooLarge) {
+			return nil, err
+		}
 		if err != nil {
 			continue // sheet rusak atau bukan worksheet: lewati, sheet lain tetap bisa dipakai
 		}
@@ -211,15 +242,22 @@ func readSheet[RT any](open func(string) ([]byte, error), sheetPath string, shar
 		} `xml:"sheetData>row"`
 	}
 	b, err := open(sheetPath)
+	if errors.Is(err, ErrTooLarge) {
+		return nil, err
+	}
 	if err != nil || xml.Unmarshal(b, &ws) != nil {
 		return nil, ErrNotXLSX
 	}
 
 	var out [][]string
+	nCells := 0
 	for _, row := range ws.Rows {
 		rn := row.R
 		if rn == 0 {
 			rn = len(out) + 1
+		}
+		if rn < 0 || rn > maxRows {
+			return nil, ErrTooLarge
 		}
 		for len(out) < rn-1 {
 			out = append(out, []string{})
@@ -228,11 +266,20 @@ func readSheet[RT any](open func(string) ([]byte, error), sheetPath string, shar
 		for j, c := range row.Cells {
 			col := j
 			if letters := strings.TrimRight(c.Ref, "0123456789"); letters != "" {
+				if len(letters) > 3 {
+					return nil, ErrTooLarge
+				}
 				col = 0
 				for _, ch := range letters {
+					if ch < 'A' || ch > 'Z' {
+						return nil, ErrNotXLSX
+					}
 					col = col*26 + int(ch-'A'+1)
 				}
 				col--
+			}
+			if col >= maxCols {
+				return nil, ErrTooLarge
 			}
 			v := c.V
 			switch c.T {
@@ -246,7 +293,10 @@ func readSheet[RT any](open func(string) ([]byte, error), sheetPath string, shar
 			for len(cells) < col {
 				cells = append(cells, "")
 			}
-			cells = append(cells, v)
+			cells = append(cells, truncate(v))
+		}
+		if nCells += len(cells); nCells > maxCells {
+			return nil, ErrTooLarge
 		}
 		for len(cells) > 0 && strings.TrimSpace(cells[len(cells)-1]) == "" {
 			cells = cells[:len(cells)-1]
@@ -257,4 +307,15 @@ func readSheet[RT any](open func(string) ([]byte, error), sheetPath string, shar
 		out = out[:len(out)-1]
 	}
 	return out, nil
+}
+
+// truncate memotong teks sel di batas Excel (dihitung per rune agar UTF-8 tidak terpotong).
+func truncate(s string) string {
+	if len(s) <= maxCellRunes {
+		return s
+	}
+	if r := []rune(s); len(r) > maxCellRunes {
+		return string(r[:maxCellRunes])
+	}
+	return s
 }
