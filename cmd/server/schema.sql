@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS tenants (
 	next_asset_id    INT NOT NULL,
 	next_karyawan_id INT NOT NULL,
 	next_invoice_id  INT NOT NULL,
+	next_tagihan_id  INT NOT NULL DEFAULT 1,
+	next_stok_id     INT NOT NULL DEFAULT 1,
+	next_produk_id   INT NOT NULL DEFAULT 1,
+	next_supplier_id INT NOT NULL DEFAULT 1,
 	trial_sampai     TIMESTAMPTZ,
 	aktif_sampai     TIMESTAMPTZ
 );
@@ -125,6 +129,78 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 	harga_satuan BIGINT NOT NULL,
 	PRIMARY KEY (tenant_id, invoice_id, no),
 	FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoices ON DELETE CASCADE
+);
+
+-- Piutang & Utang. jatuh_tempo DATE, bukan teks: kolom ini yang menentukan keterlambatan,
+-- dan keterlambatan dihitung saat dibaca, bukan disimpan.
+CREATE TABLE IF NOT EXISTS tagihan (
+	tenant_id   INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id          INT NOT NULL,
+	nomor       TEXT,
+	pihak       TEXT,
+	jenis       TEXT NOT NULL, -- RECEIVABLE | PAYABLE
+	jatuh_tempo DATE NOT NULL,
+	nominal     BIGINT NOT NULL,
+	lunas       BOOLEAN NOT NULL,
+	keterangan  TEXT,
+	PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS stok (
+	tenant_id   INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id          INT NOT NULL,
+	sku         TEXT,
+	nama        TEXT,
+	kategori    TEXT,
+	jumlah      BIGINT NOT NULL,
+	satuan      TEXT,
+	stok_min    BIGINT NOT NULL,
+	harga_pokok BIGINT NOT NULL,
+	harga_jual  BIGINT NOT NULL,
+	PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS produk (
+	tenant_id          INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id                 INT NOT NULL,
+	sku                TEXT,
+	nama               TEXT,
+	satuan             TEXT,
+	kategori           TEXT,
+	hasil_per_batch    BIGINT NOT NULL,
+	biaya_tenaga_kerja BIGINT NOT NULL,
+	biaya_overhead     BIGINT NOT NULL,
+	harga_jual         BIGINT NOT NULL,
+	catatan            TEXT,
+	PRIMARY KEY (tenant_id, id)
+);
+
+-- Resep (BOM) per produk. takaran disimpan per seribu satuan bahan (lihat finance.TakaranSkala):
+-- 180 berarti 0,18 kg. stok_id 0 = bahan di luar daftar stok, harganya di harga_manual.
+CREATE TABLE IF NOT EXISTS produk_bahan (
+	tenant_id    INT NOT NULL,
+	produk_id    INT NOT NULL,
+	no           INT NOT NULL, -- urutan baris di resep
+	stok_id      INT NOT NULL,
+	nama         TEXT,
+	satuan       TEXT,
+	takaran      BIGINT NOT NULL,
+	harga_manual BIGINT NOT NULL,
+	PRIMARY KEY (tenant_id, produk_id, no),
+	FOREIGN KEY (tenant_id, produk_id) REFERENCES produk ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS supplier (
+	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id         INT NOT NULL,
+	nama       TEXT,
+	kontak     TEXT,
+	telepon    TEXT,
+	email      TEXT,
+	alamat     TEXT,
+	tempo_hari INT NOT NULL,
+	catatan    TEXT,
+	PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS billing_orders (

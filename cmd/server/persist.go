@@ -31,6 +31,14 @@ type state struct {
 	NextKaryawanID int                     `json:"next_karyawan_id"`
 	Invoices       []finance.Invoice       `json:"invoices"`
 	NextInvoiceID  int                     `json:"next_invoice_id"`
+	Tagihan        []finance.Tagihan       `json:"tagihan"`
+	NextTagihanID  int                     `json:"next_tagihan_id"`
+	Stok           []finance.StokItem      `json:"stok"`
+	NextStokID     int                     `json:"next_stok_id"`
+	Produk         []finance.Produk        `json:"produk"`
+	NextProdukID   int                     `json:"next_produk_id"`
+	Supplier       []finance.Supplier      `json:"supplier"`
+	NextSupplierID int                     `json:"next_supplier_id"`
 	Auth           auth.StoreSnapshot      `json:"auth"`
 	Langganan      *langganan              `json:"langganan,omitempty"`
 }
@@ -116,6 +124,12 @@ func (t *tenant) snapshot() state {
 		Opening: t.opening, Karyawan: slices.Clone(t.karyawan), NextKaryawanID: t.nextKaryawanID,
 		Invoices: slices.Clone(t.invoices), NextInvoiceID: t.nextInvoiceID,
 		Langganan: &l,
+		// Disalin seperti slice lain di atas: snapshot ditulis ke disk di luar kunci, jadi
+		// berbagi array dengan tenant yang masih hidup bisa menulis data yang berubah di tengah.
+		Tagihan: slices.Clone(t.tagihan), NextTagihanID: t.nextTagihanID,
+		Stok: slices.Clone(t.stok), NextStokID: t.nextStokID,
+		Produk: slices.Clone(t.produk), NextProdukID: t.nextProdukID,
+		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
 	}
 }
 

@@ -17,7 +17,7 @@ func TestHitungPPh21_ContohBaku(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range []struct {
-		nama string
+		nama      string
 		got, want int64
 	}{
 		{"bruto setahun", r.BrutoSetahun, 120_000_000},
@@ -132,14 +132,14 @@ func TestHitungPotong_TarifDasarBenar(t *testing.T) {
 		wantPajak    int64
 		wantDiterima int64
 	}{
-		{"pph23", "23-jasa", 10_000_000, true, 200_000, 9_800_000},            // 2%
-		{"pph23", "23-jasa", 10_000_000, false, 400_000, 9_600_000},           // tanpa NPWP 2x
-		{"pph23", "23-dividen", 10_000_000, true, 1_500_000, 8_500_000},       // 15%
-		{"pph4-2", "42-sewa-tb", 50_000_000, true, 5_000_000, 45_000_000},     // 10% final
-		{"pph4-2", "42-umkm", 100_000_000, true, 500_000, 99_500_000},         // 0,5%
+		{"pph23", "23-jasa", 10_000_000, true, 200_000, 9_800_000},                  // 2%
+		{"pph23", "23-jasa", 10_000_000, false, 400_000, 9_600_000},                 // tanpa NPWP 2x
+		{"pph23", "23-dividen", 10_000_000, true, 1_500_000, 8_500_000},             // 15%
+		{"pph4-2", "42-sewa-tb", 50_000_000, true, 5_000_000, 45_000_000},           // 10% final
+		{"pph4-2", "42-umkm", 100_000_000, true, 500_000, 99_500_000},               // 0,5%
 		{"pph4-2", "42-konstruksi-kecil", 100_000_000, true, 1_750_000, 98_250_000}, // 1,75%
-		{"pph22", "22-impor-api", 100_000_000, true, 2_500_000, 97_500_000},   // 2,5%
-		{"pph15", "15-pelayaran-dn", 100_000_000, true, 1_200_000, 98_800_000}, // 1,2%
+		{"pph22", "22-impor-api", 100_000_000, true, 2_500_000, 97_500_000},         // 2,5%
+		{"pph15", "15-pelayaran-dn", 100_000_000, true, 1_200_000, 98_800_000},      // 1,2%
 	} {
 		r, err := tax.HitungPotong(tax.PotongInput{Jenis: c.jenis, Objek: c.objek, NilaiBruto: c.bruto, PunyaNPWP: c.npwp})
 		if err != nil {

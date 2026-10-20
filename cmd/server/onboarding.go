@@ -36,9 +36,13 @@ type onboardingResp struct {
 	Errors         []finance.SheetError    `json:"errors"`
 	Terbaca        []string                `json:"terbaca"`
 	Imported       bool                    `json:"imported"`
+	Tagihan        []finance.Tagihan       `json:"tagihan"`
+	Stok           []finance.StokItem      `json:"stok"`
 	// Replaced menandai data lama yang ditimpa saat commit.
 	ReplacedAssets   int `json:"replaced_assets"`
 	ReplacedKaryawan int `json:"replaced_karyawan"`
+	ReplacedTagihan  int `json:"replaced_tagihan"`
+	ReplacedStok     int `json:"replaced_stok"`
 }
 
 func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +71,7 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 
 	resp := onboardingResp{
 		Opening: d.Opening, Assets: d.Assets, Karyawan: d.Karyawan,
+		Tagihan: d.Tagihan, Stok: d.Stok,
 		TransaksiCount: len(d.Transaksi), TransaksiCeki: d.Transaksi[:min(5, len(d.Transaksi))],
 		Errors: d.Errors, Terbaca: d.Terbaca,
 	}
@@ -106,6 +111,26 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 			k.ID = s.nextKaryawanID
 			s.nextKaryawanID++
 			s.karyawan = append(s.karyawan, k)
+		}
+	}
+	if len(d.Tagihan) > 0 {
+		resp.ReplacedTagihan = len(s.tagihan)
+		s.tagihan = nil
+		s.nextTagihanID = 1
+		for _, t := range d.Tagihan {
+			t.ID = s.nextTagihanID
+			s.nextTagihanID++
+			s.tagihan = append(s.tagihan, t)
+		}
+	}
+	if len(d.Stok) > 0 {
+		resp.ReplacedStok = len(s.stok)
+		s.stok = nil
+		s.nextStokID = 1
+		for _, it := range d.Stok {
+			it.ID = s.nextStokID
+			s.nextStokID++
+			s.stok = append(s.stok, it)
 		}
 	}
 	for _, t := range d.Transaksi {

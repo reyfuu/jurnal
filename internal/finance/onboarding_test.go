@@ -230,3 +230,116 @@ func TestSummarizeKaryawan_HanyaHitungYangAktif(t *testing.T) {
 		t.Error("daftar kode PTKP harus dikirim untuk form")
 	}
 }
+
+// Regresi: kata "piutang" memuat "utang". Pemeriksaan yang salah urutan membuat SELURUH
+// piutang terbaca sebagai utang, dan ini tidak terlihat dari jumlah baris yang berhasil
+// diimpor — semua baris "berhasil", hanya arahnya terbalik.
+func TestImporTagihan_PiutangTidakTerbacaSebagaiUtang(t *testing.T) {
+	rows := [][]string{
+		{"Jenis", "Nomor", "Pelanggan / Supplier", "Jatuh Tempo", "Nominal", "Status"},
+		{"Piutang", "INV-1", "PT Pelanggan Setia", "2026-07-10", "5400000", "Belum Lunas"},
+		{"Utang", "PO-1", "Supplier Kopi", "2026-09-08", "4800000", "Belum Lunas"},
+		{"Hutang", "PO-2", "Supplier Gula", "2026-09-10", "1200000", "Belum Lunas"},
+		{"", "INV-2", "Tanpa kolom jenis", "2026-08-01", "900000", ""},
+		{"", "PO-3", "Nomor berawalan PO", "2026-08-01", "700000", ""},
+	}
+	d := finance.ParseOnboarding([]finance.ImportSheet{{Nama: "Piutang & Utang", Rows: rows}})
+	if len(d.Errors) > 0 {
+		t.Fatalf("tidak boleh ada error: %+v", d.Errors)
+	}
+	if len(d.Tagihan) != 5 {
+		t.Fatalf("want 5 baris, got %d", len(d.Tagihan))
+	}
+	want := []string{
+		finance.TagihanPiutang, finance.TagihanUtang, finance.TagihanUtang,
+		finance.TagihanPiutang, // tanpa kolom jenis, nomor INV dianggap piutang
+		finance.TagihanUtang,   // nomor berawalan PO dianggap utang
+	}
+	for i, w := range want {
+		if d.Tagihan[i].Jenis != w {
+			t.Errorf("baris %d (%s): jenis %q, want %q", i+1, d.Tagihan[i].Nomor, d.Tagihan[i].Jenis, w)
+		}
+	}
+}
+
+func TestImporStok_KolomOpsionalDanStokMinimum(t *testing.T) {
+	rows := [][]string{
+		{"SKU", "Nama Barang", "Kategori", "Jumlah", "Satuan", "Stok Minimum", "Harga Pokok", "Harga Jual"},
+		{"RM-001", "Biji Kopi", "Bahan Baku", "42", "kg", "15", "185000", ""},
+		{"RM-002", "Susu", "Bahan Baku", "18", "liter", "24", "21500", ""},
+		{"FG-001", "Es Kopi Susu", "Produk Jadi", "0", "cup", "30", "6800", "18000"},
+		{"", "Tanpa SKU & harga", "", "5", "pcs", "", "", ""},
+	}
+	d := finance.ParseOnboarding([]finance.ImportSheet{{Nama: "Stok & Gudang", Rows: rows}})
+	if len(d.Errors) > 0 {
+		t.Fatalf("kolom kosong tidak boleh jadi error: %+v", d.Errors)
+	}
+	if len(d.Stok) != 4 {
+		t.Fatalf("want 4 baris, got %d", len(d.Stok))
+	}
+	// "Stok Minimum" juga memuat kata "stok"; kalau pemetaan kolomnya salah, nilai minimum
+	// akan tertukar dengan jumlah.
+	if d.Stok[0].Jumlah != 42 || d.Stok[0].StokMin != 15 {
+		t.Errorf("jumlah %d stok_min %d, want 42 dan 15", d.Stok[0].Jumlah, d.Stok[0].StokMin)
+	}
+	if got := d.Stok[1].Status(); got != "Stok Menipis" {
+		t.Errorf("18 dari minimum 24 harus menipis, got %q", got)
+	}
+	if got := d.Stok[2].Status(); got != "Habis" {
+		t.Errorf("jumlah 0 harus habis, got %q", got)
+	}
+	if d.Stok[3].Kategori != "Barang" {
+		t.Errorf("kategori kosong harus diisi default, got %q", d.Stok[3].Kategori)
+	}
+}
+
+func TestParseTagihanFile_AbaikanSheetLain(t *testing.T) {
+	// Template onboarding tujuh sheet diunggah di halaman Piutang & Utang: hanya sheet
+	// piutang/utang yang dibaca, sheet lain tidak boleh jadi error.
+	list, errs, nama := finance.ParseTagihanFile(finance.OnboardingTemplate())
+	if len(errs) != 0 {
+		t.Fatalf("tidak boleh ada error, got %+v", errs)
+	}
+	if nama != "Piutang & Utang" {
+		t.Errorf("sheet terbaca %q", nama)
+	}
+	if len(list) != 3 {
+		t.Fatalf("3 baris contoh, got %d", len(list))
+	}
+	var piutang, utang int
+	for _, x := range list {
+		if x.Jenis == finance.TagihanPiutang {
+			piutang++
+		} else {
+			utang++
+		}
+	}
+	if piutang != 2 || utang != 1 {
+		t.Errorf("want 2 piutang 1 utang, got %d/%d", piutang, utang)
+	}
+}
+
+func TestParseStokFile_SheetTanpaNamaYangDikenali(t *testing.T) {
+	rows := finance.StokTemplate()[0].Rows
+	// "Sheet1" dari Google Sheets / Save As harus tetap terbaca selama itu satu-satunya sheet.
+	stok, errs, _ := finance.ParseStokFile([]finance.ImportSheet{{Nama: "Sheet1", Rows: rows}})
+	if len(errs) != 0 || len(stok) != 3 {
+		t.Fatalf("satu sheet tanpa nama dikenali harus dipakai: %d item, errs %+v", len(stok), errs)
+	}
+	// Dua sheet asing sekaligus: tidak boleh menebak yang mana.
+	_, errs, _ = finance.ParseStokFile([]finance.ImportSheet{{Nama: "Sheet1", Rows: rows}, {Nama: "Sheet2", Rows: rows}})
+	if len(errs) == 0 {
+		t.Error("dua sheet asing harus ditolak, bukan ditebak")
+	}
+}
+
+func TestStokTemplate_RoundTrip(t *testing.T) {
+	list, errs, _ := finance.ParseStokFile(finance.StokTemplate())
+	if len(errs) != 0 {
+		t.Fatalf("template sendiri harus bersih: %+v", errs)
+	}
+	s := finance.SummarizeStok(list)
+	if s.TotalItem != 3 || s.Menipis != 1 {
+		t.Errorf("rekap template: %+v", s)
+	}
+}

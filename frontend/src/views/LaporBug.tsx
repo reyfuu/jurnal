@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { bugScreenshotUrl, createBug, listBugs, type BugReport } from '@/lib/api'
+import { bugScreenshotUrl, createBug, getBugInfo, listBugs, type BugInfo, type BugReport } from '@/lib/api'
 
 // LaporBug: laporan disimpan di server (data/bugs.json); tiap usaha melihat laporannya sendiri.
 export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
@@ -14,12 +14,14 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
   const [shot, setShot] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
   const [list, setList] = useState<BugReport[]>([])
+  const [info, setInfo] = useState<BugInfo | null>(null)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     listBugs().then(setList, (e: Error) => setError(e.message))
+    getBugInfo().then(setInfo, () => {}) // informatif saja; kegagalannya tidak menghalangi lapor
   }, [])
 
   // pratinjau lokal; URL dilepas saat gambar diganti/dihapus
@@ -68,7 +70,18 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
 
   return (
     <>
-      <PageHeader title="Lapor Bug" subtitle="Ceritakan masalah yang Anda temui; tim kami akan menindaklanjuti" />
+      <PageHeader
+        title="Lapor Bug"
+        subtitle={info?.master
+          ? 'Anda masuk sebagai ID Master: daftar di bawah berisi laporan dari semua usaha.'
+          : 'Ceritakan masalah yang Anda temui; tim kami akan menindaklanjuti'}
+      >
+        {info && (
+          <span className={'pill-status ' + (info.penerusan_aktif ? 'pill-green' : 'pill-amber')}>
+            {info.penerusan_aktif ? `Diteruskan ke ${info.penerusan_ke}` : 'Tersimpan di server'}
+          </span>
+        )}
+      </PageHeader>
       <form className="card grid gap-4" style={{ padding: 22, maxWidth: 760, justifyContent: 'stretch' }} onSubmit={submit} onPaste={onPaste}>
         <div className="grid gap-1.5">
           <Label htmlFor="bug-judul">Judul singkat</Label>
@@ -104,7 +117,16 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
           <input id="bug-shot" type="file" accept="image/*" className="sr-only" onChange={(e) => { pickImage(e.target.files?.[0]); e.target.value = '' }} />
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        {sent && <p className="text-sm" style={{ color: 'var(--accent-green)' }} role="status">Terima kasih, laporan Anda terkirim.</p>}
+        {sent && (
+          <p className="text-sm" style={{ color: 'var(--accent-green)' }} role="status">
+            Terima kasih, laporan Anda tersimpan
+            {list[0]?.diteruskan
+              ? ' dan sudah diteruskan ke pengembang.'
+              : list[0]?.gagal_kirim
+                ? `. Penerusan otomatis gagal (${list[0].gagal_kirim}), tapi laporannya tidak hilang — pengembang masih bisa membacanya di sini.`
+                : ' dan bisa dibaca pengembang.'}
+          </p>
+        )}
         <Button type="submit" className="justify-self-start rounded-full px-5 font-bold" disabled={busy}>{busy ? 'Mengirim…' : 'Kirim laporan'}</Button>
       </form>
 
@@ -115,7 +137,13 @@ export function LaporBug({ halamanAwal }: { halamanAwal: string }) {
             {list.map((b) => (
               <li key={b.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
                 <div className="text-sm font-semibold">{b.judul}</div>
-                <div className="text-xs text-muted-foreground">{new Date(b.waktu).toLocaleString('id-ID')} · {b.user_email}{b.halaman && ` · ${b.halaman}`}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(b.waktu).toLocaleString('id-ID')} · {b.user_email}{b.halaman && ` · ${b.halaman}`}
+                  {info?.master && b.tenant_id != null && ` · usaha ${b.tenant_id}`}
+                  {b.gagal_kirim && (
+                    <span className="pill-status pill-amber" style={{ fontSize: 10, marginLeft: 6 }} title={b.gagal_kirim}>belum diteruskan</span>
+                  )}
+                </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{b.deskripsi}</p>
                 {b.screenshot && (
                   <a href={bugScreenshotUrl(b.id)} target="_blank" rel="noreferrer" className="mt-2 inline-block">

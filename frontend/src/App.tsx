@@ -13,7 +13,9 @@ import { LaporanKeuangan } from '@/views/Reports'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
 import { KalkulatorPajak } from '@/views/KalkulatorPajak'
-import { PajakUMKM, PiutangUtang, SimulasiHarga, StokModule } from '@/views/Operations'
+import { PajakUMKM, SimulasiHarga, StokModule } from '@/views/Operations'
+import { PiutangUtang, StokGudang } from '@/views/PiutangStok'
+import { ProduksiSupplier } from '@/views/ProduksiSupplier'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
@@ -192,7 +194,11 @@ export default function App() {
       case 'transaksi':
         return <Transaksi onChanged={() => reload(me!, period)} />
       case 'piutang-utang':
-        return <PiutangUtang d={d} />
+        return <PiutangUtang />
+      case 'stok-gudang':
+        return <StokGudang />
+      case 'produksi-supplier':
+        return <ProduksiSupplier />
       case 'invoice':
         return <InvoiceView />
       case 'simulasi-harga':

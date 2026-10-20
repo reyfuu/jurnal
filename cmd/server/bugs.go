@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -28,6 +29,10 @@ type bugReport struct {
 	Waktu     time.Time `json:"waktu"`
 	// Screenshot: nama berkas di data/bugs/; kosong = tanpa lampiran.
 	Screenshot string `json:"screenshot,omitempty"`
+	// Diteruskan: sudah sampai ke webhook pengembang. False dengan GagalKirim terisi berarti
+	// laporannya tersimpan tapi belum sampai — pengembang masih bisa membacanya di aplikasi.
+	Diteruskan bool   `json:"diteruskan"`
+	GagalKirim string `json:"gagal_kirim,omitempty"`
 }
 
 type bugStore struct {
@@ -135,6 +140,24 @@ func (s *Server) handleCreateBug(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "gagal menyimpan laporan", http.StatusInternalServerError)
 		return
 	}
+	// Penerusan ke pengembang SETELAH laporan tersimpan, dan kegagalannya tidak membuat
+	// pelaporan ikut gagal — hasilnya dicatat supaya pelapor tahu laporannya sampai ke mana.
+	if s.bugHook.aktif() {
+		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+		defer cancel()
+		err := s.bugHook.kirim(ctx, rep)
+		rep.Diteruskan = err == nil
+		if err != nil {
+			rep.GagalKirim = err.Error()
+			log.Printf("laporan bug #%d tersimpan tapi gagal diteruskan: %v", rep.ID, err)
+		}
+		b.list[len(b.list)-1] = rep
+		if b.path != "" {
+			if err := writeFileAtomic(b.path, b.list); err != nil {
+				log.Printf("gagal mencatat status penerusan bug #%d: %v", rep.ID, err)
+			}
+		}
+	}
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, rep)
 }
@@ -145,7 +168,7 @@ func (s *Server) handleBugScreenshot(w http.ResponseWriter, r *http.Request) {
 	b := s.bugs
 	b.mu.Lock()
 	var name string
-	if id >= 1 && id <= len(b.list) && b.list[id-1].TenantID == currentUser(r).TenantID {
+	if id >= 1 && id <= len(b.list) && (isMaster(r) || b.list[id-1].TenantID == currentUser(r).TenantID) {
 		name = b.list[id-1].Screenshot
 	}
 	img := b.mem[name]
@@ -167,12 +190,14 @@ func (s *Server) handleBugScreenshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListBugs(w http.ResponseWriter, r *http.Request) {
+	// ID Master (pengembang) melihat laporan seluruh usaha; pengguna biasa hanya usahanya.
+	master := isMaster(r)
 	tid := currentUser(r).TenantID
 	b := s.bugs
 	b.mu.Lock()
 	out := []bugReport{}
 	for i := len(b.list) - 1; i >= 0; i-- { // terbaru dulu
-		if b.list[i].TenantID == tid {
+		if master || b.list[i].TenantID == tid {
 			out = append(out, b.list[i])
 		}
 	}
@@ -186,4 +211,16 @@ func clip(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+// handleBugInfo: ke mana laporan dikirim, dan apakah yang login ID Master.
+//
+// Endpoint terpisah, bukan digabung ke /bugs: bentuk balasan /bugs sudah dipakai halaman Lapor
+// Bug sebagai array, dan mengubahnya jadi objek akan memecahkan pemanggil yang sudah ada.
+func (s *Server) handleBugInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, bugInfo{
+		Master:         isMaster(r),
+		PenerusanAktif: s.bugHook.aktif(),
+		PenerusanKe:    s.bugHook.tujuan(),
+	})
 }

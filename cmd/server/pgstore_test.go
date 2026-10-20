@@ -129,7 +129,13 @@ type tenantData struct {
 	Invoices                                             []finance.Invoice
 	Profile                                              *finance.BusinessProfile
 	Langganan                                            langganan
+	Tagihan                                              []finance.Tagihan
+	Stok                                                 []finance.StokItem
+	Produk                                               []finance.Produk
+	Supplier                                             []finance.Supplier
 	NextTxID, NextAssetID, NextKaryawanID, NextInvoiceID int
+	NextTagihanID, NextStokID                            int
+	NextProdukID, NextSupplierID                         int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -137,7 +143,9 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	t.Helper()
 	tn.mu.RLock()
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
-		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID}
+		tn.tagihan, tn.stok, tn.produk, tn.supplier,
+		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -167,7 +175,18 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.profile = ptr(filled[finance.BusinessProfile](8))
 	tn.langganan = filled[langganan](9)
 	tn.langganan.Orders[0].ID, tn.langganan.Orders[1].ID = "LB-2-1", "LB-2-2"
+	tn.tagihan = []finance.Tagihan{filled[finance.Tagihan](10), filled[finance.Tagihan](11)}
+	tn.tagihan[0].ID, tn.tagihan[1].ID = 1, 2
+	tn.tagihan[0].Jenis, tn.tagihan[1].Jenis = finance.TagihanPiutang, finance.TagihanUtang
+	tn.stok = []finance.StokItem{filled[finance.StokItem](12)}
+	tn.stok[0].ID = 1
+	// Produk dengan resep: bahannya tabel anak (produk_bahan), jadi urutan & isinya ikut diuji.
+	tn.produk = []finance.Produk{filled[finance.Produk](13)}
+	tn.produk[0].ID = 1
+	tn.supplier = []finance.Supplier{filled[finance.Supplier](14)}
+	tn.supplier[0].ID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
+	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
 	tn.mu.Unlock()
 	srv.saveFor(tn)
 	if rec := postBug(srv, qa, map[string]string{"judul": "Bug PG", "deskripsi": "d", "halaman": "dashboard"}, nil); rec.Code != http.StatusCreated {

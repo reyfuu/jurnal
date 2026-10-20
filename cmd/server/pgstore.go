@@ -83,6 +83,10 @@ type tenantRow struct {
 	NextAssetID    int       `json:"next_asset_id"`
 	NextKaryawanID int       `json:"next_karyawan_id"`
 	NextInvoiceID  int       `json:"next_invoice_id"`
+	NextTagihanID  int       `json:"next_tagihan_id"`
+	NextStokID     int       `json:"next_stok_id"`
+	NextProdukID   int       `json:"next_produk_id"`
+	NextSupplierID int       `json:"next_supplier_id"`
 	TrialSampai    time.Time `json:"trial_sampai,omitzero"`
 	AktifSampai    time.Time `json:"aktif_sampai,omitzero"`
 }
@@ -91,6 +95,13 @@ type invoiceItemRow struct {
 	InvoiceID int `json:"invoice_id"`
 	No        int `json:"no"`
 	finance.InvoiceItem
+}
+
+// produkBahanRow: satu baris resep, anak dari produk — sama polanya dengan invoice_items.
+type produkBahanRow struct {
+	ProdukID int `json:"produk_id"`
+	No       int `json:"no"`
+	finance.ResepBahan
 }
 
 // saveTenantDB menulis ulang semua data satu usaha.
@@ -106,6 +117,12 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 			items = append(items, invoiceItemRow{inv.ID, i + 1, it})
 		}
 	}
+	var bahan []produkBahanRow
+	for _, p := range st.Produk {
+		for i, b := range p.Bahan {
+			bahan = append(bahan, produkBahanRow{p.ID, i + 1, b})
+		}
+	}
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -116,7 +133,8 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 	if _, err := tx.Exec(`DELETE FROM tenants WHERE id = $1`, t.id); err != nil {
 		return err
 	}
-	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID, l.TrialSampai, l.AktifSampai}
+	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
+		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, l.TrialSampai, l.AktifSampai}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
 	}
@@ -131,6 +149,11 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		{"karyawan", st.Karyawan},
 		{"invoices", st.Invoices},
 		{"invoice_items", items},
+		{"tagihan", st.Tagihan},
+		{"stok", st.Stok},
+		{"produk", st.Produk},
+		{"produk_bahan", bahan},
+		{"supplier", st.Supplier},
 		{"billing_orders", l.Orders},
 	} {
 		if err := insertRows(tx, r.table, t.id, r.rows); err != nil {
@@ -209,8 +232,10 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 		return err
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
+		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai}}
 	var items []invoiceItemRow
+	var bahan []produkBahanRow
 	for _, q := range []struct {
 		dst   any
 		query string
@@ -220,6 +245,11 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 		{&st.Karyawan, rowsOf("karyawan", "id")},
 		{&st.Invoices, rowsOf("invoices", "id")},
 		{&items, rowsOf("invoice_items", "invoice_id, no")},
+		{&st.Tagihan, rowsOf("tagihan", "id")},
+		{&st.Stok, rowsOf("stok", "id")},
+		{&st.Produk, rowsOf("produk", "id")},
+		{&bahan, rowsOf("produk_bahan", "produk_id, no")},
+		{&st.Supplier, rowsOf("supplier", "id")},
 		{&st.Langganan.Orders, rowsOf("billing_orders", "waktu, id")},
 	} {
 		if err := selectJSON(db, q.dst, q.query, t.id); err != nil {
@@ -233,6 +263,14 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	for _, it := range items {
 		inv := &st.Invoices[byID[it.InvoiceID]]
 		inv.Items = append(inv.Items, it.InvoiceItem)
+	}
+	produkByID := map[int]int{} // id produk → indeks
+	for i, p := range st.Produk {
+		produkByID[p.ID] = i
+	}
+	for _, b := range bahan {
+		p := &st.Produk[produkByID[b.ProdukID]]
+		p.Bahan = append(p.Bahan, b.ResepBahan)
 	}
 	if err := selectJSON(db, &st.Opening, `SELECT to_jsonb(o) - 'tenant_id' FROM opening_balances o WHERE tenant_id = $1`, t.id); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err

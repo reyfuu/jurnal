@@ -442,12 +442,131 @@ tabel, satu tempat. UI menampilkan TER berdampingan sebagai pembanding bila suda
 sebelum dipakai untuk SPT. PPnBM bergantung klasifikasi barang yang tidak bisa diturunkan dari
 nominal, jadi lapisannya dipilih manual.
 
+### Piutang & Utang dan Stok & Gudang jadi data sungguhan
+
+Dua halaman ini sebelumnya hanya menampilkan contoh dari `DashboardSnapshot` — tidak tersimpan,
+tidak bisa disunting, dan isinya berbeda dengan dashboard. Sekarang keduanya record yang
+tersimpan per usaha (`state.json`), lengkap dengan CRUD dan impor Excel.
+
+- `finance.Tagihan` & `finance.StokItem` — data yang disimpan. Yang **tidak** disimpan: hari
+  keterlambatan dan status stok. Keduanya dihitung saat dibaca (`HariTerlambat`, `Status`),
+  karena nilai tersimpan basi begitu tanggal berganti atau stok diubah.
+- `TagihanRow` & `StokRow` membawa turunan itu dari server, jadi ambang "stok menipis" dan rumus
+  margin hanya ada di satu tempat, bukan dihitung ulang di React.
+- Dashboard kini **selalu** merender daftarnya dari record tenant; usaha demo dimulai dengan
+  `SeedTagihan()`/`SeedStok()`. Cabang "pakai seed tampilan" dihapus: dua tempat yang menampilkan
+  tagihan yang sama tidak boleh berbeda angkanya, dan baris contoh harus bisa disunting.
+- Impor per menu: `GET /api/v1/{tagihan,stok}/template` (satu sheet + Panduan) dan
+  `POST /api/v1/{tagihan,stok}/import`. Tanpa `?commit=1` hanya pratinjau. `mode=tambah|ganti`
+  dipilih pengguna — berbeda dari onboarding yang selalu mengganti, karena daftar ini hidup.
+- Berkas dengan sheet bernama "Sheet1" tetap terbaca bila itu satu-satunya sheet (hasil
+  "Save As"/Google Sheets); dua sheet asing ditolak, tidak ditebak.
+
+**Jebakan yang sudah kena sekali**: kata **"piutang" memuat "utang"**. Urutan pemeriksaan di
+`jenisTagihanDari` terbalik membuat SELURUH piutang terbaca sebagai utang — tanpa satu baris pun
+gagal impor, jadi tidak terlihat dari jumlah baris. Dikunci test; jangan tukar urutannya.
+
+### Produksi & Supplier — HPP per produk dari resep
+
+`finance.Produk` memuat resep (BOM) yang menunjuk `StokItem` lewat `StokID`. `HitungHPP` menjumlah
+biaya bahan dari **harga pokok di Stok & Gudang**, bukan angka yang diketik di produk, supaya HPP
+ikut naik sendiri saat harga bahan naik. Dihitung tiap kali daftar dibaca, tidak disimpan.
+
+- `TakaranSkala = 1000`: takaran bahan disimpan per seribu satuan (180 = 0,18 kg). Resep nyata
+  butuh pecahan sementara rupiah tetap bilangan bulat; UI menampilkannya sebagai desimal.
+- Pembulatan HPP per unit **ke atas** (`bagiKeAtas`). HPP yang lebih murah dari kenyataan membuat
+  harga jual ditetapkan kurang — pembulatan diarahkan ke sisi yang aman.
+- Bahan yang stoknya sudah dihapus atau harga pokoknya masih 0 **tidak menggagalkan** perhitungan:
+  biayanya 0 dan diberi peringatan, supaya jelas HPP-nya belum lengkap, bukan sekadar murah.
+- `ProdukRow.Selisih` membandingkan HPP resep dengan harga pokok di stok (dicocokkan lewat SKU).
+  Bukan 0 = angka di stok sudah basi. `POST /api/v1/produksi/produk/{id}/terapkan-hpp` menyalinnya,
+  sebagai aksi terpisah — harga pokok ikut menentukan nilai persediaan di neraca, jadi
+  perubahannya harus keputusan pengguna, bukan efek samping menyunting resep.
+- Kolom utang per supplier dicocokkan dari **nama pihak** di Piutang & Utang. Pencocokan nama
+  rapuh; UI menyebutnya perkiraan, bukan saldo resmi.
+
+### Impor mutasi bank dengan pengelompokan otomatis
+
+Dua langkah, dan langkah pertama tidak menyimpan apa pun:
+`POST /api/v1/transactions/mutasi` (pratinjau) → diperiksa di layar →
+`POST /api/v1/transactions/mutasi/commit` (baris hasil koreksi).
+
+**Commit menerima baris dari klien, bukan membaca ulang berkasnya.** Kalau berkas dibaca ulang,
+koreksi pengguna hilang dan tebakan mesin yang terbukukan — padahal seluruh guna langkah
+pratinjau justru supaya tebakan itu bisa diperbaiki.
+
+- `finance.TebakJenis` memetakan keterangan bank ke `JenisList` lewat `aturanMutasi`, satu tabel
+  berurutan (yang pertama cocok dipakai). **Urutannya penting**: "pajak bunga" memuat "bunga",
+  "biaya adm" memuat "adm". Arah uang ikut membatasi aturan — "pinjaman" masuk = Terima Pinjaman,
+  keluar = Bayar Cicilan.
+- Kata kunci ≤4 huruf dicocokkan sebagai **kata utuh**, supaya "ADMIRAL" tidak terbaca "adm".
+- Tiap baris membawa `Keyakinan` (tinggi/sedang/rendah) dan `Alasan`. Tanpa kata kunci yang cocok,
+  jenisnya diisi default per arah dengan keyakinan **rendah** — bukan dikosongkan: baris kosong
+  mudah terlewat saat diperiksa, baris berlabel "rendah" tampil menonjol. UI menghitung dan
+  memperingatkan berapa yang masih perlu diperiksa, karena uang masuk yang sebenarnya setoran
+  modal akan terhitung omzet, dan omzet itu dasar PPh final.
+- Dugaan duplikat (tanggal + nominal sama dengan transaksi yang ada) **tidak dicentang** otomatis.
+- Jenis yang arahnya bertentangan dengan arah uang di rekening ditolak di `MutasiKeTransaksi`,
+  tidak dibukukan terbalik.
+- Format yang terbaca: kolom Debet/Kredit terpisah, satu kolom Mutasi bertanda DB/CR (termasuk
+  yang menempel di angkanya, "1.250.000 DB"), tanda minus/kurung, tanggal tanpa tahun ("01/09",
+  tahunnya dari isian pengguna), `.xlsx` maupun `.csv` (pemisah `,` `;` atau tab).
+- Baris kop di atas header (nama bank, periode) dan baris kaki ("Saldo Akhir") dilewati tanpa
+  dilaporkan sebagai kesalahan.
+
+### Lapor Bug: penerusan ke pengembang
+
+Menu dan penyimpanannya (`cmd/server/bugs.go`, `bugs.json`, screenshot di `data/bugs/`) datang
+dari PR #9/#10. Yang ditambahkan di sini hanya bagian yang belum ada: **laporannya benar-benar
+sampai ke pengembang**, bukan mengendap di berkas di VPS.
+
+```
+BUG_WEBHOOK_URL      kosong = laporan hanya tersimpan di server (tidak ada data keluar)
+BUG_WEBHOOK_TIMEOUT  default 10s
+MASTER_EMAIL         pemilik ID Master: membaca laporan lintas usaha; kosong = tidak ada
+```
+
+- Penerusan dilakukan **setelah** laporan tersimpan, dan kegagalannya tidak membuat pelaporan
+  ikut gagal: penerusan bisa gagal karena jaringan, dan laporan yang hilang karena itu hilang
+  selamanya sementara pelapor sudah merasa melapor. Hasilnya dicatat di `Diteruskan`/`GagalKirim`
+  dan ditulis ulang ke `bugs.json`, jadi masih terbaca setelah restart.
+- Payload memuat `text` (Slack), `content` (Discord), dan `laporan` utuh sekaligus. **Gambarnya
+  tidak ikut**: webhook tidak menerima lampiran lewat jalur ini, dan mengirim gambar pengguna ke
+  pihak luar tanpa itu diperlukan bukan hal yang perlu dilakukan diam-diam.
+- `bugHook.tujuan()` hanya menyebut **host**, tidak URL penuh: webhook Slack/Discord memuat token
+  di path-nya, dan nilai ini ditampilkan ke pengguna di halaman Lapor Bug.
+- `MASTER_EMAIL` membuat satu akun melihat laporan seluruh usaha dan membuka lampirannya. Tanpa
+  env itu, tidak ada yang punya akses lintas usaha — dikunci test dua arah.
+- `GET /api/v1/bugs/info` sengaja **endpoint terpisah**, bukan digabung ke `/bugs`: bentuk balasan
+  `/bugs` sudah dipakai halaman Lapor Bug sebagai array, dan mengubahnya jadi objek akan
+  memecahkan pemanggil yang sudah ada.
+
+### Keempat entitas baru ikut dipetakan ke Postgres
+
+`schema.sql` dan `pgstore.go` memetakan tiap entitas ke tabelnya sendiri, bukan menyimpan `state`
+utuh sebagai JSON. Jadi entitas baru **harus** didaftarkan di tiga tempat sekaligus, kalau tidak ia
+hanya hidup di memori dan berkas JSON lalu hilang diam-diam saat `DATABASE_URL` dipakai:
+tabelnya di `schema.sql`, daftar `{tabel, rows}` di `saveTenantDB`, dan `rowsOf(...)` di
+`loadTenantDB`. Deret ID-nya ikut sebagai kolom di tabel `tenants`.
+
+`produk_bahan` jadi tabel anak seperti `invoice_items` — resep adalah daftar di dalam produk, dan
+disimpan per baris dengan kolom `no` sebagai urutannya.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
 2. Melengkapi penagihan invoice & pelunasan parsial/lunas pada modul Piutang & Utang.
+   Terkait: `StokItem.Jumlah` masih bilangan bulat, jadi stok 42,5 kg harus dicatat 42 kg atau
+   satuannya diperkecil ke gram. Perlu tipe kuantitas berpecahan (seperti `TakaranSkala` di resep)
+   sebelum stok opname; mengubah arti kolom Jumlah di template yang sudah dipakai orang tidak
+   boleh dilakukan diam-diam.
+   Mutasi bank: kata kunci `aturanMutasi` disusun dari pola cetakan BCA/Mandiri yang umum. Baris
+   berkeyakinan rendah bisa dikurangi dengan mengisi `LLM_API_KEY` dan meminta model
+   mengelompokkan sisanya — slotnya sudah ada, penyambungannya belum.
+   Lapor Bug: alur balasan pengembang (status baru/dibaca/selesai + teks balasan yang terbaca
+   pelapor) belum ada; sekarang ID Master hanya bisa membaca.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
 
