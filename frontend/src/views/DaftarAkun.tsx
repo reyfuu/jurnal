@@ -24,7 +24,7 @@ export function DaftarAkun() {
         <div className="card" style={{ padding: 22 }}>
           <div className="chart-title">CoA belum tersedia untuk jenis usaha ini</div>
           <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>
-            CoA untuk usaha jasa dan manufaktur sedang disiapkan tim Akademi Pajak. Sementara itu laporan memakai format ringkas.
+            CoA untuk usaha jasa dan manufaktur sedang disiapkan tim Master Pajak. Sementara itu laporan memakai format ringkas.
             Usaha perdagangan sudah memakai CoA lengkap.
           </p>
         </div>
@@ -69,7 +69,7 @@ export function DaftarAkun() {
               </div>
             )
           })}
-          <p className="text-xs text-muted-foreground">Sumber: Daftar COA hasil review akuntan Akademi Pajak (perdagangan).</p>
+          <p className="text-xs text-muted-foreground">Sumber: Daftar COA hasil review akuntan Master Pajak (perdagangan).</p>
         </>
       )}
     </>

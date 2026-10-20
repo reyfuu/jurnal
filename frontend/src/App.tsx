@@ -101,7 +101,7 @@ export default function App() {
   }
 
   if (!business.profile) {
-    return <Onboarding canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} provinsi={business.options.provinsi} />
+    return <Onboarding canEdit={canSee('profil-usaha')} onSaved={onProfileSaved} onLogout={onLogout} provinsi={business.options.provinsi} klu={business.options.klu} />
   }
 
   const onPaid = () => getMe().then((m) => { setSession({ status: 'in', me: m }); void reload(m) }, fail)
@@ -131,9 +131,9 @@ export default function App() {
               {canSee('langganan') && <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('langganan')}>Aktifkan langganan</Button>}
             </div>
           )}
-          {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan) && (
+          {canSee('profil-usaha') && view !== 'profil-usaha' && (!business.profile.kota || !business.profile.omzet_tahunan || !business.profile.klu) && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)', background: 'rgba(234, 179, 8, 0.08)' }} role="status">
-              <span><strong>Lengkapi profil usaha.</strong> Isi lokasi usaha serta perkiraan omzet &amp; laba per tahun supaya cek benchmark DJP dan risiko pajak bisa dihitung.</span>
+              <span><strong>Lengkapi profil usaha.</strong> Isi bidang usaha (KLU), lokasi, serta perkiraan omzet &amp; laba per tahun supaya NPM dan CTTOR bisa dibandingkan dengan rata-rata DJP.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('profil-usaha')}>Lengkapi sekarang</Button>
             </div>
           )}

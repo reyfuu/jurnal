@@ -1,5 +1,5 @@
 # Product Requirements Document (PRD)
-**Produk**: Laporan Bisnis by Akademi Pajak  
+**Produk**: Laporan Bisnis by Master Pajak  
 **Versi**: 1.0 (MVP Batch 100 User)  
 **Design System**: Navy & Gold, laporan pada permukaan netral gelap (`shadcn/ui` + `Kokonut UI` + `21st.dev`, patuh `antislop` & `impeccable`)
 
@@ -7,7 +7,7 @@
 
 ## 1. Visi Produk & Value Proposition
 **"Gambaran seluruh bisnis dalam satu layar."**  
-Laporan Bisnis by Akademi Pajak membantu pemilik UMKM melihat kesehatan bisnis secara utuh—bukan sekadar omzet kotor, melainkan **Laba Bersih sesungguhnya**, **Saldo Kas & Bank riil**, **Piutang yang macet lewat 30 hari**, **Potongan komisi aplikasi**, hingga **kewajiban Pajak UMKM 0,5%** tanpa perlu mengerti akuntansi.
+Laporan Bisnis by Master Pajak membantu pemilik UMKM melihat kesehatan bisnis secara utuh—bukan sekadar omzet kotor, melainkan **Laba Bersih sesungguhnya**, **Saldo Kas & Bank riil**, **Piutang yang macet lewat 30 hari**, **Potongan komisi aplikasi**, hingga **kewajiban Pajak UMKM 0,5%** tanpa perlu mengerti akuntansi.
 
 ---
 
@@ -41,7 +41,7 @@ Laporan Bisnis by Akademi Pajak membantu pemilik UMKM melihat kesehatan bisnis s
 
 ### 3.2 Tata Letak (Layout Hierarchy)
 1. **Top Marketing Header (Saat di Landing / Demo Preview)**:
-   - Kiri: Logo segitiga kuning **Laporan Bisnis** `by Akademi Pajak`.
+   - Kiri: Logo segitiga kuning **Laporan Bisnis** `by Master Pajak`.
    - Kanan: Link `Fitur`, `Cara kerja`, `Keamanan data`, `Harga`, tombol ghost `Masuk`, dan tombol utama kuning bulat `Beli Rp149.000`.
 2. **App Sidebar (Kiri, Lebar `240px`)**:
    - **RINGKASAN**: `Dashboard`

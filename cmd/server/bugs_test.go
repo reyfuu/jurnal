@@ -68,9 +68,15 @@ func TestBugReportPerTenantAndPersisted(t *testing.T) {
 func TestCekAwalEndpoint(t *testing.T) {
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
-	rec := do(srv, qa, http.MethodPost, "/api/v1/business/cek-awal", `{"jenis_usaha":"perdagangan","bentuk_usaha":"op","ptkp":"TK/0","omzet_tahunan":6000000000,"laba_sebelum_pajak":60000000}`)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/business/cek-awal", `{"jenis_usaha":"perdagangan","bentuk_usaha":"op","ptkp":"TK/0","klu":"471","omzet_tahunan":6000000000,"laba_sebelum_pajak":60000000}`)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"di_bawah"`) || !strings.Contains(rec.Body.String(), "Wajib menjadi PKP") {
 		t.Fatalf("cek awal: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", `{"nama_usaha":"X","jenis_usaha":"jasa","bentuk_usaha":"cv","klu":"999"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("KLU tidak dikenal: want 400, got %d", rec.Code)
+	}
+	if body := do(srv, qa, http.MethodGet, "/api/v1/business", "").Body.String(); !strings.Contains(body, `"kode":"471"`) {
+		t.Fatal("options.klu harus berisi daftar KLU")
 	}
 	if rec := do(srv, nil, http.MethodPost, "/api/v1/business/cek-awal", `{}`); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("tanpa login: want 401, got %d", rec.Code)

@@ -4,28 +4,48 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
-// Benchmark: rentang Net Profit Margin (laba sebelum pajak / omzet) yang dianggap wajar
-// per jenis usaha. Nilai INDIKATIF — sesuaikan dengan rasio benchmark DJP per KLU terbaru;
-// cukup ubah tabel ini.
-type Benchmark struct {
-	MinBps int64 `json:"min_bps"`
-	MaxBps int64 `json:"max_bps"`
+// KLUBenchmark: rata-rata nasional CTTOR (PPh terutang / peredaran usaha) dan NPM (laba sebelum
+// pajak / peredaran usaha) per kelompok KLU 3 digit. Data di klu_data.go, dibuat dari PDF DJP
+// oleh scripts/gen_klu_benchmark.py.
+type KLUBenchmark struct {
+	Kode     string `json:"kode"`
+	Nama     string `json:"nama"`
+	CTTORBps int64  `json:"cttor_bps"`
+	NPMBps   int64  `json:"npm_bps"`
 }
 
-var BenchmarkNPM = map[string]Benchmark{
-	"perdagangan": {300, 1_000},
-	"jasa":        {1_000, 3_000},
-	"manufaktur":  {500, 1_500},
+const SumberBenchmark = "Buku sektoral DJP 2021 (SPT tahun pajak 2020), angka nasional"
+
+func FindKLU(kode string) (KLUBenchmark, bool) {
+	i := slices.IndexFunc(KLUBenchmarks, func(k KLUBenchmark) bool { return k.Kode == kode })
+	if i < 0 {
+		return KLUBenchmark{}, false
+	}
+	return KLUBenchmarks[i], true
+}
+
+// JenisKLU: jenis usaha aplikasi untuk menyaring daftar KLU di onboarding.
+// Golongan 45-47 = perdagangan, 01-33 = pertanian, tambang & industri (produksi), sisanya jasa.
+func JenisKLU(kode string) string {
+	gol, _ := strconv.Atoi(kode[:min(2, len(kode))])
+	switch {
+	case gol >= 45 && gol <= 47:
+		return "perdagangan"
+	case gol >= 1 && gol <= 33:
+		return "manufaktur"
+	}
+	return "jasa"
 }
 
 // CekAwalInput: data profil usaha yang dibutuhkan (finance mengimpor tax, bukan sebaliknya).
 type CekAwalInput struct {
-	JenisUsaha, BentukUsaha, PTKP string
-	PKP                           bool
-	Omzet, Laba                   int64 // per tahun; laba sebelum pajak (boleh negatif)
+	BentukUsaha, PTKP, KLU string
+	PKP                    bool
+	Omzet, Laba            int64 // per tahun; laba sebelum pajak (boleh negatif)
 }
 
 type Risiko struct {
@@ -35,14 +55,19 @@ type Risiko struct {
 }
 
 type CekAwalResult struct {
-	NPMBps    int64     `json:"npm_bps"`
-	Benchmark Benchmark `json:"benchmark"`
-	Status    string    `json:"status"` // kurang_data | di_bawah | wajar | di_atas
-	Pesan     string    `json:"pesan"`
-	Risiko    []Risiko  `json:"risiko"`
+	KLU        *KLUBenchmark `json:"klu"`
+	NPMBps     int64         `json:"npm_bps"`
+	CTTORBps   int64         `json:"cttor_bps"`
+	Status     string        `json:"status"` // kurang_data | di_bawah | wajar
+	Pesan      string        `json:"pesan"`
+	CTTORPesan string        `json:"cttor_pesan,omitempty"`
+	Sumber     string        `json:"sumber"`
+	Risiko     []Risiko      `json:"risiko"`
 }
 
-func pct(bps int64) string { return strings.Replace(fmt.Sprintf("%.1f%%", float64(bps)/100), ".", ",", 1) }
+func pct(bps int64) string {
+	return strings.Replace(fmt.Sprintf("%.2f%%", float64(bps)/100), ".", ",", 1)
+}
 
 func rp(n int64) string {
 	s := fmt.Sprint(max(n, -n))
@@ -70,34 +95,38 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 	}
 }
 
-// CekAwal: NPM vs benchmark dan risiko pemeriksaan / bentuk usaha, untuk ringkasan onboarding
-// dan Perencanaan Pajak.
+// CekAwal: NPM & CTTOR usaha vs rata-rata nasional KLU-nya, plus risiko pemeriksaan / bentuk
+// usaha, untuk ringkasan onboarding dan Perencanaan Pajak.
 func CekAwal(in CekAwalInput) CekAwalResult {
-	r := CekAwalResult{Benchmark: BenchmarkNPM[in.JenisUsaha], Risiko: []Risiko{}}
-	if in.Omzet <= 0 {
+	r := CekAwalResult{Sumber: SumberBenchmark, Risiko: []Risiko{}}
+	if k, ok := FindKLU(in.KLU); ok {
+		r.KLU = &k
+	}
+	switch {
+	case in.Omzet <= 0:
 		r.Status = "kurang_data"
-		r.Pesan = "Isi perkiraan omzet dan laba per tahun untuk membandingkan dengan benchmark DJP."
+		r.Pesan = "Isi perkiraan omzet dan laba per tahun untuk membandingkan dengan rata-rata DJP."
+		return r
+	case r.KLU == nil:
+		r.Status = "kurang_data"
+		r.Pesan = "Pilih bidang usaha (KLU) di Profil Usaha untuk membandingkan dengan rata-rata DJP usaha sejenis."
 		return r
 	}
+	k := *r.KLU
 	r.NPMBps = in.Laba * 10_000 / in.Omzet
-	rentang := pct(r.Benchmark.MinBps) + "–" + pct(r.Benchmark.MaxBps)
-	switch {
-	case r.NPMBps < r.Benchmark.MinBps:
+	if r.NPMBps < k.NPMBps {
 		r.Status = "di_bawah"
-		r.Pesan = fmt.Sprintf("NPM Anda %s, di bawah benchmark usaha sejenis (%s). Belum wajar menurut rasio DJP.", pct(r.NPMBps), rentang)
-	case r.NPMBps > r.Benchmark.MaxBps:
-		r.Status = "di_atas"
-		r.Pesan = fmt.Sprintf("NPM Anda %s, di atas benchmark usaha sejenis (%s). Wajar dari sisi pajak; pastikan semua biaya sudah tercatat.", pct(r.NPMBps), rentang)
-	default:
+		r.Pesan = fmt.Sprintf("NPM Anda %s, di bawah rata-rata nasional %s untuk KLU %s (%s).", pct(r.NPMBps), pct(k.NPMBps), k.Kode, k.Nama)
+	} else {
 		r.Status = "wajar"
-		r.Pesan = fmt.Sprintf("NPM Anda %s, sesuai benchmark usaha sejenis (%s).", pct(r.NPMBps), rentang)
+		r.Pesan = fmt.Sprintf("NPM Anda %s, setara atau di atas rata-rata nasional %s untuk KLU %s (%s).", pct(r.NPMBps), pct(k.NPMBps), k.Kode, k.Nama)
 	}
 
 	add := func(level, judul, isi string) { r.Risiko = append(r.Risiko, Risiko{level, judul, isi}) }
 	if in.Laba <= 0 {
 		add("tinggi", "Usaha dilaporkan rugi", "Rugi terus-menerus sering memicu SP2DK. Siapkan bukti biaya dan pembukuan yang rapi.")
 	} else if r.Status == "di_bawah" {
-		add("tinggi", "Margin di bawah benchmark DJP", "DJP membandingkan SPT dengan rasio sektor; margin yang jauh lebih rendah berpotensi diminta klarifikasi (SP2DK) atau diperiksa.")
+		add("tinggi", "NPM di bawah rata-rata DJP", fmt.Sprintf("DJP membandingkan SPT dengan rasio sektor. NPM %s di bawah rata-rata nasional %s berpotensi diminta klarifikasi (SP2DK) atau diperiksa.", pct(r.NPMBps), pct(k.NPMBps)))
 	}
 	if in.Omzet > batasFasilitas {
 		if !in.PKP {
@@ -113,18 +142,35 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	if in.BentukUsaha != "op" {
 		ptkp = "TK/0"
 	}
-	if bu, err := CompareBentukUsaha(in.Omzet, r.NPMBps, ptkp); err == nil {
-		skema := bu.Skema
-		if in.Omzet > batasFasilitas { // PPh Final hanya untuk omzet s.d. 4,8 M
-			skema = slices.DeleteFunc(slices.Clone(skema), func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
-		}
-		now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet) })]
-		best := slices.MinFunc(skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
-		if hemat := now.Pajak - best.Pajak; hemat >= 1_000_000 && hemat*10 >= now.Pajak {
-			add("sedang", "Bentuk usaha belum paling hemat",
-				fmt.Sprintf("Skema sekarang (%s) sekitar %s per tahun. %s sekitar %s, hemat %s. Bandingkan di menu Perencanaan Pajak.",
-					now.Nama, rp(now.Pajak), best.Nama, rp(best.Pajak), rp(hemat)))
-		}
+	bu, err := CompareBentukUsaha(in.Omzet, r.NPMBps, ptkp)
+	if err != nil {
+		return r
+	}
+	skema := bu.Skema
+	if in.Omzet > batasFasilitas { // PPh Final hanya untuk omzet s.d. 4,8 M
+		skema = slices.DeleteFunc(slices.Clone(skema), func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
+	}
+	now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet) })]
+
+	// CTTOR: pajak skema sekarang / omzet. Untuk PPh Final, pajaknya ditetapkan dari omzet oleh
+	// aturan, jadi angkanya hanya informasi, bukan sinyal risiko.
+	r.CTTORBps = now.Pajak * 10_000 / in.Omzet
+	final := now.ID == SkemaPPOP || now.ID == SkemaPPBadan
+	switch {
+	case final:
+		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s dengan PPh Final 0,5%%; rata-rata nasional %s. Untuk PPh Final, besarnya pajak ditetapkan dari omzet, jadi perbandingan ini hanya informasi.", pct(r.CTTORBps), pct(k.CTTORBps))
+	case r.CTTORBps < k.CTTORBps:
+		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, di bawah rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
+		add("sedang", "CTTOR di bawah rata-rata DJP", fmt.Sprintf("Perbandingan pajak terutang dengan omzet (%s) lebih rendah dari rata-rata nasional KLU %s (%s). Pastikan semua penghasilan tercatat.", pct(r.CTTORBps), k.Kode, pct(k.CTTORBps)))
+	default:
+		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, setara atau di atas rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
+	}
+
+	best := slices.MinFunc(skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
+	if hemat := now.Pajak - best.Pajak; hemat >= 1_000_000 && hemat*10 >= now.Pajak {
+		add("sedang", "Bentuk usaha belum paling hemat",
+			fmt.Sprintf("Skema sekarang (%s) sekitar %s per tahun. %s sekitar %s, hemat %s. Bandingkan di menu Perencanaan Pajak.",
+				now.Nama, rp(now.Pajak), best.Nama, rp(best.Pajak), rp(hemat)))
 	}
 	return r
 }

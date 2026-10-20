@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { cekAwal, type BusinessProfile, type CekAwal } from '@/lib/api'
-import { formatPct } from '@/lib/format'
+
+// 2 desimal, sama dengan PDF DJP dan pesan dari server
+const formatPct = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
 
 const STATUS: Record<CekAwal['status'], { label: string; color: string }> = {
-  wajar: { label: 'Sesuai benchmark', color: 'var(--accent-green)' },
-  di_atas: { label: 'Di atas benchmark', color: 'var(--accent-green)' },
-  di_bawah: { label: 'Di bawah benchmark', color: 'var(--accent-red)' },
+  wajar: { label: 'Setara / di atas rata-rata', color: 'var(--accent-green)' },
+  di_bawah: { label: 'Di bawah rata-rata', color: 'var(--accent-red)' },
   kurang_data: { label: 'Belum ada data', color: 'var(--text-secondary)' },
 }
 const LEVEL: Record<CekAwal['risiko'][number]['level'], { label: string; color: string }> = {
@@ -34,16 +35,25 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
     <section className="grid gap-4 rounded-lg border border-border p-4" aria-labelledby="cek-awal-title">
       <div>
         <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark DJP & risiko pajak</h3>
-        <p className="mt-1 text-xs text-muted-foreground">Net Profit Margin (laba sebelum pajak ÷ omzet) dibandingkan rasio benchmark usaha sejenis. Angka benchmark bersifat indikatif.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          NPM (laba sebelum pajak ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional DJP{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
+        </p>
       </div>
-      {c.status !== 'kurang_data' && (
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <div><span className="text-2xl font-bold tabular">{formatPct(c.npm_bps)}</span> <span className="text-xs text-muted-foreground">NPM Anda</span></div>
-          <div className="text-sm tabular text-muted-foreground">Benchmark {formatPct(c.benchmark.min_bps)}–{formatPct(c.benchmark.max_bps)}</div>
-          <div className="text-sm font-semibold" style={{ color: st.color }}>{st.label}</div>
+      {c.status !== 'kurang_data' && c.klu && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-border p-3">
+            <div className="text-xs text-muted-foreground">NPM</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.npm_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.npm_bps)}</span></div>
+            <div className="mt-1 text-xs font-semibold" style={{ color: st.color }}>{st.label}</div>
+          </div>
+          <div className="rounded-md border border-border p-3">
+            <div className="text-xs text-muted-foreground">CTTOR</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.cttor_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.cttor_bps)}</span></div>
+          </div>
         </div>
       )}
       <p className="text-sm leading-relaxed">{c.pesan}</p>
+      {c.cttor_pesan && <p className="text-sm leading-relaxed text-muted-foreground">{c.cttor_pesan}</p>}
       {c.risiko.length > 0 ? (
         <ul className="grid gap-3">
           {c.risiko.map((r) => (

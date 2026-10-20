@@ -1,5 +1,5 @@
 // Package coa: Chart of Accounts perdagangan dari "Daftar COA.xlsx" (sheet COA Baru, review
-// akuntan Akademi Pajak), pemetaan otomatis transaksi ke akun, jurnal, dan laporan per akun.
+// akuntan Master Pajak), pemetaan otomatis transaksi ke akun, jurnal, dan laporan per akun.
 package coa
 
 import "pajak/internal/finance"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Laporan Bisnis by Akademi Pajak - VPS Deployment Script
+# Laporan Bisnis by Master Pajak - VPS Deployment Script
 # Usage: ./deploy.sh [PORT]
 
 APP_PORT="${1:-8085}"

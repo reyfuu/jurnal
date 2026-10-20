@@ -6,7 +6,7 @@ const a = (x: Answers): Answers => ({ ...DEFAULT_ANSWERS, ...x })
 describe('toProfile', () => {
   it('warung pribadi, menikah, 2 tanggungan', () => {
     expect(toProfile(a({ nama: '  Warung Bu Siti ', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' }))).toEqual({
-      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
+      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, klu: '', metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
     })
   })
 
@@ -50,12 +50,12 @@ describe('omzet & laba', () => {
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'lokasi', 'jenis', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
+      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
-    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
+    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
   })
 
   it('belum menikah melewati pertanyaan penghasilan pasangan', () => {
@@ -71,6 +71,9 @@ describe('answered', () => {
     expect(answered('stok', a({}))).toBe(true) // default periodik
     expect(answered('lokasi', a({ alamat: 'Jl. A', kecamatan: 'B', kota: 'C' }))).toBe(false) // provinsi belum
     expect(answered('lokasi', a({ alamat: 'Jl. A', kecamatan: 'B', kota: 'C', provinsi: 'Bali' }))).toBe(true)
+    expect(answered('klu', a({}))).toBe(false)
+    expect(answered('klu', a({ klu: '471' }))).toBe(true)
+    expect(toProfile(a({ jenis: 'perdagangan', bentuk: 'pt', klu: '471' })).klu).toBe('471')
     expect(answered('omzet', a({ omzet: '0' }))).toBe(false)
     expect(answered('omzet', a({ omzet: 'Rp750.000.000' }))).toBe(true)
     expect(answered('laba', a({ laba: '0' }))).toBe(true) // impas boleh

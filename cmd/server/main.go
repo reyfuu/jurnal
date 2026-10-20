@@ -805,7 +805,7 @@ func main() {
 		port = "8080"
 	}
 	srv := NewServer()
-	log.Printf("Laporan Bisnis by Akademi Pajak listening on http://localhost:%s", port)
+	log.Printf("Laporan Bisnis by Master Pajak listening on http://localhost:%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)
 	}

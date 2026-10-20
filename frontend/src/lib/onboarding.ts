@@ -4,7 +4,7 @@ import { formatRp } from './format'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
 // lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
 export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
 export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
@@ -38,6 +38,10 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
       { value: 'jasa', label: 'Saya menjual jasa atau keahlian, bukan barang', hint: 'Salon, laundry, servis, konsultan, agensi' },
       { value: 'manufaktur', label: 'Saya membuat atau mengolah barang sendiri lalu menjualnya', hint: 'Kue, catering, konveksi, kerajinan, kopi sangrai' },
     ],
+  },
+  klu: {
+    judul: 'Bidang usaha mana yang paling cocok?',
+    alasan: 'Dipakai untuk membandingkan margin laba (NPM) dan rasio pajak (CTTOR) usaha Anda dengan rata-rata nasional DJP untuk bidang yang sama.',
   },
   stok: {
     judul: 'Bagaimana Anda tahu sisa stok barang?',
@@ -110,6 +114,7 @@ export function steps(a: Answers): StepId[] {
     'nama',
     'lokasi',
     'jenis',
+    'klu',
     ...(jualBarang(a) ? ['stok' as const] : []),
     'omzet',
     'laba',
@@ -139,6 +144,7 @@ export function toProfile(a: Answers): BusinessProfile {
     bentuk_usaha: bentuk,
     ptkp: bentuk === 'op' ? `${status}/${n}` : '',
     pkp: a.pkp === 'ya',
+    klu: a.klu ?? '',
     metode_persediaan: jenis === 'jasa' ? '' : ((a.stok as BusinessProfile['metode_persediaan']) || 'periodik'),
     omzet_tahunan: parseRp(a.omzet) || 0,
     laba_sebelum_pajak: parseRp(a.laba) || 0,

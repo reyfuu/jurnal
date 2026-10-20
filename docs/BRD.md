@@ -1,5 +1,5 @@
 # Business Requirements Document (BRD)
-**Produk**: Laporan Bisnis by Akademi Pajak  
+**Produk**: Laporan Bisnis by Master Pajak  
 **Tagline**: *"Gambaran seluruh bisnis dalam satu layar"*  
 **Target Skala Awal**: 100 UMKM Aktif (Early Adopters / Batch Pertama)  
 **Model Harga**: Rp149.000 (Sekali bayar / Akses tahunan terjangkau untuk UMKM)

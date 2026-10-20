@@ -1,6 +1,6 @@
-# AGENT.md — Laporan Bisnis (by Akademi Pajak)
+# AGENT.md — Laporan Bisnis (by Master Pajak)
 
-> **Project**: Laporan Bisnis by Akademi Pajak — SaaS Pembukuan, Operasional & Pajak UMKM ("Gambaran seluruh bisnis dalam satu layar")  
+> **Project**: Laporan Bisnis by Master Pajak — SaaS Pembukuan, Operasional & Pajak UMKM ("Gambaran seluruh bisnis dalam satu layar")  
 > **Target Scale**: 1.000 Active UMKM Tenants (~4.000–10.000 transaksi/tenant/tahun), di-host di server lokal (on-premise)  
 > **Core Stack**: **Go (Golang)** atau **ElysiaJS (Bun)** + PostgreSQL + Next.js/React (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
@@ -47,7 +47,7 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 ### C. UI/UX, Visual Craft & Verification
 10. **`antislop`, `taste`, & `impeccable`**
     - **DILARANG KERAS** membuat UI generik "AI slop" (gradien ungu-biru murahan, bayangan berlebihan, kartu tanpa hierarki, teks placeholder asal-asalan).
-    - Ikuti estetika referensi **Laporan Bisnis by Akademi Pajak**:
+    - Ikuti estetika referensi **Laporan Bisnis by Master Pajak**:
       - **Dark Obsidian Theme**: Background utama `#0B0C0E`, surface kartu `#121418`, border halus `#1F2229` (`1px solid rgba(255,255,255,0.06)`).
       - **Brand Utama**: Navy `#222852` pada login/onboarding, sidebar, favicon, dan tema browser (keputusan pengguna 19 Oktober 2026; lihat `DESIGN.md` §2).
       - **Brand Accent**: Amber/Gold `#EAB308` / `#F5C428` untuk logo, metrik utama, CTA, dan active nav state; teks tombol emas menggunakan navy `#222852`.
@@ -66,7 +66,7 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
 
 ## 2. Domain Architecture Map (Laporan Bisnis)
 
-Sesuai referensi desain produk **Laporan Bisnis by Akademi Pajak**, sistem terdiri dari 5 grup navigasi utama:
+Sesuai referensi desain produk **Laporan Bisnis by Master Pajak**, sistem terdiri dari 5 grup navigasi utama:
 
 1. **RINGKASAN**
    - `Dashboard`: Ringkasan 6 KPI utama, grafik tren 11 bulan (`Omzet, biaya, dan laba`), grafik bar `Omzet harian` vs target harian, grafik area `Saldo kas per bulan`, `Omzet per produk` (Top 5), dan `Omzet per channel` (termasuk potongan aplikasi).

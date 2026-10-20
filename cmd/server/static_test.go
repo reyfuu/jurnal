@@ -13,10 +13,10 @@ func TestStaticCacheHeaders(t *testing.T) {
 	}
 	srv := NewServer()
 	for path, want := range map[string]string{
-		"/":                                    "no-cache",
-		"/laporan":                             "no-cache", // fallback SPA
+		"/":                                   "no-cache",
+		"/laporan":                            "no-cache", // fallback SPA
 		"/assets/" + filepath.Base(assets[0]): "public, max-age=31536000, immutable",
-		"/assets/tidak-ada.js":                 "no-cache", // jatuh ke index.html
+		"/assets/tidak-ada.js":                "no-cache", // jatuh ke index.html
 	} {
 		if got := do(srv, nil, http.MethodGet, path, "").Header().Get("Cache-Control"); got != want {
 			t.Errorf("%s: Cache-Control %q, want %q", path, got, want)

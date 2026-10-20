@@ -1,5 +1,5 @@
 # Functional Requirements Document (FRD)
-**Produk**: Laporan Bisnis by Akademi Pajak  
+**Produk**: Laporan Bisnis by Master Pajak  
 **Referensi Visual**: Desain Dashboard Laporan Bisnis (`Agustus 2026` — *Kedai Kopi Senja*)
 
 ---

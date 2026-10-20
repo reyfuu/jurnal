@@ -14,7 +14,7 @@ const FAQ = [
   ['Apakah saya perlu paham akuntansi?', 'Tidak. Anda cukup menjawab beberapa pertanyaan tentang usaha Anda. Daftar akun, laporan laba rugi, dan neraca disiapkan otomatis dari transaksi yang Anda catat.'],
   ['Bagaimana cara berlangganan?', 'Setelah daftar dan mengisi profil usaha, pilih paket bulanan atau tahunan lalu bayar lewat Midtrans. Semua fitur langsung aktif begitu pembayaran berhasil.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans. Anda bisa memilih metode yang tersedia di halaman pembayaran, seperti virtual account bank, QRIS, e-wallet, atau kartu.'],
-  ['Apakah hasil cek benchmark DJP itu resmi?', 'Bukan. Cek awal membandingkan margin usaha Anda dengan rentang indikatif usaha sejenis, untuk membantu Anda bersiap. Untuk keputusan pajak, tetap konsultasikan dengan konsultan pajak.'],
+  ['Dari mana angka benchmark DJP-nya?', 'Pembandingnya adalah rata-rata NPM dan CTTOR nasional per bidang usaha (KLU) dari buku sektoral DJP, data SPT tahun pajak 2020. Hasilnya acuan untuk bersiap, bukan nasihat pajak; untuk keputusan pajak tetap konsultasikan dengan konsultan pajak.'],
   ['Siapa saja yang bisa memakai akun saya?', 'Owner bisa menambah Admin Keuangan dan Kasir. Tiap peran hanya melihat menu yang sesuai, dan data tiap usaha terpisah dari usaha lain.'],
 ] as const
 
@@ -59,7 +59,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <BrandMark size={26} />
             <span className="leading-tight">
               <span className="block text-[15px] font-bold tracking-tight">Laporan Bisnis</span>
-              <span className="brand-sub block">by Akademi Pajak</span>
+              <span className="brand-sub block">by Master Pajak</span>
             </span>
           </a>
           <div className="hidden items-center gap-7 text-sm text-[var(--text-secondary)] md:flex">
@@ -134,7 +134,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <article className="overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-card)] md:col-span-2 md:row-span-2">
               <div className="p-7">
                 <h3 className="flex items-center gap-2 text-lg font-bold"><ShieldCheck className="size-5 text-[var(--accent-amber)]" aria-hidden="true" />Cek benchmark DJP & perencanaan pajak</h3>
-                <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-[var(--text-secondary)]">Margin usaha dibandingkan rasio usaha sejenis, risiko pemeriksaan ditandai, dan enam skema PPh dibandingkan untuk mencari yang paling hemat secara legal.</p>
+                <p className="mt-2 max-w-[56ch] text-sm leading-relaxed text-[var(--text-secondary)]">NPM dan CTTOR usaha dibandingkan rata-rata nasional DJP untuk bidang usaha Anda, risiko pemeriksaan ditandai, dan enam skema PPh dibandingkan.</p>
               </div>
               <img src="/landing/pajak.webp" width={1440} height={900} loading="lazy" alt="Halaman Perencanaan Pajak dengan cek benchmark DJP dan perbandingan skema pajak" className="ml-7 w-[calc(100%-1.75rem)] rounded-tl-xl border-l border-t border-white/10" />
             </article>
@@ -168,7 +168,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <ol className="grid gap-8">
               {[
                 ['Daftar akun', 'Cukup nama, email, dan password.'],
-                ['Kenalkan usaha Anda', 'Jawab pertanyaan sederhana: jenis usaha, lokasi, omzet, dan bentuk usaha. Kami siapkan daftar akun dan cek awal pajaknya.'],
+                ['Kenalkan usaha Anda', 'Jawab pertanyaan sederhana: jenis dan bidang usaha, lokasi, omzet, dan bentuk usaha. Kami siapkan daftar akun dan cek awal pajaknya.'],
                 ['Pilih paket & bayar', 'Bulanan atau tahunan, bayar lewat Midtrans: virtual account, QRIS, e-wallet, atau kartu.'],
                 ['Catat atau impor transaksi', 'Ketik langsung atau unggah Excel. Laporan dan dashboard langsung terisi.'],
               ].map(([judul, isi], i) => (
@@ -220,8 +220,8 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
 
       <footer className="border-t border-white/5">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-[var(--text-secondary)] md:flex-row md:items-center md:justify-between md:px-6">
-          <div className="flex items-center gap-2"><BrandMark size={18} /> Laporan Bisnis by Akademi Pajak</div>
-          <div>© {new Date().getFullYear()} Akademi Pajak</div>
+          <div className="flex items-center gap-2"><BrandMark size={18} /> Laporan Bisnis by Master Pajak</div>
+          <div>© {new Date().getFullYear()} Master Pajak</div>
         </div>
       </footer>
     </div>

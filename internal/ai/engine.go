@@ -85,7 +85,7 @@ func (e *Engine) answerSummary(snap finance.DashboardSnapshot, is finance.Income
 			"**2. Posisi Likuiditas & Kas:**\n"+
 			"- **Saldo Kas Akhir:** %s (Kenaikan kas bersih: Rp %s dari saldo awal Rp 80,0 jt)\n"+
 			"- **Rekonsiliasi Arus Kas:** Laba Bersih (%s) - Piutang Baru (%s) + Utang Baru (%s) = Kenaikan Kas (%s). **Status: Invarian 100%% Terpenuhi.**\n\n"+
-			"**3. Rekomendasi & Catatan Kritis Akademi Pajak:**\n"+
+			"**3. Rekomendasi & Catatan Kritis Master Pajak:**\n"+
 			"- **Piutang Tertahan:** Terdapat piutang ShopeePay sebesar Rp 11,0 jt yang sudah lewat 30 hari. Segera lakukan penagihan/rekonsiliasi ke kanal pembayaran.\n"+
 			"- **Pajak UMKM PP 55/2022:** Omzet kumulatif saat ini Rp 190,0 jt masih di bawah ambang batas bebas pajak Rp 500 jt. Pajak terutang bulan ini: **Rp 0 (Nihil)**.",
 		snap.PeriodLabel,
@@ -181,7 +181,7 @@ func (e *Engine) answerCashflow(snap finance.DashboardSnapshot, cf finance.CashF
 }
 
 func (e *Engine) answerPricing() QueryResponse {
-	answer := "### Rumus Simulasi Harga Jual & Komisi Aplikasi (Akademi Pajak)\n\n" +
+	answer := "### Rumus Simulasi Harga Jual & Komisi Aplikasi (Master Pajak)\n\n" +
 		"Banyak pengusaha UMKM keliru saat menghitung kenaikan harga untuk GoFood/GrabFood/ShopeeFood sehingga margin laba tergerus.\n\n" +
 		"**1. Rumus yang SALAH (Sering Dilakukan):**\n" +
 		"`Harga Online = Harga Dine-in + 20%` (salah)\n" +

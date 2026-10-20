@@ -31,6 +31,15 @@ func saveProfile(p string, prof finance.BusinessProfile) error {
 	return writeFileAtomic(p, prof)
 }
 
+// kluOptions: daftar KLU untuk picker onboarding, dengan jenis usaha untuk penyaringan.
+var kluOptions = func() []map[string]string {
+	out := make([]map[string]string, 0, len(tax.KLUBenchmarks))
+	for _, k := range tax.KLUBenchmarks {
+		out = append(out, map[string]string{"kode": k.Kode, "nama": k.Nama, "jenis": tax.JenisKLU(k.Kode)})
+	}
+	return out
+}()
+
 func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	prof := s.profile
@@ -43,6 +52,7 @@ func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 			"ptkp":              tax.PTKPCodes,
 			"metode_persediaan": finance.MetodePersediaanOptions,
 			"provinsi":          finance.ProvinsiOptions,
+			"klu":               kluOptions,
 		},
 	})
 }

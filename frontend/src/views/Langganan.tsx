@@ -85,7 +85,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
         <p className="mt-1 text-sm text-muted-foreground">{statusText(b.langganan)}</p>
       </div>
 
-      {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Akademi Pajak untuk aktivasi.</p>}
+      {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Master Pajak untuk aktivasi.</p>}
       <div className="grid gap-4 sm:grid-cols-2" style={{ maxWidth: 880 }}>
         {b.paket.map((p) => (
           <div key={p.id} className="card grid gap-3" style={{ padding: 22, justifyContent: 'stretch' }}>
