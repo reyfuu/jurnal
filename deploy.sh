@@ -8,6 +8,8 @@ APP_PORT="${1:-8085}"
 # Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
 # MIDTRANS_SERVER_KEY / MIDTRANS_CLIENT_KEY (opsional, di .env): pembayaran langganan;
 # MIDTRANS_PRODUCTION=true untuk akun produksi (default sandbox).
+# LLM_API_KEY (+ LLM_BASE_URL & LLM_MODEL bila bukan OpenAI, opsional, di .env): mengaktifkan
+# Laporan AI, chat AI, analisa klien, dan saran bidang usaha. Kosong = fitur AI mati.
 # MASTER_EMAIL + MASTER_PASSWORD (opsional, di .env): membuat akun Master pertama Panel Master
 # sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
@@ -59,6 +61,10 @@ docker run -d \
   -e MIDTRANS_PRODUCTION="${MIDTRANS_PRODUCTION:-false}" \
   -e MASTER_EMAIL="${MASTER_EMAIL:-}" \
   -e MASTER_PASSWORD="${MASTER_PASSWORD:-}" \
+  -e LLM_API_KEY="${LLM_API_KEY:-}" \
+  -e LLM_BASE_URL="${LLM_BASE_URL:-}" \
+  -e LLM_MODEL="${LLM_MODEL:-}" \
+  -e LLM_TIMEOUT="${LLM_TIMEOUT:-}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   "$IMAGE_NAME"
