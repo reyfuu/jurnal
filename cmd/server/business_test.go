@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
+	"pajak/internal/finance"
 	"pajak/internal/tax"
 )
 
@@ -72,5 +74,29 @@ func TestTaxPlanningEndpoint(t *testing.T) {
 	}
 	if rec := do(srv, login(t, srv, "kasir@kedaikopisenja.id"), http.MethodPost, "/api/v1/tax/planning", `{}`); rec.Code != http.StatusForbidden {
 		t.Fatalf("kasir must get 403, got %d", rec.Code)
+	}
+}
+
+func TestWilayahEndpoint(t *testing.T) {
+	srv := NewServer()
+	if c := do(srv, nil, http.MethodGet, "/api/v1/wilayah?provinsi=Bali", "").Code; c != http.StatusUnauthorized {
+		t.Fatalf("tanpa login: want 401, got %d", c)
+	}
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	var kota []finance.Kota
+	rec := do(srv, owner, http.MethodGet, "/api/v1/wilayah?provinsi=Jawa+Barat", "")
+	if err := json.NewDecoder(rec.Body).Decode(&kota); err != nil || rec.Code != http.StatusOK || len(kota) != 27 {
+		t.Fatalf("Jawa Barat: %d %d kab/kota %v", rec.Code, len(kota), err)
+	}
+	if c := do(srv, owner, http.MethodGet, "/api/v1/wilayah?provinsi=Atlantis", "").Code; c != http.StatusBadRequest {
+		t.Fatalf("provinsi asing: want 400, got %d", c)
+	}
+	bad := `{"nama_usaha":"X","jenis_usaha":"jasa","bentuk_usaha":"op","ptkp":"K/1","provinsi":"Jawa Barat","kota":"Kota Bandung","kecamatan":"Kebayoran Baru"}`
+	if c := do(srv, owner, http.MethodPut, "/api/v1/business", bad).Code; c != http.StatusBadRequest {
+		t.Fatalf("kecamatan bukan di kota itu: want 400, got %d", c)
+	}
+	good := strings.Replace(bad, "Kebayoran Baru", "Sukasari", 1)
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", good); rec.Code != http.StatusOK {
+		t.Fatalf("wilayah valid: %d %s", rec.Code, rec.Body)
 	}
 }
