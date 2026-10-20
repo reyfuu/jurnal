@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, UserCheck, UserX } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { HapusPermanenDialog } from './KelolaDialog'
+import { HapusPermanenDialog, KonfirmasiDialog } from './KelolaDialog'
 import { getTim, hapusAnggotaTim, hapusRole, simpanRole, tambahAnggota, ubahAnggota, type AnggotaRow, type Izin, type MasterRole, type TimData } from '@/lib/api'
 import { formatRelatif } from '@/lib/format'
 
@@ -15,6 +15,7 @@ type Form = { id: number | null; nama: string; email: string; password: string; 
 
 export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boolean }) {
   const [hapus, setHapus] = useState<AnggotaRow | null>(null)
+  const [nonaktif, setNonaktif] = useState<AnggotaRow | null>(null)
   const [tim, setTim] = useState<TimData | null>(null)
   const [tab, setTab] = useState<'anggota' | 'role'>('anggota')
   const [form, setForm] = useState<Form | null>(null)
@@ -52,6 +53,7 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
   const toggleIzin = (r: MasterRole, i: Izin) =>
     void jalankan(() => simpanRole({ id: r.id, nama: r.nama, izin: r.izin.includes(i) ? r.izin.filter((x) => x !== i) : [...r.izin, i] }))
 
+  const setAktif = (a: AnggotaRow, aktif: boolean) => ubahAnggota(a.user.id, { role: a.role, klien: a.klien, aktif })
   const set = (p: Partial<Form>) => setForm((f) => f && { ...f, ...p })
   const edit = (a: AnggotaRow) => { setError(''); setForm({ id: a.user.id, nama: a.user.name, email: a.user.email, password: '', role: a.role, klien: a.klien, aktif: a.user.active }) }
 
@@ -87,10 +89,13 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
                     <td className="text-sm">{lihatSemua(a.role) ? <span className="text-muted-foreground">Semua klien</span>
                       : a.klien.map((id) => tim.klien.find((k) => k.id === id)?.nama ?? `#${id}`).join(', ') || <span className="text-muted-foreground">Belum ada</span>}</td>
                     <td>{formatRelatif(a.user.last_seen)}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Ubah ${a.user.name}`} onClick={() => edit(a)}><Pencil /></Button>
-                      {bisaHapus && !a.user.active && a.user.id !== selfId && (
-                        <Button variant="ghost" size="icon-sm" aria-label={`Hapus permanen ${a.user.name}`} onClick={() => setHapus(a)}><Trash2 /></Button>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <Button variant="ghost" size="icon-sm" aria-label={`Ubah ${a.user.name}`} title="Ubah role & klien" onClick={() => edit(a)}><Pencil /></Button>
+                      {a.user.id !== selfId && (a.user.active
+                        ? <Button variant="ghost" size="sm" title="Soft delete: tidak bisa masuk, data tetap" onClick={() => setNonaktif(a)}><UserX /> Nonaktifkan</Button>
+                        : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void jalankan(() => setAktif(a, true))}><UserCheck /> Aktifkan</Button>)}
+                      {bisaHapus && a.user.id !== selfId && (
+                        <Button variant="ghost" size="sm" className="text-destructive" title="Hard delete: hapus permanen" onClick={() => setHapus(a)}><Trash2 /> Hapus</Button>
                       )}
                     </td>
                   </tr>
@@ -218,8 +223,17 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
       </Dialog>
       {hapus && (
         <HapusPermanenDialog open onClose={() => setHapus(null)} judul={`Hapus permanen ${hapus.user.name}`}
-          teks="Akun anggota tim ini dan penugasannya dihapus. Catatan audit yang dibuatnya tetap tersimpan." kunci={hapus.user.email} labelKunci="email anggota"
-          onHapus={async (k) => { await hapusAnggotaTim(hapus.user.id, k); setHapus(null); await muat() }} />
+          teks={(hapus.user.active ? 'Akun ini masih aktif; akan dinonaktifkan dulu lalu dihapus. ' : '') + 'Akun anggota tim ini dan penugasannya dihapus. Catatan audit yang dibuatnya tetap tersimpan.'}
+          kunci={hapus.user.email} labelKunci="email anggota"
+          onHapus={async (k) => {
+            if (hapus.user.active) await setAktif(hapus, false)
+            await hapusAnggotaTim(hapus.user.id, k); setHapus(null); await muat()
+          }} />
+      )}
+      {nonaktif && (
+        <KonfirmasiDialog open onClose={() => setNonaktif(null)} judul={`Nonaktifkan ${nonaktif.user.name}?`} tombol="Nonaktifkan"
+          teks="Soft delete: anggota tidak bisa masuk lagi dan sesinya berakhir, tetapi akun, penugasan, dan catatan audit tetap tersimpan. Bisa diaktifkan kembali kapan saja."
+          onYa={async () => { await setAktif(nonaktif, false); setNonaktif(null); await muat() }} />
       )}
     </>
   )

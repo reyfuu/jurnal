@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { KeyRound, Pencil, Trash2 } from 'lucide-react'
+import { KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { getPenggunaKlien, hapusPenggunaKlien, resetPasswordKlien, ubahPenggunaKlien, type PenggunaKlien } from '@/lib/api'
 import { formatRelatif } from '@/lib/format'
-import { HapusPermanenDialog } from './KelolaDialog'
+import { HapusPermanenDialog, KonfirmasiDialog } from './KelolaDialog'
 
 // Pengguna klien: semua akun usaha (bukan tim) yang boleh dilihat anggota — kontak, usaha, status.
 // Nonaktif = soft delete (bisa diaktifkan lagi); hapus permanen hanya untuk akun nonaktif.
@@ -22,6 +22,7 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
   const [saring, setSaring] = useState<Saring>('semua')
   const [edit, setEdit] = useState<PenggunaKlien | null>(null)
   const [hapus, setHapus] = useState<PenggunaKlien | null>(null)
+  const [nonaktif, setNonaktif] = useState<PenggunaKlien | null>(null)
   const [reset, setReset] = useState<{ u: PenggunaKlien; pw?: string } | null>(null)
   const muat = useCallback(() => getPenggunaKlien().then(setRows, (e: Error) => setError(e.message)), [])
   useEffect(() => { void muat() }, [muat])
@@ -29,6 +30,8 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
   const tampil = useMemo(() => (rows ?? []).filter((u) =>
     (saring === 'semua' || (saring === 'aktif') === u.active) &&
     [u.name, u.email, u.wa, u.usaha, u.kota].join(' ').toLowerCase().includes(q.trim().toLowerCase())), [rows, q, saring])
+
+  const setAktif = (u: PenggunaKlien, aktif: boolean) => ubahPenggunaKlien(u.id, { name: u.name, email: u.email, wa: u.wa ?? '', aktif })
 
   async function jalankanReset(u: PenggunaKlien) {
     try {
@@ -54,7 +57,7 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
           <Input aria-label="Cari pengguna" placeholder="Cari nama, email, no HP, usaha" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280, marginLeft: 'auto' }} />
         </div>
         <div className="table-scroll">
-          <table className="data-table" style={{ minWidth: 980 }}>
+          <table className="data-table" style={{ minWidth: 1180 }}>
             <thead><tr><th>Nama</th><th>No HP</th><th>Usaha</th><th>Alamat usaha</th><th>Role</th><th>Status</th><th>Terakhir aktif</th><th style={{ textAlign: 'right' }}>Aksi</th></tr></thead>
             <tbody>
               {tampil.map((u) => (
@@ -69,7 +72,10 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {bisaKelola && <Button variant="ghost" size="icon-sm" aria-label={`Ubah ${u.name}`} onClick={() => setEdit(u)}><Pencil /></Button>}
                     {bisaReset && <Button variant="ghost" size="icon-sm" aria-label={`Reset password ${u.name}`} title="Reset password" onClick={() => setReset({ u })}><KeyRound /></Button>}
-                    {bisaHapus && !u.active && <Button variant="ghost" size="icon-sm" aria-label={`Hapus permanen ${u.name}`} onClick={() => setHapus(u)}><Trash2 /></Button>}
+                    {bisaKelola && (u.active
+                      ? <Button variant="ghost" size="sm" title="Soft delete: tidak bisa masuk, data tetap" onClick={() => setNonaktif(u)}><UserX /> Nonaktifkan</Button>
+                      : <Button variant="ghost" size="sm" onClick={() => void setAktif(u, true).then(muat, (e: Error) => setError(e.message))}><UserCheck /> Aktifkan</Button>)}
+                    {bisaHapus && <Button variant="ghost" size="sm" className="text-destructive" title="Hard delete: hapus permanen" onClick={() => setHapus(u)}><Trash2 /> Hapus</Button>}
                   </td>
                 </tr>
               ))}
@@ -77,7 +83,7 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">Nonaktifkan = pengguna tidak bisa masuk, data tetap. Hapus permanen hanya untuk akun yang sudah nonaktif. Semua tindakan tercatat di audit log.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Nonaktifkan (soft delete) = pengguna tidak bisa masuk, data tetap, bisa diaktifkan lagi. Hapus (hard delete) = akun dihapus permanen; akun aktif dinonaktifkan dulu otomatis. Semua tindakan tercatat di audit log.</p>
       </div>
 
       {edit && <EditPengguna u={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void muat() }} />}
@@ -105,8 +111,17 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
 
       {hapus && (
         <HapusPermanenDialog open onClose={() => setHapus(null)} judul={`Hapus permanen ${hapus.name}`}
-          teks="Akun pengguna ini dihapus dari database. Data usahanya tetap ada." kunci={hapus.email} labelKunci="email pengguna"
-          onHapus={async (k) => { await hapusPenggunaKlien(hapus.id, k); setHapus(null); await muat() }} />
+          teks={(hapus.active ? 'Akun ini masih aktif; akan dinonaktifkan dulu lalu dihapus. ' : '') + 'Akun pengguna ini dihapus dari database. Data usahanya tetap ada.'}
+          kunci={hapus.email} labelKunci="email pengguna"
+          onHapus={async (k) => {
+            if (hapus.active) await setAktif(hapus, false)
+            await hapusPenggunaKlien(hapus.id, k); setHapus(null); await muat()
+          }} />
+      )}
+      {nonaktif && (
+        <KonfirmasiDialog open onClose={() => setNonaktif(null)} judul={`Nonaktifkan ${nonaktif.name}?`} tombol="Nonaktifkan"
+          teks="Soft delete: pengguna tidak bisa masuk lagi dan sesinya berakhir, tetapi akun dan data usahanya tetap tersimpan. Bisa diaktifkan kembali kapan saja."
+          onYa={async () => { await setAktif(nonaktif, false); setNonaktif(null); await muat() }} />
       )}
     </>
   )
