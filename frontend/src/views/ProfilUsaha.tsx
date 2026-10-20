@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { BrandMark } from '@/components/Sidebar'
+import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { PageHeader } from '@/components/PageHeader'
@@ -189,6 +189,21 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
         </div>
       )}
       <div className="grid gap-1.5">
+        <Label>Metode penyusutan aset</Label>
+        {info.profile?.metode_penyusutan ? (
+          <p className="text-sm">
+            <b>{info.options.metode_penyusutan.find((o) => o.value === info.profile!.metode_penyusutan)?.label}</b> untuk semua aset
+            (bangunan tetap garis lurus). <span className="text-muted-foreground">Sudah dikunci; perubahan metode memerlukan persetujuan DJP.</span>
+          </p>
+        ) : (
+          <>
+            <ChoiceGrid name="Metode penyusutan" options={info.options.metode_penyusutan} value={p.metode_penyusutan ?? ''}
+              onChange={(v) => set({ metode_penyusutan: v as BusinessProfile['metode_penyusutan'] })} />
+            <p className="text-xs" style={{ color: 'var(--text-warn)' }}>Berlaku untuk semua aset dan tidak bisa diubah setelah disimpan.</p>
+          </>
+        )}
+      </div>
+      <div className="grid gap-1.5">
         <Label>Bentuk usaha</Label>
         <ChoiceGrid name="Bentuk usaha" options={info.options.bentuk_usaha} value={p.bentuk_usaha} onChange={(v) => set({ bentuk_usaha: v as BentukUsaha })} />
       </div>
@@ -233,7 +248,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
 
       <FakturFields p={p} set={set} />
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <Button type="submit" size="lg" className="rounded-full font-bold" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
+      <Button type="submit" size="lg" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
     </form>
   )
 }
@@ -363,13 +378,7 @@ export function OnboardingShell({ onLogout, labelledBy, children }: { onLogout: 
     <main className="onboarding-page">
       <div className="onboarding-shell">
         <header className="onboarding-brand dark">
-          <div className="flex items-center gap-2.5">
-            <BrandMark size={28} />
-            <div>
-              <div className="text-base font-bold tracking-tight">Laporan Bisnis</div>
-              <div className="brand-sub">by Master Pajak</div>
-            </div>
-          </div>
+          <Logo tinggi={28} />
           <div className="flex items-center gap-1">
             <ThemeToggle className="nav-item size-11 justify-center p-0 text-muted-foreground" />
             <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={onLogout}>Keluar</Button>

@@ -13,7 +13,7 @@ import (
 	"pajak/internal/master"
 )
 
-// Usulan koreksi: tim MasterPajak mengusulkan ubah/hapus transaksi klien; pemilik usaha yang
+// Usulan koreksi: tim Master Pajak mengusulkan ubah/hapus transaksi klien; pemilik usaha yang
 // memutuskan. Pembukuan baru berubah setelah disetujui (finance.TerapkanKoreksi).
 
 type koreksiRow struct {
@@ -86,7 +86,7 @@ func (s *Server) handleUsulKoreksi(w http.ResponseWriter, r *http.Request) {
 // handleMasterKoreksi: semua usulan di klien yang boleh dilihat anggota, terbaru dulu.
 func (s *Server) handleMasterKoreksi(w http.ResponseWriter, r *http.Request) {
 	out := []koreksiRow{}
-	for _, k := range s.klienRows(aksesOf(r), time.Now()) {
+	for _, k := range s.klienRows(aksesOf(r), time.Now(), false) { // koreksi hanya butuh ID usaha
 		s.tenantsMu.RLock()
 		t := s.tenants[k.ID]
 		s.tenantsMu.RUnlock()

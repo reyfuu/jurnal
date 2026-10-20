@@ -26,7 +26,7 @@ const EMPTY: TxInput = {
 
 type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
 
-/** lihat: tim MasterPajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
+/** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
 export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean } }) {
   const [txs, setTxs] = useState<Tx[]>([])
@@ -196,7 +196,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
       </div>
 
       <div className="tx-note">
-        <Info size={15} className="shrink-0" style={{ color: 'var(--accent-amber)', marginTop: 1 }} />
+        <Info size={15} className="shrink-0" style={{ color: 'var(--link)', marginTop: 1 }} />
         <span>
           Angka di sini menurut <b>tanggal transaksi</b>, semua jenis. Omzet di Dashboard dan Laporan Keuangan = Penjualan saja; biaya di sana = modal
           bahan &amp; biaya. Kas masuk/keluar di Arus Kas hanya menghitung yang sudah <b>lunas</b>, jadi beda kalau ada yang belum dibayar.
@@ -230,7 +230,7 @@ export function Transaksi({ onChanged, lihat }: { onChanged: () => Promise<void>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
                     {coa?.supported && (
-                      <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-warn)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
+                      <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-brand)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
                     )}
                     <td>
                       <div style={{ fontWeight: 500 }}>{t.keterangan || '-'}</div>

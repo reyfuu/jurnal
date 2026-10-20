@@ -434,7 +434,7 @@ export function ProduksiSupplier() {
                       ) : p.selisih === 0 ? (
                         <span className="pill-status pill-green" style={{ fontSize: 10 }}>Sama ({formatRp(p.hpp_stok)})</span>
                       ) : (
-                        <button className="nav-item" style={{ ...aksiBtn, color: AMBER }} onClick={() => void pakaiHPP(p)}>
+                        <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)' }} onClick={() => void pakaiHPP(p)}>
                           Stok {formatRp(p.hpp_stok)} — pakai HPP resep
                         </button>
                       )}

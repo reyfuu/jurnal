@@ -6,7 +6,7 @@ import {
 } from '@/lib/api'
 import { Dua, Hasil, Uang } from '@/components/KalkulatorUI'
 import { formatRp } from '@/lib/format'
-import { AMBER, GREEN, RED, persen } from '@/lib/kalkulator'
+import { GREEN, RED, SOROT, persen } from '@/lib/kalkulator'
 import { FormBeliSewa, FormGrossUp, FormNPPN, FormPPNHarga } from './KalkulatorRencana'
 
 type TabID = 'pph21' | 'pph-badan' | string
@@ -41,8 +41,8 @@ export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }
 
       <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          <span style={{ color: AMBER, fontWeight: 600 }}>Alat bantu, bukan pengganti konsultan.</span>{' '}
-          Tarif mengikuti parameter pajak yang dikelola tim MasterPajak dan setiap objek mencantumkan rujukan aturannya.
+          <span style={{ color: 'var(--text-warn)', fontWeight: 600 }}>Alat bantu, bukan pengganti konsultan.</span>{' '}
+          Tarif mengikuti parameter pajak yang dikelola tim Master Pajak dan setiap objek mencantumkan rujukan aturannya.
           Minta tim pajak memverifikasi baris yang relevan sebelum dipakai untuk SPT.
         </div>
       </div>
@@ -130,7 +130,7 @@ function FormPPh21({ m }: { m: KalkulatorMaster }) {
         <>
           <Hasil
             utama={[
-              { label: 'PPh 21 sebulan', v: r.hasil.pph_sebulan, warna: AMBER },
+              { label: 'PPh 21 sebulan', v: r.hasil.pph_sebulan, warna: SOROT },
               { label: 'PPh 21 setahun', v: r.hasil.pph_setahun },
               { label: 'Take home sebulan', v: r.hasil.take_home_sebulan, warna: GREEN },
             ]}
@@ -221,7 +221,7 @@ export function FormPotong({ jenis }: { jenis: KalkulatorMaster['jenis'][number]
           <Hasil
             utama={[
               { label: 'Dasar pengenaan pajak', v: r.dpp },
-              { label: `Pajak (${persen(r.tarif_bps)})`, v: r.pajak, warna: AMBER },
+              { label: `Pajak (${persen(r.tarif_bps)})`, v: r.pajak, warna: SOROT },
               { label: 'Diterima setelah potong', v: r.diterima, warna: GREEN },
             ]}
             langkah={r.langkah}
@@ -276,7 +276,7 @@ export function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
         <>
           <Hasil
             utama={[
-              { label: 'PPh badan terutang', v: r.pph_terutang, warna: AMBER },
+              { label: 'PPh badan terutang', v: r.pph_terutang, warna: SOROT },
               { label: 'Tarif efektif', v: r.pkp > 0 ? Math.round((r.pph_terutang / r.pkp) * 10000) / 100 : 0, persen: true },
             ]}
             langkah={r.langkah}

@@ -211,7 +211,7 @@ func (s *Server) saveAll() {
 		}
 	}
 	if err := saveMasterDB(s.db, s.master, s.master.Audit); err != nil {
-		log.Fatalf("impor tim MasterPajak: %v", err)
+		log.Fatalf("impor tim Master Pajak: %v", err)
 	}
 	if err := saveKatalogDB(s.db, s.katalog); err != nil {
 		log.Fatalf("impor katalog: %v", err)

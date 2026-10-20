@@ -1,4 +1,4 @@
-# Design Brief — Laporan Bisnis by Master Pajak
+# Design Brief — Master Pajak
 
 > Dokumen ringkas ini mendampingi [BRD.md](file:///home/reyfuu/pajak/docs/BRD.md), [FRD.md](file:///home/reyfuu/pajak/docs/FRD.md), [TRD.md](file:///home/reyfuu/pajak/docs/TRD.md), dan [PRD.md](file:///home/reyfuu/pajak/docs/PRD.md). Spesifikasi sistem desain teknis lengkap tersedia di [DESIGN.md](file:///home/reyfuu/pajak/DESIGN.md).
 
@@ -34,8 +34,8 @@
 ---
 
 ## 4. Aturan Implementasi Komponen (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
-- Warna utama brand: **navy `#222852`** (keputusan pengguna, 19 Oktober 2026), dengan aksen emas `#F5C428` / `#EAB308`. Navy tampil pada login, onboarding, sidebar, favicon, dan tema browser; teks tombol emas memakai navy. Teks sekunder sidebar `#BFC5D8` dan muted `#AAB1CA`. Detail penggunaan ada di `DESIGN.md` §2.
-- Gunakan primitif `Card`, `Badge`, `Select`, dan `Tooltip` dari **`shadcn/ui`** yang dikustomisasi ke palet *Dark Obsidian* (`#0F1115` / `#161920`).
+- Brand mengikuti **Brand Guideline Master Pajak v1.0** (Oktober 2026, `docs/brand/`): logo M dua warna + wordmark `masterpajak`, Biru DJP `#212C5F` sebagai primer, kuning `#FED111` sebagai aksen maks. 3%, font Rubik + Public Sans, tema terang default. Detail token di `DESIGN.md` §2–3.
+- Gunakan primitif `Card`, `Badge`, `Select`, dan `Tooltip` dari **`shadcn/ui`** yang memakai token brand di `frontend/src/index.css`.
 - Gunakan pola kartu finansial dari **`Kokonut UI`** dan transisi halus dari **`21st.dev`**.
 - Pastikan semua nominal dan persentase memakai `font-variant-numeric: tabular-nums`.
 

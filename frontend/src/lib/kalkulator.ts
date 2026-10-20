@@ -13,3 +13,4 @@ export const keBps = (s: string) => Math.round(parseFloat((s || '0').replace(','
 const IBUKOTA10 = ['medan', 'palembang', 'jakarta', 'bandung', 'semarang', 'surabaya', 'denpasar', 'manado', 'makassar', 'pontianak']
 export const wilayahDariKota = (kota?: string) =>
   kota && IBUKOTA10.some((k) => kota.toLowerCase().includes(k)) ? 'ibukota10' : ''
+export const SOROT = 'var(--text-brand)'

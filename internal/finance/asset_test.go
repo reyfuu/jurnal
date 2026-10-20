@@ -222,3 +222,47 @@ func TestAssetsForPeriod_DraftDariTransaksi(t *testing.T) {
 		t.Fatalf("aset lengkap: %d aset / %d draft / beban %d", len(as.Assets), as.DraftCount, as.BebanPenyusutan)
 	}
 }
+
+func TestMetodeUsaha_SemuaAsetIkutKecualiBangunan(t *testing.T) {
+	as := finance.SeedAssets()
+	finance.TerapkanMetode(as, finance.MetodeSaldoMenurun)
+	for _, a := range as {
+		want := finance.MetodeSaldoMenurun
+		if a.Kelompok == "bangunan_tidak_permanen" {
+			want = finance.MetodeGarisLurus // PMK 72/2023: bangunan hanya garis lurus
+		}
+		if a.Metode != want {
+			t.Errorf("%s: metode %s, want %s", a.Nama, a.Metode, want)
+		}
+	}
+	finance.TerapkanMetode(as, "") // belum dipilih: metode per aset dibiarkan
+	if as[0].Metode != finance.MetodeSaldoMenurun {
+		t.Error("metode kosong mengubah aset")
+	}
+}
+
+func TestMetodeSeragam(t *testing.T) {
+	as := finance.SeedAssets() // espresso saldo menurun, sisanya garis lurus
+	if m, ok := finance.MetodeSeragam(as); ok || m != "" {
+		t.Errorf("seed campur: %q %v", m, ok)
+	}
+	as[0].Metode = finance.MetodeGarisLurus
+	if m, ok := finance.MetodeSeragam(as); !ok || m != finance.MetodeGarisLurus {
+		t.Errorf("seragam garis lurus: %q %v", m, ok)
+	}
+	// bangunan & draft tidak ikut menentukan; tanpa aset lain = belum ada pilihan
+	if m, ok := finance.MetodeSeragam([]finance.Asset{as[4], {Nama: "draft"}}); !ok || m != "" {
+		t.Errorf("hanya bangunan/draft: %q %v", m, ok)
+	}
+}
+
+func TestProfil_MetodePenyusutanValid(t *testing.T) {
+	p := finance.BusinessProfile{NamaUsaha: "A", JenisUsaha: "jasa", BentukUsaha: "pt", MetodePenyusutan: "cepat"}
+	if err := p.Validate(); err == nil {
+		t.Fatal("metode ngawur diterima")
+	}
+	p.MetodePenyusutan = finance.MetodeSaldoMenurun
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

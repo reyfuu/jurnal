@@ -40,7 +40,7 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
         <div className="card" style={{ padding: 20, borderColor: 'var(--accent-amber)' }} role="status">
           <div className="chart-title">Versi baru daftar akun tersedia (v{p.versi})</div>
           <p className="text-sm text-muted-foreground" style={{ marginTop: 4 }}>
-            Tim MasterPajak memperbarui template. Usaha Anda masih memakai v{c?.template?.versi} sampai Anda menerapkan versi baru.
+            Tim Master Pajak memperbarui template. Usaha Anda masih memakai v{c?.template?.versi} sampai Anda menerapkan versi baru.
           </p>
           <ul className="text-sm" style={{ margin: '10px 0', display: 'grid', gap: 4 }}>
             {p.diff.tambah.map((a) => <li key={'t' + a.kode}><span style={{ color: 'var(--accent-green)' }}>+ Akun baru</span> {a.kode} {a.nama}</li>)}

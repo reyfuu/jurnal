@@ -246,7 +246,7 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	o := order{ID: fmt.Sprintf("LB-%d-%d", t.id, time.Now().UnixNano()), Paket: p.ID, Jumlah: p.Harga, Status: "pending", Waktu: time.Now()}
 	snap, err := mt.CreateSnap(r.Context(), midtrans.SnapRequest{
 		OrderID: o.ID, Amount: p.Harga, Name: u.Name, Email: u.Email,
-		Items: []midtrans.Item{{ID: p.ID, Price: p.Harga, Quantity: 1, Name: "Laporan Bisnis " + p.Nama}},
+		Items: []midtrans.Item{{ID: p.ID, Price: p.Harga, Quantity: 1, Name: "Master Pajak " + p.Nama}},
 	})
 	if err != nil {
 		log.Printf("midtrans checkout %s: %v", o.ID, err)

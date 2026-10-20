@@ -59,7 +59,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
           aria-controls={listId}
           data-placeholder={selected ? undefined : ""}
           className={cn(
-            "flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50",
+            "flex h-10 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-[var(--bg-input)] py-2 pr-2.5 pl-3 text-left text-sm transition-colors outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-foreground",
             className
           )}
         >
@@ -71,7 +71,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
         <PopoverPrimitive.Content
           align="start"
           sideOffset={4}
-          className="z-50 w-(--radix-popover-trigger-width) min-w-56 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+          className="z-50 w-(--radix-popover-trigger-width) min-w-56 rounded-lg bg-popover p-1 text-popover-foreground shadow-[var(--shadow-2)] ring-1 ring-[var(--border-subtle)]"
         >
           <input
             autoFocus
@@ -82,7 +82,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
             aria-label={searchPlaceholder}
             aria-controls={listId}
             aria-activedescendant={shown[active] ? `${listId}-${active}` : undefined}
-            className="mb-1 h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring"
+            className="mb-1 h-9 w-full rounded-md border border-input bg-[var(--bg-input)] px-2.5 text-sm outline-none focus-visible:border-primary"
           />
           <div id={listId} role="listbox" className="max-h-64 overflow-y-auto">
             {shown.length === 0 && <p className="px-2.5 py-2 text-sm text-muted-foreground">{empty}</p>}

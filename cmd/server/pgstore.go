@@ -386,7 +386,7 @@ func (s *Server) loadDB() (ok bool, err error) {
 	s.users = auth.Restore(snap)
 	s.bugs = &bugStore{path: dataPath("bugs.json"), mem: map[string][]byte{}}
 	if s.master, err = loadMasterDB(s.db); err != nil {
-		return false, fmt.Errorf("tim MasterPajak: %w", err)
+		return false, fmt.Errorf("tim Master Pajak: %w", err)
 	}
 	if s.katalog, err = loadKatalogDB(s.db); err != nil {
 		return false, fmt.Errorf("katalog: %w", err)

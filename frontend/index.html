@@ -1,18 +1,18 @@
 <!doctype html>
-<html lang="id" class="dark">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#222852" />
+    <meta name="theme-color" content="#212c5f" />
     <script>
-      // Pasang tema sebelum render (lib/theme.ts): default gelap, terang bila dipilih.
-      try { if (localStorage.getItem('tema') === 'terang') document.documentElement.classList.remove('dark') } catch {}
+      // Pasang tema sebelum render (lib/theme.ts): default terang, gelap bila dipilih.
+      try { if (localStorage.getItem('tema') === 'gelap') document.documentElement.classList.add('dark') } catch {}
     </script>
-    <title>Laporan Bisnis — by Master Pajak</title>
+    <title>Master Pajak — Jualan lancar, pajak beres.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=Rubik:wght@500;700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

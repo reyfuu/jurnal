@@ -9,7 +9,7 @@ import (
 	"pajak/internal/finance"
 )
 
-// Template COA yang dikelola tim MasterPajak (per jenis usaha, berversi) harus tetap bisa dipakai
+// Template COA yang dikelola tim Master Pajak (per jenis usaha, berversi) harus tetap bisa dipakai
 // jurnal otomatis: semua kode yang ditulis langsung di jurnal & laporan wajib ada.
 
 var ErrTemplate = errors.New("template COA tidak valid")

@@ -12,7 +12,7 @@ const STATUS: Record<CekAwal['status'], { label: string; color: string }> = {
 }
 const LEVEL: Record<CekAwal['risiko'][number]['level'], { label: string; color: string }> = {
   tinggi: { label: 'Risiko tinggi', color: 'var(--accent-red)' },
-  sedang: { label: 'Perlu dipertimbangkan', color: 'var(--accent-amber-bright)' },
+  sedang: { label: 'Perlu dipertimbangkan', color: 'var(--accent-orange)' },
   info: { label: 'Info', color: 'var(--text-secondary)' },
 }
 

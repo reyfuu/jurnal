@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 	screenshot TEXT -- nama berkas di $DATA_DIR/bugs/
 );
 
--- Panel Master (Okt 2026): aktivitas user, status & balasan tiket, tim MasterPajak.
+-- Panel Master (Okt 2026): aktivitas user, status & balasan tiket, tim Master Pajak.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS status TEXT;
 ALTER TABLE bug_reports ADD COLUMN IF NOT EXISTS balasan JSONB;
@@ -380,3 +380,6 @@ CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE s
 	), '[]'::jsonb)
 	FROM jsonb_array_elements(rows) AS e
 $$;
+
+-- Metode penyusutan usaha (Okt 2026): dipilih sekali untuk semua aset, lalu terkunci.
+ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS metode_penyusutan TEXT;

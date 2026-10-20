@@ -10,7 +10,7 @@ import (
 )
 
 // Parameter: semua angka aturan pajak yang dipakai kalkulator, perencanaan pajak, dan laporan
-// PPh final. Versi aktif dikelola tim MasterPajak di Panel Master (katalog, draft → aktif →
+// PPh final. Versi aktif dikelola tim Master Pajak di Panel Master (katalog, draft → aktif →
 // arsip); bawaan = ParameterBawaan(). Nilai Rupiah bulat, tarif dalam basis poin.
 type Parameter struct {
 	PTKP    map[string]int64 `json:"ptkp"`

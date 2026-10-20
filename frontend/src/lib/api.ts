@@ -7,9 +7,9 @@ export type View =
   | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
-  | 'panel-master' // akun tim MasterPajak: seluruh aplikasi diganti Panel Master
-  | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim MasterPajak
-  | 'pustaka' // artikel pajak dari tim MasterPajak
+  | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
+  | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim Master Pajak
+  | 'pustaka' // artikel pajak dari tim Master Pajak
 
 export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
@@ -32,7 +32,7 @@ export interface Me {
   views: View[]
   langganan: LanggananStatus
   garansi: GaransiStatus
-  /** Hanya akun tim MasterPajak: role tim dan izin efektifnya. */
+  /** Hanya akun tim Master Pajak: role tim dan izin efektifnya. */
   master?: MasterMe
   /** Akun tim yang sedang "lihat sebagai klien": views berisi menu klien versi baca. */
   lihat?: { klien_id: number; nama: string; alasan: string; sampai: string }
@@ -283,6 +283,8 @@ export interface PriceSim {
 export interface PriceSimInput {
   cogs: number
   targetProfit: number
+  /** > 0: harga dihitung dari margin yang diinginkan (persen), targetProfit diabaikan. */
+  marginPct?: number
   feePct: number
   fixedCost?: number // kosong = beban operasional periode berjalan
   monthlyVolume: number
@@ -417,12 +419,20 @@ export interface AssetSummary {
   draft_count: number
   /** Jumlah baris pemetaan jenis harta yang belum diverifikasi ke Lampiran PMK. */
   pemetaan_belum_dicek: number
+  /** Metode penyusutan usaha; '' = belum dipilih (usaha lama, metode masih per aset). */
+  metode_usaha: '' | MetodePenyusutan
+  /** Saat belum dipilih: metode yang sudah seragam dipakai aset, atau campur. */
+  metode_saran?: '' | MetodePenyusutan
+  metode_campur?: boolean
 }
 
 export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
 export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
 export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
 export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
+/** Pilih metode penyusutan usaha sekali; setelah itu terkunci untuk semua aset. */
+export const pilihMetodePenyusutan = (metode: MetodePenyusutan) =>
+  api<BusinessProfile>('/business/metode-penyusutan', { method: 'POST', body: { metode } })
 
 export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo[]; can_edit: boolean }>('/transactions')
 export type SavedTx = Tx & { warnings?: CashWarning[] }
@@ -437,6 +447,7 @@ export const simulatePrice = (period: string, i: PriceSimInput) =>
       cogs: i.cogs,
       target_profit: i.targetProfit,
       fee_bps: Math.round(i.feePct * 100),
+      margin_bps: i.marginPct ? Math.round(i.marginPct * 100) : 0,
       fixed_cost: i.fixedCost,
       monthly_volume: i.monthlyVolume,
       target_net_profit: i.targetNetProfit,
@@ -502,6 +513,8 @@ export interface BusinessProfile {
   ptkp: string
   pkp: boolean
   metode_persediaan: '' | 'periodik' | 'perpetual'
+  /** Dipilih sekali untuk semua aset (bangunan tetap garis lurus), lalu terkunci. */
+  metode_penyusutan?: MetodePenyusutan
   /** Kelompok KLU 3 digit; pembanding NPM & CTTOR DJP. */
   klu?: string
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
@@ -530,7 +543,7 @@ export interface KLUOption { kode: string; nama: string; jenis: JenisUsaha }
 
 export interface BusinessInfo {
   profile: BusinessProfile | null
-  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; provinsi: string[]; klu: KLUOption[] }
+  options: { jenis_usaha: Option[]; bentuk_usaha: Option[]; ptkp: string[]; metode_persediaan: Option[]; metode_penyusutan: Option[]; provinsi: string[]; klu: KLUOption[] }
 }
 
 export const getBusiness = () => api<BusinessInfo>('/business')
@@ -578,7 +591,7 @@ export interface BugReport {
   tenant_id?: number
   /** Status tiket di Panel Master; kosong = baru. */
   status?: TiketStatus
-  /** Balasan tim MasterPajak, terbaca pelapor. */
+  /** Balasan tim Master Pajak, terbaca pelapor. */
   balasan?: { nama: string; isi: string; waktu: string }[]
 }
 
@@ -606,7 +619,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
   return res.json()
 }
 
-// --- Panel Master (akun tim MasterPajak) ---
+// --- Panel Master (akun tim Master Pajak) ---
 
 export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
   | 'parameter_pajak' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
@@ -705,7 +718,7 @@ export interface CoAInfo {
   kelompok: string[]
   /** Versi template COA yang dipakai usaha ini. */
   template?: { id: number; jenis: string; versi: number }
-  /** Ada versi template lebih baru dari tim MasterPajak; berlaku setelah Owner menerapkannya. */
+  /** Ada versi template lebih baru dari tim Master Pajak; berlaku setelah Owner menerapkannya. */
   pembaruan?: { id: number; versi: number; diff: DiffAkun } | null
 }
 export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[] }
@@ -1428,3 +1441,19 @@ export const pakaiPengetahuan = (id: number, dipakai_ai: boolean) => api<unknown
 export const hapusPengetahuan = (id: number) => api<void>(`/master/pengetahuan/${id}`, { method: 'DELETE' })
 export const cariPengetahuan = (q: string) => api<Potongan[]>(`/master/pengetahuan/cari?q=${encodeURIComponent(q)}`)
 export const analisaKlien = (id: number) => api<AnalisaKlien>(`/master/klien/${id}/analisa`)
+// --- Simulasi usaha (Simulasi & Harga) ---
+
+export interface DasarSimulasi {
+  periode: string[]; omzet: number; modal_bahan: number; biaya_variabel: number; biaya_tetap: number
+  penyusutan: number; pendapatan_lain: number; laba: number; hari_buka: number
+}
+export interface HasilSimulasi {
+  omzet: number; modal_bahan: number; biaya_variabel: number; biaya_tetap: number; penyusutan: number
+  pendapatan_lain: number; laba: number; margin_bps: number
+}
+export interface TitikImpasUsaha { ada: boolean; per_bulan: number; per_hari: number; biaya_tetap: number; sisa_per_100rb: number; di_atas_bps: number }
+export interface PorsiProduk { nama: string; harga: number; modal: number; ada_modal: boolean; variabel: number; sisa: number; porsi_per_hari: number; ada: boolean }
+/** Perubahan dalam basis poin: 500 = +5%. */
+export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: number; tambah_tetap: number }
+export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
+export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })

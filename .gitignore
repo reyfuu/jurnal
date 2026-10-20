@@ -8,3 +8,6 @@ node_modules/
 .env
 .gstack/
 data/
+
+# artefak build lokal: Dockerfile membangun ke /out/laporan-bisnis, biner ini tidak dipakai
+/server

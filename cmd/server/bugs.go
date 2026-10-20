@@ -205,7 +205,7 @@ func (s *Server) serveBugScreenshot(w http.ResponseWriter, r *http.Request, bole
 }
 
 func (s *Server) handleListBugs(w http.ResponseWriter, r *http.Request) {
-	// Hanya laporan usaha sendiri; tim MasterPajak membaca semua lewat Panel Master.
+	// Hanya laporan usaha sendiri; tim Master Pajak membaca semua lewat Panel Master.
 	tid := currentUser(r).TenantID
 	b := s.bugs
 	b.mu.Lock()

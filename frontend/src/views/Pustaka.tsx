@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { listPustaka, type Artikel } from '@/lib/api'
 import { formatTanggal } from '@/lib/format'
 
-/** Artikel pajak dari tim MasterPajak yang ditandai untuk klien. */
+/** Artikel pajak dari tim Master Pajak yang ditandai untuk klien. */
 export function Pustaka() {
   const [rows, setRows] = useState<Artikel[] | null>(null)
   const [error, setError] = useState('')
@@ -17,7 +17,7 @@ export function Pustaka() {
     && [a.judul, a.isi, a.dasar_hukum, ...a.tag].join(' ').toLowerCase().includes(q.trim().toLowerCase()))
   return (
     <>
-      <PageHeader title="Pustaka Pajak" subtitle="Penjelasan aturan pajak dan pembukuan dari tim MasterPajak, ditulis untuk pemilik usaha." />
+      <PageHeader title="Pustaka Pajak" subtitle="Penjelasan aturan pajak dan pembukuan dari tim Master Pajak, ditulis untuk pemilik usaha." />
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
       <div className="flex flex-wrap items-center gap-3">
         <div className="tabbar" role="tablist" aria-label="Kategori">

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { createAsset, deleteAsset, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
+import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
-const AMBER = 'var(--text-warn)'
+const SOROT = 'var(--text-brand)'
 const RED = 'var(--text-danger)'
 const BLUE = 'var(--accent-blue)'
 
@@ -26,6 +26,51 @@ function toInput(a: Asset): AssetInput {
   }
 }
 
+const NAMA_METODE: Record<MetodePenyusutan, string> = { garis_lurus: 'Garis lurus', saldo_menurun: 'Saldo menurun' }
+
+/** Usaha lama yang belum memilih metode penyusutan: pilih sekali, lalu semua aset dihitung ulang. */
+function PilihMetode({ data, onChanged }: { data: AssetSummary; onChanged: () => void }) {
+  const [m, setM] = useState<MetodePenyusutan | ''>(data.metode_saran || '')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function kunci() {
+    if (!m || !confirm(`Pakai ${NAMA_METODE[m].toLowerCase()} untuk semua aset? Pilihan ini dikunci dan tidak bisa diubah dari aplikasi.`)) return
+    setBusy(true)
+    setError('')
+    try {
+      await pilihMetodePenyusutan(m)
+      onChanged()
+    } catch (err) {
+      const msg = (err as Error).message
+      setError(/akses|forbidden|izin/i.test(msg) ? 'Hanya Owner yang bisa memilih metode penyusutan.' : msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14 }}>
+      <strong>Pilih satu metode penyusutan untuk semua aset.</strong>{' '}
+      {data.metode_campur
+        ? 'Aset Anda sekarang memakai dua metode berbeda; setelah dipilih, semua aset dihitung ulang dengan metode yang sama.'
+        : 'Metode ini dipakai untuk semua aset sekarang dan nanti.'}{' '}
+      Bangunan tetap garis lurus. Setelah dipilih, metode dikunci karena perubahan metode memerlukan persetujuan DJP.
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 10 }}>
+        <select className="input-field" style={{ width: 'auto' }} aria-label="Metode penyusutan usaha" value={m} onChange={(e) => setM(e.target.value as MetodePenyusutan)}>
+          <option value="" disabled>Pilih metode</option>
+          <option value="garis_lurus">Garis lurus — sama rata setiap tahun</option>
+          <option value="saldo_menurun">Saldo menurun — lebih besar di awal</option>
+        </select>
+        <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} disabled={!m || busy} onClick={() => void kunci()}>
+          {busy ? 'Menyimpan…' : 'Pakai & kunci'}
+        </button>
+      </div>
+      {error && <div className="pill-status pill-red" role="alert" style={{ marginTop: 10, whiteSpace: 'normal' }}>{error}</div>}
+    </div>
+  )
+}
+
 // periodLabel tidak lagi dipakai di sini: judul & periode dipegang header Laporan Keuangan.
 export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () => void }) {
   const [form, setForm] = useState<AssetInput | null>(null)
@@ -38,6 +83,9 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
   const jenisTerpilih = data.jenis_harta.find((j) => j.id === form?.jenis_harta)
   const kelompokAktif = data.kelompok.find((k) => k.id === (jenisTerpilih?.kelompok ?? form?.kelompok))
   const bolehSaldoMenurun = (kelompokAktif?.tarif_sm_bps ?? 0) > 0
+  // Metode usaha sudah dipilih: aset ikut metode itu (bangunan garis lurus), tidak dipilih per aset.
+  const metodeUsaha = data.metode_usaha
+  const metodeAset: MetodePenyusutan = metodeUsaha ? (bolehSaldoMenurun ? metodeUsaha : 'garis_lurus') : form?.metode ?? 'garis_lurus'
 
   function buka(a?: Asset) {
     setError('')
@@ -51,7 +99,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
     setBusy(true)
     try {
       // Kelompok bangunan tidak boleh saldo menurun; samakan sebelum dikirim.
-      const body = { ...form, metode: bolehSaldoMenurun ? form.metode : ('garis_lurus' as MetodePenyusutan) }
+      const body = { ...form, metode: bolehSaldoMenurun ? metodeAset : ('garis_lurus' as MetodePenyusutan) }
       await (editId === null ? createAsset(body) : updateAsset(editId, body))
       setForm(null)
       setEditId(null)
@@ -86,6 +134,8 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
         (Pasal 2 ayat 2). Bangunan hanya boleh garis lurus.
       </div>
 
+      {!metodeUsaha && <PilihMetode key={data.metode_saran ?? ''} data={data} onChanged={onChanged} />}
+
       {data.pemetaan_belum_dicek > 0 && (
         <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14 }}>
           <strong>{data.pemetaan_belum_dicek} jenis harta belum diverifikasi</strong> ke Lampiran PMK 72/2023.
@@ -113,7 +163,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
         </div>
         <div className="card">
           <div className="kpi-label">Beban Bulan Ini</div>
-          <div className="kpi-value tabular" style={{ color: AMBER }}>{formatJt(data.beban_total)}</div>
+          <div className="kpi-value tabular" style={{ color: SOROT }}>{formatJt(data.beban_total)}</div>
           <div className="kpi-meta-row">
             <span>Penyusutan {formatJt(data.beban_penyusutan)} + amortisasi {formatJt(data.beban_amortisasi)}</span>
           </div>
@@ -184,6 +234,15 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
               />
             </label>
 
+            {metodeUsaha ? (
+              <div>
+                <span className="kpi-label">Metode Penyusutan (metode usaha)</span>
+                <div className="input-field tabular" style={{ color: BLUE, borderStyle: 'dashed' }}>
+                  {NAMA_METODE[metodeAset]}
+                  {kelompokAktif && ` — ${formatTarif(metodeAset === 'saldo_menurun' ? kelompokAktif.tarif_sm_bps : kelompokAktif.tarif_gl_bps)}`}
+                </div>
+              </div>
+            ) : (
             <label>
               <span className="kpi-label">Metode Penyusutan</span>
               <select
@@ -198,6 +257,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                 )}
               </select>
             </label>
+            )}
 
             <div>
               <span className="kpi-label">Kelompok &amp; masa manfaat (otomatis)</span>
@@ -207,7 +267,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
             </div>
           </div>
 
-          {!bolehSaldoMenurun && kelompokAktif && (
+          {!bolehSaldoMenurun && kelompokAktif && (metodeUsaha !== 'garis_lurus') && (
             <div className="note-box warn">Bangunan hanya boleh garis lurus, jadi metode dikunci.</div>
           )}
           {form.tak_berwujud && (
@@ -229,7 +289,11 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div className="chart-title">Register Aset</div>
-            <div className="chart-subtitle">Metode dipilih per aset: garis lurus atau saldo menurun</div>
+            <div className="chart-subtitle">
+              {metodeUsaha
+                ? `Metode usaha: ${NAMA_METODE[metodeUsaha].toLowerCase()} untuk semua aset (bangunan garis lurus) · terkunci`
+                : 'Metode masih per aset sampai metode usaha dipilih'}
+            </div>
           </div>
           <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => buka()}>
             + Tambah Aset
@@ -269,7 +333,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                     {a.tak_berwujud && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>amortisasi</div>}
                   </td>
                   <td style={{ textAlign: 'right' }}>{a.draft ? '—' : formatTarif(a.tarif_bps)}</td>
-                  <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(a.beban_bulan_ini)}</td>
+                  <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(a.beban_bulan_ini)}</td>
                   <td style={{ textAlign: 'right', color: RED }}>{formatRp(a.akumulasi)}</td>
                   <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(a.nilai_buku)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
@@ -290,7 +354,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                 <td colSpan={3}>TOTAL — {assets.length} aset</td>
                 <td style={{ textAlign: 'right' }}>{formatRp(data.total_harga_perolehan)}</td>
                 <td colSpan={2} />
-                <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(data.beban_total)}</td>
+                <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(data.beban_total)}</td>
                 <td style={{ textAlign: 'right', color: RED }}>{formatRp(data.total_akumulasi)}</td>
                 <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(data.total_nilai_buku)}</td>
                 <td />
@@ -321,7 +385,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                   <tr key={y.tahun}>
                     <td>{y.tahun}{y.bulan < 12 && <span style={{ color: 'var(--text-muted)' }}> ({y.bulan} bln)</span>}</td>
                     <td style={{ textAlign: 'right' }}>{formatRp(y.dasar_awal)}</td>
-                    <td style={{ textAlign: 'right', color: AMBER }}>{formatRp(y.penyusutan)}</td>
+                    <td style={{ textAlign: 'right', color: SOROT }}>{formatRp(y.penyusutan)}</td>
                     <td style={{ textAlign: 'right', color: y.sisa_akhir === 0 ? 'var(--text-profit)' : BLUE }}>{formatRp(y.sisa_akhir)}</td>
                   </tr>
                 ))}

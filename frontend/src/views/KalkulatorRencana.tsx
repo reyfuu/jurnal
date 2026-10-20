@@ -5,7 +5,7 @@ import {
   type BeliSewaResult, type BusinessProfile, type GrossUpResult, type KalkulatorMaster, type Norma, type NPPNResult, type PPNHargaResult, type Wilayah,
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
-import { AMBER, GREEN, RED, keBps, persen, wilayahDariKota } from '@/lib/kalkulator'
+import { GREEN, RED, SOROT, keBps, persen, wilayahDariKota } from '@/lib/kalkulator'
 
 // Kalkulator perencanaan (Tax Planning Calculator V2.1): dihitung di server dengan parameter pajak
 // versi aktif dari Panel Master. Isian awal diambil dari Profil Usaha bila ada.
@@ -96,7 +96,7 @@ export function FormNPPN({ m, profile }: Props) {
         <>
           <Hasil
             utama={[
-              { label: 'PPh setahun dengan norma', v: h.r.pph, warna: AMBER },
+              { label: 'PPh setahun dengan norma', v: h.r.pph, warna: SOROT },
               { label: `Pembanding PPh final ${m.parameter.dasar_umkm}`, v: h.r.pph_final },
               { label: `Penghasilan neto (${persen(h.r.norma_bps)})`, v: h.r.neto, warna: GREEN },
             ]}
@@ -142,7 +142,7 @@ export function FormGrossUp({ m }: Props) {
         <>
           <Hasil
             utama={[
-              { label: 'Tulis di kontrak / invoice', v: h.r.nilai_kontrak, warna: AMBER },
+              { label: 'Tulis di kontrak / invoice', v: h.r.nilai_kontrak, warna: SOROT },
               { label: `Pajak dipotong (efektif ${persen(h.r.tarif_efektif_bps)})`, v: h.r.pajak },
               { label: 'Diterima vendor', v: h.r.diterima, warna: GREEN },
             ]}
@@ -204,7 +204,7 @@ export function FormPPNHarga({ m }: Props) {
                 <div style={{ margin: '12px 0', fontSize: 13.5, lineHeight: 1.7 }}>
                   Laba tertinggi: <b style={{ color: GREEN }}>{top.nama}</b> ({formatRp(top.laba)}).<br />
                   {h.r.kenaikan_harga_bps > 0
-                    ? <>Jadi PKP dan membebankan PPN membuat harga ke pembeli naik <b style={{ color: AMBER }}>{persen(h.r.kenaikan_harga_bps)}</b> dibanding belum PKP.</>
+                    ? <>Jadi PKP dan membebankan PPN membuat harga ke pembeli naik <b style={{ color: SOROT }}>{persen(h.r.kenaikan_harga_bps)}</b> dibanding belum PKP.</>
                     : <>Harga ke pembeli tidak naik bila jadi PKP dan membebankan PPN: PPN masukan yang tadinya ikut di-markup sebagai HPP kini dikreditkan.</>}
                 </div>
               )
@@ -291,8 +291,8 @@ export function FormBeliSewa({ m, profile }: Props) {
               utama={[
                 { label: 'Total kas keluar — beli', v: h.r.beli.total_kas },
                 { label: 'Total kas keluar — sewa', v: h.r.sewa.total_kas },
-                { label: 'PPh tahun pertama — beli', v: h.r.beli.tahun[0].pph, warna: AMBER },
-                { label: 'PPh tahun pertama — sewa', v: h.r.sewa.tahun[0].pph, warna: AMBER },
+                { label: 'PPh tahun pertama — beli', v: h.r.beli.tahun[0].pph, warna: SOROT },
+                { label: 'PPh tahun pertama — sewa', v: h.r.sewa.tahun[0].pph, warna: SOROT },
               ]}
               langkah={[]}
             />

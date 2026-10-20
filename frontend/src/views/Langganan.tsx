@@ -30,7 +30,7 @@ const tanggal = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('id-ID
 export function statusText(l: LanggananStatus) {
   if (l.status === 'aktif') return l.sampai ? `Langganan aktif sampai ${tanggal(l.sampai)}.` : 'Langganan aktif.'
   if (l.status === 'trial') return `Masa coba gratis sampai ${tanggal(l.sampai)}.`
-  return 'Langganan belum aktif. Pilih paket untuk mulai memakai Laporan Bisnis.'
+  return 'Langganan belum aktif. Pilih paket untuk mulai memakai Master Pajak.'
 }
 
 export const SYARAT_GARANSI =
@@ -135,7 +135,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
   const habis = b.langganan.status === 'habis'
   return (
     <>
-      <PageHeader title="Langganan" subtitle="Kelola paket Laporan Bisnis untuk usaha Anda" />
+      <PageHeader title="Langganan" subtitle="Kelola paket Master Pajak untuk usaha Anda" />
       <div className="card" style={{ padding: 22, maxWidth: 880, marginBottom: 16, borderColor: habis ? 'var(--accent-red)' : undefined }}>
         <div className="text-sm font-semibold">Status: {b.langganan.status === 'trial' ? 'Masa coba' : b.langganan.status === 'aktif' ? 'Aktif' : 'Belum aktif'}</div>
         <p className="mt-1 text-sm text-muted-foreground">{statusText(b.langganan)}</p>
@@ -157,7 +157,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
                 <li key={x} className="flex items-center gap-2"><Check className="size-4 text-[var(--accent-green)]" aria-hidden="true" />{x}</li>
               ))}
             </ul>
-            <Button className="rounded-full font-bold" disabled={!b.aktif || busy !== ''} onClick={() => void bayar(p.id)}>
+            <Button variant={p.hemat ? 'accent' : 'outline'} disabled={!b.aktif || busy !== ''} onClick={() => void bayar(p.id)}>
               {busy === p.id ? 'Membuka pembayaran…' : `Bayar ${p.nama.toLowerCase()}`}
             </Button>
           </div>

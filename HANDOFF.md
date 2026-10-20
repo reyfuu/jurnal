@@ -181,7 +181,7 @@ Pain point baru (BRD §1 masalah 5): UMKM menengah tidak mampu atau bingung mere
 
 - Pengguna menetapkan navy **`#222852`** sebagai warna utama agar mengingatkan pada perpajakan/DJP. Kedua kode yang dikirim sama; aksen emas yang sudah ada dipertahankan.
 - Token `--brand-navy` menjadi sumber warna login, onboarding, sidebar, dan teks CTA emas. Favicon dan meta tema browser memakai nilai yang sama. Warna teks sidebar disesuaikan agar terbaca di atas navy; permukaan laporan tetap netral.
-- Pedoman diperbarui di `DESIGN.md`, salinannya `design.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`.
+- Pedoman diperbarui di `DESIGN.md`, `docs/DESIGN_BRIEF.md`, `docs/PRD.md`, dan `agent.md`. (Brand ini digantikan Brand Guideline v1.0 pada 20 Oktober 2026; lihat `DESIGN.md` §2.)
 - Build frontend berhasil. Chromium: login, onboarding mobile, dan dashboard diperiksa; warna terhitung sidebar/login `rgb(34, 40, 82)`. Kontras emas/navy 8,58:1; teks sekunder sidebar/navy 8,16:1; label sidebar/navy 6,60:1. Screenshot di `/tmp/pajak-brand-*.png`. Commit `c82fad5` terkirim setelah PR #1 digabung, sehingga dibawa ke branch lanjutan `feat/login-password-visibility`; belum deploy.
 
 ## Tambahan UX login — 19 Oktober 2026
@@ -684,6 +684,22 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   konsekuensi ganti OP ↔ badan). Ikut di `CekAwalResult.saran`, tampil di ringkasan sign-up dan
   Perencanaan Pajak (`CekAwalCard`), juga tanpa KLU. Menggantikan risiko lama "Bentuk usaha belum
   paling hemat". Badan memakai PTKP TK/0 untuk skema orang pribadi (disebut di catatan).
+
+## Simulasi & Harga — simulasi usaha + kalkulator per produk (20 Okt 2026)
+
+- `finance/simulasi.go` (TDD; angka uji dari contoh desain pemilik, titik impas Rp47.924.397):
+  dasar = rata-rata 3 bulan terakhir yang ada omzetnya s.d. periode dipilih (`RataRataSimulasi`).
+  Biaya variabel = potongan channel (ikut omzet); biaya tetap = beban operasional kas; penyusutan
+  dipisah dan ikut ditutup titik impas. `Simulasikan` (slider harga/pembeli/modal dalam bps +
+  tambahan biaya tetap), `HitungTitikImpas` (dibulatkan ke atas; per hari = hari kalender),
+  `PorsiBalikModal` (modal dari HPP resep Produksi), `HargaUntukMargin` (mode margin %).
+  Perkalian lewat `math/big` (omzet ratusan miliar aman).
+- `POST /api/v1/simulasi?period=` mengembalikan dasar, hasil skenario, titik impas, dan tabel
+  produk (produk resep + item terjual tanpa resep, modal "–"). `/pricing/simulate` menerima
+  `margin_bps`.
+- Frontend `views/SimulasiHarga.tsx`: kalkulator lama **dipertahankan & di-upgrade** (otomatis
+  tanpa tombol Hitung, pilih produk → HPP resep, pilih saluran → komisi, margin % atau Rp/porsi,
+  titik impas produk di bagian lipat). Slider di-debounce 150 ms, hitungan tetap di server.
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 

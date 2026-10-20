@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Koreksi: usulan tim MasterPajak untuk mengubah atau menghapus satu transaksi klien. Pembukuan
+// Koreksi: usulan tim Master Pajak untuk mengubah atau menghapus satu transaksi klien. Pembukuan
 // tidak berubah sampai pemilik usaha menyetujuinya. Sebelum = potret transaksi saat diusulkan;
 // bila transaksinya kemudian berubah, usulan basi dan tidak boleh diterapkan.
 type Koreksi struct {

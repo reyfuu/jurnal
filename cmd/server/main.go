@@ -59,7 +59,7 @@ type tenant struct {
 	nextProdukID   int
 	supplier       []finance.Supplier
 	nextSupplierID int
-	// koreksi: usulan tim MasterPajak; mengubah txs hanya setelah disetujui pemilik.
+	// koreksi: usulan tim Master Pajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
@@ -83,7 +83,7 @@ type Server struct {
 	db        *sql.DB // nil = berkas JSON di DATA_DIR (atau memori saja)
 	// bugHook: penerusan laporan bug ke pengembang; nil-aman, tanpa BUG_WEBHOOK_URL mati.
 	bugHook *bugHook
-	// master: tim MasterPajak (role, penugasan klien, audit log) untuk Panel Master.
+	// master: tim Master Pajak (role, penugasan klien, audit log) untuk Panel Master.
 	masterMu sync.Mutex
 	master   master.State
 	lihat    map[int]lihatGrant // user id → lihat-sebagai aktif (memori saja; restart = selesai)
@@ -305,6 +305,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/wilayah", s.guard("", handleWilayah))
 	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePutBusiness))))
+	s.mux.HandleFunc("POST /api/v1/business/metode-penyusutan", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePilihMetode))))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))
 	s.mux.HandleFunc("GET /api/v1/kalkulator", s.guard("kalkulator-pajak", s.handleKalkulatorMaster))
@@ -318,6 +319,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
+	s.mux.HandleFunc("POST /api/v1/simulasi", s.guard("simulasi-harga", s.on((*tenant).handleSimulasi)))
 	s.mux.HandleFunc("POST /api/v1/ai/chat", s.guard("", s.handleAIChat))
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
@@ -436,7 +438,7 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
 			g, ok := s.lihatUntuk(u.ID, time.Now())
 			if !ok {
-				http.Error(w, "akun tim MasterPajak hanya membuka Panel Master", http.StatusForbidden)
+				http.Error(w, "akun tim Master Pajak hanya membuka Panel Master", http.StatusForbidden)
 				return
 			}
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -477,7 +479,7 @@ type meResp struct {
 	Views     []string        `json:"views"`
 	Langganan langgananStatus `json:"langganan"`
 	Garansi   garansiStatus   `json:"garansi"`
-	Master    *masterInfo     `json:"master,omitempty"` // hanya akun tim MasterPajak
+	Master    *masterInfo     `json:"master,omitempty"` // hanya akun tim Master Pajak
 	Lihat     *lihatInfo      `json:"lihat,omitempty"`  // akun tim yang sedang lihat-sebagai
 	// KoreksiMenunggu: usulan koreksi yang menunggu keputusan pemilik usaha.
 	KoreksiMenunggu int `json:"koreksi_menunggu,omitempty"`
@@ -639,7 +641,7 @@ type usersResp struct {
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	// Role tim MasterPajak bukan pilihan untuk user usaha (auth menolaknya juga).
+	// Role tim Master Pajak bukan pilihan untuk user usaha (auth menolaknya juga).
 	roles := maps.Clone(auth.Roles)
 	delete(roles, auth.MP)
 	delete(roles, auth.Lihat)
@@ -722,7 +724,12 @@ func (s *tenant) openingFor(period string) finance.ReportOpening {
 func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+	rep := finance.BuildPeriodReport(s.txs, s.assets, period, s.openingFor(period))
+	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
+		saran, seragam := finance.MetodeSeragam(s.assets)
+		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
+	}
+	return rep
 }
 
 func (s *tenant) handleFinancial(w http.ResponseWriter, r *http.Request) {
@@ -800,6 +807,9 @@ type simulateReq struct {
 	FixedCost       *int64 `json:"fixed_cost"` // kosong = total beban operasional periode berjalan
 	MonthlyVolume   int64  `json:"monthly_volume"`
 	TargetNetProfit int64  `json:"target_net_profit"`
+	// MarginBps > 0: harga dihitung dari margin yang diinginkan (mis. 6000 = 60%), bukan
+	// TargetProfit per pcs.
+	MarginBps int `json:"margin_bps"`
 }
 
 type simulateResp struct {
@@ -815,6 +825,13 @@ func (s *tenant) handleSimulatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sim := finance.SimulateChannelPrice(req.COGS, req.TargetProfit, req.FeeBps, req.FixedFee)
+	if req.MarginBps > 0 {
+		var err error
+		if sim, err = finance.HargaUntukMargin(req.COGS, req.FeeBps, req.FixedFee, req.MarginBps); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	// Beban tetap break-even memakai beban operasional kas; penyusutan tidak ikut karena
 	// tidak memengaruhi kas yang harus ditutup penjualan.
 	fixed := s.report(periodOrDefault(r)).Income.Opex
@@ -1025,7 +1042,7 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("<h1>Laporan Bisnis API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
+	_, _ = w.Write([]byte("<h1>Master Pajak API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
 }
 
 func main() {
@@ -1034,7 +1051,7 @@ func main() {
 		port = "8080"
 	}
 	srv := NewServer()
-	log.Printf("Laporan Bisnis by Master Pajak listening on http://localhost:%s", port)
+	log.Printf("Master Pajak listening on http://localhost:%s", port)
 	hs := &http.Server{
 		Addr: ":" + port, Handler: srv,
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute,

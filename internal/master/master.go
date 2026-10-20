@@ -1,4 +1,4 @@
-// Package master: hak akses tim MasterPajak di Panel Master — daftar izin, role yang bisa
+// Package master: hak akses tim Master Pajak di Panel Master — daftar izin, role yang bisa
 // ditambah, penugasan klien ke anggota tim, dan audit log. Hanya data & aturan; HTTP dan
 // penyimpanan ada di cmd/server.
 package master

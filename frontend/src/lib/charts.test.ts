@@ -29,8 +29,8 @@ describe('dailyBars', () => {
   it('garis target di Rp3 jt dan warna redup di bawah target', () => {
     const c = dailyBars([{ day: 1, omzet: 6_000_000, above_target: true }, { day: 2, omzet: 0, above_target: false }], 3_000_000)
     expect(c.yTarget).toBeCloseTo(53.5)
-    expect(c.bars[0]).toMatchObject({ y: 10, h: 87, fill: 'var(--accent-amber)' })
-    expect(c.bars[1].fill).toBe('var(--accent-amber-dim)')
+    expect(c.bars[0]).toMatchObject({ y: 10, h: 87, fill: 'var(--chart-1)' })
+    expect(c.bars[1].fill).toBe('var(--chart-1-dim)')
   })
 })
 
