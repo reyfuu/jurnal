@@ -137,7 +137,7 @@ func (p *BusinessProfile) Validate() error {
 		p.PTKP = "" // PTKP hanya berlaku untuk wajib pajak orang pribadi
 		return nil
 	}
-	if _, ok := tax.PTKP[p.PTKP]; !ok {
+	if _, ok := tax.PTKPOf(p.PTKP); !ok {
 		return errors.New("pilih status PTKP pemilik (mis. TK/0, K/1)")
 	}
 	return nil

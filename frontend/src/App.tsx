@@ -238,7 +238,7 @@ export default function App() {
       case 'pajak-umkm':
         return <PajakUMKM d={d} />
       case 'kalkulator-pajak':
-        return <KalkulatorPajak />
+        return <KalkulatorPajak profile={business?.profile ?? null} />
       case 'perencanaan-pajak':
         return <PerencanaanPajak profile={business!.profile} ptkpCodes={business!.options.ptkp} />
       case 'profil-usaha':

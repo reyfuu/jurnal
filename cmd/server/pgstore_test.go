@@ -333,12 +333,22 @@ func TestPostgresKatalog(t *testing.T) {
 	if rec := do(srv, m, http.MethodPost, "/api/v1/master/benchmark/2/aktifkan", ""); rec.Code != http.StatusOK {
 		t.Fatalf("aktifkan: %d %s", rec.Code, rec.Body)
 	}
+	pulihkanParameter(t)
+	do(srv, m, http.MethodPost, "/api/v1/master/parameter/1/salin", "")
+	unggahXlsx(srv, m, "/api/v1/master/parameter/2/norma", [][]string{{"KLU"}, {"47111", "Toko", "20", "15", "-"}}, nil)
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/parameter/2/aktifkan", ""); rec.Code != http.StatusOK {
+		t.Fatalf("aktifkan parameter: %d %s", rec.Code, rec.Body)
+	}
+	tax.AktifkanParameter(tax.ParameterBawaan()) // muat ulang harus memasang lagi versi aktif dari DB
 	srv2 := NewServer()
 	if got, want := normJSON(t, srv2.katalog), normJSON(t, srv.katalog); got != want {
 		t.Fatalf("katalog berubah setelah simpan-muat:\n got %s\nwant %s", got, want)
 	}
 	if n := len(tax.BenchmarkAktif()); n != 5 {
 		t.Errorf("benchmark aktif setelah muat ulang = %d baris", n)
+	}
+	if n, ok := tax.CariNorma("47111"); !ok || len(tax.P().Norma) != 1 || n.DaerahLainBps != -1 {
+		t.Errorf("parameter aktif setelah muat ulang: norma %d baris %+v", len(tax.P().Norma), n)
 	}
 }
 

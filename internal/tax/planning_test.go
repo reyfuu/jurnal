@@ -105,7 +105,7 @@ func TestPerbandinganTanpaPPFinalDiAtas4_8M(t *testing.T) {
 	if r.Termurah == SkemaPPOP || r.Termurah == SkemaPPBadan {
 		t.Fatalf("termurah tidak boleh PPh Final: %s", r.Termurah)
 	}
-	if r, _ := CompareBentukUsaha(batasFasilitas, 1000, "TK/0"); len(r.Skema) != 6 {
+	if r, _ := CompareBentukUsaha(P().BatasOmzetUMKM, 1000, "TK/0"); len(r.Skema) != 6 {
 		t.Fatalf("tepat Rp4,8 M masih boleh PPh Final: %d skema", len(r.Skema))
 	}
 	for _, e := range CompareEntitas(4_800_000_001, 9000) {
@@ -142,7 +142,7 @@ func TestCekPKP(t *testing.T) {
 		{4_800_000_001, true, 0, 10_000},
 	} {
 		r := CekPKP(c.omzet)
-		if r.WajibPKP != c.wajib || r.Sisa != c.sisa || r.PemakaianBps != c.bps || r.Batas != batasFasilitas {
+		if r.WajibPKP != c.wajib || r.Sisa != c.sisa || r.PemakaianBps != c.bps || r.Batas != P().BatasPKP {
 			t.Errorf("CekPKP(%d) = %+v; want wajib=%v sisa=%d bps=%d", c.omzet, r, c.wajib, c.sisa, c.bps)
 		}
 		if len(r.Catatan) == 0 {
@@ -157,7 +157,7 @@ func TestPTKPCodesTanpaKI(t *testing.T) {
 		t.Fatalf("want 8 pilihan (TK/0–K/3), got %v", PTKPCodes)
 	}
 	for _, c := range PTKPCodes {
-		if _, ok := PTKP[c]; !ok || strings.HasPrefix(c, "K/I/") {
+		if _, ok := PTKPOf(c); !ok || strings.HasPrefix(c, "K/I/") {
 			t.Fatalf("pilihan %q tidak sah", c)
 		}
 	}

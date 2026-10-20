@@ -645,6 +645,41 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Klien: menu **Pustaka Pajak** (view `pustaka`, Owner & Admin).
 - Postgres: `artikel`, `sumber_pengetahuan` (tulis ulang semua baris; ponytail di pgstore.go).
 
+## Parameter Pajak & kalkulator perencanaan (20 Okt 2026)
+
+- **Satu sumber angka aturan**: `tax.Parameter` (PTKP, lapisan Pasal 17, biaya jabatan, pengali
+  tanpa NPWP, TER, tarif & batas UMKM, tarif badan & Pasal 31E, dividen, batas PKP, PPN + DPP
+  11/12, batas NPPN, tarif objek potong-pungut, norma NPPN per KLU). Semua hitungan membaca
+  `tax.P()` (versi aktif, atomic pointer); konstanta lama dihapus. `ParameterBawaan()` = angka
+  di kode, juga dipakai laporan PPh final UMKM (`finance.CalculateUMKMTax`).
+- **Panel Master → Parameter Pajak** (izin `parameter_pajak`): versi di `katalog.State.Parameter`
+  (draft → aktif → arsip; arsip bisa diaktifkan lagi). Ubah = salin versi jadi draft → edit →
+  simpan → aktifkan. Validasi penuh di setiap simpan (`Parameter.Validasi`, galat 400). Versi 1
+  diisi ulang dari kode tiap boot (`segarkanBawaan`). Postgres: tabel `parameter_pajak` (isi JSONB).
+- Objek `42-umkm`, `ppn-umum`, `ppn-mewah` **terikat** ke field utama (`Selaraskan`, dipanggil saat
+  simpan & aktifkan) dan terkunci di UI, supaya tarif yang sama tidak hidup di dua tempat.
+- **Norma NPPN**: 1.432 KLU 5 digit, `internal/tax/norma_data.go`, dibangkitkan
+  `scripts/gen_norma_nppn.py` dari sheet "Norma" Tax Planning Calculator V2.1 (salinan PER-17/PJ/2015;
+  hanya XML, makro tidak disentuh). Sel kosong / "-" = -1 (tidak tersedia, kalkulator minta norma
+  manual). KLU 01623 dan 43299 kembar di workbook; baris kedua dibuang (dicetak skrip). Tim
+  mengganti tabel lewat Excel di draft (`POST /master/parameter/{id}/norma`).
+- **Perlu verifikasi tim** (tampil di versi bawaan): workbook menyebut "PP 20/2026" untuk PPh final
+  UMKM — tidak bisa diverifikasi, aplikasi tetap merujuk PP 55/2022 (`dasar_umkm`, bisa diubah);
+  TER masih belum lengkap (sekarang bisa dilengkapi dari Panel Master tanpa deploy).
+- **Kalkulator klien** (menu Kalkulator Pajak, baris "Perencanaan"; isian awal dari Profil Usaha —
+  omzet, PTKP, KLU, kota → wilayah, bentuk usaha):
+  - NPPN (`/kalkulator/nppn`) + cari KLU (`/kalkulator/norma?q=`), pembanding PPh final.
+  - Gross up (`/kalkulator/gross-up`): PPh 23, PPh 4(2), PPh 21 bukan pegawai (DPP 50%, Pasal 17,
+    tanpa NPWP 120%). Bagi dua mencari nilai kontrak terkecil — pembulatan & tarif progresif persis.
+  - PPN & harga jual (`/kalkulator/ppn-harga`): gabungan sheet "PPN Dibebankan vs Ditanggung" dan
+    "Simulasi Pricing PPN" → belum PKP / PKP dibebankan / PKP ditanggung (harga termasuk PPN).
+    Workbook: rumus skema 2 melingkar dan PPN masukan memakai 11% tertulis; di sini memakai parameter.
+  - Beli vs sewa aset (`/kalkulator/beli-sewa`): per tahun selama umur ekonomis; rekomendasi dari
+    **total kas keluar** (harga/sewa + PPh), bukan hanya PPh tahun pertama seperti workbook (sampel
+    workbook: PPh tahun 1 sama persis, rekomendasi berbeda — beli lebih hemat 5,3 jt selama 4 tahun).
+    PPh potong atas sewa ditampilkan sebagai informasi, bukan biaya tambahan.
+- Bentuk usaha & perbandingan entitas tetap di menu Perencanaan Pajak (sekarang ikut parameter).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

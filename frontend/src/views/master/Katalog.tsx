@@ -16,7 +16,7 @@ import { bandingkanAkun } from '@/lib/katalog'
 const STATUS: Record<StatusKatalog, [string, string]> = {
   draft: ['pill-amber', 'Draft'], terbit: ['pill-green', 'Terbit'], aktif: ['pill-green', 'Aktif'], arsip: ['pill-status-muted', 'Arsip'],
 }
-const Status = ({ s }: { s: StatusKatalog }) => <span className={'pill-status ' + STATUS[s][0]}>{STATUS[s][1]}</span>
+export const Status = ({ s }: { s: StatusKatalog }) => <span className={'pill-status ' + STATUS[s][0]}>{STATUS[s][1]}</span>
 const JENIS_LABEL: Record<string, string> = { perdagangan: 'Perdagangan', jasa: 'Jasa', manufaktur: 'Manufaktur / Produksi' }
 const KELOMPOK = ['Aset Lancar', 'Aset Tidak Lancar', 'Liabilitas Jangka Pendek', 'Liabilitas Jangka Panjang', 'Ekuitas',
   'Pendapatan Usaha', 'Harga Pokok Penjualan', 'Beban Operasional', 'Pendapatan Lain-lain', 'Beban Lain-lain']
@@ -24,13 +24,13 @@ const KONDISI: [Account['kondisi'], string][] = [['selalu', 'Selalu'], ['jika_ad
   ['jika_non_pt', 'Khusus OP / CV'], ['jika_perpetual', 'Persediaan perpetual'], ['jika_periodik', 'Persediaan periodik']]
 const pct = (bps: number) => (bps < 0 ? '−' : '') + (Math.abs(bps) / 100).toFixed(2).replace('.', ',') + '%'
 
-function Pesan({ error, info }: { error: string; info: string }) {
+export function Pesan({ error, info }: { error: string; info: string }) {
   if (error) return <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', whiteSpace: 'normal' }}>{error}</div>
   if (info) return <div className="pill-status pill-green" role="status" style={{ alignSelf: 'flex-start' }}>{info}</div>
   return null
 }
 
-function ImporDialog({ open, onClose, judul, keterangan, fields, onKirim }: {
+export function ImporDialog({ open, onClose, judul, keterangan, fields, onKirim }: {
   open: boolean; onClose: () => void; judul: string; keterangan: string
   fields: { id: string; label: string; placeholder?: string; wajib?: boolean }[]
   onKirim: (file: File, nilai: Record<string, string>) => Promise<void>

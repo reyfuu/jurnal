@@ -266,7 +266,10 @@ func saveKatalogDB(db *sql.DB, st katalog.State) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM coa_template; DELETE FROM benchmark_versi`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM coa_template; DELETE FROM benchmark_versi; DELETE FROM parameter_pajak`); err != nil {
+		return err
+	}
+	if err := insertRows(tx, "parameter_pajak", nil, st.Parameter); err != nil {
 		return err
 	}
 	if err := insertRows(tx, "coa_template", nil, st.Template); err != nil {
@@ -288,6 +291,16 @@ func loadKatalogDB(db *sql.DB) (katalog.State, error) {
 	}
 	if err := selectJSON(db, &bm, `SELECT jsonb_agg(to_jsonb(b) ORDER BY id) FROM benchmark_versi b`); err != nil {
 		return st, err
+	}
+	var pm []katalog.ParameterVersi
+	if err := selectJSON(db, &pm, `SELECT jsonb_agg(to_jsonb(p) ORDER BY id) FROM parameter_pajak p`); err != nil {
+		return st, err
+	}
+	if len(pm) > 0 {
+		st.Parameter = pm
+	}
+	for _, p := range st.Parameter {
+		st.NextParameterID = max(st.NextParameterID, p.ID+1)
 	}
 	if len(tm) > 0 {
 		st.Template = tm

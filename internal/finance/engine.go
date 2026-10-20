@@ -3,6 +3,8 @@ package finance
 import (
 	"fmt"
 	"strings"
+
+	"pajak/internal/tax"
 )
 
 // ponytail: in-memory deterministic seed + int64 Rupiah computation for 100-user scale; swap to pgx pool when persistent DB is attached.
@@ -169,7 +171,8 @@ func FormatJt(rp int64) string {
 }
 
 func CalculateUMKMTax(entityType string, monthlyOmzet []int64) UMKMTaxReport {
-	const opExemption int64 = 500_000_000
+	pr := tax.P()
+	opExemption := pr.UMKMBebasOP
 	monthNames := []string{
 		"Januari", "Februari", "Maret", "April", "Mei", "Juni",
 		"Juli", "Agustus", "September", "Oktober", "November", "Desember",
@@ -196,14 +199,14 @@ func CalculateUMKMTax(entityType string, monthlyOmzet []int64) UMKMTaxReport {
 			taxable = omzet
 		}
 
-		// PPh Final 0.5% = taxable * 5 / 1000
-		tax := (taxable * 5) / 1000
+		// PPh final UMKM = taxable x tarif (bawaan 0,5%)
+		pph := taxable * pr.UMKMTarifBps / 10_000
 		totalTaxable += taxable
-		totalTax += tax
+		totalTax += pph
 
-		status := "Kena PPh 0,5%"
-		if tax == 0 {
-			status = "Bebas Pajak (Kuota ≤ Rp500 jt)"
+		status := "Kena PPh " + persen(int(pr.UMKMTarifBps))
+		if pph == 0 {
+			status = "Bebas Pajak (Kuota ≤ " + FormatJt(opExemption) + ")"
 		}
 
 		mName := fmt.Sprintf("Bulan %d", i+1)
@@ -216,7 +219,7 @@ func CalculateUMKMTax(entityType string, monthlyOmzet []int64) UMKMTaxReport {
 			GrossOmzet:      omzet,
 			CumulativeOmzet: cum,
 			TaxableAmount:   taxable,
-			TaxDue:          tax,
+			TaxDue:          pph,
 			Status:          status,
 		})
 	}

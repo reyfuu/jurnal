@@ -603,7 +603,7 @@ export async function createBug(b: { judul: string; deskripsi: string; halaman: 
 // --- Panel Master (akun tim MasterPajak) ---
 
 export type Izin = 'klien_semua' | 'klien_lihat' | 'tiket' | 'lihat_sebagai' | 'usul_koreksi' | 'langganan' | 'coa_template' | 'benchmark'
-  | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
+  | 'parameter_pajak' | 'pengetahuan' | 'artikel' | 'artikel_terbit' | 'pembayaran' | 'tim' | 'audit'
 export interface IzinInfo { id: Izin; label: string; keterangan?: string }
 export interface MasterRole { id: string; nama: string; kunci: boolean; izin: Izin[] }
 /** klien -1 = semua klien. */
@@ -1282,6 +1282,7 @@ export interface KalkulatorMaster {
     belum_lengkap: string[] | null
   }
   tarif_badan_bps: number
+  parameter: { ppn_efektif_bps: number; dasar_umkm: string; batas_nppn: number; batas_pkp: number }
 }
 
 export interface Langkah { label: string; nilai: number; keterangan?: string }
@@ -1320,6 +1321,70 @@ export const hitungPPhBadan = (b: { peredaran_bruto: number; penghasilan_kena_pa
 /** Posisi omzet setahun terhadap batas wajib PKP Rp4,8 M. */
 export interface HasilPKP { omzet: number; batas: number; wajib_pkp: boolean; sisa: number; pemakaian_bps: number; catatan: string[] }
 export const cekPKP = (omzet: number) => api<HasilPKP>('/kalkulator/pkp', { method: 'POST', body: { omzet } })
+
+// --- Kalkulator perencanaan (Tax Planning Calculator V2.1) ---
+
+export type Wilayah = 'ibukota10' | 'ibukota_lain' | 'daerah_lain'
+/** Norma per KLU 5 digit; -1 = tidak tersedia untuk wilayah itu. */
+export interface Norma { klu: string; uraian: string; ibukota10_bps: number; ibukota_lain_bps: number; daerah_lain_bps: number }
+export interface NPPNResult {
+  norma: Norma | null; norma_bps: number; neto: number; ptkp: number; pkp: number; pph: number
+  pph_final: number; boleh: boolean; catatan: string[]; langkah: Langkah[]
+}
+export interface GrossUpResult {
+  nilai_kontrak: number; dpp: number; pajak: number; diterima: number; tarif_efektif_bps: number; final: boolean; langkah: Langkah[]
+}
+export interface SkemaPPN {
+  id: 'non_pkp' | 'pkp_dibebankan' | 'pkp_ditanggung'; nama: string; keterangan: string
+  harga_pembeli: number; dpp: number; ppn_keluaran: number; ppn_masukan: number; ppn_setor: number; hpp: number; opex: number; laba: number
+}
+export interface PPNHargaResult { tarif_efektif_bps: number; skema: SkemaPPN[]; kenaikan_harga_bps: number; laba_tertinggi: string; catatan: string[] }
+export interface TahunAset { tahun: number; beban: number; laba: number; pph: number }
+export interface OpsiAset { tahun: TahunAset[]; total_pph: number; total_kas: number }
+export interface BeliSewaResult {
+  metode: string; beli: OpsiAset; sewa: OpsiAset; potong_sewa: number; rekomendasi: 'beli' | 'sewa'; selisih: number; catatan: string[]
+}
+export const cariNorma = (q: string) => api<Norma[]>('/kalkulator/norma?q=' + encodeURIComponent(q))
+export const hitungNPPN = (b: { omzet: number; klu: string; wilayah: string; norma_bps: number; ptkp: string }) =>
+  api<NPPNResult>('/kalkulator/nppn', { method: 'POST', body: b })
+export const hitungGrossUp = (b: { jenis: string; objek: string; diterima: number; punya_npwp: boolean }) =>
+  api<GrossUpResult>('/kalkulator/gross-up', { method: 'POST', body: b })
+export const hitungPPNHarga = (b: { pembelian: number; termasuk_ppn: boolean; porsi_dari_pkp_bps: number; markup_bps: number; opex_bps: number; opex_nominal: number }) =>
+  api<PPNHargaResult>('/kalkulator/ppn-harga', { method: 'POST', body: b })
+export const hitungBeliSewa = (b: {
+  bentuk: 'badan' | 'op'; ptkp: string; omzet: number; biaya_lain: number; harga_aset: number
+  umur_tahun: number; metode: string; bangunan: boolean; sewa_per_tahun: number
+}) => api<BeliSewaResult>('/kalkulator/beli-sewa', { method: 'POST', body: b })
+
+// --- Parameter pajak (Panel Master) ---
+
+export interface Lapis { sampai: number; tarif_bps: number }
+export interface TERBaris { batas_bawah: number; batas_atas: number; tarif_bps: number }
+/** Isi satu versi parameter; norma tidak ikut (dikelola lewat Excel). */
+export interface ParameterIsi {
+  ptkp: Record<string, number>
+  pasal17: Lapis[]
+  biaya_jabatan_bps: number; biaya_jabatan_maks: number; tanpa_npwp_pph21_bps: number; dasar_bukan_pegawai_bps: number
+  ter: { kategori: Record<string, string>; lapisan: Record<string, TERBaris[]> }
+  umkm_tarif_bps: number; umkm_bebas_op: number; batas_omzet_umkm: number; dasar_umkm: string
+  badan_tarif_bps: number; fasilitas_31e_bps: number; batas_31e_penuh: number; batas_31e: number; dividen_bps: number
+  batas_pkp: number; ppn_tarif_bps: number; ppn_dpp_pembilang: number; ppn_dpp_penyebut: number
+  batas_nppn: number; norma_perbandingan_bps: number
+  objek: JenisPajak[]
+  perlu_verifikasi: string[] | null
+}
+export interface ParameterVersi {
+  id: number; nama: string; dasar: string; status: StatusKatalog; isi: ParameterIsi
+  oleh?: string; waktu: string; jumlah_norma: number
+}
+export const getParameter = () => api<{ versi: ParameterVersi[]; ptkp_codes: string[]; objek_terikat: string[] }>('/master/parameter')
+export const salinParameter = (id: number) => api<ParameterVersi>(`/master/parameter/${id}/salin`, { method: 'POST' })
+export const ubahParameter = (id: number, b: { nama: string; dasar: string; isi: ParameterIsi }) =>
+  api<ParameterVersi>(`/master/parameter/${id}`, { method: 'PUT', body: b })
+export const hapusParameter = (id: number) => api<void>(`/master/parameter/${id}`, { method: 'DELETE' })
+export const aktifkanParameter = (id: number) => api<ParameterVersi>(`/master/parameter/${id}/aktifkan`, { method: 'POST' })
+export const imporNorma = (id: number, file: File) => unggah<ParameterVersi>(`/master/parameter/${id}/norma`, file, {})
+export const unduhNormaUrl = (id: number) => `/api/v1/master/parameter/${id}/norma.xlsx`
 
 // --- Artikel pajak, basis pengetahuan AI, analisa AI per klien ---
 

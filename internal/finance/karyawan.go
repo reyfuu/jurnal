@@ -47,7 +47,7 @@ func ValidateKaryawan(k *Karyawan) error {
 	if k.PTKP == "" {
 		k.PTKP = "TK/0"
 	}
-	if _, ok := tax.PTKP[k.PTKP]; !ok {
+	if _, ok := tax.PTKPOf(k.PTKP); !ok {
 		return errors.New("status PTKP tidak dikenal (mis. TK/0, K/1)")
 	}
 	return nil
