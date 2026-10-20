@@ -4,14 +4,14 @@ import { formatRp } from './format'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut'
 // lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
 export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
 export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
 export type Answers = Partial<Record<Field, string>>
 
 // jawaban aman bila pengguna ragu
-export const DEFAULT_ANSWERS: Answers = { stok: 'periodik', gabung: 'tidak', pkp: 'tidak' }
+export const DEFAULT_ANSWERS: Answers = { stok: 'periodik', gabung: 'tidak', pkp: 'tidak', susut: 'garis_lurus' }
 
 export interface Question { judul: string; alasan: string; options?: Option[] }
 
@@ -104,6 +104,14 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
       { value: 'ya', label: 'Ya, usaha saya sudah PKP' },
     ],
   },
+  susut: {
+    judul: 'Bagaimana nilai alat dan aset usaha dikurangi tiap tahun?',
+    alasan: 'Mesin, kendaraan, dan peralatan menyusut nilainya; pengurangannya menjadi biaya usaha. Satu cara dipakai untuk semua aset dan tidak bisa diganti lagi tanpa persetujuan DJP. Bangunan selalu memakai cara rata.',
+    options: [
+      { value: 'garis_lurus', label: 'Sama rata setiap tahun (garis lurus)', hint: 'Paling umum dan paling mudah. Pilih ini kalau ragu.' },
+      { value: 'saldo_menurun', label: 'Lebih besar di tahun-tahun awal (saldo menurun)', hint: 'Biaya awal lebih besar sehingga pajak tahun awal lebih kecil' },
+    ],
+  },
 }
 
 const pribadi = (a: Answers) => a.bentuk === 'op' || a.bentuk === 'tidak_tahu'
@@ -122,6 +130,7 @@ export function steps(a: Answers): StepId[] {
     ...(pribadi(a) ? ['menikah' as const, 'tanggungan' as const] : []),
     ...(pribadi(a) && a.menikah === 'sudah' ? ['gabung' as const] : []),
     'pkp',
+    'susut',
     'ringkasan',
   ]
 }
@@ -146,6 +155,7 @@ export function toProfile(a: Answers): BusinessProfile {
     pkp: a.pkp === 'ya',
     klu: a.klu ?? '',
     metode_persediaan: jenis === 'jasa' ? '' : ((a.stok as BusinessProfile['metode_persediaan']) || 'periodik'),
+    metode_penyusutan: (a.susut as BusinessProfile['metode_penyusutan']) || 'garis_lurus',
     omzet_tahunan: parseRp(a.omzet) || 0,
     laba_sebelum_pajak: parseRp(a.laba) || 0,
   }
@@ -182,5 +192,11 @@ export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
       : []),
     { judul: 'Pajak penghasilan', isi: PAJAK[p.bentuk_usaha] + (p.ptkp ? ` Status PTKP Anda: ${p.ptkp}.` : '') + ' Perbandingan skema lengkap ada di menu Perencanaan Pajak.' },
     { judul: 'PPN', isi: p.pkp ? 'Usaha Anda memungut PPN; akun PPN masukan dan keluaran disiapkan.' : 'Usaha Anda belum memungut PPN.' },
+    ...(p.metode_penyusutan
+      ? [{
+          judul: 'Penyusutan aset',
+          isi: (p.metode_penyusutan === 'saldo_menurun' ? 'Saldo menurun' : 'Garis lurus') + ' untuk semua aset (bangunan tetap garis lurus). Pilihan ini dikunci setelah disimpan.',
+        }]
+      : []),
   ]
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"pajak/internal/finance"
@@ -151,5 +152,66 @@ func TestAssets_DraftDariTransaksi(t *testing.T) {
 	_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/reports/balance-sheet?period=2026-08", "").Body).Decode(&bs)
 	if !bs.IsBalanced {
 		t.Errorf("neraca harus tetap seimbang dengan draft aset: %+v", bs)
+	}
+}
+
+func TestMetodePenyusutan_DipilihSekaliLaluTerkunci(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", profileBody); rec.Code != http.StatusOK {
+		t.Fatalf("profil: %d %s", rec.Code, rec.Body)
+	}
+	as := assetsOf(t, srv, owner)
+	if as.MetodeUsaha != "" || !as.MetodeCampur {
+		t.Fatalf("seed campur belum dipilih: usaha %q campur %v", as.MetodeUsaha, as.MetodeCampur)
+	}
+	if rec := do(srv, login(t, srv, "admin@kedaikopisenja.id"), http.MethodPost, "/api/v1/business/metode-penyusutan", `{"metode":"saldo_menurun"}`); rec.Code != http.StatusForbidden {
+		t.Errorf("admin memilih metode: %d", rec.Code)
+	}
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/business/metode-penyusutan", `{"metode":""}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("metode kosong: %d", rec.Code)
+	}
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/business/metode-penyusutan", `{"metode":"saldo_menurun"}`); rec.Code != http.StatusOK {
+		t.Fatalf("pilih metode: %d %s", rec.Code, rec.Body)
+	}
+	as = assetsOf(t, srv, owner)
+	for _, a := range as.Assets {
+		want := finance.MetodeSaldoMenurun
+		if a.Kelompok == "bangunan_tidak_permanen" {
+			want = finance.MetodeGarisLurus
+		}
+		if a.Metode != want {
+			t.Errorf("%s: %s, want %s", a.Nama, a.Metode, want)
+		}
+	}
+	if as.MetodeUsaha != finance.MetodeSaldoMenurun || as.MetodeCampur {
+		t.Errorf("ringkasan: %q campur %v", as.MetodeUsaha, as.MetodeCampur)
+	}
+
+	// terkunci: pilih ulang dan ubah lewat profil ditolak; profil tanpa field tetap menyimpan metode
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/business/metode-penyusutan", `{"metode":"garis_lurus"}`); rec.Code != http.StatusConflict {
+		t.Errorf("pilih ulang: %d", rec.Code)
+	}
+	ganti := strings.Replace(profileBody, `"pkp":false`, `"pkp":false,"metode_penyusutan":"garis_lurus"`, 1)
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", ganti); rec.Code != http.StatusConflict {
+		t.Errorf("ganti lewat profil: %d", rec.Code)
+	}
+	var p finance.BusinessProfile
+	_ = json.NewDecoder(do(srv, owner, http.MethodPut, "/api/v1/business", profileBody).Body).Decode(&p)
+	if p.MetodePenyusutan != finance.MetodeSaldoMenurun {
+		t.Errorf("profil tanpa field menghapus metode: %q", p.MetodePenyusutan)
+	}
+
+	// aset baru ikut metode usaha walau body meminta lain
+	rec := do(srv, owner, http.MethodPost, "/api/v1/assets", `{"nama":"Laptop","kelompok":"k1","metode":"garis_lurus","tanggal_perolehan":"2026-08-01","harga_perolehan":12000000}`)
+	var a finance.Asset
+	_ = json.NewDecoder(rec.Body).Decode(&a)
+	if rec.Code != http.StatusCreated || a.Metode != finance.MetodeSaldoMenurun {
+		t.Fatalf("aset baru: %d %+v", rec.Code, a)
+	}
+	rec = do(srv, owner, http.MethodPost, "/api/v1/assets", `{"nama":"Gudang","kelompok":"bangunan_permanen","tanggal_perolehan":"2026-08-01","harga_perolehan":120000000}`)
+	_ = json.NewDecoder(rec.Body).Decode(&a)
+	if rec.Code != http.StatusCreated || a.Metode != finance.MetodeGarisLurus {
+		t.Fatalf("bangunan baru: %d %+v", rec.Code, a)
 	}
 }

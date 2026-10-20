@@ -68,6 +68,9 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		sheets = append(sheets, finance.ImportSheet{Nama: sh.Name, Rows: sh.Rows})
 	}
 	d := finance.ParseOnboarding(sheets)
+	s.mu.RLock()
+	finance.TerapkanMetode(d.Assets, s.metodeUsaha()) // kolom Metode di Excel kalah oleh metode usaha
+	s.mu.RUnlock()
 
 	resp := onboardingResp{
 		Opening: d.Opening, Assets: d.Assets, Karyawan: d.Karyawan,

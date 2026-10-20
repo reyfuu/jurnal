@@ -6,7 +6,7 @@ const a = (x: Answers): Answers => ({ ...DEFAULT_ANSWERS, ...x })
 describe('toProfile', () => {
   it('warung pribadi, menikah, 2 tanggungan', () => {
     expect(toProfile(a({ nama: '  Warung Bu Siti ', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' }))).toEqual({
-      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, klu: '', metode_persediaan: 'periodik', omzet_tahunan: 0, laba_sebelum_pajak: 0,
+      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, klu: '', metode_persediaan: 'periodik', metode_penyusutan: 'garis_lurus', omzet_tahunan: 0, laba_sebelum_pajak: 0,
     })
   })
 
@@ -17,6 +17,11 @@ describe('toProfile', () => {
 
   it('belum menikah mengabaikan jawaban gabung', () => {
     expect(toProfile(a({ jenis: 'jasa', bentuk: 'op', menikah: 'belum', tanggungan: '1', gabung: 'ya' })).ptkp).toBe('TK/1')
+  })
+
+  it('metode penyusutan: bawaan garis lurus, pilihan saldo menurun ikut', () => {
+    expect(toProfile(a({ jenis: 'jasa', bentuk: 'pt', susut: 'saldo_menurun' })).metode_penyusutan).toBe('saldo_menurun')
+    expect(toProfile({ jenis: 'jasa', bentuk: 'pt' }).metode_penyusutan).toBe('garis_lurus')
   })
 
   it('"tidak tahu" dianggap usaha pribadi', () => {
@@ -50,12 +55,12 @@ describe('omzet & laba', () => {
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'ringkasan'],
+      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'susut', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
-    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'ringkasan'])
+    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'susut', 'ringkasan'])
   })
 
   it('belum menikah melewati pertanyaan penghasilan pasangan', () => {
@@ -84,7 +89,7 @@ describe('answered', () => {
 describe('summary', () => {
   it('menjelaskan akun, stok, pajak, dan PPN', () => {
     const s = summary(toProfile(a({ nama: 'X', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' })))
-    expect(s.map((x) => x.judul)).toEqual(['Daftar akun', 'Pencatatan stok', 'Pajak penghasilan', 'PPN'])
+    expect(s.map((x) => x.judul)).toEqual(['Daftar akun', 'Pencatatan stok', 'Pajak penghasilan', 'PPN', 'Penyusutan aset'])
     expect(s[2].isi).toContain('0,5%')
     expect(s[2].isi).toContain('K/2')
   })

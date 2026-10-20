@@ -294,3 +294,6 @@ CREATE OR REPLACE FUNCTION lb_rows(rows jsonb, tid int) RETURNS jsonb LANGUAGE s
 	), '[]'::jsonb)
 	FROM jsonb_array_elements(rows) AS e
 $$;
+
+-- Metode penyusutan usaha (Okt 2026): dipilih sekali untuk semua aset, lalu terkunci.
+ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS metode_penyusutan TEXT;

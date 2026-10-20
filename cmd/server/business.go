@@ -62,6 +62,7 @@ func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 			"bentuk_usaha":      finance.BentukUsahaOptions,
 			"ptkp":              tax.PTKPCodes,
 			"metode_persediaan": finance.MetodePersediaanOptions,
+			"metode_penyusutan": finance.MetodePenyusutanOptions,
 			"provinsi":          finance.ProvinsiOptions,
 			"klu":               kluOptions,
 		},
@@ -88,13 +89,22 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Metode penyusutan terkunci setelah dipilih; formulir yang tidak mengirimnya tetap aman.
+	switch lama := s.metodeUsaha(); {
+	case lama != "" && prof.MetodePenyusutan == "":
+		prof.MetodePenyusutan = lama
+	case lama != "" && prof.MetodePenyusutan != lama:
+		http.Error(w, errMetodeTerkunci, http.StatusConflict)
+		return
+	}
 	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan profil usaha", http.StatusInternalServerError)
 		return
 	}
-	s.mu.Lock()
 	s.profile = &prof
-	s.mu.Unlock()
+	finance.TerapkanMetode(s.assets, prof.MetodePenyusutan)
 	writeJSON(w, prof)
 }
 

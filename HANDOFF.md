@@ -582,6 +582,21 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `mp_audit` (hanya INSERT — audit tidak pernah diubah). `TestPostgresPanelMaster` terbukti gagal
   bila pemetaan `mp_audit` atau kolom `balasan` dibuang.
 
+## Metode penyusutan per usaha, terkunci (20 Okt 2026)
+
+- `BusinessProfile.MetodePenyusutan` (`garis_lurus` | `saldo_menurun`): satu metode untuk **semua**
+  aset usaha; bangunan tetap garis lurus (`finance.MetodeUntuk`, PMK 72/2023). Ditanyakan di
+  onboarding (langkah `susut`, bawaan garis lurus) dan di Profil Usaha selama belum dipilih.
+- **Terkunci setelah dipilih**: `PUT /business` dengan metode lain → 409; tanpa field → metode lama
+  dipertahankan (formulir lama aman). `POST /business/metode-penyusutan` (Owner, sekali) untuk usaha
+  lama. Mengganti metode memerlukan persetujuan DJP, jadi tidak ada jalur ubah di aplikasi; bila
+  perlu, tim mengubah data langsung setelah ada persetujuan.
+- Saat dipilih, semua aset dihitung ulang (`TerapkanMetode`); aset baru / diubah / impor Excel
+  mengabaikan metode di input. Usaha lama tanpa pilihan: perilaku lama (per aset) + banner di tab
+  Aset; `AssetSummary.metode_saran` / `metode_campur` dari `MetodeSeragam` (demo Kedai Kopi Senja
+  campur: mesin espresso saldo menurun).
+- Postgres: `business_profiles.metode_penyusutan` (`ADD COLUMN IF NOT EXISTS`).
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

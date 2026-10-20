@@ -176,6 +176,47 @@ func ValidateAsset(a *Asset) error {
 	return nil
 }
 
+// MetodeUntuk: metode yang berlaku untuk aset a bila usaha memakai metode m. Bangunan selalu
+// garis lurus (PMK 72/2023). m kosong (belum dipilih) = metode aset itu sendiri.
+func MetodeUntuk(m string, a Asset) string {
+	if m == "" {
+		return cmp.Or(a.Metode, MetodeGarisLurus)
+	}
+	if k, ok := KelompokOf(a.Kelompok); ok && k.TarifSMBps == 0 {
+		return MetodeGarisLurus
+	}
+	return m
+}
+
+// TerapkanMetode menyetel metode semua aset ke metode usaha m (kosong = tidak mengubah apa pun).
+func TerapkanMetode(as []Asset, m string) {
+	if m == "" {
+		return
+	}
+	for i := range as {
+		as[i].Metode = MetodeUntuk(m, as[i])
+	}
+}
+
+// MetodeSeragam: untuk usaha yang belum memilih — metode yang sudah dipakai semua aset bukan
+// bangunan (ok=true), "" bila belum ada aset seperti itu, ok=false bila campur.
+func MetodeSeragam(as []Asset) (string, bool) {
+	var m string
+	for _, a := range as {
+		k, ok := KelompokOf(a.Kelompok)
+		if !ok || k.TarifSMBps == 0 {
+			continue // draft & bangunan tidak punya pilihan
+		}
+		switch am := cmp.Or(a.Metode, MetodeGarisLurus); {
+		case m == "":
+			m = am
+		case m != am:
+			return "", false
+		}
+	}
+	return m, true
+}
+
 // parseYM membaca "YYYY-MM" atau "YYYY-MM-DD".
 func parseYM(s string) (year, month int, ok bool) {
 	if len(s) < 7 || s[4] != '-' {
@@ -325,6 +366,11 @@ type AssetSummary struct {
 	// setoran modal berupa aset agar neraca tetap seimbang.
 	TambahanTanpaKas int64 `json:"tambahan_tanpa_kas"`
 	DraftCount       int   `json:"draft_count"`
+	// MetodeUsaha: metode penyusutan usaha (profil); kosong = belum dipilih. MetodeSaran /
+	// MetodeCampur membantu usaha lama memilih: metode yang sudah seragam dipakai asetnya.
+	MetodeUsaha  string `json:"metode_usaha"`
+	MetodeSaran  string `json:"metode_saran,omitempty"`
+	MetodeCampur bool   `json:"metode_campur,omitempty"`
 	// PemetaanBelumDicek: jumlah baris JenisHartaList yang belum diverifikasi ke Lampiran PMK.
 	PemetaanBelumDicek int `json:"pemetaan_belum_dicek"`
 }
