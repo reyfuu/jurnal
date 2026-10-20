@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Brain, Contact, MessageSquareText, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BellRing, BookOpen, Brain, Contact, MessageSquareText, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import type { Izin, Me } from '@/lib/api'
@@ -13,8 +13,9 @@ import { ArtikelView, BasisPengetahuan } from './Pengetahuan'
 import { ParameterView } from './Parameter'
 import { PenggunaKlienView } from './PenggunaKlien'
 import { CatatanMaster } from './CatatanMaster'
+import { PengingatMaster } from './PengingatMaster'
 
-export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pengguna' | 'catatan' | 'pembayaran' | 'tim' | 'audit'
+export type Page = 'ringkasan' | 'klien' | 'koreksi' | 'tiket' | 'pengetahuan' | 'artikel' | 'coa' | 'benchmark' | 'parameter' | 'pengguna' | 'catatan' | 'pengingat' | 'pembayaran' | 'tim' | 'audit'
 
 // Menu Panel Master; izin kosong = cukup melihat klien (klien_lihat atau klien_semua).
 const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon; izin?: Izin | Izin[] }[] }[] = [
@@ -26,6 +27,7 @@ const NAV: { group: string; items: { page: Page; label: string; icon: LucideIcon
       { page: 'pengguna', label: 'Pengguna Klien', icon: Contact, izin: 'pengguna_lihat' },
       { page: 'koreksi', label: 'Usulan Koreksi', icon: FileCheck2, izin: ['usul_koreksi', 'klien_semua'] },
       { page: 'catatan', label: 'Catatan Konsultan', icon: MessageSquareText, izin: ['catatan', 'pengaturan', 'klien_semua'] },
+      { page: 'pengingat', label: 'Pengingat', icon: BellRing, izin: ['pengaturan', 'catatan', 'klien_semua'] },
       { page: 'tiket', label: 'Tiket · Lapor Bug', icon: Ticket, izin: 'tiket' },
     ],
   },
@@ -121,7 +123,8 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
             : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} bisaUbah={bisa('klien_ubah')}
               bisaHapus={bisa('hapus_permanen')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
           {page === 'koreksi' && <KoreksiMaster />}
-          {page === 'catatan' && <CatatanMaster bisaAtur={bisa('pengaturan')} />}
+          {page === 'catatan' && <CatatanMaster />}
+          {page === 'pengingat' && <PengingatMaster bisaAtur={bisa('pengaturan')} />}
           {page === 'pengguna' && <PenggunaKlienView bisaKelola={bisa('pengguna_kelola')} bisaReset={bisa('pengguna_reset')} bisaHapus={bisa('hapus_permanen')} />}
           {page === 'pengetahuan' && <BasisPengetahuan />}
           {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}

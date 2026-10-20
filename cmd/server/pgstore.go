@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -228,9 +229,12 @@ func saveMasterDB(db *sql.DB, st master.State, auditBaru []master.Catatan) error
 	if _, err := tx.Exec(`DELETE FROM mp_roles; DELETE FROM mp_anggota; DELETE FROM mp_pengaturan`); err != nil {
 		return err
 	}
-	if st.Pengingat != nil {
-		b, _ := json.Marshal(st.Pengingat)
-		if _, err := tx.Exec(`INSERT INTO mp_pengaturan (kunci, isi) VALUES ('pengingat', $1)`, string(b)); err != nil {
+	for kunci, isi := range map[string]any{"pengingat": st.Pengingat, "jadwal": st.Jadwal} {
+		if reflect.ValueOf(isi).IsNil() {
+			continue // belum pernah diatur: bawaan
+		}
+		b, _ := json.Marshal(isi)
+		if _, err := tx.Exec(`INSERT INTO mp_pengaturan (kunci, isi) VALUES ($1, $2)`, kunci, string(b)); err != nil {
 			return err
 		}
 	}
@@ -269,6 +273,13 @@ func loadMasterDB(db *sql.DB) (master.State, error) {
 	}
 	if p.IntervalHari > 0 {
 		st.Pengingat = &p
+	}
+	var j finance.DaftarJadwal
+	if err := selectJSON(db, &j, `SELECT (SELECT isi FROM mp_pengaturan WHERE kunci = 'jadwal')`); err != nil {
+		return st, err
+	}
+	if j.NextID > 0 {
+		st.Jadwal = &j
 	}
 	for _, c := range st.Audit {
 		st.NextAuditID = max(st.NextAuditID, c.ID+1)

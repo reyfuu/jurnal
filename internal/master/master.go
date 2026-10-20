@@ -43,7 +43,7 @@ const (
 	CatatanKonsultan Izin = "catatan"
 	// Pengaturan: aturan yang berlaku untuk semua klien, mis. frekuensi pengingat.
 	Pengaturan Izin = "pengaturan"
-	Audit          Izin = "audit"
+	Audit      Izin = "audit"
 )
 
 type IzinInfo struct {
@@ -133,6 +133,16 @@ type State struct {
 	NextAuditID int       `json:"next_audit_id"`
 	// Pengingat: aturan pengingat catatan konsultan untuk semua klien; nil = bawaan.
 	Pengingat *finance.Pengingat `json:"pengingat,omitempty"`
+	// Jadwal: jadwal pengingat laporan & pajak untuk semua klien; nil = bawaan.
+	Jadwal *finance.DaftarJadwal `json:"jadwal,omitempty"`
+}
+
+// DaftarJadwal: jadwal yang berlaku (bawaan bila belum pernah diatur).
+func (s State) DaftarJadwal() finance.DaftarJadwal {
+	if s.Jadwal == nil {
+		return finance.JadwalBawaan()
+	}
+	return finance.DaftarJadwal{Item: slices.Clone(s.Jadwal.Item), NextID: s.Jadwal.NextID}
 }
 
 // AturanPengingat: pengingat yang berlaku (bawaan bila belum pernah diatur).
@@ -152,6 +162,10 @@ func (s State) Clone() State {
 		p := *s.Pengingat
 		p.Kanal = slices.Clone(p.Kanal)
 		c.Pengingat = &p
+	}
+	if s.Jadwal != nil {
+		j := s.DaftarJadwal()
+		c.Jadwal = &j
 	}
 	for i := range c.Roles {
 		c.Roles[i].Izin = slices.Clone(c.Roles[i].Izin)

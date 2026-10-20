@@ -796,6 +796,12 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   sebelum disimpan. AI mati / gagal / kuota habis → `ai_pesan`, pratinjau tetap jalan.
 - Kuota saran KLU memakai mekanisme yang sama (`jatahAI("klu|<user>")`).
 
+## Jadwal pengingat laporan & pajak (20 Okt 2026)
+
+- Panel Master → **Pengingat** (izin lihat: pengaturan/catatan/klien_semua; ubah: `pengaturan`): daftar jadwal (bulanan tanggal N / tahunan tanggal-bulan), mulai diingatkan H-n (0–60), berlaku untuk semua / orang pribadi / badan / PKP, aktif/nonaktif. Simpan = ganti seluruh daftar (`PUT /api/v1/master/jadwal`, audit "Ubah jadwal pengingat"); disimpan di `mp_pengaturan` kunci `jadwal` (JSON mode: `master.json`). Pengaturan pengingat catatan konsultan dipindah ke halaman ini juga.
+- Bawaan: tutup buku bulanan (tgl 5), setor PPh Final UMKM (15), lapor SPT Masa PPh badan (20), setor & lapor SPT Masa PPN untuk PKP (akhir bulan), tutup buku tahunan (31 Jan), SPT Tahunan OP (31 Mar), SPT Tahunan Badan (30 Apr). **Tenggat pajak bawaan ditandai "perlu dicek tim pajak"** — cocokkan dengan PMK 81/2024 & Coretax; tenggat yang jatuh di hari libur belum digeser ke hari kerja berikutnya.
+- Klien: `/auth/me` → `jadwal` (tenggat dalam jendela H-n, sesuai `bentuk_usaha` & `pkp` profil) → banner di atas halaman. "Sudah dikerjakan" hanya menyembunyikan tenggat itu di browser tersebut (localStorage); tenggat periode berikutnya muncul lagi. Tanggal dihitung WIB; tanggal 29–31 di bulan pendek memakai hari terakhir.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

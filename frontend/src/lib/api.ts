@@ -43,6 +43,8 @@ export interface Me {
   /** Catatan konsultan yang belum ditandai selesai, dan yang jatuh tempo diingatkan (pop-up). */
   catatan_terbuka?: number
   catatan_ingat?: number
+  /** Tenggat laporan & pajak yang sedang dalam jendela pengingat (diatur Panel Master). */
+  jadwal?: PengingatJadwal[]
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
@@ -1528,3 +1530,15 @@ export interface PorsiProduk { nama: string; harga: number; modal: number; ada_m
 export interface Skenario { harga_bps: number; volume_bps: number; modal_bps: number; tambah_tetap: number }
 export interface SimulasiUsaha { dasar: DasarSimulasi; hasil: HasilSimulasi; titik_impas: TitikImpasUsaha; produk: PorsiProduk[] }
 export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>(`/simulasi?period=${period}`, { method: 'POST', body: s })
+
+// --- Jadwal pengingat laporan & pajak (Panel Master, berlaku untuk semua klien) ---
+
+export type UntukJadwal = 'semua' | 'op' | 'badan' | 'pkp'
+export interface JadwalPengingat {
+  id: number; judul: string; keterangan?: string
+  frekuensi: 'bulanan' | 'tahunan'; tanggal: number; bulan?: number
+  hari_sebelum: number; untuk: UntukJadwal; aktif: boolean; perlu_verifikasi?: boolean
+}
+export interface PengingatJadwal { id: number; judul: string; keterangan?: string; jatuh_tempo: string; sisa_hari: number }
+export const getJadwalMaster = () => api<{ item: JadwalPengingat[] }>('/master/jadwal')
+export const aturJadwal = (item: JadwalPengingat[]) => api<{ item: JadwalPengingat[] }>('/master/jadwal', { method: 'PUT', body: { item } })
