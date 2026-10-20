@@ -113,6 +113,7 @@ func TestKalkulatorPerencanaan_Endpoint(t *testing.T) {
 	for path, body := range map[string]string{
 		"/api/v1/kalkulator/gross-up":  `{"jenis":"pph23","objek":"23-jasa","diterima":200000000,"punya_npwp":true}`,
 		"/api/v1/kalkulator/ppn-harga": `{"pembelian":1000000000,"porsi_dari_pkp_bps":10000,"markup_bps":1000,"opex_bps":200}`,
+		"/api/v1/kalkulator/pph22-marketplace": `{"omzet_marketplace":2000000000,"npm_bps":300,"bentuk":"badan","skema":"umum"}`,
 		"/api/v1/kalkulator/beli-sewa": `{"bentuk":"badan","omzet":1000000000,"biaya_lain":400000000,"harga_aset":10000000,"umur_tahun":4,"metode":"garis_lurus","sewa_per_tahun":4000000}`,
 	} {
 		if rec := do(srv, qa, http.MethodPost, path, body); rec.Code != http.StatusOK {

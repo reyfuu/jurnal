@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { getKalkulator, type BusinessProfile, type KalkulatorMaster } from '@/lib/api'
-import { FormCekPKP, FormPotong, FormPPhBadan } from '@/views/KalkulatorPajak'
+import { FormCekPKP, FormPPhBadan } from '@/views/KalkulatorPajak'
+import { FormMarketplace } from '@/views/FormMarketplace'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
 
 const TABS = [
   { id: 'pkp', label: 'Cek Ambang PKP' },
-  { id: 'pph22', label: 'Kalkulator PPh 22' },
+  { id: 'pph22', label: 'PPh 22 Marketplace' },
   { id: '31e', label: 'Simulasi Pasal 31E' },
   { id: 'bentuk', label: 'Bentuk Usaha Paling Hemat' },
 ] as const
@@ -19,7 +20,6 @@ export function AlatGratis({ profile, ptkpCodes, onLangganan }: { profile: Busin
   const [error, setError] = useState('')
 
   useEffect(() => { getKalkulator().then(setM, (e) => setError((e as Error).message)) }, [])
-  const pph22 = m?.jenis.find((j) => j.id === 'pph22')
 
   return (
     <div className="alat-gratis grid gap-4">
@@ -36,7 +36,7 @@ export function AlatGratis({ profile, ptkpCodes, onLangganan }: { profile: Busin
 
       {error && <p className="pill-status pill-red" role="alert">{error}</p>}
       {tab === 'pkp' && <FormCekPKP />}
-      {tab === 'pph22' && pph22 && <FormPotong jenis={pph22} />}
+      {tab === 'pph22' && m && <FormMarketplace m={m} profile={profile} onLangganan={onLangganan} />}
       {tab === '31e' && m && <FormPPhBadan m={m} />}
       {tab === 'bentuk' && <PerencanaanPajak profile={profile} ptkpCodes={ptkpCodes} />}
 

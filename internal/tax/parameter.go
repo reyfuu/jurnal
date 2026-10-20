@@ -39,7 +39,11 @@ type Parameter struct {
 	PPNDPPPembilang int64 `json:"ppn_dpp_pembilang"` // DPP nilai lain 11/12
 	PPNDPPPenyebut  int64 `json:"ppn_dpp_penyebut"`
 
-	BatasNPPN int64 `json:"batas_nppn"` // omzet setahun di bawah ini boleh memakai norma (NPPN)
+	// PPh 22 atas penjualan lewat marketplace (pedagang dalam negeri).
+	MarketplaceTarifBps int64  `json:"marketplace_tarif_bps"`
+	MarketplaceBebasOP  int64  `json:"marketplace_bebas_op"` // OP beromzet s.d. ini tidak dipungut (surat pernyataan)
+	DasarMarketplace    string `json:"dasar_marketplace"`
+	BatasNPPN           int64  `json:"batas_nppn"` // omzet setahun di bawah ini boleh memakai norma (NPPN)
 	// NormaPerbandinganBps: norma untuk skema NPPN di perbandingan bentuk usaha, yang tidak
 	// tahu KLU 5 digit usaha. Kalkulator NPPN memakai Norma per KLU.
 	NormaPerbandinganBps int64        `json:"norma_perbandingan_bps"`
@@ -101,6 +105,7 @@ func ParameterBawaan() Parameter {
 		UMKMTarifBps: 50, UMKMBebasOP: 500_000_000, BatasOmzetUMKM: 4_800_000_000, DasarUMKM: "PP 55/2022",
 		BadanTarifBps: 2200, Fasilitas31EBps: 5000, Batas31EPenuh: 4_800_000_000, Batas31E: 50_000_000_000, DividenBps: 1000,
 		BatasPKP: 4_800_000_000, PPNTarifBps: 1200, PPNDPPPembilang: 11, PPNDPPPenyebut: 12,
+		MarketplaceTarifBps: 50, MarketplaceBebasOP: 500_000_000, DasarMarketplace: "PMK 37/2025",
 		BatasNPPN: 4_800_000_000, NormaPerbandinganBps: 5000, Objek: JenisPajakList, Norma: normaBawaan,
 		PerluVerifikasi: []string{
 			"Tax Planning Calculator V2.1 menyebut skema PPh final UMKM sebagai \"PP 20/2026\"; aturan itu belum diverifikasi tim, aplikasi masih merujuk PP 55/2022.",
@@ -134,7 +139,11 @@ func (p Parameter) Salin() Parameter {
 var ObjekTerikat = []string{"42-umkm", "ppn-umum", "ppn-mewah"}
 
 // Selaraskan menyalin tarif UMKM & PPN ke objek terikat; dipanggil sebelum simpan & aktifkan.
+// Versi yang disimpan sebelum field PPh 22 marketplace ada diisi dengan angka bawaan.
 func (p *Parameter) Selaraskan() {
+	if p.MarketplaceTarifBps == 0 && p.DasarMarketplace == "" {
+		p.MarketplaceTarifBps, p.MarketplaceBebasOP, p.DasarMarketplace = 50, 500_000_000, "PMK 37/2025"
+	}
 	for i := range p.Objek {
 		for j := range p.Objek[i].Objek {
 			o := &p.Objek[i].Objek[j]
@@ -205,7 +214,7 @@ func (p Parameter) Validasi() error {
 		{"dasar PPh 21 bukan pegawai", p.DasarBukanPegawaiBps, 10_000}, {"tarif UMKM", p.UMKMTarifBps, 10_000},
 		{"tarif badan", p.BadanTarifBps, 10_000}, {"fasilitas Pasal 31E", p.Fasilitas31EBps, 10_000},
 		{"tarif dividen", p.DividenBps, 10_000}, {"tarif PPN", p.PPNTarifBps, 10_000},
-		{"norma perbandingan", p.NormaPerbandinganBps, 10_000},
+		{"norma perbandingan", p.NormaPerbandinganBps, 10_000}, {"tarif PPh 22 marketplace", p.MarketplaceTarifBps, 10_000},
 	} {
 		if err := bpsWajar(c.nama, c.v, c.max); err != nil {
 			return err
@@ -216,7 +225,7 @@ func (p Parameter) Validasi() error {
 		return salah("pengali tanpa NPWP tidak boleh di bawah 100%%")
 	case p.DasarBukanPegawaiBps == 0 || p.NormaPerbandinganBps == 0:
 		return salah("dasar bukan pegawai dan norma perbandingan wajib lebih dari 0")
-	case p.BiayaJabatanMaks < 0 || p.UMKMBebasOP < 0:
+	case p.BiayaJabatanMaks < 0 || p.UMKMBebasOP < 0 || p.MarketplaceBebasOP < 0:
 		return salah("batas biaya jabatan dan omzet bebas UMKM tidak boleh negatif")
 	case p.BatasOmzetUMKM <= 0 || p.BatasPKP <= 0 || p.BatasNPPN <= 0:
 		return salah("batas omzet UMKM, PKP, dan NPPN wajib diisi")

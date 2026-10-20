@@ -228,4 +228,5 @@ func (s *Server) parameterRoutes() {
 	m.HandleFunc("POST /api/v1/kalkulator/gross-up", k(hitung(tax.HitungGrossUp)))
 	m.HandleFunc("POST /api/v1/kalkulator/ppn-harga", k(hitung(tax.HitungPPNHarga)))
 	m.HandleFunc("POST /api/v1/kalkulator/beli-sewa", k(hitung(tax.HitungBeliSewa)))
+	m.HandleFunc("POST /api/v1/kalkulator/pph22-marketplace", k(hitung(tax.HitungMarketplace)))
 }

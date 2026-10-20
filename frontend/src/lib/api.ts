@@ -1363,6 +1363,15 @@ export interface OpsiAset { tahun: TahunAset[]; total_pph: number; total_kas: nu
 export interface BeliSewaResult {
   metode: string; beli: OpsiAset; sewa: OpsiAset; potong_sewa: number; rekomendasi: 'beli' | 'sewa'; selisih: number; catatan: string[]
 }
+export interface SaranPajak { judul: string; isi: string; langganan: boolean }
+export interface MarketplaceResult {
+  omzet_total: number; laba: number; final: boolean; dipungut: number; terutang: number; terutang_umum: number
+  lebih_bayar: number; kurang_bayar: number; npm_impas_bps: number
+  status: 'bebas' | 'lunas' | 'kurang_bayar' | 'lebih_bayar'
+  rekomendasi: SaranPajak[]; langkah: Langkah[]; catatan: string[]
+}
+export const hitungMarketplace = (b: { omzet_marketplace: number; omzet_lain: number; npm_bps: number; bentuk: 'op' | 'badan'; skema: 'final' | 'umum'; ptkp: string }) =>
+  api<MarketplaceResult>('/kalkulator/pph22-marketplace', { method: 'POST', body: b })
 export const cariNorma = (q: string) => api<Norma[]>('/kalkulator/norma?q=' + encodeURIComponent(q))
 export const hitungNPPN = (b: { omzet: number; klu: string; wilayah: string; norma_bps: number; ptkp: string }) =>
   api<NPPNResult>('/kalkulator/nppn', { method: 'POST', body: b })
@@ -1388,6 +1397,7 @@ export interface ParameterIsi {
   umkm_tarif_bps: number; umkm_bebas_op: number; batas_omzet_umkm: number; dasar_umkm: string
   badan_tarif_bps: number; fasilitas_31e_bps: number; batas_31e_penuh: number; batas_31e: number; dividen_bps: number
   batas_pkp: number; ppn_tarif_bps: number; ppn_dpp_pembilang: number; ppn_dpp_penyebut: number
+  marketplace_tarif_bps: number; marketplace_bebas_op: number; dasar_marketplace: string
   batas_nppn: number; norma_perbandingan_bps: number
   objek: JenisPajak[]
   perlu_verifikasi: string[] | null

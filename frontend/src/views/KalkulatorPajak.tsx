@@ -8,6 +8,7 @@ import { Dua, Hasil, Uang } from '@/components/KalkulatorUI'
 import { formatRp } from '@/lib/format'
 import { GREEN, RED, SOROT, persen } from '@/lib/kalkulator'
 import { FormBeliSewa, FormGrossUp, FormNPPN, FormPPNHarga } from './KalkulatorRencana'
+import { FormMarketplace } from './FormMarketplace'
 
 type TabID = 'pph21' | 'pph-badan' | string
 
@@ -30,6 +31,7 @@ export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }
     { id: 'gross-up', label: 'Gross Up' },
     { id: 'ppn-harga', label: 'PPN & Harga Jual' },
     { id: 'beli-sewa', label: 'Beli vs Sewa Aset' },
+    { id: 'pph22-marketplace', label: 'PPh 22 Marketplace' },
   ]
 
   return (
@@ -65,6 +67,7 @@ export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }
       {tab === 'gross-up' && <FormGrossUp m={m} profile={profile} />}
       {tab === 'ppn-harga' && <FormPPNHarga m={m} profile={profile} />}
       {tab === 'beli-sewa' && <FormBeliSewa m={m} profile={profile} />}
+      {tab === 'pph22-marketplace' && <FormMarketplace m={m} profile={profile} />}
       {m.jenis.filter((j) => j.id === tab).map((j) => <FormPotong key={j.id} jenis={j} />)}
     </>
   )

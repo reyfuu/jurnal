@@ -208,6 +208,12 @@ export function ParameterView() {
               <Baris label="Rujukan aturan (tampil di klien)"><Input disabled={off} value={isi.dasar_umkm} onChange={(e) => ubah((x) => { x.dasar_umkm = e.target.value })} /></Baris>
             </Bagian>
 
+            <Bagian judul="PPh 22 marketplace">
+              <Baris label="Tarif atas omzet marketplace"><Pct bps={isi.marketplace_tarif_bps} off={off} set={(n) => ubah((x) => { x.marketplace_tarif_bps = n })} /></Baris>
+              <Baris label="OP tidak dipungut bila omzet setahun s.d."><Rp v={isi.marketplace_bebas_op} off={off} set={(n) => ubah((x) => { x.marketplace_bebas_op = n })} /></Baris>
+              <Baris label="Rujukan aturan"><Input disabled={off} value={isi.dasar_marketplace} onChange={(e) => ubah((x) => { x.dasar_marketplace = e.target.value })} /></Baris>
+            </Bagian>
+
             <Bagian judul="PPh badan & Pasal 31E">
               <Baris label="Tarif badan"><Pct bps={isi.badan_tarif_bps} off={off} set={(n) => ubah((x) => { x.badan_tarif_bps = n })} /></Baris>
               <Baris label="Pengurangan tarif Pasal 31E"><Pct bps={isi.fasilitas_31e_bps} off={off} set={(n) => ubah((x) => { x.fasilitas_31e_bps = n })} /></Baris>
