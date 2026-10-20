@@ -701,6 +701,21 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   tanpa tombol Hitung, pilih produk → HPP resep, pilih saluran → komisi, margin % atau Rp/porsi,
   titik impas produk di bagian lipat). Slider di-debounce 150 ms, hitungan tetap di server.
 
+## PPh 22 marketplace di Alat Gratis (20 Okt 2026)
+
+- `tax.HitungMarketplace` (`POST /kalkulator/pph22-marketplace`, ikut boleh untuk usaha belum
+  berlangganan karena di bawah `/api/v1/kalkulator/`): PPh 22 dipungut marketplace = tarif x omzet
+  marketplace (PMK 37/2025; OP beromzet s.d. Rp500 jt tidak dipungut dengan surat pernyataan).
+  Skema final: pungutan = bagian pelunasan PPh final. Skema pembukuan: pungutan = kredit pajak;
+  bila melebihi PPh terutang → lebih bayar + `npm_impas_bps` (margin di bawah ini pungutan > pajak).
+- Rekomendasi berbasis aturan (bukan LLM): SKB PPh 22 bila lebih bayar + ajakan "Isi data &
+  berlangganan"; surat pernyataan bila di bawah Rp500 jt; pembanding pembukuan bila lebih murah.
+- Parameter: `marketplace_tarif_bps`, `marketplace_bebas_op`, `dasar_marketplace` (Panel Master →
+  Parameter Pajak). Versi lama tanpa field ini diisi bawaan oleh `Selaraskan`.
+- Alat Gratis: tab "PPh 22 Marketplace" menggantikan kalkulator PPh 22 umum; juga tab Perencanaan
+  di Kalkulator Pajak. **Perlu verifikasi tim**: prosedur SKB & pengembalian kelebihan pungutan
+  final mengikuti PMK 37/2025.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
