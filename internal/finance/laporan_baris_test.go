@@ -32,7 +32,7 @@ func TestBagianLabaRugi(t *testing.T) {
 	}
 	cek := map[string]int64{"omzet": 100_000, "potongan": -10_000, "penjualan_bersih": 90_000, "hpp": -30_000,
 		"laba_kotor": 60_000, "beban:Sewa": -15_000, "beban:Listrik": -5_000, "penyusutan": -5_000,
-		"total_beban": -25_000, "pendapatan_lain": 1_000, "laba_bersih": 36_000}
+		"total_beban": -20_000, "pendapatan_lain": 1_000, "laba_bersih": 36_000}
 	for k, v := range cek {
 		if r := barisDengan(t, b, k); r.Nilai != v || r.Agregat != AgregatJumlah {
 			t.Errorf("%s = %d (%s), mau %d (jumlah)", k, r.Nilai, r.Agregat, v)

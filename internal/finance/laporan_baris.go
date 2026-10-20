@@ -64,13 +64,12 @@ func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	for _, l := range is.OpexLines {
 		s.tambah(GayaBaris, "beban:"+l.Label, l.Label, -l.Amount)
 	}
-	if is.Depreciation != 0 {
-		s.tambah(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation)
-	}
-	if is.Amortization != 0 {
-		s.tambah(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization)
-	}
-	s.tambah(GayaTotal, "total_beban", "Total beban operasional", -is.TotalOpex)
+	s.tambah(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex)
+	s.tambah(GayaTotal, "ebitda", "EBITDA (laba sebelum penyusutan & amortisasi)", is.EBITDA)
+	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
+	s.tambah(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation)
+	s.tambah(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization)
+	s.tambah(GayaTotal, "ebit", "Laba usaha (EBIT)", is.EBIT)
 	if is.OtherIncome != 0 {
 		s.tambah(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome)
 	}
@@ -96,6 +95,7 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.judul("judul_modal", "Modal (Ekuitas)")
 	s.tambah(GayaBaris, "modal_awal", "Modal awal", bs.Equity.OpeningCapital)
 	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal - ambil pribadi", bs.Equity.AddedCapital)
+	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
 	s.tambah(GayaBaris, "laba_berjalan", "Laba bersih periode berjalan", bs.Equity.CurrentProfit)
 	s.tambah(GayaTotal, "total_modal", "Total modal", bs.Equity.Total)
 	s.tambah(GayaTotal, "total_pasiva", "Total pasiva (utang + modal)", bs.Liabilities.Total+bs.Equity.Total)

@@ -48,6 +48,7 @@ type IncomeStatementResult struct {
 	LabaUsaha        int64        `json:"laba_usaha"`
 	PendapatanLain   []ReportLine `json:"pendapatan_lain"`
 	BebanLain        []ReportLine `json:"beban_lain"`
+	EBITDA           int64        `json:"ebitda"`
 	LabaBersih       int64        `json:"laba_bersih"`
 	Catatan          []string     `json:"catatan"`
 }
@@ -103,6 +104,13 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 	r.LabaKotor = r.PenjualanBersih - r.HPP
 	r.BebanOperasional, r.TotalBebanOps = linesOf(tb, BebanOperasional)
 	r.LabaUsaha = r.LabaKotor - r.TotalBebanOps
+	// EBITDA: laba usaha sebelum penyusutan (6113) & amortisasi (6118) yang dijurnal saat penutupan bulan.
+	r.EBITDA = r.LabaUsaha
+	for _, l := range r.BebanOperasional {
+		if l.Kode == "6113" || l.Kode == "6118" {
+			r.EBITDA += l.Jumlah
+		}
+	}
 	var lain, bebanLain int64
 	r.PendapatanLain, lain = linesOf(tb, PendapatanLain)
 	r.BebanLain, bebanLain = linesOf(tb, BebanLain)

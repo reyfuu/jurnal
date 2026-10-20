@@ -64,7 +64,8 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
             <AmountRow label="Laba kotor" value={formatRp(is.laba_kotor)} bold />
             <Lines lines={is.beban_operasional} negate />
             <AmountRow label="Total beban operasional" value={formatRp(-is.total_beban_operasional)} color={RED} bold />
-            <AmountRow label="Laba usaha" value={formatRp(is.laba_usaha)} bold />
+            <AmountRow label="EBITDA (sebelum penyusutan 6113 & amortisasi 6118)" value={formatRp(is.ebitda)} />
+            <AmountRow label="Laba usaha (EBIT)" value={formatRp(is.laba_usaha)} bold />
             <Lines lines={is.pendapatan_lain} />
             <Lines lines={is.beban_lain} negate />
             <AmountRow label="Laba bersih" value={formatRp(is.laba_bersih)} color={GREEN} bold />

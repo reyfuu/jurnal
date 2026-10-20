@@ -844,6 +844,15 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Tren dashboard: ≤ 12 bulan berakhir di periode dipilih, mulai dari bulan data pertama. Omzet setahun (Perencanaan Pajak) & dasar simulasi memakai bulan yang punya transaksi.
 - Frontend memasang bulan bawaan sekali per sesi/usaha (`periodeAwal` ref) agar pilihan pengguna tidak tertimpa.
 
+## Buku berjalan, EBITDA, umur piutang/utang (21 Okt 2026)
+
+- **Neraca & arus kas berjalan** (`finance.BuildLaporanBerjalan`, `PosisiPada`): saldo dibawa dari saldo awal pembukuan (`tenant.bukuAwalLocked`: neraca awal onboarding; demo = kas Januari contoh + persediaan contoh; lainnya nol di bulan data pertama). Kas bergerak di **tanggal pelunasan** (`TanggalLunas`); penjualan/pembelian tempo jadi piutang/utang sampai dilunasi; pinjaman, setoran, prive berjalan. Arus kas metode langsung dari kas yang bergerak bulan itu; tidak langsung dari perubahan saldo piutang/utang/persediaan — keduanya sama (diuji).
+- **Penutupan buku**: laba bulan-bulan sebelumnya = **Laba Ditahan** (`Equity.RetainedEarnings`); penyusutan & amortisasi dibebankan tiap bulan dari register aset (jurnal penutupan). Aset & selisih nilai stok titik nol yang masuk tanpa kas = tambahan modal.
+- **Laba Rugi bertingkat**: laba kotor → beban operasional tunai → **EBITDA** → penyusutan & amortisasi → **EBIT** → pendapatan lain → laba bersih (UI, PDF/Banding, CoA).
+- **CoA berjalan**: saldo awal akun dari posisi akhir bulan lalu (`coa.OpeningBerjalan`, 3201 = laba ditahan) + `coa.JournalBerjalan` (transaksi bulan ini; pelunasan transaksi bulan lalu Dr Kas/Cr 1201 atau Dr 2101/Cr Kas di tanggal bayar). Laba & total aset CoA = ringkas (diuji 3 bulan).
+- **Umur Piutang & Utang** (menu Laporan, view `umur-piutang`): transaksi belum lunas + saldo awal per tanggal, kelompok 0–30/31–60/61–90/>90 hari, per pihak; total = Neraca. **Catat pelunasan** → `POST /api/v1/transactions/{id}/lunas {tanggal}`.
+- Catatan: menu Piutang & Utang (daftar tagihan manual) dan KPI "Piutang belum tertagih" di dashboard masih dari daftar tagihan terpisah, belum dari buku besar — disatukan berikutnya. Baris PPh di laba rugi belum ada.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

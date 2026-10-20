@@ -748,16 +748,40 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // --- Laporan ---
 
-// openingFor: saldo awal periode. Memakai neraca awal onboarding bila sudah diisi, kalau belum
-// memakai saldo data demo (usaha baru: nol). Pemanggil harus memegang s.mu.
-func (s *tenant) openingFor(period string) finance.ReportOpening {
-	if s.opening == nil {
-		if !s.demo {
-			return finance.ReportOpening{}
-		}
-		return finance.SeedOpening(period)
+// bukuAwalLocked: saldo awal pembukuan berjalan — neraca awal onboarding bila sudah diisi;
+// demo memakai saldo awal Januari data contoh; usaha lain mulai dari nol di bulan data pertama.
+// Pemanggil memegang s.mu.
+func (s *tenant) bukuAwalLocked() finance.OpeningBalance {
+	if s.opening != nil {
+		return *s.opening
 	}
-	return s.opening.At(s.txs, period)
+	if s.demo {
+		return finance.OpeningBalance{Tanggal: "2026-01-01", Kas: finance.OpeningCash("2026-01"), Persediaan: finance.SeedInventory}
+	}
+	awal := finance.BulanBerjalan()
+	for _, t := range s.txs {
+		if len(t.Tanggal) >= 7 && t.Tanggal[:7] < awal {
+			awal = t.Tanggal[:7]
+		}
+	}
+	return finance.OpeningBalance{Tanggal: awal + "-01"}
+}
+
+// openingFor: saldo awal satu periode (posisi akhir bulan sebelumnya) dari buku berjalan.
+// Pemanggil harus memegang s.mu.
+func (s *tenant) openingFor(period string) finance.ReportOpening {
+	ob := s.bukuAwalLocked()
+	p := finance.PosisiPada(ob, s.txs, period+"-00")
+	inv := ob.Persediaan
+	if sp := s.kartuLocked().Periode(period); sp.Aktif {
+		inv = sp.PersediaanAwal
+	}
+	return finance.ReportOpening{Cash: p.Kas, Receivables: p.Piutang, Payables: p.Utang, Loans: p.Pinjaman, Inventory: inv}
+}
+
+// reportLocked: laporan berjalan satu periode; pemanggil memegang s.mu.
+func (s *tenant) reportLocked(period string) finance.PeriodReport {
+	return finance.BuildLaporanBerjalan(s.txs, s.assets, period, s.bukuAwalLocked(), s.kartuLocked())
 }
 
 // report menghitung seluruh laporan satu periode dari state saat ini. Semua endpoint laporan
@@ -765,7 +789,7 @@ func (s *tenant) openingFor(period string) finance.ReportOpening {
 func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rep := finance.BuildPeriodReportStok(s.txs, s.assets, period, s.openingFor(period), s.kartuLocked().Periode(period))
+	rep := s.reportLocked(period)
 	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
 		saran, seragam := finance.MetodeSeragam(s.assets)
 		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
@@ -813,7 +837,7 @@ func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	finance.ApplyKPIs(&snap, rep.Income, rep.CashFlow, txs, seedN)
 	// Grafik tren & sparkline ikut dihitung ulang supaya tidak bertentangan dengan KPI.
 	s.mu.RLock()
-	history := finance.TrendHistory(s.txs, s.assets, period, s.openingFor, s.kartuLocked().Periode)
+	history := finance.TrendHistory(s.txs, period, s.reportLocked)
 	s.mu.RUnlock()
 	finance.ApplyTrend(&snap, history)
 	snap.CashWarnings = finance.CashWarnings(txs, rep.CashFlow.OpeningBalance)

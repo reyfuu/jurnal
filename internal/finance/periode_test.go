@@ -43,7 +43,9 @@ func TestTrendHistoryMengikutiData(t *testing.T) {
 		{Tanggal: "2026-09-05", Jenis: "Penjualan", Nominal: 100, Lunas: true},
 		{Tanggal: "2026-10-05", Jenis: "Penjualan", Nominal: 200, Lunas: true},
 	}
-	h := TrendHistory(txs, nil, "2026-10", func(string) ReportOpening { return ReportOpening{} }, nil)
+	h := TrendHistory(txs, "2026-10", func(p string) PeriodReport {
+		return BuildLaporanBerjalan(txs, nil, p, OpeningBalance{Tanggal: "2026-09-01"}, KartuStok{})
+	})
 	if len(h) != 2 || h[1].Omzet != 200 {
 		t.Errorf("tren Oktober harus memuat Sep & Okt: %+v", h)
 	}

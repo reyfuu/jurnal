@@ -67,6 +67,10 @@ type IncomeStatement struct {
 	NetProfit    int64  `json:"net_profit"`
 	MarginBps    int    `json:"margin_bps"`
 	OpexLines    []Line `json:"opex_lines"`
+	// EBITDA = laba kotor − beban operasional tunai (sebelum penyusutan & amortisasi);
+	// EBIT = EBITDA − penyusutan − amortisasi (laba usaha); laba bersih = EBIT + pendapatan lain.
+	EBITDA int64 `json:"ebitda"`
+	EBIT   int64 `json:"ebit"`
 	// HPPStok: rincian HPP dari kartu stok (setelah titik nol); nil = HPP = belanja bahan.
 	HPPStok *StokPeriode `json:"hpp_stok,omitempty"`
 }
@@ -151,8 +155,11 @@ type BalanceSheetLiabilities struct {
 type BalanceSheetEquity struct {
 	OpeningCapital int64 `json:"opening_capital"`
 	AddedCapital   int64 `json:"added_capital"` // setor modal − ambil pribadi + aset masuk tanpa kas
-	CurrentProfit  int64 `json:"current_profit"`
-	Total          int64 `json:"total"`
+	// RetainedEarnings: laba (rugi) bulan-bulan sebelumnya sejak saldo awal — hasil penutupan
+	// buku tiap akhir bulan. 0 pada laporan per periode lama (BuildPeriodReport).
+	RetainedEarnings int64 `json:"retained_earnings"`
+	CurrentProfit    int64 `json:"current_profit"`
+	Total            int64 `json:"total"`
 }
 
 type BalanceSheet struct {
@@ -198,7 +205,9 @@ func (is *IncomeStatement) turunan() {
 	is.NetSales = is.Omzet - is.ChannelFees
 	is.GrossProfit = is.NetSales - is.COGS
 	is.TotalOpex = is.Opex + is.Depreciation + is.Amortization
-	is.NetProfit = is.GrossProfit - is.TotalOpex + is.OtherIncome
+	is.EBITDA = is.GrossProfit - is.Opex
+	is.EBIT = is.EBITDA - is.Depreciation - is.Amortization
+	is.NetProfit = is.EBIT + is.OtherIncome
 	is.MarginBps = 0
 	if is.Omzet > 0 {
 		is.MarginBps = int(is.NetProfit * 10000 / is.Omzet)
@@ -280,12 +289,7 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 	cf.OperasiLangsung.note("Penjualan tempo & biaya belum dibayar — belum menyentuh kas")
 	cf.OperasiLangsung.note("Penyusutan & amortisasi — tidak mengeluarkan kas")
 
-	cf.OperasiTidakLangsung.add("Laba bersih (dari laporan laba rugi)", is.NetProfit)
-	cf.OperasiTidakLangsung.add("Penyusutan aset tetap", is.Depreciation)
-	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
-	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)
-	cf.OperasiTidakLangsung.add("Kenaikan utang usaha", cf.NewPayables)
-	cf.OperasiTidakLangsung.note(catatanPersediaan)
+	cf.susunTidakLangsung(is)
 
 	cf.Investasi.add("Beli alat / aset tetap", -beliAset)
 	cf.Pendanaan.add("Setor modal", modal)
@@ -293,6 +297,18 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 	cf.Pendanaan.add("Bayar cicilan pinjaman", -cicilan)
 	cf.Pendanaan.add("Ambil uang pribadi (prive)", -prive)
 	return cf
+}
+
+// susunTidakLangsung: kas operasi metode tidak langsung dari laba bersih, beban non-kas, dan
+// perubahan modal kerja (NewReceivables/NewPayables harus sudah terisi).
+func (cf *CashFlow) susunTidakLangsung(is IncomeStatement) {
+	cf.OperasiTidakLangsung = CashFlowSection{}
+	cf.OperasiTidakLangsung.add("Laba bersih (dari laporan laba rugi)", is.NetProfit)
+	cf.OperasiTidakLangsung.add("Penyusutan aset tetap", is.Depreciation)
+	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
+	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)
+	cf.OperasiTidakLangsung.add("Kenaikan utang usaha", cf.NewPayables)
+	cf.OperasiTidakLangsung.note(catatanPersediaan)
 }
 
 // tally menjumlahkan per label sambil menjaga urutan kemunculan.

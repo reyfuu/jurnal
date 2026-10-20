@@ -80,8 +80,13 @@ func TestReportsEndpoints(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&cf); err != nil {
 		t.Fatal(err)
 	}
-	if cf.ClosingBalance != 97_000_000 {
-		t.Fatalf("ClosingBalance: want 97_000_000, got %d", cf.ClosingBalance)
+	// Buku berjalan: kas awal Agustus = kas akhir Juli, dan kas akhir = kas awal + arus kas bersih.
+	rec = httptest.NewRecorder()
+	asOwner(t, srv).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/reports/cashflow?period=2026-07", nil))
+	var juli finance.CashFlow
+	_ = json.NewDecoder(rec.Body).Decode(&juli)
+	if cf.OpeningBalance != juli.ClosingBalance || cf.ClosingBalance != cf.OpeningBalance+cf.NetCash || cf.ClosingBalance <= 0 {
+		t.Fatalf("kas tidak berlanjut: awal %d (akhir Juli %d), akhir %d, bersih %d", cf.OpeningBalance, juli.ClosingBalance, cf.ClosingBalance, cf.NetCash)
 	}
 	if cf.OperasiLangsung.Net != cf.OperasiTidakLangsung.Net {
 		t.Fatalf("kas operasi dua metode beda: langsung %d, tidak langsung %d",
