@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  createTransaction, getGerakStok, getKartuBarang, getMutasiStok, hapusGerakStok, mutasiStokXlsxUrl, stokAwal, stokOpname, stokProduksi,
-  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type ProdukRow, type StokRow,
+  createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
+  stokAwal, stokOpname, stokProduksi,
+  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
 } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -452,9 +453,11 @@ export function RiwayatGerakPanel({ items, bisaUbah, onChanged }: { items: StokR
 }
 
 /** Catat produksi: bahan dari stok dipakai sesuai resep, barang jadi bertambah. */
-export function ProduksiDialog({ produk, stok, mulai, onClose, onDone }: {
-  produk: ProdukRow; stok: StokRow[]; mulai: string; onClose: () => void; onDone: (pesan: string) => void
+export function ProduksiDialog({ produkList, awal, stok, mulai, onClose, onDone }: {
+  produkList: ProdukRow[]; awal?: ProdukRow; stok: StokRow[]; mulai: string; onClose: () => void; onDone: (pesan: string) => void
 }) {
+  const [pilihId, setPilihId] = useState(awal?.id ?? produkList[0]?.id ?? 0)
+  const produk = produkList.find((p) => p.id === pilihId) ?? produkList[0]
   const [tanggal, setTanggal] = useState(hariIni)
   const [batch, setBatch] = useState(1)
   const [error, setError] = useState('')
@@ -484,9 +487,13 @@ export function ProduksiDialog({ produk, stok, mulai, onClose, onDone }: {
       <DialogContent className="sm:max-w-xl">
         <form onSubmit={kirim} className="grid gap-3">
           <DialogHeader>
-            <DialogTitle>Catat produksi — {produk.nama}</DialogTitle>
-            <DialogDescription>Bahan dari stok berkurang sesuai resep dan {produk.nama} bertambah. Nilai barang jadi = nilai bahan dari stok yang terpakai.</DialogDescription>
+            <DialogTitle>Catat produksi</DialogTitle>
+            <DialogDescription>Pilih produk dan jumlah batch. Bahan dari stok berkurang sesuai resep dan produk jadi bertambah. Nilai produk jadi = nilai bahan dari stok yang terpakai.</DialogDescription>
           </DialogHeader>
+          <div className="grid gap-1.5"><Label htmlFor="pr-produk">Produk</Label>
+            <select id="pr-produk" className="input-field" value={produk.id} onChange={(e) => setPilihId(Number(e.target.value))}>
+              {produkList.map((p) => <option key={p.id} value={p.id}>{p.nama}{p.sku ? ` (${p.sku})` : ''}</option>)}
+            </select></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label htmlFor="pr-tgl">Tanggal</Label>
               <Input id="pr-tgl" type="date" min={mulai} required value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
@@ -519,5 +526,75 @@ export function ProduksiDialog({ produk, stok, mulai, onClose, onDone }: {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Laporan produksi per bulan: apa yang diproduksi, berapa, bahan terpakai, dan nilainya. */
+export function LaporanProduksiPanel({ muatUlang, bisaUbah, bisaEkspor, onChanged }: { muatUlang: number; bisaUbah: boolean; bisaEkspor: boolean; onChanged: () => void }) {
+  const [bulan, setBulan] = useState(() => hariIni().slice(0, 7))
+  const dari = `${bulan}-01`
+  const [y, m] = bulan.split('-').map(Number)
+  const sampai = `${bulan}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`
+  const [data, setData] = useState<{ kunci: string; l?: LaporanProduksi; error?: string } | null>(null)
+  const kunci = `${dari}|${muatUlang}`
+  useEffect(() => {
+    let batal = false
+    getLaporanProduksi(dari, sampai).then((l) => !batal && setData({ kunci, l }), (e: Error) => !batal && setData({ kunci, error: e.message }))
+    return () => { batal = true }
+  }, [dari, sampai, kunci])
+  const geser = (n: number) => {
+    const d = new Date(Date.UTC(y, m - 1 + n, 1))
+    setBulan(d.toISOString().slice(0, 7))
+  }
+  async function hapus(id: number) {
+    if (!window.confirm('Hapus catatan produksi ini? Bahan & produk jadi dihitung ulang.')) return
+    try {
+      await hapusGerakStok(id)
+      onChanged()
+    } catch (e) {
+      setData((d) => d && { ...d, error: (e as Error).message })
+    }
+  }
+  const l = data?.l
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div className="flex flex-wrap items-end gap-3" style={{ marginBottom: 12 }}>
+        <div>
+          <div className="chart-title">Laporan produksi</div>
+          <div className="chart-subtitle">Setiap produksi yang dicatat: hasil, bahan terpakai, dan nilai produk jadi.</div>
+        </div>
+        <div className="flex items-end gap-2" style={{ marginLeft: 'auto' }}>
+          <Button variant="outline" size="icon" aria-label="Bulan sebelumnya" onClick={() => geser(-1)}><ChevronLeft /></Button>
+          <Input aria-label="Bulan" type="month" value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} style={{ width: 170 }} />
+          <Button variant="outline" size="icon" aria-label="Bulan berikutnya" onClick={() => geser(1)}><ChevronRight /></Button>
+          {bisaEkspor && <Button variant="outline" onClick={() => void ekspor(laporanProduksiXlsxUrl(dari, sampai))}><FileSpreadsheet /> Export Excel</Button>}
+        </div>
+      </div>
+      <Galat teks={data?.error ?? ''} />
+      <div className="table-scroll" style={{ opacity: data?.kunci === kunci ? 1 : 0.6 }}>
+        <table className="data-table tabular" style={{ minWidth: 880 }}>
+          <thead><tr><th>Tanggal</th><th>Produk</th><th style={{ textAlign: 'right' }}>Batch</th><th style={{ textAlign: 'right' }}>Hasil</th><th>Bahan terpakai</th><th style={{ textAlign: 'right' }}>Nilai</th><th style={{ textAlign: 'right' }}>Per unit</th><th>Oleh</th>{bisaUbah && <th />}</tr></thead>
+          <tbody>
+            {l?.baris.map((b) => (
+              <tr key={b.id}>
+                <td>{formatTanggal(b.tanggal)}</td>
+                <td className="font-semibold">{b.produk}</td>
+                <td style={{ textAlign: 'right' }}>{b.batch.toLocaleString('id-ID')}</td>
+                <td style={{ textAlign: 'right', color: GREEN, fontWeight: 600 }}>+{formatQty(b.hasil_qty)} {b.satuan}</td>
+                <td className="text-xs" style={{ whiteSpace: 'normal', maxWidth: 300 }}>{b.bahan.map((x) => `${x.nama} ${formatQty(x.qty)} ${x.satuan}`).join(' · ') || '—'}</td>
+                <td style={{ textAlign: 'right' }}>{formatRp(b.nilai)}</td>
+                <td style={{ textAlign: 'right' }}>{formatRp(b.per_unit)}</td>
+                <td className="text-sm">{b.oleh}</td>
+                {bisaUbah && <td style={{ textAlign: 'right' }}><Button variant="ghost" size="icon-sm" aria-label="Hapus catatan produksi" onClick={() => void hapus(b.id)}><Trash2 /></Button></td>}
+              </tr>
+            ))}
+            {l && l.baris.length === 0 && <tr><td colSpan={9} className="text-center text-muted-foreground" style={{ padding: 24 }}>Belum ada produksi di bulan ini.</td></tr>}
+          </tbody>
+          {l && l.baris.length > 0 && (
+            <tfoot><tr className="font-semibold"><td colSpan={5}>Total nilai produksi</td><td style={{ textAlign: 'right' }}>{formatRp(l.total_nilai)}</td><td colSpan={bisaUbah ? 3 : 2} /></tr></tfoot>
+          )}
+        </table>
+      </div>
+    </div>
   )
 }

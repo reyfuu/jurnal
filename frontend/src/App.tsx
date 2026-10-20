@@ -289,7 +289,7 @@ export default function App() {
       case 'stok-gudang':
         return <StokGudang bisaUbah={!me!.lihat} />
       case 'produksi-supplier':
-        return <ProduksiSupplier />
+        return <ProduksiSupplier bisaUbah={!me!.lihat} />
       case 'invoice':
         return <InvoiceView />
       case 'simulasi-harga':

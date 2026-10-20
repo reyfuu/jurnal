@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Factory, Plus, Trash2 } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
@@ -9,7 +9,7 @@ import {
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
-import { ProduksiDialog } from '@/views/KartuStok'
+import { LaporanProduksiPanel, ProduksiDialog } from '@/views/KartuStok'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--text-profit)'
@@ -196,11 +196,15 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
   )
 }
 
-export function ProduksiSupplier() {
+/** bisaUbah: false di mode lihat-sebagai (hanya baca). */
+export function ProduksiSupplier({ bisaUbah = true }: { bisaUbah?: boolean }) {
+  const [tab, setTab] = useState<'produksi' | 'produk' | 'supplier'>('produksi')
+  const [muatUlang, setMuatUlang] = useState(0)
   const [data, setData] = useState<ProduksiSummary | null>(null)
   const [stok, setStok] = useState<StokRow[]>([])
   const [stokMulai, setStokMulai] = useState('')
-  const [produksi, setProduksi] = useState<ProdukRow | null>(null)
+  // Dialog catat produksi; awal = produk yang dipilih dari baris tabel resep.
+  const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(null)
   const [form, setForm] = useState<ProdukInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [supForm, setSupForm] = useState<SupplierInput | null>(null)
@@ -294,19 +298,59 @@ export function ProduksiSupplier() {
     <>
       <PageHeader
         title="Produksi & Supplier"
-        subtitle="Susun resep per produk; HPP dihitung dari harga bahan di Stok & Gudang, jadi ikut berubah saat harga bahan naik."
+        subtitle={tab === 'produksi' ? 'Catat setiap kali produksi: bahan di stok berkurang, produk jadi bertambah.'
+          : tab === 'produk' ? 'Daftar produk & resepnya (diisi sekali per produk). HPP dihitung dari harga bahan di Stok & Gudang.'
+            : 'Daftar supplier bahan dan perkiraan utang ke masing-masing.'}
       >
-        <button
-          className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }}
-          onClick={() => { setError(''); setEditId(null); setForm({ ...PRODUK_KOSONG, bahan: [] }) }}
-        >
-          + Tambah Produk
-        </button>
+        {bisaUbah && tab === 'produksi' && (
+          <button className="btn-cta accent" style={{ padding: '10px 20px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            disabled={!stokMulai || produk.length === 0}
+            title={!stokMulai ? 'Mulai kartu stok dulu di Stok & Gudang' : produk.length === 0 ? 'Tambah produk & resep dulu' : undefined}
+            onClick={() => { setError(''); setPesan(''); setProduksi({}) }}>
+            <Factory size={17} aria-hidden /> Catat produksi
+          </button>
+        )}
+        {bisaUbah && tab === 'produk' && (
+          <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }}
+            onClick={() => { setError(''); setEditId(null); setForm({ ...PRODUK_KOSONG, bahan: [] }) }}>
+            + Tambah Produk
+          </button>
+        )}
+        {bisaUbah && tab === 'supplier' && (
+          <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }}
+            onClick={() => { setError(''); setSupEditId(null); setSupForm({ ...SUPPLIER_KOSONG }) }}>
+            + Tambah Supplier
+          </button>
+        )}
       </PageHeader>
+
+      <div className="tabbar" role="tablist" aria-label="Bagian produksi" style={{ marginBottom: 12 }}>
+        <button role="tab" className="tab-btn" aria-selected={tab === 'produksi'} onClick={() => setTab('produksi')}>Produksi</button>
+        <button role="tab" className="tab-btn" aria-selected={tab === 'produk'} onClick={() => setTab('produk')}>Produk &amp; Resep</button>
+        <button role="tab" className="tab-btn" aria-selected={tab === 'supplier'} onClick={() => setTab('supplier')}>Supplier</button>
+      </div>
 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
       {pesan && <div className="pill-status pill-green" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{pesan}</div>}
 
+      {tab === 'produksi' && (!stokMulai ? (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="chart-title">Mulai kartu stok dulu</div>
+          <div className="chart-subtitle" style={{ marginBottom: 12 }}>
+            Mencatat produksi butuh kartu stok supaya bahan yang terpakai dan produk jadi yang dihasilkan ikut tercatat. Mulai dari menu
+            <strong> Stok &amp; Gudang → Mulai kartu stok</strong> (hitung fisik pertama).
+          </div>
+        </div>
+      ) : produk.length === 0 ? (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="chart-title">Belum ada produk & resep</div>
+          <div className="chart-subtitle">Buka tab <strong>Produk &amp; Resep</strong> → <strong>+ Tambah Produk</strong> (sekali saja per produk), lalu kembali ke sini untuk mencatat produksi.</div>
+        </div>
+      ) : (
+        <LaporanProduksiPanel muatUlang={muatUlang} bisaUbah={bisaUbah} bisaEkspor={bisaUbah} onChanged={() => { setMuatUlang((n) => n + 1); muat() }} />
+      ))}
+
+      {tab === 'produk' && <>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 16 }}>
         <div className="card" style={{ padding: '14px 18px' }}>
           <div className="kpi-label">Produk Ber-resep</div>
@@ -330,13 +374,6 @@ export function ProduksiSupplier() {
         </div>
       </div>
 
-      {produksi && (
-        <ProduksiDialog produk={produksi} stok={stok} mulai={stokMulai} onClose={() => setProduksi(null)}
-          onDone={(m) => { setProduksi(null); setPesan(m); muat() }} />
-      )}
-      {!stokMulai && produk.length > 0 && (
-        <div className="note-box" style={{ marginBottom: 12 }}>Untuk mencatat produksi (bahan berkurang, barang jadi bertambah), mulai kartu stok dulu di menu Stok & Gudang.</div>
-      )}
 
       {form && (
         <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpanProduk}>
@@ -456,7 +493,7 @@ export function ProduksiSupplier() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {stokMulai && <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)', fontWeight: 600 }} onClick={() => { setError(''); setPesan(''); setProduksi(p) }}>Produksi</button>}
+                        {stokMulai && <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)', fontWeight: 600 }} onClick={() => { setError(''); setPesan(''); setProduksi({ awal: p }) }}>Catat produksi</button>}
                         <button className="nav-item" style={aksiBtn} onClick={() => { setError(''); setEditId(p.id); setForm(toProdukInput(p)) }}>Ubah</button>
                         <button className="nav-item" style={{ ...aksiBtn, color: RED }} onClick={() => void hapusProduk(p)}>Hapus</button>
                       </div>
@@ -477,16 +514,11 @@ export function ProduksiSupplier() {
         </div>
       </div>
 
+      </>}
+
+      {tab === 'supplier' && (
       <div className="card" style={{ padding: 20 }}>
-        <div className="chart-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Supplier</span>
-          <button
-            className="nav-item" style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
-            onClick={() => { setError(''); setSupEditId(null); setSupForm({ ...SUPPLIER_KOSONG }) }}
-          >
-            + Tambah Supplier
-          </button>
-        </div>
+        <div className="chart-title">Supplier</div>
 
         {supForm && (
           <form className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12 }} onSubmit={simpanSupplier}>
@@ -568,6 +600,12 @@ export function ProduksiSupplier() {
           bukan saldo resmi. Kalau nama di tagihan berbeda ejaannya, utangnya tidak terhitung di sini.
         </p>
       </div>
+      )}
+
+      {produksi && (
+        <ProduksiDialog produkList={produk} awal={produksi.awal} stok={stok} mulai={stokMulai} onClose={() => setProduksi(null)}
+          onDone={(m) => { setProduksi(null); setPesan(m); setTab('produksi'); setMuatUlang((n) => n + 1); muat() }} />
+      )}
     </>
   )
 }
