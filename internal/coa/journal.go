@@ -95,6 +95,63 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile) []Line {
 	return out
 }
 
+// JournalBerjalan: jurnal satu periode untuk buku berjalan. Transaksi bulan ini dijurnal ke
+// kas bila sudah lunas sampai akhir bulan, selain itu ke piutang (1201) / utang (2101);
+// transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
+// atau Dr Utang / Cr Kas) di tanggal bayar.
+func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile) []Line {
+	akhir := period + "-31"
+	var out []Line
+	for _, t := range txs {
+		if len(t.Tanggal) < 7 {
+			continue
+		}
+		j, _ := finance.LookupJenis(t.Jenis)
+		masuk := j.Arah == "masuk"
+		bayar := t.TanggalLunas
+		if bayar == "" {
+			bayar = t.Tanggal
+		}
+		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel})
+		switch {
+		case t.Tanggal[:7] == period:
+			lawan := kas
+			if !t.Lunas || bayar > akhir {
+				lawan = "2101"
+				if masuk {
+					lawan = "1201"
+				}
+			}
+			akun := AccountFor(t, p)
+			if masuk {
+				out = append(out, Line{t.ID, t.Tanggal, lawan, t.Nominal, 0}, Line{t.ID, t.Tanggal, akun, 0, t.Nominal})
+			} else {
+				out = append(out, Line{t.ID, t.Tanggal, akun, t.Nominal, 0}, Line{t.ID, t.Tanggal, lawan, 0, t.Nominal})
+			}
+		case t.Tanggal[:7] < period && t.Lunas && len(bayar) >= 7 && bayar[:7] == period:
+			if masuk {
+				out = append(out, Line{t.ID, bayar, kas, t.Nominal, 0}, Line{t.ID, bayar, "1201", 0, t.Nominal})
+			} else {
+				out = append(out, Line{t.ID, bayar, "2101", t.Nominal, 0}, Line{t.ID, bayar, kas, 0, t.Nominal})
+			}
+		}
+	}
+	return out
+}
+
+// OpeningBerjalan: saldo awal akun pada awal periode dari posisi buku berjalan. Modal (3101)
+// adalah selisih aset − kewajiban − laba ditahan (3201).
+func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal map[string]int64) map[string]int64 {
+	out := map[string]int64{"1101": kas, "1201": piutang, "1301": persediaan, "2101": -utang, "2102": -pinjaman, "3201": -labaDitahan}
+	bersih := kas + piutang + persediaan - utang - pinjaman
+	for kode, v := range assetAwal {
+		out[kode] += v
+		bersih += v
+	}
+	out["3101"] = -(bersih - labaDitahan)
+	return out
+}
+
 // akunAset: akun harta, akumulasi, dan beban untuk satu aset. Dipilih dari jenis hartanya
 // supaya peralatan, gedung, kendaraan, dan harta tak berwujud tidak menumpuk di satu akun.
 func akunAset(a finance.Asset) (harta, akumulasi, beban string) {

@@ -36,7 +36,7 @@ func (s *Server) handleAIReport(t *tenant, w http.ResponseWriter, r *http.Reques
 	snap := t.snapshotLocked(period)
 	invoices := append([]finance.Invoice(nil), t.invoices...)
 	karyawan := append([]finance.Karyawan(nil), t.karyawan...)
-	riwayat := finance.TrendHistory(t.txs, t.assets, period, t.openingFor, t.kartuLocked().Periode)
+	riwayat := finance.TrendHistory(t.txs, period, t.reportLocked)
 	t.mu.RUnlock()
 
 	facts := finance.CollectFacts(rep, snap, t.currentProfile(), invoices, karyawan, riwayat)

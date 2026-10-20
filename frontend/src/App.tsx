@@ -15,6 +15,7 @@ import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login } from '@/views/Login'
 import { LaporanKeuangan } from '@/views/Reports'
+import { UmurPiutang } from '@/views/UmurPiutang'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
 import { KalkulatorPajak } from '@/views/KalkulatorPajak'
@@ -291,6 +292,8 @@ export default function App() {
             onAssetsChanged={() => { void reload(me!, period); getBusiness().then(setBusiness, fail) }} // metode penyusutan bisa dipilih dari tab Aset
           />
         )
+      case 'umur-piutang':
+        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'transaksi':

@@ -47,8 +47,8 @@ func SummarizePeriod(rep PeriodReport) PeriodSummary {
 //
 // ponytail: menghitung ulang semua periode setiap request dashboard. Untuk 8 periode dan
 // ribuan transaksi masih sub-milidetik; pasang cache per tenant bila periode sudah bertahun-tahun.
-// stok: efek kartu stok per periode (nil = tanpa kartu stok).
-func TrendHistory(txs []Transaction, assets []Asset, period string, opening func(string) ReportOpening, stok func(string) StokPeriode) []PeriodSummary {
+// laporan menghitung laporan satu periode (laporan berjalan usaha itu).
+func TrendHistory(txs []Transaction, period string, laporan func(string) PeriodReport) []PeriodSummary {
 	// Sampai 12 bulan terakhir, mulai dari bulan data paling awal (tanpa bulan kosong di depan).
 	ids := []string{period}
 	data := bulanData(txs)
@@ -62,11 +62,7 @@ func TrendHistory(txs []Transaction, assets []Asset, period string, opening func
 	slices.Sort(ids)
 	out := make([]PeriodSummary, 0, len(ids))
 	for _, id := range ids {
-		var sp StokPeriode
-		if stok != nil {
-			sp = stok(id)
-		}
-		out = append(out, SummarizePeriod(BuildPeriodReportStok(txs, assets, id, opening(id), sp)))
+		out = append(out, SummarizePeriod(laporan(id)))
 	}
 	return out
 }

@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -188,6 +188,10 @@ export interface IncomeStatement {
   other_income: number
   net_profit: number
   margin_bps: number
+  /** Laba kotor − beban operasional tunai (sebelum penyusutan & amortisasi). */
+  ebitda: number
+  /** Laba usaha = EBITDA − penyusutan − amortisasi. */
+  ebit: number
   opex_lines: { label: string; amount: number }[] | null
   /** Rincian HPP dari kartu stok (setelah titik nol); tidak ada = HPP = belanja bahan. */
   hpp_stok?: {
@@ -244,7 +248,7 @@ export interface BalanceSheet {
     total: number
   }
   liabilities: { payables: number; loans: number; total: number }
-  equity: { opening_capital: number; added_capital: number; current_profit: number; total: number }
+  equity: { opening_capital: number; added_capital: number; retained_earnings: number; current_profit: number; total: number }
   is_balanced: boolean
 }
 
@@ -845,6 +849,7 @@ export interface CoAReport {
     beban_operasional: ReportLine[] | null
     total_beban_operasional: number
     laba_usaha: number
+    ebitda: number
     pendapatan_lain: ReportLine[] | null
     beban_lain: ReportLine[] | null
     laba_bersih: number
@@ -1624,3 +1629,14 @@ export interface BarisProduksi {
 export interface LaporanProduksi { dari: string; sampai: string; mulai: string; baris: BarisProduksi[]; total_nilai: number }
 export const getLaporanProduksi = (dari: string, sampai: string) => api<LaporanProduksi>(`/produksi/laporan?dari=${dari}&sampai=${sampai}`)
 export const laporanProduksiXlsxUrl = (dari: string, sampai: string) => `/api/v1/produksi/laporan.xlsx?dari=${dari}&sampai=${sampai}`
+
+// --- Umur piutang & utang (dari transaksi belum lunas + saldo awal; sama dengan Neraca) ---
+export interface UmurSaldo {
+  per: string; piutang: boolean
+  kelompok: { label: string; nilai: number; jumlah: number }[]
+  pihak: { nama: string; nilai: number[]; total: number }[]
+  baris: { transaksi_id?: number; tanggal: string; pihak: string; keterangan: string; jenis: string; nilai: number; hari: number; kelompok: number }[]
+  total: number
+}
+export const getUmurSaldo = (jenis: 'piutang' | 'utang', per: string) => api<UmurSaldo>(`/reports/umur?jenis=${jenis}&per=${per}`)
+export const lunasiTransaksi = (id: number, tanggal: string) => api<SavedTx>(`/transactions/${id}/lunas`, { method: 'POST', body: { tanggal } })

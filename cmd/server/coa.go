@@ -57,19 +57,20 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 		return coaReport{}
 	}
 	period := periodOrDefault(r)
+	// Buku berjalan: saldo awal akun = posisi akhir bulan lalu; transaksi bulan ini dan
+	// pelunasan transaksi bulan lalu dijurnal di bulan ini.
 	s.mu.RLock()
-	lines := coa.Journal(finance.ForPeriod(s.txs, period), p)
-	opening := s.openingFor(period) // ikut neraca awal onboarding bila sudah diisi
+	lines := coa.JournalBerjalan(s.txs, period, p)
+	opening := s.openingFor(period)
 	sp := s.kartuLocked().Periode(period)
+	rep := s.reportLocked(period)
 	s.mu.RUnlock()
-	if sp.Aktif {
-		opening.Inventory = sp.PersediaanAwal
-	}
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
 	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
-	as := s.report(period).Assets
+	as := rep.Assets
 	lines = append(lines, coa.DepreciationJournal(as, period)...)
-	saldoAwal := coa.Opening(opening.Cash, opening.Inventory, coa.OpeningAssets(as, period))
+	saldoAwal := coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period))
 	tb := coa.TrialBalanceFrom(all, active, saldoAwal, lines)
 	// Kartu stok: sesuaikan 1301 ke nilai persediaan akhir; selisihnya masuk HPP.
 	var penyesuaian int64

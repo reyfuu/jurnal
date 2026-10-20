@@ -126,18 +126,20 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
             </>
           })()}
           <AmountRow label="Laba kotor" value={formatRp(r.gross_profit)} bold />
+          <div className="section-head">Beban operasional</div>
           {(r.opex_lines ?? []).map((l, i) => (
             <AmountRow key={i} label={l.label} value={formatRp(-l.amount)} color={RED} />
           ))}
-          {r.depreciation !== 0 && (
-            <AmountRow label="Beban penyusutan aset tetap" value={formatRp(-r.depreciation)} color={RED} />
-          )}
-          {r.amortization !== 0 && (
-            <AmountRow label="Beban amortisasi harta tak berwujud" value={formatRp(-r.amortization)} color={RED} />
-          )}
-          <AmountRow label="Total beban operasional" value={formatRp(-r.total_opex)} color={RED} bold />
-          {r.other_income > 0 && <AmountRow label="Pendapatan lain" value={formatRp(r.other_income)} color={GREEN} />}
-          <AmountRow label="Laba bersih" value={formatRp(r.net_profit)} color={GREEN} bold />
+          <AmountRow label="Total beban operasional (tunai)" value={formatRp(-r.opex)} color={RED} bold />
+          <AmountRow label="EBITDA" value={formatRp(r.ebitda)} color={r.ebitda < 0 ? RED : 'var(--text-brand)'} bold
+            style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }} />
+          <div className="list-row sub"><span>Laba sebelum penyusutan & amortisasi — kemampuan usaha menghasilkan kas dari operasi</span><span /></div>
+          <div className="section-head">Penutupan bulan: penyusutan & amortisasi</div>
+          <AmountRow label="Beban penyusutan aset tetap" value={formatRp(-r.depreciation)} color={RED} />
+          <AmountRow label="Beban amortisasi harta tak berwujud" value={formatRp(-r.amortization)} color={RED} />
+          <AmountRow label="Laba usaha (EBIT)" value={formatRp(r.ebit)} bold />
+          {r.other_income !== 0 && <AmountRow label="Pendapatan lain" value={formatRp(r.other_income)} color={GREEN} />}
+          <AmountRow label="Laba bersih" value={formatRp(r.net_profit)} color={r.net_profit < 0 ? RED : GREEN} bold />
         </div>
       </div>
 
@@ -198,11 +200,12 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
 
           <div className="section-head">Modal (Ekuitas)</div>
           <AmountRow label="TOTAL MODAL" value={formatRp(bs.equity.total)} color={GREEN} bold />
-          <AmountRow label="Modal Awal (kas + stok + nilai buku aset awal)" value={formatRp(bs.equity.opening_capital)} />
+          <AmountRow label="Modal Awal (saldo awal pembukuan)" value={formatRp(bs.equity.opening_capital)} />
           {bs.equity.added_capital !== 0 && (
-            <AmountRow label="Tambahan Modal − Ambil Pribadi" value={formatRp(bs.equity.added_capital)} />
+            <AmountRow label="Tambahan Modal (setoran − ambil pribadi + aset & stok tanpa kas)" value={formatRp(bs.equity.added_capital)} />
           )}
-          <AmountRow label="Laba Bersih Periode Berjalan" value={formatRp(bs.equity.current_profit)} color={GREEN} />
+          <AmountRow label="Laba Ditahan (laba bulan-bulan sebelumnya)" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : GREEN} />
+          <AmountRow label="Laba Bersih Periode Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : GREEN} />
 
           <AmountRow
             label="TOTAL PASIVA (Utang + Modal)"
