@@ -17,6 +17,7 @@ export interface User {
   role: Role
   active: boolean
   created_at: string
+  wa?: string
 }
 
 export interface Me {
@@ -311,8 +312,8 @@ export const getPeriods = () => api<PeriodOption[]>('/periods')
 
 export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
-export const register = (name: string, email: string, password: string) =>
-  api<Me>('/auth/register', { method: 'POST', body: { name, email, password } })
+export interface DaftarInput { name: string; email: string; password: string; wa: string; setuju_pdp: boolean }
+export const register = (body: DaftarInput) => api<Me>('/auth/register', { method: 'POST', body })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */

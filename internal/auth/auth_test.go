@@ -168,3 +168,25 @@ func TestSnapshotRestore(t *testing.T) {
 		t.Fatalf("next ID %d must be > %d (%v)", next.ID, u.ID, err)
 	}
 }
+
+func TestNormalizeWA(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+		ok       bool
+	}{
+		{"0812-3456-7890", "6281234567890", true},
+		{"+62 812 3456 7890", "6281234567890", true},
+		{"6281234567890", "6281234567890", true},
+		{"0812.3456.789", "628123456789", true},
+		{"812345", "", false},            // terlalu pendek
+		{"0212345678", "", false},        // bukan nomor seluler
+		{"08123456789012345", "", false}, // terlalu panjang
+		{"0812abc45678", "", false},
+		{"", "", false},
+	} {
+		got, err := auth.NormalizeWA(tc.in)
+		if (err == nil) != tc.ok || got != tc.want {
+			t.Errorf("NormalizeWA(%q) = %q, %v; want %q ok=%v", tc.in, got, err, tc.want, tc.ok)
+		}
+	}
+}

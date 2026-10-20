@@ -231,6 +231,11 @@ CREATE TABLE IF NOT EXISTS users (
 	hash       TEXT NOT NULL  -- PBKDF2-SHA256, base64
 );
 
+-- Kolom tambahan users (Okt 2026): nomor WA & persetujuan UU PDP saat daftar mandiri.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wa TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS persetujuan_pdp TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS versi_pdp TEXT;
+
 CREATE TABLE IF NOT EXISTS sessions (
 	token   TEXT PRIMARY KEY,
 	user_id INT NOT NULL,
