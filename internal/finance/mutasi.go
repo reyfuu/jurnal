@@ -402,6 +402,11 @@ func bacaNominal(debet, kredit, mutasi, tanda string) (int64, string) {
 		return 0, ""
 	}
 	arah := tandaArah(tanda)
+	if arah == "" && strings.TrimSpace(tanda) == "?" {
+		// Penanda "?" dari pembaca PDF: arahnya memang tidak diketahui, jangan ditebak masuk.
+		n, _ := parseRupiah(mutasi)
+		return n, ""
+	}
 	m := mutasi
 	// Penanda menempel di angka: "1.250.000 DB" atau "1.250.000CR".
 	for _, suf := range []string{"DB", "CR", "D", "K", "db", "cr"} {

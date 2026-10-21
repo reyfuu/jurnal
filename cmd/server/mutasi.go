@@ -25,8 +25,19 @@ import (
 // dibaca ulang, koreksi pengguna akan hilang dan tebakan mesin yang dibukukan — padahal
 // seluruh gunanya langkah pratinjau justru supaya tebakan itu bisa diperbaiki.
 
-// bacaTabel membaca .xlsx maupun .csv jadi baris-baris sel.
+// bacaTabel membaca .xlsx, .csv, maupun PDF e-statement jadi baris-baris sel.
 func bacaTabel(nama string, data []byte) ([][]string, error) {
+	if bytes.HasPrefix(data, []byte("%PDF")) {
+		baris, err := barisPDF(data)
+		if err != nil {
+			return nil, err
+		}
+		rows := finance.MutasiDariTeks(baris)
+		if rows == nil {
+			return nil, errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
+		}
+		return rows, nil
+	}
 	if strings.EqualFold(filepath.Ext(nama), ".csv") || !bytes.HasPrefix(data, []byte("PK")) {
 		return bacaCSV(data)
 	}
@@ -115,7 +126,7 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	f, fh, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "unggah berkas mutasi .xlsx atau .csv (maks 5 MB) di field file", http.StatusBadRequest)
+		http.Error(w, "unggah berkas mutasi PDF, .xlsx, atau .csv (maks 5 MB) di field file", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
 	defer f.Close()
@@ -125,15 +136,24 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		return finance.MutasiHasil{}, false
 	}
 	rows, err := bacaTabel(fh.Filename, data)
+	if err != nil && bytes.HasPrefix(data, []byte("%PDF")) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return finance.MutasiHasil{}, false
+	}
 	if err != nil || len(rows) == 0 {
-		http.Error(w, "berkas tidak terbaca; unggah hasil unduhan mutasi dari m-banking dalam format .xlsx atau .csv", http.StatusBadRequest)
+		http.Error(w, "berkas tidak terbaca; unggah hasil unduhan mutasi dari m-banking dalam format PDF, .xlsx, atau .csv", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
 	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
 	s.mu.RLock()
 	existing := append([]finance.Transaction(nil), s.txs...)
 	s.mu.RUnlock()
-	return finance.ParseMutasi(rows, tahun, existing), true
+	h := finance.ParseMutasi(rows, tahun, existing)
+	if bytes.HasPrefix(data, []byte("%PDF")) {
+		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks.
+		h.Peringatan = append(h.Peringatan, "Dibaca dari PDF: cocokkan jumlah baris serta total uang masuk dan keluar di atas dengan rekening koran Anda sebelum menyimpan.")
+	}
+	return h, true
 }
 
 type mutasiCommitReq struct {

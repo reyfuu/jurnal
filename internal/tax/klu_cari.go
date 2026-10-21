@@ -46,6 +46,14 @@ var jualOnline = []string{"online", "olshop", "shopee", "tokopedia", "tiktok", "
 // produksi: kata yang membuat KLU industri/pengolahan (golongan 10–33) masuk akal.
 var produksi = []string{"produksi", "pabrik", "bikin", "membuat", "olah", "mengolah", "industri", "konveksi", "jahit", "masak", "roasting", "sangrai", "cetak", "rakit"}
 
+// jasaKata: kata yang menunjukkan yang dijual adalah tenaga / keahlian.
+var jasaKata = []string{"jasa", "servis", "service", "reparasi", "perbaikan", "bengkel", "binatu", "laundry", "cuci", "salon", "pangkas",
+	"konsultan", "konsultasi", "les", "kursus", "privat", "desain", "sewa", "rental", "pijat", "spa", "fotografi", "foto", "travel",
+	"ekspedisi", "kurir", "ojek", "agensi", "event", "wedding", "arsitek", "akuntan", "klinik", "terapi"}
+
+// sajian: masak untuk disajikan (kafe, restoran, katering) termasuk jasa makanan, bukan industri.
+var sajian = []string{"kafe", "cafe", "coffee", "restoran", "resto", "kedai", "catering", "katering", "boga", "angkringan", "warung", "gofood", "grabfood"}
+
 // grosir: kata yang membuat KLU perdagangan besar (46x) masuk akal.
 var grosir = []string{"grosir", "besar", "distributor", "agen", "partai"}
 
@@ -129,6 +137,17 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 		return slices.ContainsFunc(istilah, func(t string) bool { return slices.Contains(daftar, t) })
 	}
 	mauGrosir, online, buatSendiri := ada(grosir), ada(jualOnline), ada(produksi)
+	// Jenis belum dipilih (mis. saran di langkah "usaha Anda paling mirip yang mana"): tebak dari
+	// kata kerjanya, supaya "bikin kue sendiri" tidak jatuh ke toko kue.
+	bonusJenis := 1.0
+	if jenis == "" {
+		switch {
+		case buatSendiri && !ada(sajian):
+			jenis, bonusJenis = "manufaktur", 3
+		case ada(jasaKata):
+			jenis, bonusJenis = "jasa", 3
+		}
+	}
 
 	var out []KandidatKLU
 	for i, k := range klu {
@@ -148,8 +167,11 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 			continue
 		}
 		j := JenisKLU(k.Kode)
-		if jenis != "" && j == jenis {
-			skor += 1
+		switch {
+		case jenis != "" && j == jenis:
+			skor += bonusJenis
+		case bonusJenis > 1 && j != jenis:
+			skor -= bonusJenis // jenis hasil tebakan: kategori jenis lain mundur
 		}
 		if strings.HasPrefix(k.Kode, "46") && !mauGrosir {
 			skor -= 6

@@ -100,7 +100,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
         <DialogHeader>
           <DialogTitle className="inline-flex items-center gap-2"><Landmark size={18} aria-hidden /> Impor dari mutasi bank</DialogTitle>
           <DialogDescription>
-            Unggah mutasi rekening (.xlsx atau .csv dari m-banking). Jenis transaksi ditebak dari keterangan bank —
+            Unggah mutasi rekening: <strong>PDF e-statement / rekening koran</strong>, atau .xlsx / .csv dari m-banking. Jenis transaksi ditebak dari keterangan bank —
             periksa dan betulkan dulu di bawah, karena salah kelompok ikut mengubah omzet dan pajaknya.
           </DialogDescription>
         </DialogHeader>
@@ -111,7 +111,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
               <FileSpreadsheet size={16} aria-hidden /> {nama ? 'Ganti berkas' : 'Pilih berkas mutasi'}
               <input
                 type="file" className="sr-only"
-                accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".pdf,application/pdf,.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => { void pilihBerkas(e.target.files?.[0]); e.target.value = '' }}
               />
             </label>

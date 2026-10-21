@@ -309,7 +309,8 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   .onboarding-question h2:focus-visible { outline: 2px solid var(--ring); outline-offset: 6px; border-radius: 2px; }
   .onboarding-wizard .profile-choices { grid-template-columns: 1fr; }
   .onboarding-reason { color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
-  .onboarding-reason strong { display: block; color: var(--text-primary); font-weight: 600; margin-bottom: 4px; }
+  .onboarding-reason > strong:first-child { display: block; margin-bottom: 4px; }
+  .onboarding-reason strong { color: var(--text-primary); font-weight: 600; }
   .onboarding-summary > div { padding: 16px 0; border-bottom: 1px solid var(--border-shell); }
   .onboarding-summary > div:first-child { padding-top: 0; }
   .onboarding-summary dt { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
