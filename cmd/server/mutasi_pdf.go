@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ledongthuc/pdf"
@@ -25,6 +26,35 @@ var (
 	errPDFGambar     = errors.New("PDF ini tidak berisi teks (hasil scan / foto), jadi belum bisa dibaca. Unduh e-statement asli dari internet banking, atau pakai mutasi .xlsx / .csv")
 )
 
+// potongAwalPDF membuang sampah sebelum tanda "%PDF-". Beberapa internet banking menyisipkan
+// keluaran HTML (mis. "<br><br>") di depan berkas yang diunduh; tanpa dipotong berkasnya tidak
+// dikenali sebagai PDF dan posisi objek di dalamnya bergeser.
+//
+// Berkas seperti itu biasanya juga terpotong di ujung sebanyak sampah di depannya (panjang
+// unduhan dihitung dari PDF aslinya), sehingga "startxref" & "%%EOF" hilang; penutupnya
+// disusun ulang dari letak tabel xref terakhir.
+func potongAwalPDF(data []byte) []byte {
+	if i := bytes.Index(data[:min(len(data), 4096)], []byte("%PDF-")); i > 0 {
+		data = data[i:]
+	}
+	if !bytes.HasPrefix(data, []byte("%PDF-")) || bytes.Contains(data[max(0, len(data)-1024):], []byte("%%EOF")) {
+		return data
+	}
+	x := bytes.LastIndex(data, []byte("\nxref"))
+	if x < 0 {
+		return data
+	}
+	akhir := len(data)
+	if s := bytes.LastIndex(data, []byte("startxref")); s > x {
+		akhir = s
+	}
+	out := append(bytes.Clone(data[:akhir]), []byte("startxref\n"+strconv.Itoa(x+1)+"\n%%EOF\n")...)
+	return out
+}
+
+// isiPDF: berkas adalah PDF (boleh diawali sampah, lihat potongAwalPDF).
+func isiPDF(data []byte) bool { return bytes.HasPrefix(potongAwalPDF(data), []byte("%PDF-")) }
+
 // maxHalamanPDF membatasi rekening koran yang sangat tebal (dan PDF yang sengaja dibuat berat).
 const maxHalamanPDF = 60
 
@@ -39,6 +69,7 @@ func barisPDF(data []byte, sandi string) (out []string, err error) {
 			out, err = nil, errPDFTerkunci
 		}
 	}()
+	data = potongAwalPDF(data)
 	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil && bytes.Contains(data, []byte("/Encrypt")) {
 		var polos []byte

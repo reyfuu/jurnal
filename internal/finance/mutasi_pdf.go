@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,19 +14,49 @@ import (
 // ParseMutasi persis seperti berkas .xlsx / .csv.
 
 var (
-	polaAwalTanggal = regexp.MustCompile(`(?i)^(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}[ -](?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|des|dec)[a-z]*(?:[ -]\d{2,4})?)\b`)
+	// Tanggal di awal baris: 2026-08-31, 31/08, 31/08/26, 31-08-2026, 31 Agu 2026, 31-Aug-26.
+	polaAwalTanggal = regexp.MustCompile(`(?i)^(\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}[ -](?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|des|dec)[a-z]*(?:[ -]\d{2,4})?)\b`)
+	polaISO         = regexp.MustCompile(`^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$`)
+	polaNoUrut      = regexp.MustCompile(`^\d{1,4}\.?$`)
+	polaTahunKop    = regexp.MustCompile(`\b(20\d\d)\b`)
 	polaJam         = regexp.MustCompile(`^\d{1,2}[:.]\d{2}(?:[:.]\d{2})?$`)
-	polaUang        = regexp.MustCompile(`^[-(]?(?:Rp\.?)?(?:\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\d+[.,]\d{2})\)?-?$`)
+	polaUang        = regexp.MustCompile(`(?i)^[-+(]?(?:Rp\.?|IDR)?(?:\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?|\d+[.,]\d{2})\)?-?$`)
 )
 
 // barisPenutup: baris ringkasan cetakan bank; bukan transaksi dan bukan lanjutan keterangan.
-var barisPenutup = []string{"saldo awal", "saldo akhir", "mutasi cr", "mutasi db", "mutasi kredit", "mutasi debet", "total", "halaman", "bersambung", "page "}
+var barisPenutup = []string{"saldo awal", "saldo akhir", "mutasi cr", "mutasi db", "mutasi kredit", "mutasi debet", "total", "halaman", "bersambung", "page ",
+	"opening balance", "closing balance", "beginning balance", "ending balance", "saldo sebelumnya"}
+
+// labelSaldoAwal: baris yang menyebut saldo awal rekening (dipakai menebak arah lewat saldo).
+var labelSaldoAwal = []string{"saldo awal", "opening balance", "beginning balance", "saldo sebelumnya", "previous balance"}
+
+func sebutSaldoAwal(low string) bool {
+	for _, l := range labelSaldoAwal {
+		if strings.Contains(low, l) {
+			return true
+		}
+	}
+	return false
+}
+
+// mataUang: kode mata uang di sela angka ("IDR 15,000.00"); dilewati, bukan pemutus.
+func mataUang(k string) bool {
+	switch strings.ToUpper(strings.TrimSuffix(k, ":")) {
+	case "IDR", "RP", "RP.":
+		return true
+	}
+	return false
+}
 
 var bulanTeks = map[string]string{"jan": "01", "feb": "02", "mar": "03", "apr": "04", "mei": "05", "may": "05", "jun": "06",
 	"jul": "07", "agu": "08", "agt": "08", "aug": "08", "sep": "09", "okt": "10", "oct": "10", "nov": "11", "des": "12", "dec": "12"}
 
-// angkaTanggal: "02 Okt 2026" → "02/10/2026", supaya nama bulan Indonesia pun terbaca.
+// angkaTanggal: "02 Okt 2026" → "02/10/2026", "2026-08-31" → "31/08/2026", supaya nama bulan
+// Indonesia dan format ISO pun terbaca dengan aturan hari/bulan yang sama.
 func angkaTanggal(s string) string {
+	if m := polaISO.FindStringSubmatch(s); m != nil {
+		return m[3] + "/" + m[2] + "/" + m[1]
+	}
 	f := strings.FieldsFunc(s, func(r rune) bool { return r == ' ' || r == '-' })
 	if len(f) < 2 {
 		return s
@@ -46,8 +77,10 @@ type uangPDF struct {
 // uangTeks membaca nominal cetakan bank dalam dua kebiasaan: 1,500,000.00 dan 1.500.000,00.
 // Pemisah desimal adalah pemisah terakhir yang diikuti tepat dua angka; sen dibulatkan.
 func uangTeks(s string) (int64, bool) {
-	s = strings.Trim(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(s), "-"), "("), "()-")
-	s = strings.TrimPrefix(strings.TrimPrefix(s, "Rp."), "Rp")
+	s = strings.Trim(strings.TrimSpace(s), "+-()")
+	for _, p := range []string{"Rp.", "Rp", "RP", "IDR", "idr"} {
+		s = strings.TrimPrefix(s, p)
+	}
 	if s == "" {
 		return 0, false
 	}
@@ -74,7 +107,11 @@ func ujungUang(kata []string) ([]string, []uangPDF) {
 	i := len(kata)
 	for i > 0 {
 		k := kata[i-1]
-		if a := tandaArah(k); a != "" && len(k) <= 2 {
+		if mataUang(k) && len(uang)+len(tandaTertunda) > 0 {
+			i--
+			continue
+		}
+		if a := tandaArah(k); a != "" && len(k) <= 6 {
 			tandaTertunda = a
 			i--
 			continue
@@ -95,12 +132,19 @@ func ujungUang(kata []string) ([]string, []uangPDF) {
 			break
 		}
 		u := uangPDF{nilai: n, tanda: tempel, minus: strings.HasPrefix(k, "-") || strings.HasSuffix(k, "-") || strings.HasPrefix(k, "(")}
+		if u.tanda == "" && strings.HasPrefix(k, "+") {
+			u.tanda = "masuk" // "+Rp1.000.000" (bank digital)
+		}
 		if u.tanda == "" {
 			u.tanda = tandaTertunda
 		}
 		tandaTertunda = ""
 		uang = append([]uangPDF{u}, uang...)
 		i--
+	}
+	// Penanda di KIRI angka ("DB 500.000,00"): tersisa sebagai penanda tertunda.
+	if tandaTertunda != "" && len(uang) > 0 && uang[0].tanda == "" {
+		uang[0].tanda = tandaTertunda
 	}
 	return kata[:i], uang
 }
@@ -127,13 +171,46 @@ func arahDariKeterangan(ket string) string {
 // MutasiDariTeks mengubah baris teks PDF mutasi bank menjadi tabel untuk ParseMutasi.
 // nil bila tidak ada satu pun baris transaksi.
 func MutasiDariTeks(baris []string) [][]string {
+	rows, _ := MutasiDariTeksCek(baris)
+	return rows
+}
+
+// tahunDariKop: tahun periode dari kop rekening koran ("PERIODE : SEPTEMBER 2026",
+// "Date : 01 Aug 2026 - 31 Aug 2026"); "" bila tidak ada atau lebih dari satu tahun.
+func tahunDariKop(baris []string) string {
+	tahun := ""
+	for _, b := range baris[:min(len(baris), 40)] {
+		low := strings.ToLower(b)
+		if !strings.Contains(low, "periode") && !strings.Contains(low, "period") && !strings.Contains(low, "date") && !strings.Contains(low, "tanggal") && !strings.Contains(low, "bulan") {
+			continue
+		}
+		for _, t := range polaTahunKop.FindAllString(b, -1) {
+			if tahun != "" && t != tahun {
+				return ""
+			}
+			tahun = t
+		}
+	}
+	return tahun
+}
+
+// MutasiDariTeksCek: seperti MutasiDariTeks, ditambah peringatan dari pemeriksaan saldo
+// berjalan — saldo sebelumnya ± mutasi harus sama dengan saldo baris itu. Baris yang tidak
+// cocok hampir pasti salah baca (angka terpotong, kolom tergeser), jadi pengguna diminta
+// mencocokkannya sebelum membukukan.
+func MutasiDariTeksCek(baris []string) ([][]string, []string) {
 	var txs []transaksiPDF
 	var saldoAwal *int64
 	var cur *transaksiPDF
+	tahunKop := tahunDariKop(baris)
 	for _, b := range baris {
 		b = strings.Join(strings.Fields(b), " ")
 		if b == "" {
 			continue
+		}
+		// Nomor urut di depan tanggal ("1 01/08/2026 …").
+		if f := strings.Fields(b); len(f) > 2 && polaNoUrut.MatchString(f[0]) && polaAwalTanggal.MatchString(strings.Join(f[1:], " ")) {
+			b = strings.Join(f[1:], " ")
 		}
 		low := strings.ToLower(b)
 		m := polaAwalTanggal.FindString(b)
@@ -145,7 +222,7 @@ func MutasiDariTeks(baris []string) [][]string {
 				}
 			}
 			kata, uang := ujungUang(strings.Fields(b))
-			if strings.Contains(low, "saldo awal") && len(uang) > 0 && saldoAwal == nil && len(txs) == 0 {
+			if sebutSaldoAwal(low) && len(uang) > 0 && saldoAwal == nil && len(txs) == 0 {
 				v := uang[len(uang)-1].nilai
 				saldoAwal = &v
 			}
@@ -170,7 +247,7 @@ func MutasiDariTeks(baris []string) [][]string {
 		}
 		kata, uang := ujungUang(rest)
 		ket := strings.Join(kata, " ")
-		if strings.Contains(strings.ToLower(ket), "saldo awal") {
+		if sebutSaldoAwal(strings.ToLower(ket)) {
 			if len(uang) > 0 && len(txs) == 0 {
 				v := uang[len(uang)-1].nilai
 				saldoAwal = &v
@@ -178,12 +255,18 @@ func MutasiDariTeks(baris []string) [][]string {
 			cur = nil
 			continue
 		}
-		txs = append(txs, transaksiPDF{tanggal: angkaTanggal(m), keterangan: ket, uang: uang})
+		tgl := angkaTanggal(m)
+		if tahunKop != "" && strings.Count(tgl, "/")+strings.Count(tgl, "-") == 1 {
+			tgl += "/" + tahunKop // "31/08" → "31/08/2026" dari kop periode
+		}
+		txs = append(txs, transaksiPDF{tanggal: tgl, keterangan: ket, uang: uang})
 		cur = &txs[len(txs)-1]
 	}
 	if len(txs) == 0 {
-		return nil
+		return nil, nil
 	}
+	var tidakCocok []string
+	cekBaris := 0
 
 	// Mutasi + DB/CR "?" hanya terisi bila arahnya tidak bisa dipastikan, supaya ParseMutasi
 	// melaporkan baris itu alih-alih menganggapnya uang masuk.
@@ -240,6 +323,14 @@ func MutasiDariTeks(baris []string) [][]string {
 				debet = strconv.FormatInt(mut.nilai, 10)
 			}
 		}
+		if prev != nil && sal != nil && (debet != "" || kredit != "") {
+			d, _ := strconv.ParseInt(debet, 10, 64)
+			k, _ := strconv.ParseInt(kredit, 10, 64)
+			cekBaris++
+			if *prev+k-d != *sal {
+				tidakCocok = append(tidakCocok, t.tanggal)
+			}
+		}
 		if sal != nil {
 			saldo = strconv.FormatInt(*sal, 10)
 			prev = sal
@@ -252,5 +343,12 @@ func MutasiDariTeks(baris []string) [][]string {
 		}
 		out = append(out, []string{t.tanggal, t.keterangan, debet, kredit, "", "", saldo})
 	}
-	return out
+	var peringatan []string
+	// Banyak yang tidak cocok biasanya berarti urutannya terbalik (terbaru dulu), bukan salah
+	// baca; itu tidak dilaporkan per baris.
+	if n := len(tidakCocok); n > 0 && n*2 <= cekBaris {
+		peringatan = append(peringatan, fmt.Sprintf("%d baris saldonya tidak cocok dengan mutasinya (tanggal %s). Kemungkinan ada angka yang salah terbaca; cocokkan baris itu dengan rekening koran sebelum membukukan.",
+			n, strings.Join(tidakCocok[:min(5, n)], ", ")))
+	}
+	return out, peringatan
 }

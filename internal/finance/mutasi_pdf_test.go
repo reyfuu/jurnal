@@ -1,6 +1,9 @@
 package finance
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestUangTeks_DuaKebiasaan(t *testing.T) {
 	for in, want := range map[string]int64{
@@ -111,5 +114,70 @@ func TestMutasiDariTeks_GayaBRImo(t *testing.T) {
 	}
 	if h.Rows[2].Keterangan != "Transfer BI-Fast dari BANK MANDIRI (PERSERO), PT 8888698 - SITI" {
 		t.Errorf("keterangan lanjutan: %q", h.Rows[2].Keterangan)
+	}
+}
+
+// Variasi tata letak antar bank. Tiap kasus: baris teks PDF → transaksi yang diharapkan.
+func TestMutasiDariTeks_BerbagaiBank(t *testing.T) {
+	type tx struct {
+		tgl, arah string
+		n         int64
+	}
+	for _, c := range []struct {
+		nama  string
+		baris []string
+		want  []tx
+	}{
+		{"BCA Bisnis: tanggal ISO + jam, IDR, DB/CR di kanan", []string{
+			"Opening Balance : IDR 1,946,256.00",
+			"Date FT Number Description Currency Amount DB CR Balance",
+			"2026-08-31 17:05:01 8284488867.73.20260831 Biaya Administrasi IDR 15,000.00 DB 1,931,256.00",
+			"Page 1/1",
+		}, []tx{{"2026-08-31", "keluar", 15_000}}},
+		{"Nomor urut di depan, kolom Debit/Kredit/Saldo", []string{
+			"No Tanggal Uraian Debit Kredit Saldo",
+			"1 03/08/2026 Setoran Tunai 0,00 2.500.000,00 7.500.000,00",
+			"2 04/08/2026 Transfer ke Supplier 1.000.000,00 0,00 6.500.000,00",
+		}, []tx{{"2026-08-03", "masuk", 2_500_000}, {"2026-08-04", "keluar", 1_000_000}}},
+		{"Bank digital: tanda +/− dan Rp menempel", []string{
+			"05 Agu 2026 Transfer masuk dari Andi +Rp1.250.000",
+			"06 Agu 2026 Pembayaran QRIS -Rp45.000",
+		}, []tx{{"2026-08-05", "masuk", 1_250_000}, {"2026-08-06", "keluar", 45_000}}},
+		{"Penanda di kiri angka & kata Kredit/Debit", []string{
+			"07/08/2026 Bunga Kredit 12.345,00",
+			"08/08/2026 Biaya Debit 5.000,00",
+		}, []tx{{"2026-08-07", "masuk", 12_345}, {"2026-08-08", "keluar", 5_000}}},
+		{"Tanggal tanpa tahun: tahun dari kop periode, arah dari saldo", []string{
+			"PERIODE : AGUSTUS 2025",
+			"SALDO AWAL 1,000,000.00",
+			"10/08 TRANSFER DARI BUDI 500,000.00 1,500,000.00",
+			"11/08 TARIK TUNAI 200,000.00 1,300,000.00",
+		}, []tx{{"2025-08-10", "masuk", 500_000}, {"2025-08-11", "keluar", 200_000}}},
+	} {
+		rows, peringatan := MutasiDariTeksCek(c.baris)
+		h := ParseMutasi(rows, 2026, nil)
+		if len(h.Errors) != 0 || len(h.Rows) != len(c.want) || len(peringatan) != 0 {
+			t.Errorf("%s: errors=%v peringatan=%v rows=%+v", c.nama, h.Errors, peringatan, h.Rows)
+			continue
+		}
+		for i, w := range c.want {
+			if r := h.Rows[i]; r.Tanggal != w.tgl || r.Arah != w.arah || r.Nominal != w.n {
+				t.Errorf("%s baris %d: %s %s %d; want %+v", c.nama, i+1, r.Tanggal, r.Arah, r.Nominal, w)
+			}
+		}
+	}
+}
+
+// Saldo berjalan yang tidak cocok (angka salah baca) dilaporkan per tanggal.
+func TestMutasiDariTeks_SaldoTidakCocokDiperingatkan(t *testing.T) {
+	_, p := MutasiDariTeksCek([]string{
+		"SALDO AWAL 1,000,000.00",
+		"10/08/2026 TRANSFER CR 500,000.00 1,500,000.00",
+		"11/08/2026 TARIK TUNAI DB 200,000.00 1,350,000.00",
+		"12/08/2026 TRANSFER CR 100,000.00 1,450,000.00",
+		"13/08/2026 TRANSFER CR 100,000.00 1,550,000.00",
+	})
+	if len(p) != 1 || !strings.Contains(p[0], "11/08/2026") {
+		t.Fatalf("peringatan saldo: %v", p)
 	}
 }

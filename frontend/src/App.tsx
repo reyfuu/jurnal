@@ -71,14 +71,27 @@ export default function App() {
     }
   }, [])
 
-  const reload = useCallback(async (m: Me, p = period) => {
+  // Periode dibaca lewat ref: kalau reload bergantung pada state period, signIn ikut berganti
+  // setiap ganti periode, efek login berjalan ulang, dan halaman terlempar ke Dashboard.
+  const periodRef = useRef(period)
+  useEffect(() => { periodRef.current = period }, [period])
+  // muat: nomor permintaan terakhir; jawaban lama yang datang belakangan diabaikan.
+  const muatKe = useRef(0)
+  const [memuat, setMemuat] = useState(false)
+  const reload = useCallback(async (m: Me, p?: string) => {
+    const ke = ++muatKe.current
+    setMemuat(true)
     try {
-      setData(await loadAll(m.views, p))
+      const hasil = await loadAll(m.views, p ?? periodRef.current)
+      if (ke !== muatKe.current) return
+      setData(hasil) // data lama tetap tampil sampai yang baru siap: tanpa layar kosong
       setError('')
     } catch (e) {
-      fail(e)
+      if (ke === muatKe.current) fail(e)
+    } finally {
+      if (ke === muatKe.current) setMemuat(false)
     }
-  }, [fail, period])
+  }, [fail])
 
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
@@ -244,11 +257,13 @@ export default function App() {
                   style={{ background: 'var(--bg-input)', border: '1px solid var(--border-strong)', color: 'var(--text-primary)', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
                   value={period}
                   onChange={(e) => changePeriod(e.target.value)}
+                  aria-busy={memuat}
                 >
                   {periods.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </select>
+                {memuat && <span role="status" style={{ fontSize: 11, color: 'var(--text-muted)' }}>memuat…</span>}
               </div>
             </div>
           )}
