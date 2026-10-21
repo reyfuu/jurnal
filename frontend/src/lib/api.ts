@@ -49,7 +49,13 @@ export interface Me {
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
 export interface LanggananStatus { status: 'trial' | 'aktif' | 'habis'; sampai?: string }
-export interface Paket { id: string; nama: string; harga: number; hari: number; hemat?: string }
+export interface Paket {
+  id: string; nama: string; harga: number; hari: number; hemat?: string
+  /** starter | pro | premium; kosong = paket lama satu tingkat. */
+  tingkat?: string
+  /** Harga sebelum promo, ditampilkan dicoret. */
+  harga_normal?: number
+}
 export interface BillingOrder { id: string; paket: string; jumlah: number; status: 'pending' | 'lunas' | 'gagal'; waktu: string }
 /** Garansi 7 hari uang kembali: pembayaran pertama, gugur setelah ekspor data. */
 export interface GaransiStatus { berlaku: boolean; sampai?: string; alasan?: string; order_id?: string }

@@ -213,10 +213,10 @@ func TestMaster_TiketBalasanSampaiKePelapor(t *testing.T) {
 func TestMaster_AturLangganan(t *testing.T) {
 	srv, m := serverMaster(t)
 	qa := register(t, srv, registerBody)
-	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"bulanan"}`); rec.Code != http.StatusBadRequest {
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"starter-bulanan"}`); rec.Code != http.StatusBadRequest {
 		t.Errorf("tanpa alasan: want 400, got %d", rec.Code)
 	}
-	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"bulanan","alasan":"Bayar transfer BCA 20 Okt"}`); rec.Code != http.StatusOK {
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"starter-bulanan","alasan":"Bayar transfer BCA 20 Okt"}`); rec.Code != http.StatusOK {
 		t.Fatalf("aktifkan manual: %d %s", rec.Code, rec.Body)
 	}
 	me := getJSON[meResp](t, srv, qa, "/api/v1/auth/me")

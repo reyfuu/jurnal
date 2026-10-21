@@ -484,7 +484,7 @@ func (s *Server) handleMasterLangganan(w http.ResponseWriter, r *http.Request) {
 		l.TrialSampai = maxTime(now, l.TrialSampai).AddDate(0, 0, req.Hari)
 		aksi = fmt.Sprintf("Perpanjang masa coba +%d hari", req.Hari)
 	case "aktifkan":
-		p, ok := findPaket(req.Paket)
+		p, ok := paketDijual(req.Paket)
 		if !ok {
 			t.mu.Unlock()
 			http.Error(w, "paket tidak dikenal", http.StatusBadRequest)

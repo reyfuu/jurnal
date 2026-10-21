@@ -42,7 +42,7 @@ func bayarLewatMidtrans(t *testing.T, srv *Server, status map[string]string, bod
 	var co struct {
 		OrderID string `json:"order_id"`
 	}
-	_ = json.NewDecoder(do(srv, c, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"bulanan"}`).Body).Decode(&co)
+	_ = json.NewDecoder(do(srv, c, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"starter-bulanan"}`).Body).Decode(&co)
 	status[co.OrderID] = "settlement"
 	if code := notify(srv, co.OrderID, ""); code != http.StatusOK {
 		t.Fatalf("notify: %d", code)
