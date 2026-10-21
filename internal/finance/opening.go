@@ -2,6 +2,7 @@ package finance
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -19,9 +20,22 @@ type OpeningBalance struct {
 	Persediaan int64  `json:"persediaan"`
 	Utang      int64  `json:"utang"`
 	Pinjaman   int64  `json:"pinjaman"`
-	// ModalDisetor opsional: hanya dipakai untuk dicocokkan dengan modal hasil hitung,
-	// supaya salah input ketahuan. Modal yang dipakai laporan selalu hasil hitung.
+	// ModalDisetor & LabaDitahan: sisi modal neraca awal. Untuk saldo awal per akun (Rincian)
+	// keduanya wajib dan harus membuat Harta = Kewajiban + Modal; saldo awal lama yang hanya
+	// mengisi ModalDisetor untuk dicocokkan tetap terbaca seperti dulu.
 	ModalDisetor int64 `json:"modal_disetor"`
+	LabaDitahan  int64 `json:"laba_ditahan,omitempty"` // boleh negatif (rugi yang belum tertutup)
+	// AsetLain: harta lancar selain kas, piutang usaha, dan stok (uang muka, biaya dibayar di
+	// muka, pajak dibayar di muka). KewajibanLain: selain utang usaha & pinjaman (utang pajak,
+	// beban yang masih harus dibayar). Keduanya tetap sampai ada transaksi yang menyentuhnya.
+	AsetLain      int64 `json:"aset_lain,omitempty"`
+	KewajibanLain int64 `json:"kewajiban_lain,omitempty"`
+	// AsetTetap: nilai buku aset tetap yang DINYATAKAN di saldo awal; harus sama dengan nilai
+	// buku register aset per tanggal mulai (aset tetap sendiri dicatat di register, bukan di sini).
+	AsetTetap int64 `json:"aset_tetap,omitempty"`
+	// Rincian: saldo awal per akun (template CoA / menu Saldo Awal). Bila ada, semua angka di
+	// atas diturunkan dari sini lewat TerapkanRincian.
+	Rincian []SaldoAkun `json:"rincian,omitempty"`
 	// Pelunasan: cicilan pelunasan piutang/utang saldo awal (tidak punya transaksi asal).
 	Pelunasan []PelunasanAwal `json:"pelunasan,omitempty"`
 }
@@ -99,16 +113,38 @@ func (o OpeningBalance) Period() string {
 
 // ModalAwal = aktiva awal − kewajiban awal. nilaiBukuAset diambil dari register aset.
 func (o OpeningBalance) ModalAwal(nilaiBukuAset int64) int64 {
-	return o.Kas + o.Piutang + o.Persediaan + nilaiBukuAset - o.Utang - o.Pinjaman
+	return o.Harta(nilaiBukuAset) - o.Kewajiban()
 }
 
-// SelisihModal: 0 bila ModalDisetor tidak diisi atau sudah cocok. Nilai bukan nol berarti
-// isian neraca awal tidak seimbang dan perlu diperiksa user.
+// Harta / Kewajiban / Modal: tiga sisi neraca awal.
+func (o OpeningBalance) Harta(nilaiBukuAset int64) int64 {
+	return o.Kas + o.Piutang + o.Persediaan + o.AsetLain + nilaiBukuAset
+}
+func (o OpeningBalance) Kewajiban() int64 { return o.Utang + o.Pinjaman + o.KewajibanLain }
+func (o OpeningBalance) Modal() int64     { return o.ModalDisetor + o.LabaDitahan }
+
+// SelisihModal = Modal yang diisi − (Harta − Kewajiban); 0 berarti Harta = Kewajiban + Modal.
+// Saldo awal lama tanpa rincian dan tanpa modal (modal dulu dihitung otomatis) dianggap cocok.
 func (o OpeningBalance) SelisihModal(nilaiBukuAset int64) int64 {
-	if o.ModalDisetor == 0 {
+	if len(o.Rincian) == 0 && o.ModalDisetor == 0 && o.LabaDitahan == 0 {
 		return 0
 	}
-	return o.ModalDisetor - o.ModalAwal(nilaiBukuAset)
+	return o.Modal() - o.ModalAwal(nilaiBukuAset)
+}
+
+// CekSeimbang: saldo awal baru wajib Harta = Kewajiban + Modal, dan aset tetap yang dinyatakan
+// harus sama dengan nilai buku register aset. Tanpa ini selisihnya diam-diam menjadi "modal"
+// dan terbawa ke semua laporan sesudahnya.
+func (o OpeningBalance) CekSeimbang(nilaiBukuAset int64) error {
+	if o.AsetTetap != nilaiBukuAset {
+		return fmt.Errorf("aset tetap (nilai buku) di saldo awal %s, sedangkan menurut daftar aset per %s nilai bukunya %s. Samakan dengan daftar aset; aset tetap dicatat di sheet / menu Aset",
+			formatRpID(o.AsetTetap), o.Tanggal, formatRpID(nilaiBukuAset))
+	}
+	if d := o.Harta(nilaiBukuAset) - o.Kewajiban() - o.Modal(); d != 0 {
+		return fmt.Errorf("saldo awal belum seimbang: Harta %s, Kewajiban %s, Modal %s; selisih %s. Harta harus sama dengan Kewajiban + Modal",
+			formatRpID(o.Harta(nilaiBukuAset)), formatRpID(o.Kewajiban()), formatRpID(o.Modal()), formatRpID(d))
+	}
+	return nil
 }
 
 // SeedInventory: nilai persediaan data demo.

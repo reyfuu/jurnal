@@ -147,14 +147,18 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 	a := BalanceSheetAssets{
 		Cash: p1.Kas, Receivables: p1.Piutang, Inventory: persediaanAkhir,
 		FixedAssetsCost: as.TotalHargaPerolehan, AccumDepreciation: as.TotalAkumulasi, FixedAssets: as.TotalNilaiBuku,
+		OtherAssets: ob.AsetLain,
 	}
-	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets
-	l := BalanceSheetLiabilities{Payables: p1.Utang, Loans: p1.Pinjaman}
-	l.Total = l.Payables + l.Loans
+	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets + a.OtherAssets
+	l := BalanceSheetLiabilities{Payables: p1.Utang, Loans: p1.Pinjaman, Other: ob.KewajibanLain}
+	l.Total = l.Payables + l.Loans + l.Other
+	// Modal awal = yang dimiliki − kewajiban − laba ditahan saldo awal; untuk saldo awal yang
+	// seimbang sama dengan modal disetor. Laba ditahan saldo awal digabung dengan laba
+	// bulan-bulan sesudahnya.
 	q := BalanceSheetEquity{
-		OpeningCapital:   ob.Kas + ob.Piutang + ob.Persediaan + nilaiBukuAwal - ob.Utang - ob.Pinjaman,
+		OpeningCapital:   ob.ModalAwal(nilaiBukuAwal) - ob.LabaDitahan,
 		AddedCapital:     p1.SetorModal - p1.Prive + asetTanpaKas + selisihTitikNol,
-		RetainedEarnings: labaDitahan,
+		RetainedEarnings: labaDitahan + ob.LabaDitahan,
 		CurrentProfit:    is.NetProfit,
 	}
 	q.Total = q.OpeningCapital + q.AddedCapital + q.RetainedEarnings + q.CurrentProfit

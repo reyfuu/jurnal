@@ -73,6 +73,7 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 		}
 	}
 	opening := s.openingFor(period)
+	saldoLain := coa.SaldoAwalLain(s.bukuAwalLocked(), all)
 	sp := s.kartuLocked().Periode(period)
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
@@ -81,7 +82,7 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	as := rep.Assets
 	lines = append(lines, coa.DepreciationJournal(as, period)...)
 	saldoAwal := coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
-		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period))
+		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period), saldoLain)
 	tb := coa.TrialBalanceFrom(all, active, saldoAwal, lines)
 	// Kartu stok: sesuaikan 1301 ke nilai persediaan akhir; selisihnya masuk HPP.
 	var penyesuaian int64

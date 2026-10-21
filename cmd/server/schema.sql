@@ -442,3 +442,9 @@ CREATE TABLE IF NOT EXISTS gerak_stok (
 -- Tutup buku bulanan & pelunasan saldo awal (Okt 2026).
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tutup_buku TEXT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS pelunasan JSONB;
+-- saldo awal per akun (template CoA): pos tambahan neraca awal + rinciannya
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS laba_ditahan BIGINT;
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS aset_lain BIGINT;
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS kewajiban_lain BIGINT;
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS aset_tetap BIGINT;
+ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS rincian JSONB;

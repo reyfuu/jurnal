@@ -84,6 +84,9 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.tambah(GayaBaris, "kas", "Saldo kas & bank", a.Cash)
 	s.tambah(GayaBaris, "piutang", "Piutang belum tertagih", a.Receivables)
 	s.tambah(GayaBaris, "persediaan", "Nilai persediaan stok", a.Inventory)
+	if a.OtherAssets != 0 {
+		s.tambah(GayaBaris, "aset_lain", "Aset lancar lain (uang muka, dibayar di muka)", a.OtherAssets)
+	}
 	s.tambah(GayaBaris, "aset_tetap", "Aset tetap & tak berwujud (nilai buku)", a.FixedAssets)
 	s.tambah(GayaSub, "harga_perolehan", "Harga perolehan", a.FixedAssetsCost)
 	s.tambah(GayaSub, "akumulasi", "Akumulasi penyusutan & amortisasi", -a.AccumDepreciation)
@@ -91,11 +94,14 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.judul("judul_kewajiban", "Kewajiban (Utang)")
 	s.tambah(GayaBaris, "utang_usaha", "Utang usaha / operasional", bs.Liabilities.Payables)
 	s.tambah(GayaBaris, "pinjaman", "Pinjaman", bs.Liabilities.Loans)
+	if bs.Liabilities.Other != 0 {
+		s.tambah(GayaBaris, "kewajiban_lain", "Kewajiban lain (utang pajak, beban terutang)", bs.Liabilities.Other)
+	}
 	s.tambah(GayaTotal, "total_kewajiban", "Total kewajiban", bs.Liabilities.Total)
 	s.judul("judul_modal", "Modal (Ekuitas)")
 	s.tambah(GayaBaris, "modal_awal", "Modal awal", bs.Equity.OpeningCapital)
 	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal - ambil pribadi", bs.Equity.AddedCapital)
-	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
+	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (saldo awal + bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
 	s.tambah(GayaBaris, "laba_berjalan", "Laba bersih periode berjalan", bs.Equity.CurrentProfit)
 	s.tambah(GayaTotal, "total_modal", "Total modal", bs.Equity.Total)
 	s.tambah(GayaTotal, "total_pasiva", "Total pasiva (utang + modal)", bs.Liabilities.Total+bs.Equity.Total)

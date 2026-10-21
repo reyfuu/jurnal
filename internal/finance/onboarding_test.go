@@ -1,6 +1,7 @@
 package finance_test
 
 import (
+	"strings"
 	"testing"
 
 	"pajak/internal/finance"
@@ -8,7 +9,7 @@ import (
 
 // Template yang kita bagikan harus lolos parsernya sendiri; kalau tidak, user ikut gagal.
 func TestOnboardingTemplate_LolosParsernyaSendiri(t *testing.T) {
-	d := finance.ParseOnboarding(finance.OnboardingTemplate())
+	d := finance.ParseOnboarding(finance.OnboardingTemplate(""))
 
 	if len(d.Errors) != 0 {
 		t.Fatalf("template harus bebas error, got %+v", d.Errors)
@@ -23,7 +24,7 @@ func TestOnboardingTemplate_LolosParsernyaSendiri(t *testing.T) {
 		t.Fatalf("jumlah baris: %d aset, %d karyawan, %d transaksi", len(d.Assets), len(d.Karyawan), len(d.Transaksi))
 	}
 	// Kelompok & metode terisi dari jenis harta, bukan diisi manual di sheet.
-	if d.Assets[0].Kelompok != "k1" || d.Assets[0].Metode != finance.MetodeSaldoMenurun {
+	if d.Assets[0].Kelompok != "k1" || d.Assets[0].Metode != finance.MetodeGarisLurus {
 		t.Errorf("aset pertama: %+v", d.Assets[0])
 	}
 	if !d.Assets[3].TakBerwujud {
@@ -32,6 +33,56 @@ func TestOnboardingTemplate_LolosParsernyaSendiri(t *testing.T) {
 	// Renovasi ruko = bangunan tidak permanen, wajib garis lurus.
 	if d.Assets[2].Kelompok != "bangunan_tidak_permanen" || d.Assets[2].Metode != finance.MetodeGarisLurus {
 		t.Errorf("renovasi: %+v", d.Assets[2])
+	}
+}
+
+// Contoh template harus seimbang (Harta = Kewajiban + Modal) dan aset tetapnya sama dengan
+// nilai buku sheet Aset, untuk metode penyusutan apa pun yang dipakai usaha.
+func TestOnboardingTemplate_SaldoAwalSeimbang(t *testing.T) {
+	for _, metode := range []string{"", finance.MetodeGarisLurus, finance.MetodeSaldoMenurun} {
+		d := finance.ParseOnboarding(finance.OnboardingTemplate(metode))
+		if len(d.Errors) != 0 || d.Opening == nil {
+			t.Fatalf("%q: %+v", metode, d.Errors)
+		}
+		finance.TerapkanMetode(d.Assets, metode)
+		nbv := finance.AssetsForPeriod(d.Assets, d.Transaksi, d.Opening.Period()).NilaiBukuAwal
+		if nbv == 0 || d.Opening.AsetTetap != nbv {
+			t.Errorf("%q: aset tetap %d, nilai buku sheet Aset %d", metode, d.Opening.AsetTetap, nbv)
+		}
+		if err := d.Opening.CekSeimbang(nbv); err != nil {
+			t.Errorf("%q: %v", metode, err)
+		}
+		if d.Opening.Kas != 45_000_000 || d.Opening.AsetLain != 6_000_000 || d.Opening.KewajibanLain != 450_000 || d.Opening.LabaDitahan != 10_000_000 {
+			t.Errorf("%q: pos saldo awal %+v", metode, d.Opening)
+		}
+	}
+}
+
+// Baris tambahan klien (akun di luar template) dibaca dari Kategori-nya; saldo awal yang tidak
+// seimbang ditolak dengan angka yang jelas.
+func TestSaldoAwalPerAkun_BarisTambahanDanTidakSeimbang(t *testing.T) {
+	rows := [][]string{
+		{"Saldo Awal"},
+		{"Tanggal mulai pembukuan", "2026-01-01"},
+		{"Kode Akun", "Nama Akun", "Kategori Akun", "Nominal (Rp)", "Keterangan"},
+		{"1102", "Bank BCA", "Harta: Kas & Bank", "10.000.000", ""},
+		{"", "Rekening Mandiri kedua", "Harta: Kas & Bank", "5000000", "ditambah sendiri"},
+		{"", "Utang ke saudara", "Kewajiban: Lain-lain", "3000000", ""},
+		{"3101", "Modal Pemilik", "Modal: Modal Disetor", "12000000", ""},
+	}
+	d := finance.ParseOnboarding([]finance.ImportSheet{{Nama: "Saldo Awal", Rows: rows}})
+	if len(d.Errors) != 0 || d.Opening == nil || d.Opening.Kas != 15_000_000 || d.Opening.KewajibanLain != 3_000_000 || len(d.Opening.Rincian) != 4 {
+		t.Fatalf("%+v %+v", d.Errors, d.Opening)
+	}
+	if err := d.Opening.CekSeimbang(0); err != nil {
+		t.Fatalf("15 jt = 3 jt + 12 jt harus seimbang: %v", err)
+	}
+	d.Opening.ModalDisetor = 10_000_000
+	if err := d.Opening.CekSeimbang(0); err == nil || !strings.Contains(err.Error(), "2.000.000") {
+		t.Fatalf("selisih 2 jt harus ditolak: %v", err)
+	}
+	if err := d.Opening.CekSeimbang(5_000_000); err == nil || !strings.Contains(err.Error(), "nilai buku") {
+		t.Fatalf("aset tetap tidak sama dengan register harus ditolak: %v", err)
 	}
 }
 
@@ -296,7 +347,7 @@ func TestImporStok_KolomOpsionalDanStokMinimum(t *testing.T) {
 func TestParseTagihanFile_AbaikanSheetLain(t *testing.T) {
 	// Template onboarding tujuh sheet diunggah di halaman Piutang & Utang: hanya sheet
 	// piutang/utang yang dibaca, sheet lain tidak boleh jadi error.
-	list, errs, nama := finance.ParseTagihanFile(finance.OnboardingTemplate())
+	list, errs, nama := finance.ParseTagihanFile(finance.OnboardingTemplate(""))
 	if len(errs) != 0 {
 		t.Fatalf("tidak boleh ada error, got %+v", errs)
 	}

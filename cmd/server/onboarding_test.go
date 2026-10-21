@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -260,4 +262,91 @@ func TestSaldoAwal_TidakBolehSetelahTransaksiPertama(t *testing.T) {
 	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", pas); rec.Code != http.StatusOK {
 		t.Fatalf("tanggal = transaksi pertama: %d %s", rec.Code, rec.Body)
 	}
+}
+
+// Template yang diunduh (tabel bergaris, rumus ringkasan, kunci kolom) diunggah apa adanya:
+// harus lolos, saldo awalnya seimbang, dan neraca bulan pertama memuat semua posnya.
+func TestTemplateDataAwal_UnduhUnggahNeracaSeimbang(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	rec := do(srv, owner, http.MethodGet, "/api/v1/onboarding/template", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("template: %d", rec.Code)
+	}
+	berkas := rec.Body.Bytes()
+	for _, isi := range []string{"sheetProtection", "dataValidation", "SUMIF"} {
+		if !bytes.Contains(unzipSemua(t, berkas), []byte(isi)) {
+			t.Errorf("template tidak memuat %s", isi)
+		}
+	}
+	kirim := func(commit bool) (int, onboardingResp, string) {
+		var body bytes.Buffer
+		mw := multipart.NewWriter(&body)
+		fw, _ := mw.CreateFormFile("file", "template-data-awal.xlsx")
+		_, _ = fw.Write(berkas)
+		_ = mw.Close()
+		url := "/api/v1/onboarding/import"
+		if commit {
+			url += "?commit=1"
+		}
+		r := upload(srv, owner, url, &body, mw.FormDataContentType())
+		var res onboardingResp
+		raw := r.Body.String()
+		_ = json.Unmarshal([]byte(raw), &res)
+		return r.Code, res, raw
+	}
+	if code, res, raw := kirim(false); code != http.StatusOK || !res.BisaDisimpan || len(res.Errors) != 0 || res.NilaiBukuAset == 0 {
+		t.Fatalf("pratinjau: %d %s", code, raw)
+	}
+	if code, _, raw := kirim(true); code != http.StatusOK {
+		t.Fatalf("commit: %d %s", code, raw)
+	}
+	bs := getJSON[finance.BalanceSheet](t, srv, owner, "/api/v1/reports/balance-sheet?period=2026-01")
+	if !bs.IsBalanced || bs.Assets.OtherAssets != 6_000_000 || bs.Liabilities.Other != 450_000 || bs.Equity.RetainedEarnings != 10_000_000 {
+		t.Fatalf("neraca Januari: %+v", bs)
+	}
+	info := getJSON[openingResp](t, srv, owner, "/api/v1/opening")
+	if info.Opening == nil || bs.Equity.OpeningCapital != info.Opening.ModalDisetor || info.SelisihModal != 0 {
+		t.Fatalf("modal awal %d, modal disetor %+v", bs.Equity.OpeningCapital, info)
+	}
+}
+
+// Saldo awal per akun lewat menu Saldo Awal: tidak seimbang ditolak, seimbang diterima.
+func TestSaldoAwalPerAkun_HarusSeimbang(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	info := getJSON[openingResp](t, srv, owner, "/api/v1/opening?tanggal=2026-01-01")
+	nbv := strconv.FormatInt(info.NilaiBukuAset, 10)
+	baris := func(modal string) string {
+		return `{"tanggal":"2026-01-01","rincian":[` +
+			`{"nama":"Bank","kategori":"kas","nominal":20000000},` +
+			`{"nama":"Aset tetap","kategori":"aset_tetap","nominal":` + nbv + `},` +
+			`{"nama":"Hutang Bank","kategori":"pinjaman","nominal":5000000},` +
+			`{"nama":"Modal Pemilik","kategori":"modal","nominal":` + modal + `}]}`
+	}
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", baris("1")); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "belum seimbang") {
+		t.Fatalf("tidak seimbang: %d %s", rec.Code, rec.Body)
+	}
+	modal := strconv.FormatInt(20_000_000+info.NilaiBukuAset-5_000_000, 10)
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", baris(modal)); rec.Code != http.StatusOK {
+		t.Fatalf("seimbang: %d %s", rec.Code, rec.Body)
+	}
+	if bs := getJSON[finance.BalanceSheet](t, srv, owner, "/api/v1/reports/balance-sheet?period=2026-01"); !bs.IsBalanced {
+		t.Fatalf("neraca: %+v", bs)
+	}
+}
+
+func unzipSemua(t *testing.T, b []byte) []byte {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	for _, f := range zr.File {
+		rc, _ := f.Open()
+		_, _ = io.Copy(&out, rc)
+		_ = rc.Close()
+	}
+	return out.Bytes()
 }
