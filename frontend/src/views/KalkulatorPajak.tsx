@@ -61,8 +61,8 @@ export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }
       ))}
 
       {tab === 'pph21' && <FormPPh21 m={m} />}
-      {tab === 'pph-badan' && <FormPPhBadan m={m} />}
-      {tab === 'pkp' && <FormCekPKP />}
+      {tab === 'pph-badan' && <FormPPhBadan m={m} profile={profile} />}
+      {tab === 'pkp' && <FormCekPKP profile={profile} />}
       {tab === 'nppn' && <FormNPPN m={m} profile={profile} />}
       {tab === 'gross-up' && <FormGrossUp m={m} profile={profile} />}
       {tab === 'ppn-harga' && <FormPPNHarga m={m} profile={profile} />}
@@ -241,9 +241,13 @@ export function FormPotong({ jenis }: { jenis: KalkulatorMaster['jenis'][number]
 
 // ===== PPh Badan =====
 
-export function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
-  const [omzet, setOmzet] = useState(4_000_000_000)
-  const [pkp, setPkp] = useState(500_000_000)
+// dariProfil: catatan bahwa angka awal diambil dari isian profil usaha (onboarding).
+const dariProfil = (p: BusinessProfile | null | undefined) =>
+  p?.omzet_tahunan ? 'Angka awal dari profil usaha Anda; ubah untuk mencoba angka lain.' : undefined
+
+export function FormPPhBadan({ m, profile }: { m: KalkulatorMaster; profile?: BusinessProfile | null }) {
+  const [omzet, setOmzet] = useState(profile?.omzet_tahunan || 4_000_000_000)
+  const [pkp, setPkp] = useState(profile?.omzet_tahunan ? Math.max(profile.laba_sebelum_pajak ?? 0, 0) : 500_000_000)
   const [r, setR] = useState<PPhBadanResult | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -267,6 +271,7 @@ export function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
         <form onSubmit={hitung}>
           <div className="chart-title">PPh Badan</div>
           <div className="chart-subtitle">Tarif {persen(m.tarif_badan_bps)} dengan fasilitas Pasal 31E</div>
+          {dariProfil(profile) && <p className="kpi-meta-row" style={{ marginBottom: 8 }}>{dariProfil(profile)}</p>}
           <Uang label="Peredaran bruto setahun" v={omzet} set={setOmzet} hint="Menentukan besarnya fasilitas Pasal 31E" />
           <Uang label="Penghasilan kena pajak setahun" v={pkp} set={setPkp} hint="Laba fiskal setelah koreksi" />
           <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy}>
@@ -293,8 +298,8 @@ export function FormPPhBadan({ m }: { m: KalkulatorMaster }) {
 
 // ===== Cek ambang PKP =====
 
-export function FormCekPKP() {
-  const [omzet, setOmzet] = useState(3_000_000_000)
+export function FormCekPKP({ profile }: { profile?: BusinessProfile | null }) {
+  const [omzet, setOmzet] = useState(profile?.omzet_tahunan || 3_000_000_000)
   const [r, setR] = useState<HasilPKP | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -318,6 +323,7 @@ export function FormCekPKP() {
         <form onSubmit={hitung}>
           <div className="chart-title">Cek Ambang PKP</div>
           <div className="chart-subtitle">Batas pengusaha kecil PPN: omzet Rp4,8 miliar setahun</div>
+          {dariProfil(profile) && <p className="kpi-meta-row" style={{ marginBottom: 8 }}>{dariProfil(profile)}</p>}
           <Uang label="Omzet setahun (atau kumulatif tahun berjalan)" v={omzet} set={setOmzet} hint="Seluruh peredaran bruto" />
           <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy}>
             {busy ? 'Menghitung…' : 'Cek'}

@@ -12,8 +12,78 @@ import (
 // Register aset: sumber tunggal penyusutan & amortisasi untuk Laba Rugi, Neraca, dan Arus Kas.
 // Hak akses mengikuti "laporan-keuangan" karena tab Aset ada di dalam menu itu.
 
+// asetListResp: ringkasan aset + jumlah aset yang sumber dananya belum dipilih.
+type asetListResp struct {
+	finance.AssetSummary
+	// SumberBelumDipilih: aset tanpa transaksi, diperoleh sejak saldo awal, yang belum dipilih
+	// sumber dananya. Sementara dicatat sebagai tambahan modal supaya neraca tetap seimbang.
+	SumberBelumDipilih int    `json:"sumber_belum_dipilih"`
+	TanggalSaldoAwal   string `json:"tanggal_saldo_awal"`
+}
+
 func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, s.report(periodOrDefault(r)).Assets)
+	out := asetListResp{AssetSummary: s.report(periodOrDefault(r)).Assets}
+	s.mu.RLock()
+	out.TanggalSaldoAwal = s.bukuAwalLocked().Tanggal
+	for _, a := range s.assets {
+		if a.TransaksiID == 0 && a.SumberDana == "" && a.TanggalPerolehan >= out.TanggalSaldoAwal {
+			out.SumberBelumDipilih++
+		}
+	}
+	s.mu.RUnlock()
+	writeJSON(w, out)
+}
+
+// sinkronTxAset menjaga transaksi "Beli Alat / Aset" milik aset yang dibayar kas / utang.
+// lama = keadaan sebelum diubah (nil saat membuat). Dipanggil dengan s.mu terkunci.
+//
+// Aset yang didaftarkan dari transaksi pengguna (draft "Lengkapi") tetap memakai transaksi itu.
+// Aset yang diperoleh sebelum tanggal saldo awal sudah termasuk saldo awal, jadi tanpa sumber.
+func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
+	milikAset := lama != nil && lama.TransaksiID != 0 && finance.SumberBerTransaksi(lama.SumberDana)
+	if lama != nil {
+		a.TransaksiID = lama.TransaksiID // tautan transaksi hanya diatur server
+	}
+	if a.TransaksiID != 0 && !milikAset {
+		a.SumberDana = "" // dari transaksi pengguna: kas/utangnya sudah tercatat di sana
+		return nil
+	}
+	if a.TanggalPerolehan < s.bukuAwalLocked().Tanggal {
+		a.SumberDana = ""
+	}
+	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return milikAset && t.ID == lama.TransaksiID })
+	if !finance.SumberBerTransaksi(a.SumberDana) {
+		if i >= 0 {
+			s.txs = slices.Delete(s.txs, i, i+1)
+		}
+		a.TransaksiID = 0
+		return nil
+	}
+	t := finance.Transaction{Tanggal: a.TanggalPerolehan, Jenis: finance.JenisBeliAset, Nominal: a.HargaPerolehan,
+		Keterangan: "Aset: " + a.Nama, Lunas: a.SumberDana == finance.SumberKas}
+	if i >= 0 && lama.SumberDana == a.SumberDana {
+		// Status lunas tidak disentuh: utang aset bisa sudah dilunasi dari menu Piutang & Utang.
+		t.ID, t.Lunas, t.TanggalLunas, t.Channel, t.Pihak = s.txs[i].ID, s.txs[i].Lunas, s.txs[i].TanggalLunas, s.txs[i].Channel, s.txs[i].Pihak
+		if t.TanggalLunas != "" && t.TanggalLunas < t.Tanggal {
+			t.TanggalLunas = t.Tanggal
+		}
+	}
+	if err := finance.Validate(&t); err != nil {
+		return err
+	}
+	if err := s.cekTerbukaLocked(t.Tanggal); err != nil {
+		return err
+	}
+	if i >= 0 {
+		t.ID = s.txs[i].ID
+		s.txs[i] = t
+	} else {
+		t.ID = s.nextTxID
+		s.nextTxID++
+		s.txs = append(s.txs, t)
+	}
+	a.TransaksiID = t.ID
+	return nil
 }
 
 // metodeUsaha: metode penyusutan profil; "" = belum dipilih. Dipanggil dengan s.mu terkunci
@@ -97,6 +167,16 @@ func (s *tenant) handleCreateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	if a.TransaksiID != 0 && slices.ContainsFunc(s.assets, func(x finance.Asset) bool { return x.TransaksiID == a.TransaksiID }) {
+		s.mu.Unlock()
+		http.Error(w, "transaksi ini sudah terdaftar sebagai aset", http.StatusConflict)
+		return
+	}
+	if err := s.sinkronTxAset(&a, nil); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	a.ID = s.nextAssetID
 	s.nextAssetID++
 	s.assets = append(s.assets, a)
@@ -127,7 +207,12 @@ func (s *tenant) handleUpdateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	a.ID = s.assets[i].ID
+	lama := s.assets[i]
+	if err := s.sinkronTxAset(&a, &lama); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	a.ID = lama.ID
 	s.assets[i] = a
 	writeJSON(w, a)
 }
@@ -141,6 +226,14 @@ func (s *tenant) handleDeleteAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.cekTerbukaLocked(s.assets[i].TanggalPerolehan); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	// Transaksi yang dibuat otomatis untuk aset ini ikut dihapus; transaksi milik pengguna tetap.
+	lama := s.assets[i]
+	kosong := lama
+	kosong.SumberDana = ""
+	if err := s.sinkronTxAset(&kosong, &lama); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}

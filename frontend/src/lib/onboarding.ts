@@ -4,7 +4,7 @@ import { formatRp } from './format'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'kelamin' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut'
 // lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
 export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
 export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
@@ -70,12 +70,21 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
       { value: 'tidak_tahu', label: 'Saya tidak tahu', hint: 'Kami anggap atas nama pribadi; bisa diubah nanti' },
     ],
   },
+  kelamin: {
+    judul: 'Apa jenis kelamin Anda?',
+    alasan: 'Dalam aturan pajak penghasilan, tanggungan keluarga melekat pada **suami sebagai kepala keluarga**. **Istri yang masih menikah** memakai status **TK/0** tanpa tanggungan, jadi pertanyaan tanggungan dilewati. **Janda** (cerai atau suami meninggal) boleh menghitung tanggungannya lagi.',
+    options: [
+      { value: 'laki', label: 'Laki-laki' },
+      { value: 'perempuan', label: 'Perempuan' },
+    ],
+  },
   menikah: {
     judul: 'Apakah Anda sudah menikah?',
     alasan: 'Untuk usaha pribadi, status keluarga menentukan bagian penghasilan yang tidak kena pajak.',
     options: [
       { value: 'belum', label: 'Belum menikah' },
       { value: 'sudah', label: 'Sudah menikah' },
+      { value: 'cerai', label: 'Cerai, atau pasangan sudah meninggal', hint: 'Janda / duda: status TK, tanggungan tetap dihitung' },
     ],
   },
   tanggungan: {
@@ -115,6 +124,9 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
 }
 
 const pribadi = (a: Answers) => a.bentuk === 'op' || a.bentuk === 'tidak_tahu'
+// istri: perempuan yang masih menikah; tanggungan melekat pada suami, statusnya TK/0.
+// Janda/duda (cerai hidup atau mati) berstatus TK dan boleh menghitung tanggungan.
+const istri = (a: Answers) => a.kelamin === 'perempuan' && a.menikah === 'sudah'
 const jualBarang = (a: Answers) => a.jenis === 'perdagangan' || a.jenis === 'manufaktur'
 
 export function steps(a: Answers): StepId[] {
@@ -127,8 +139,9 @@ export function steps(a: Answers): StepId[] {
     'omzet',
     'laba',
     'bentuk',
-    ...(pribadi(a) ? ['menikah' as const, 'tanggungan' as const] : []),
-    ...(pribadi(a) && a.menikah === 'sudah' ? ['gabung' as const] : []),
+    ...(pribadi(a) ? ['kelamin' as const, 'menikah' as const] : []),
+    ...(pribadi(a) && !istri(a) ? ['tanggungan' as const] : []),
+    ...(pribadi(a) && a.menikah === 'sudah' && !istri(a) ? ['gabung' as const] : []),
     'pkp',
     'susut',
     'ringkasan',
@@ -141,8 +154,8 @@ export const answered = (s: StepId, a: Answers) =>
 export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
   const bentuk = (pribadi(a) ? 'op' : a.bentuk) as BentukUsaha
-  const n = Math.min(Number(a.tanggungan) || 0, 3)
-  const status = a.menikah !== 'sudah' ? 'TK' : a.gabung === 'ya' ? 'K/I' : 'K'
+  const n = istri(a) ? 0 : Math.min(Number(a.tanggungan) || 0, 3)
+  const status = a.menikah !== 'sudah' || istri(a) ? 'TK' : a.gabung === 'ya' ? 'K/I' : 'K'
   return {
     nama_usaha: (a.nama ?? '').trim(),
     alamat: (a.alamat ?? '').trim(),

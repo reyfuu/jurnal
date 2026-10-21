@@ -44,6 +44,10 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [berkas, setBerkas] = useState<File | null>(null)
+  // Kata sandi PDF e-statement: hanya di memori dialog ini, dikosongkan saat dialog ditutup.
+  const [sandi, setSandi] = useState('')
+  const pdf = berkas?.name.toLowerCase().endsWith('.pdf') ?? false
+  const perluSandi = /kata sandi/i.test(error)
 
   function reset(next: boolean) {
     if (!next) {
@@ -51,6 +55,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
       setRows([])
       setNama('')
       setBerkas(null)
+      setSandi('')
       setError('')
     }
     onOpenChange(next)
@@ -64,7 +69,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
     setError('')
     setBusy(true)
     try {
-      const h = await previewMutasi(f, Number(th) || undefined)
+      const h = await previewMutasi(f, Number(th) || undefined, sandi)
       setHasil(h)
       setRows(h.rows ?? [])
     } catch (e) {
@@ -129,6 +134,19 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 hanya untuk tanggal tanpa tahun (mis. 15/01). Mutasi Des–Jan: isi tahun Januari-nya.
               </span>
             </label>
+            {(pdf || perluSandi) && (
+              <form className="grid gap-1" style={{ width: 220 }} onSubmit={(e) => { e.preventDefault(); if (berkas) void pilihBerkas(berkas) }}>
+                <label className="kpi-label" htmlFor="mutasi-sandi">Kata sandi PDF (bila dikunci)</label>
+                <div className="flex gap-1.5">
+                  <input id="mutasi-sandi" className="input-field" type="password" autoComplete="off" value={sandi}
+                    autoFocus={perluSandi} onChange={(e) => setSandi(e.target.value)} />
+                  <Button type="submit" size="sm" variant="outline" disabled={!berkas || busy || !sandi}>Buka</Button>
+                </div>
+                <span style={{ fontSize: 11, lineHeight: 1.3, color: 'var(--text-muted)' }}>
+                  hanya untuk membuka berkas ini; tidak disimpan.
+                </span>
+              </form>
+            )}
             {nama && <span className="text-sm text-muted-foreground" style={{ paddingBottom: 2 }}>{nama}</span>}
           </div>
 
@@ -181,7 +199,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 </div>
               )}
 
-              <div className="table-scroll" style={{ maxHeight: 360, overflowY: 'auto' }}>
+              <div className="table-scroll" style={{ maxHeight: 'min(360px, 45dvh)', overflowY: 'auto' }}>
                 <table className="data-table tabular" style={{ minWidth: 940, marginTop: 0 }}>
                   <thead>
                     <tr>
@@ -257,7 +275,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="sticky -bottom-5 z-10 bg-popover">
           <Button type="button" variant="outline" onClick={() => reset(false)}>Batal</Button>
           <Button type="button" disabled={busy || terpilih.length === 0} onClick={() => void simpan()}>
             {busy && hasil ? 'Menyimpan…' : `Bukukan ${terpilih.length} transaksi`}

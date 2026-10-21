@@ -35,9 +35,9 @@ export function AlatGratis({ profile, ptkpCodes, onLangganan }: { profile: Busin
       </div>
 
       {error && <p className="pill-status pill-red" role="alert">{error}</p>}
-      {tab === 'pkp' && <FormCekPKP />}
+      {tab === 'pkp' && <FormCekPKP profile={profile} />}
       {tab === 'pph22' && m && <FormMarketplace m={m} profile={profile} onLangganan={onLangganan} />}
-      {tab === '31e' && m && <FormPPhBadan m={m} />}
+      {tab === '31e' && m && <FormPPhBadan m={m} profile={profile} />}
       {tab === 'bentuk' && <PerencanaanPajak profile={profile} ptkpCodes={ptkpCodes} />}
 
       <div className="note-box flex flex-wrap items-center justify-between gap-3">

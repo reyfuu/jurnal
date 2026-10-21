@@ -30,6 +30,16 @@ const (
 // JenisBeliAset: jenis transaksi yang memunculkan draft aset di register.
 const JenisBeliAset = "Beli Alat / Aset"
 
+// Sumber dana aset yang didaftarkan langsung di register (bukan dari transaksi).
+const (
+	SumberKas   = "kas"   // dibayar tunai / transfer
+	SumberUtang = "utang" // dibeli kredit / dicicil, belum lunas
+	SumberModal = "modal" // barang setoran pemilik (inbreng)
+)
+
+// SumberBerTransaksi: sumber dana yang dibukukan lewat transaksi "Beli Alat / Aset".
+func SumberBerTransaksi(s string) bool { return s == SumberKas || s == SumberUtang }
+
 // KelompokAset: masa manfaat dalam bulan, tarif tahunan dalam basis point (2500 = 25%).
 // TarifSMBps 0 berarti saldo menurun tidak boleh dipakai (bangunan).
 type KelompokAset struct {
@@ -117,7 +127,11 @@ type Asset struct {
 	HargaPerolehan   int64  `json:"harga_perolehan"`
 	TakBerwujud      bool   `json:"tak_berwujud"` // true = amortisasi, bukan penyusutan
 	TransaksiID      int    `json:"transaksi_id,omitempty"`
-	Keterangan       string `json:"keterangan,omitempty"`
+	// SumberDana: cara aset tanpa transaksi kas dibayar — SumberKas / SumberUtang (transaksi
+	// "Beli Alat / Aset" dibuat & dijaga otomatis), SumberModal (barang setoran pemilik).
+	// Kosong = belum dipilih (data lama / impor), sementara dicatat sebagai tambahan modal.
+	SumberDana string `json:"sumber_dana,omitempty"`
+	Keterangan string `json:"keterangan,omitempty"`
 }
 
 func KelompokOf(id string) (KelompokAset, bool) {
@@ -149,6 +163,11 @@ func ValidateAsset(a *Asset) error {
 	}
 	if a.HargaPerolehan <= 0 {
 		return errors.New("harga perolehan harus lebih dari 0")
+	}
+	switch a.SumberDana {
+	case "", SumberKas, SumberUtang, SumberModal:
+	default:
+		return errors.New("sumber dana aset harus kas, utang, atau modal")
 	}
 	if a.JenisHarta != "" {
 		j, ok := jenisHartaOf(a.JenisHarta)

@@ -215,3 +215,61 @@ func TestMetodePenyusutan_DipilihSekaliLaluTerkunci(t *testing.T) {
 		t.Fatalf("bangunan baru: %d %+v", rec.Code, a)
 	}
 }
+
+// Aset yang didaftarkan langsung dibukukan sesuai sumber dananya, bukan otomatis jadi modal.
+func TestAset_SumberDanaMenentukanPasanganNeraca(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	neraca := func() finance.BalanceSheet {
+		return getJSON[finance.BalanceSheet](t, srv, owner, "/api/v1/reports/balance-sheet?period=2026-08")
+	}
+	awal := neraca()
+	buat := func(sumber string) finance.Asset {
+		rec := do(srv, owner, http.MethodPost, "/api/v1/assets", `{"nama":"Mesin `+sumber+`","kelompok":"k1","tanggal_perolehan":"2026-08-10","harga_perolehan":10000000,"sumber_dana":"`+sumber+`"}`)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("aset %s: %d %s", sumber, rec.Code, rec.Body)
+		}
+		var a finance.Asset
+		_ = json.NewDecoder(rec.Body).Decode(&a)
+		return a
+	}
+
+	kas := buat("kas")
+	b := neraca()
+	if !b.IsBalanced || b.Assets.Cash != awal.Assets.Cash-10_000_000 || b.Equity.AddedCapital != awal.Equity.AddedCapital || kas.TransaksiID == 0 {
+		t.Fatalf("kas: kas harus turun 10 jt, modal tetap: awal %+v, sekarang %+v", awal, b)
+	}
+	utang := buat("utang")
+	c := neraca()
+	if !c.IsBalanced || c.Liabilities.Total != b.Liabilities.Total+10_000_000 || c.Assets.Cash != b.Assets.Cash {
+		t.Fatalf("utang: utang harus naik 10 jt, kas tetap: %+v", c)
+	}
+	buat("modal")
+	d := neraca()
+	if !d.IsBalanced || d.Equity.AddedCapital != c.Equity.AddedCapital+10_000_000 {
+		t.Fatalf("modal: tambahan modal harus naik 10 jt: %+v", d)
+	}
+
+	// Transaksi pembelian aset tidak bisa dihapus dari menu Transaksi.
+	if rec := do(srv, owner, http.MethodDelete, "/api/v1/transactions/"+strconv.Itoa(kas.TransaksiID), ""); rec.Code != http.StatusConflict {
+		t.Fatalf("hapus transaksi aset: %d %s", rec.Code, rec.Body)
+	}
+	// Ganti sumber kas → modal: transaksinya hilang, kas kembali, modal naik.
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/assets/"+strconv.Itoa(kas.ID), `{"nama":"Mesin kas","kelompok":"k1","tanggal_perolehan":"2026-08-10","harga_perolehan":10000000,"sumber_dana":"modal"}`); rec.Code != http.StatusOK {
+		t.Fatalf("ubah sumber: %d %s", rec.Code, rec.Body)
+	}
+	e := neraca()
+	if !e.IsBalanced || e.Assets.Cash != awal.Assets.Cash || e.Equity.AddedCapital != d.Equity.AddedCapital+10_000_000 {
+		t.Fatalf("kas→modal: %+v", e)
+	}
+	// Hapus aset utang: transaksi utangnya ikut terhapus.
+	if rec := do(srv, owner, http.MethodDelete, "/api/v1/assets/"+strconv.Itoa(utang.ID), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("hapus aset: %d %s", rec.Code, rec.Body)
+	}
+	if f := neraca(); !f.IsBalanced || f.Liabilities.Total != awal.Liabilities.Total {
+		t.Fatalf("utang aset terhapus harus hilang: %+v", f)
+	}
+	if as := getJSON[asetListResp](t, srv, owner, "/api/v1/assets?period=2026-08"); as.SumberBelumDipilih != 0 {
+		t.Errorf("semua aset baru sudah dipilih sumbernya: %d", as.SumberBelumDipilih)
+	}
+}

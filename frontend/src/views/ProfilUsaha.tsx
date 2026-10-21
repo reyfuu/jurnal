@@ -366,7 +366,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
               {info.options.ptkp.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">TK = belum kawin, K = kawin, angka = jumlah tanggungan (paling banyak 3): hanya keluarga garis lurus yang biaya hidupnya sepenuhnya ditanggung, yaitu anak kandung/tiri/angkat, orang tua, atau mertua. Saudara kandung, ipar, sepupu, dan keponakan tidak dihitung. K/I = penghasilan suami-istri digabung.</p>
+          <p className="text-xs text-muted-foreground">TK = belum kawin, janda/duda, atau istri yang masih menikah (istri selalu TK/0); K = kawin (suami sebagai kepala keluarga); angka = jumlah tanggungan (paling banyak 3): hanya keluarga garis lurus yang biaya hidupnya sepenuhnya ditanggung, yaitu anak kandung/tiri/angkat, orang tua, atau mertua. Saudara kandung, ipar, sepupu, dan keponakan tidak dihitung. K/I = penghasilan suami-istri digabung.</p>
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2">

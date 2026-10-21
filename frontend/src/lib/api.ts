@@ -403,7 +403,12 @@ export interface AssetInput {
   tak_berwujud: boolean
   /** Diisi saat melengkapi draft, supaya aset tertaut ke transaksi pembeliannya. */
   transaksi_id?: number
+  /** Cara aset dibayar bila tidak berasal dari transaksi: kas, utang (kredit/cicilan), atau
+   *  modal (barang setoran pemilik). Kosong = belum dipilih. */
+  sumber_dana?: SumberDanaAset
 }
+
+export type SumberDanaAset = '' | 'kas' | 'utang' | 'modal'
 
 export interface AssetYear {
   tahun: number
@@ -440,6 +445,10 @@ export interface AssetSummary {
   beban_total: number
   tambahan_tanpa_kas: number
   draft_count: number
+  /** Aset tanpa transaksi yang sumber dananya belum dipilih (sementara dianggap modal). */
+  sumber_belum_dipilih?: number
+  /** Aset sebelum tanggal ini termasuk saldo awal, jadi tidak perlu sumber dana. */
+  tanggal_saldo_awal?: string
   /** Jumlah baris pemetaan jenis harta yang belum diverifikasi ke Lampiran PMK. */
   pemetaan_belum_dicek: number
   /** Metode penyusutan usaha; '' = belum dipilih (usaha lama, metode masih per aset). */
@@ -1155,10 +1164,12 @@ export interface MutasiCommitResult {
 }
 
 /** Langkah 1: baca berkas & tebak jenisnya. Tidak menyimpan apa pun. */
-export async function previewMutasi(file: File, tahun?: number): Promise<MutasiHasil> {
+/** sandi: kata sandi PDF e-statement; hanya dipakai server membuka berkas ini, tidak disimpan. */
+export async function previewMutasi(file: File, tahun?: number, sandi?: string): Promise<MutasiHasil> {
   const form = new FormData()
   form.append('file', file)
   if (tahun) form.append('tahun', String(tahun))
+  if (sandi) form.append('sandi', sandi)
   const res = await fetch('/api/v1/transactions/mutasi', { method: 'POST', body: form })
   if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
   return res.json()

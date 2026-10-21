@@ -55,12 +55,34 @@ describe('omzet & laba', () => {
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'omzet', 'laba', 'bentuk', 'menikah', 'tanggungan', 'gabung', 'pkp', 'susut', 'ringkasan'],
+      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'omzet', 'laba', 'bentuk', 'kelamin', 'menikah', 'tanggungan', 'gabung', 'pkp', 'susut', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
     expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'susut', 'ringkasan'])
+  })
+
+  it('istri yang masih menikah melewati tanggungan & gabung, PTKP TK/0', () => {
+    const ans = a({ jenis: 'jasa', bentuk: 'op', kelamin: 'perempuan', menikah: 'sudah', tanggungan: '2', gabung: 'ya' })
+    expect(steps(ans)).not.toContain('tanggungan')
+    expect(steps(ans)).not.toContain('gabung')
+    expect(toProfile(ans).ptkp).toBe('TK/0')
+  })
+
+  it('janda / duda: TK, tanggungan ditanya & dihitung, tanpa pertanyaan gabung', () => {
+    for (const kelamin of ['perempuan', 'laki']) {
+      const ans = a({ jenis: 'jasa', bentuk: 'op', kelamin, menikah: 'cerai', tanggungan: '2', gabung: 'ya' })
+      expect(steps(ans)).toContain('tanggungan')
+      expect(steps(ans)).not.toContain('gabung')
+      expect(toProfile(ans).ptkp).toBe('TK/2')
+    }
+  })
+
+  it('perempuan belum menikah tetap ditanya tanggungan', () => {
+    const ans = a({ jenis: 'jasa', bentuk: 'op', kelamin: 'perempuan', menikah: 'belum', tanggungan: '1' })
+    expect(steps(ans)).toContain('tanggungan')
+    expect(toProfile(ans).ptkp).toBe('TK/1')
   })
 
   it('belum menikah melewati pertanyaan penghasilan pasangan', () => {
