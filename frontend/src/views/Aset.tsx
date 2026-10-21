@@ -82,7 +82,9 @@ function PilihMetode({ data, onChanged }: { data: AssetSummary; onChanged: () =>
 }
 
 // periodLabel tidak lagi dipakai di sini: judul & periode dipegang header Laporan Keuangan.
-export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () => void }) {
+/** tanggalSaldoAwal: tanggal mulai yang sedang diisi di layar Saldo Awal (belum tersimpan). */
+export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary; onChanged: () => void; tanggalSaldoAwal?: string }) {
+  const tglAwal = tanggalSaldoAwal || data.tanggal_saldo_awal
   const [form, setForm] = useState<AssetInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -247,7 +249,7 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
 
             {(() => {
               const dariTransaksi = !!form.transaksi_id && form.sumber_dana !== 'kas' && form.sumber_dana !== 'utang'
-              const saldoAwal = !!data.tanggal_saldo_awal && !!form.tanggal_perolehan && form.tanggal_perolehan < data.tanggal_saldo_awal
+              const saldoAwal = !!tglAwal && !!form.tanggal_perolehan && form.tanggal_perolehan < tglAwal
               if (dariTransaksi) {
                 return <div><span className="kpi-label">Sumber dana</span><div className="input-field" style={{ borderStyle: 'dashed' }}>Dari transaksi pembelian #{form.transaksi_id}</div></div>
               }

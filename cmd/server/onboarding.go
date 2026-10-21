@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"pajak/internal/coa"
 	"pajak/internal/finance"
 	"pajak/internal/xlsx"
 )
@@ -221,23 +222,48 @@ type openingResp struct {
 	// NilaiBukuAset: nilai buku register aset per tanggal saldo awal (atau ?tanggal=), untuk
 	// baris Aset Tetap yang tidak bisa diketik bebas.
 	NilaiBukuAset int64 `json:"nilai_buku_aset"`
-	// Kategori & AkunTemplate: pilihan kategori dan baris akun bawaan layar Saldo Awal.
+	// Kategori & AkunTemplate: pilihan kategori dan baris akun bawaan layar Saldo Awal (dari CoA
+	// usaha ini). AsetTetap: baris aset tetap per akun dari daftar aset — tidak diketik bebas.
 	Kategori     []finance.KategoriSaldo `json:"kategori"`
 	AkunTemplate []finance.SaldoAkun     `json:"akun_template"`
+	AsetTetap    []finance.SaldoAkun     `json:"aset_tetap"`
+	JumlahAset   int                     `json:"jumlah_aset"`
+	// Persediaan: nilai yang seharusnya di saldo awal (daftar barang / hitung fisik pertama).
+	Persediaan      int64  `json:"persediaan"`
+	LabelPersediaan string `json:"label_persediaan"`
 }
 
 // openingSummary: tanggal = tanggal pembanding nilai buku aset ("" = tanggal saldo awal).
 func (s *tenant) openingSummary(tanggal string) openingResp {
+	all, active, _ := s.akunSaldoAwal()
+	peta := coa.PetaDari(all)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := openingResp{TransaksiPertama: s.transaksiPertamaLocked(), Kategori: finance.KategoriSaldoList, AkunTemplate: finance.TemplateAkunSaldo()}
+	out := openingResp{TransaksiPertama: s.transaksiPertamaLocked(), Kategori: finance.KategoriSaldoList, JumlahAset: len(s.assets)}
+	out.AkunTemplate = coa.TemplateSaldoAwal(active, peta, finance.TemplateAkunSaldo())
+	if len(out.AkunTemplate) == 0 {
+		out.AkunTemplate = finance.TemplateAkunSaldo()
+	}
+	out.Persediaan, out.LabelPersediaan = s.pembandingPersediaanLocked()
+	period := s.bukuAwalLocked().Period()
 	if s.opening != nil {
 		o := *s.opening
 		nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal
 		out.Opening, out.ModalAwal, out.SelisihModal, out.Aktif, out.NilaiBukuAset = &o, o.ModalAwal(nbv), o.SelisihModal(nbv), true, nbv
 	}
 	if len(tanggal) >= 7 {
-		out.NilaiBukuAset = finance.AssetsForPeriod(s.assets, s.txs, tanggal[:7]).NilaiBukuAwal
+		period = tanggal[:7]
+		out.NilaiBukuAset = finance.AssetsForPeriod(s.assets, s.txs, period).NilaiBukuAwal
+	}
+	out.AsetTetap = coa.NilaiBukuPerAkun(finance.AssetsForPeriod(s.assets, s.txs, period), period, all, peta)
+	if len(out.AsetTetap) == 0 {
+		// Belum ada aset: satu baris kosong berkode akun peralatan, isinya dari daftar aset.
+		kode := peta.Kode(coa.PeranPeralatan)
+		nama := "Aset tetap"
+		if a, ok := coa.Find(all, kode); ok {
+			nama = a.Nama
+		}
+		out.AsetTetap = []finance.SaldoAkun{{Kode: kode, Nama: nama, Kategori: finance.KatAsetTetap, Keterangan: "isi dari daftar aset"}}
 	}
 	return out
 }
