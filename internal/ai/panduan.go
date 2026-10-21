@@ -67,7 +67,7 @@ var daftarTopik = []topik{
 		tautan:  []Tautan{keTransaksi}},
 	{kode: "mutasi", ringkas: "impor mutasi bank / rekening koran",
 		kata:    []string{"mutasi", "mutasi bank", "rekening koran", "rekening", "bca", "mandiri", "bri", "bni", "e statement", "estatement"},
-		jawaban: "Buka **Transaksi** → **Impor mutasi bank**, unggah file mutasi/rekening koran. Baris dikelompokkan otomatis; yang belum yakin dibantu AI, dan Anda bisa memeriksa sebelum menyimpan.",
+		jawaban: "Buka **Transaksi** → **Impor mutasi bank**, unggah file mutasi/rekening koran (PDF e-statement, Excel .xlsx, atau .csv). Baris dikelompokkan otomatis; yang belum yakin dibantu AI, dan Anda bisa memeriksa sebelum menyimpan.",
 		tautan:  []Tautan{{View: "transaksi", Label: "Impor mutasi bank"}}},
 	{kode: "saldo-awal", ringkas: "mengisi saldo awal / data awal / modal awal / impor Excel data lama",
 		kata:    []string{"saldo awal", "data awal", "neraca awal", "modal awal", "impor data", "import data", "data lama", "template excel"},

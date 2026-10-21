@@ -32,7 +32,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   },
   jenis: {
     judul: 'Usaha Anda paling mirip yang mana?',
-    alasan: 'Supaya daftar akun dan laporan keuangan yang kami siapkan sesuai dengan cara usaha Anda menghasilkan uang.',
+    alasan: 'Supaya **daftar akun dan laporan keuangan** yang kami siapkan sesuai dengan cara usaha Anda menghasilkan uang. Kalau usaha Anda campuran, pilih yang **paling banyak menghasilkan omzet**.',
     options: [
       { value: 'perdagangan', label: 'Saya menjual barang yang saya beli dari orang lain', hint: 'Warung, toko, reseller, distributor, minimarket' },
       { value: 'jasa', label: 'Saya menjual jasa atau keahlian, bukan barang', hint: 'Salon, laundry, servis, konsultan, agensi' },
@@ -41,14 +41,14 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   },
   klu: {
     judul: 'Bidang usaha mana yang paling cocok?',
-    alasan: 'Dipakai untuk membandingkan margin laba (NPM) dan rasio pajak (CTTOR) usaha Anda dengan rata-rata nasional untuk bidang yang sama.',
+    alasan: 'Dipakai untuk membandingkan **persentase laba (NPM)** dan **persentase pajak (CTTOR)** usaha Anda dengan rata-rata usaha sejenis di Indonesia.',
   },
   stok: {
-    judul: 'Bagaimana Anda tahu sisa stok barang?',
-    alasan: 'Supaya laporan laba menghitung modal barang dengan cara yang sama seperti Anda mencatatnya.',
+    judul: 'Bagaimana Anda mencatat stok barang?',
+    alasan: 'Laba usaha dihitung dari penjualan dikurangi **modal barang yang terjual**. Modal itu baru bisa dihitung kalau kami tahu cara Anda mencatat stok: **dihitung sebulan sekali**, atau **dicatat setiap ada barang masuk dan keluar**. Jawaban ini tidak menambah pekerjaan Anda; kami hanya menyesuaikan cara hitungnya.',
     options: [
-      { value: 'periodik', label: 'Saya hitung stok sesekali, misalnya tiap akhir bulan', hint: 'Paling umum. Pilih ini kalau ragu.' },
-      { value: 'perpetual', label: 'Setiap barang masuk dan keluar langsung saya catat', hint: 'Sisa stok selalu ketahuan tanpa menghitung ulang' },
+      { value: 'periodik', label: 'Saya menghitung sisa stok sesekali, misalnya setiap akhir bulan', hint: 'Paling umum di UMKM. Pilih ini kalau ragu.' },
+      { value: 'perpetual', label: 'Setiap barang masuk dan keluar langsung saya catat', hint: 'Misalnya dengan aplikasi kasir atau kartu stok, jadi sisa stok selalu diketahui' },
     ],
   },
   omzet: {
@@ -79,13 +79,13 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     ],
   },
   tanggungan: {
-    judul: 'Berapa orang yang Anda tanggung biaya hidupnya?',
-    alasan: 'Anak, orang tua, atau saudara yang tinggal bersama dan Anda biayai. Tiap orang (maksimal 3) menambah bagian yang tidak kena pajak.',
+    judul: 'Berapa anggota keluarga yang seluruh biaya hidupnya Anda tanggung?',
+    alasan: 'Yang dihitung hanya keluarga **garis lurus ke atas atau ke bawah**: **anak kandung, anak tiri, anak angkat, orang tua, atau mertua** yang biaya hidupnya sepenuhnya Anda tanggung. **Saudara kandung, kakak/adik ipar, sepupu, keponakan, paman, dan bibi tidak dihitung**, walaupun tinggal serumah. Suami/istri juga tidak dihitung di sini. Tiap orang (paling banyak 3) menambah bagian penghasilan yang tidak kena pajak.',
     options: [
       { value: '0', label: 'Tidak ada' },
       { value: '1', label: '1 orang' },
       { value: '2', label: '2 orang' },
-      { value: '3', label: '3 orang atau lebih' },
+      { value: '3', label: '3 orang atau lebih', hint: 'Dihitung paling banyak 3 orang' },
     ],
   },
   gabung: {
@@ -105,11 +105,11 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     ],
   },
   susut: {
-    judul: 'Bagaimana nilai alat dan aset usaha dikurangi tiap tahun?',
-    alasan: 'Mesin, kendaraan, dan peralatan menyusut nilainya; pengurangannya menjadi biaya usaha. Satu cara dipakai untuk semua aset dan tidak bisa diganti lagi tanpa persetujuan DJP. Bangunan selalu memakai cara rata.',
+    judul: 'Bagaimana perhitungan pengurangan nilai aset usaha Anda setiap tahunnya?',
+    alasan: 'Mesin, kendaraan, dan peralatan yang Anda pakai untuk usaha nilainya makin lama makin berkurang. Pengurangan nilai itu kami catat sebagai **biaya usaha setiap tahunnya** (disebut penyusutan), jadi laba dan pajak Anda lebih tepat. **Satu cara berlaku untuk semua aset dan tidak bisa diganti lagi tanpa persetujuan kantor pajak.** Bangunan selalu memakai cara sama rata.',
     options: [
-      { value: 'garis_lurus', label: 'Sama rata setiap tahun (garis lurus)', hint: 'Paling umum dan paling mudah. Pilih ini kalau ragu.' },
-      { value: 'saldo_menurun', label: 'Lebih besar di tahun-tahun awal (saldo menurun)', hint: 'Biaya awal lebih besar sehingga pajak tahun awal lebih kecil' },
+      { value: 'garis_lurus', label: 'Sama rata setiap tahunnya (garis lurus)', hint: 'Paling umum dan paling mudah. Pilih ini kalau ragu.' },
+      { value: 'saldo_menurun', label: 'Lebih besar di tahun-tahun awal (saldo menurun)', hint: 'Biaya di tahun awal lebih besar, sehingga pajak di tahun awal lebih kecil' },
     ],
   },
 }

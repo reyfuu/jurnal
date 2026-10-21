@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
+import { Tebal } from '@/components/InfoTip'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -205,6 +206,70 @@ function BantuKLU({ jenis, value, onChange }: { jenis?: string; value: string; o
   )
 }
 
+// Arti tiap sektor dalam bahasa awam, ditampilkan bersama rekomendasi.
+const SEKTOR: Record<JenisUsaha, { nama: string; arti: string }> = {
+  perdagangan: { nama: 'Perdagangan (retail / dagang)', arti: 'Anda membeli barang jadi lalu menjualnya kembali tanpa mengolahnya.' },
+  jasa: { nama: 'Jasa', arti: 'Yang Anda jual adalah tenaga, waktu, atau keahlian. Barang hanya pelengkap.' },
+  manufaktur: { nama: 'Manufaktur (produksi)', arti: 'Anda mengolah bahan baku menjadi barang baru, lalu menjualnya.' },
+}
+
+// BantuJenis: pemilik menceritakan usahanya, lalu sektor (perdagangan / jasa / manufaktur)
+// direkomendasikan dari bidang usaha (KLU) yang paling cocok. Memakai saran yang sama dengan
+// langkah KLU, jadi bidangnya ikut terisi bila rekomendasi dipakai.
+function BantuJenis({ value, onPakai }: { value: string; onPakai: (jenis: JenisUsaha, klu: string) => void }) {
+  const [cerita, setCerita] = useState('')
+  const [hasil, setHasil] = useState<{ ai: boolean; saran: SaranKLU[] } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function tanya() {
+    if (cerita.trim().length < 3 || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      setHasil(await saranKLU(cerita))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const s = hasil?.saran[0]
+  const sektor = s && SEKTOR[s.jenis]
+  return (
+    <div className="grid gap-2 rounded-lg border border-border p-3">
+      <label htmlFor="jenis-cerita" className="text-sm font-semibold">Belum yakin? Ceritakan usaha Anda, kami bantu pilihkan</label>
+      <div className="flex flex-wrap gap-2">
+        <Input id="jenis-cerita" className="min-w-0 flex-1" style={{ flexBasis: 220 }} value={cerita} maxLength={300}
+          placeholder="mis. saya bikin kue kering sendiri lalu jual lewat Shopee"
+          onChange={(e) => setCerita(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void tanya() } }} />
+        <Button type="button" variant="outline" className="rounded-full" disabled={busy || cerita.trim().length < 3} onClick={() => void tanya()}>
+          <Sparkles aria-hidden="true" />{busy ? 'Mencari…' : 'Rekomendasikan'}
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      {hasil && (!s || !sektor
+        ? <p className="text-sm text-muted-foreground">Belum ketemu yang cocok. Coba ceritakan apa yang dijual, apakah dibuat sendiri atau dibeli jadi, dan cara menjualnya.</p>
+        : (
+          <div className="grid gap-1.5 rounded-md border p-3" style={{ borderColor: value === s.jenis ? 'var(--text-brand)' : 'var(--border-subtle)' }} aria-live="polite">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="text-sm">Rekomendasi: <strong>{sektor.nama}</strong></div>
+              <Button type="button" size="sm" variant={value === s.jenis ? 'default' : 'outline'} className="rounded-full" onClick={() => onPakai(s.jenis, s.kode)}>
+                {value === s.jenis ? 'Dipakai' : 'Pakai rekomendasi ini'}
+              </Button>
+            </div>
+            <p className="text-sm leading-relaxed">{sektor.arti}</p>
+            {s.alasan && <p className="text-sm leading-relaxed">{s.alasan}</p>}
+            <p className="text-xs text-muted-foreground">Bidang usaha yang paling cocok: <span className="tabular">{s.kode}</span> {s.nama}. Bidang ini ikut terisi di pertanyaan berikutnya.</p>
+          </div>
+        ))}
+      {hasil && s && <p className="text-xs text-muted-foreground">{hasil.ai ? 'Saran AI dari cerita Anda. Pastikan sesuai sebelum memakainya.' : 'Saran dari kecocokan kata. Bila kurang pas, pilih sendiri dari tiga pilihan di atas.'}</p>}
+    </div>
+  )
+}
+
 export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo; onSaved: (p: BusinessProfile) => void; submitLabel: string }) {
   const [p, setP] = useState<BusinessProfile>(info.profile ?? EMPTY)
   const [error, setError] = useState('')
@@ -281,7 +346,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
               {info.options.ptkp.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">TK = belum kawin, K = kawin, angka = jumlah tanggungan. K/I = penghasilan suami-istri digabung.</p>
+          <p className="text-xs text-muted-foreground">TK = belum kawin, K = kawin, angka = jumlah tanggungan (paling banyak 3): hanya keluarga garis lurus yang biaya hidupnya sepenuhnya ditanggung, yaitu anak kandung/tiri/angkat, orang tua, atau mertua. Saudara kandung, ipar, sepupu, dan keponakan tidak dihitung. K/I = penghasilan suami-istri digabung.</p>
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -401,13 +466,16 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
           ) : step === 'klu' ? (
             <KLUPicker value={a.klu ?? ''} onChange={(v) => setA((x) => ({ ...x, klu: v }))} options={klu} jenis={a.jenis} />
           ) : q!.options ? (
-            <ChoiceGrid
-              key={step}
-              name={q!.judul}
-              options={q!.options}
-              value={a[step] ?? ''}
-              onChange={(v) => setA((x) => ({ ...x, [step]: v }))}
-            />
+            <>
+              <ChoiceGrid
+                key={step}
+                name={q!.judul}
+                options={q!.options}
+                value={a[step] ?? ''}
+                onChange={(v) => setA((x) => ({ ...x, [step]: v }))}
+              />
+              {step === 'jenis' && <BantuJenis value={a.jenis ?? ''} onPakai={(jenis, klu) => setA((x) => ({ ...x, jenis, klu }))} />}
+            </>
           ) : (
             <div className="grid gap-2">
               <Label htmlFor="onboarding-input">{INPUT_LABEL[step as keyof typeof INPUT_LABEL]}</Label>
@@ -418,7 +486,7 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
               )}
             </div>
           )}
-          <p className="onboarding-reason" id="onboarding-reason"><strong>Kenapa kami tanya ini?</strong> {q!.alasan}</p>
+          <p className="onboarding-reason" id="onboarding-reason"><strong>Kenapa kami tanya ini?</strong> <Tebal teks={q!.alasan} /></p>
         </>
       )}
       {error && <p className="onboarding-error" role="alert">{error}</p>}

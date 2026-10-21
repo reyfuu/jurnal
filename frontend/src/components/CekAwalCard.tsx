@@ -1,6 +1,26 @@
 import { useEffect, useState } from 'react'
 import { cekAwal, type BusinessProfile, type CekAwal, type SaranBentuk } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { InfoTip, TebalAngka } from './InfoTip'
+
+// Penjelasan singkat istilah di kartu cek awal; poin yang perlu diperhatikan ditebalkan.
+export function PenjelasanNPM() {
+  return (
+    <>
+      <span><strong>NPM (Net Profit Margin)</strong> = laba bersih ÷ omzet. Artinya: dari setiap Rp100 penjualan, berapa rupiah yang menjadi <strong>laba bersih</strong>.</span>
+      <span>Gunanya: kantor pajak membandingkan NPM usaha dengan <strong>rata-rata usaha sejenis</strong>. NPM yang <strong>jauh di bawah rata-rata</strong> bisa dianggap ada omzet yang belum dicatat atau biaya yang terlalu besar, sehingga lebih mungkin <strong>ditanya atau diperiksa</strong>.</span>
+    </>
+  )
+}
+
+export function PenjelasanCTTOR() {
+  return (
+    <>
+      <span><strong>CTTOR (Corporate Tax to Turnover Ratio)</strong> = pajak penghasilan ÷ omzet. Artinya: dari setiap Rp100 penjualan, berapa rupiah yang dibayar sebagai <strong>pajak</strong>.</span>
+      <span>Gunanya: menunjukkan apakah pajak yang dibayar <strong>wajar dibanding usaha sejenis</strong>. CTTOR yang <strong>jauh di bawah rata-rata</strong> sering menjadi alasan kantor pajak meminta penjelasan. Untuk <strong>PPh Final 0,5%</strong>, angka ini sudah pasti dari omzet, jadi hanya sebagai informasi.</span>
+    </>
+  )
+}
 
 // 2 desimal, sama dengan data sumber dan pesan dari server
 const formatPct = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
@@ -41,7 +61,7 @@ function SaranCard({ s }: { s: SaranBentuk }) {
         </div>
       )}
       <ul className="grid gap-2">
-        {s.alasan.map((a) => <li key={a} className="text-sm leading-relaxed">{a}</li>)}
+        {s.alasan.map((a) => <li key={a} className="text-sm leading-relaxed"><TebalAngka teks={a} /></li>)}
       </ul>
       <div>
         <div className="text-xs font-semibold text-muted-foreground">Perbandingan {s.skema.length} skema pajak per tahun (% dari omzet)</div>
@@ -103,24 +123,24 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
       <div>
         <h3 id="cek-awal-title" className="text-sm font-bold">Cek awal: benchmark nasional & risiko pajak</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          NPM (laba bersih ÷ omzet) dan CTTOR (pajak ÷ omzet) dibandingkan rata-rata nasional{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Sumber: {c.sumber}.
+          <strong>NPM</strong> (laba bersih ÷ omzet) dan <strong>CTTOR</strong> (pajak ÷ omzet) dibandingkan dengan rata-rata nasional{c.klu ? ` untuk KLU ${c.klu.kode} ${c.klu.nama}` : ''}. Arahkan kursor ke tanda tanya untuk penjelasannya.
         </p>
       </div>
       {c.status !== 'kurang_data' && c.klu && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-md border border-border p-3">
-            <div className="text-xs text-muted-foreground">NPM</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">NPM <InfoTip label="NPM"><PenjelasanNPM /></InfoTip></div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.npm_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.npm_bps)}</span></div>
             <div className="mt-1 text-xs font-semibold" style={{ color: st.color }}>{st.label}</div>
           </div>
           <div className="rounded-md border border-border p-3">
-            <div className="text-xs text-muted-foreground">CTTOR</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">CTTOR <InfoTip label="CTTOR"><PenjelasanCTTOR /></InfoTip></div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.cttor_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.cttor_bps)}</span></div>
           </div>
         </div>
       )}
-      <p className="text-sm leading-relaxed">{c.pesan}</p>
-      {c.cttor_pesan && <p className="text-sm leading-relaxed text-muted-foreground">{c.cttor_pesan}</p>}
+      <p className="text-sm leading-relaxed"><TebalAngka teks={c.pesan} /></p>
+      {c.cttor_pesan && <p className="text-sm leading-relaxed text-muted-foreground"><TebalAngka teks={c.cttor_pesan} /></p>}
       {c.risiko.length > 0 ? (
         <ul className="grid gap-3">
           {c.risiko.map((r) => (

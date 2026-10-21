@@ -54,3 +54,16 @@ func TestCariKLU_BahasaSehariHari(t *testing.T) {
 		t.Errorf("kata umum saja memberi hasil %v", kodeKandidat(got))
 	}
 }
+
+func TestCariKLU_TanpaJenisDitebakDariKataKerja(t *testing.T) {
+	for teks, want := range map[string]string{
+		"saya bikin kue kering dan bolu sendiri lalu jual di toko dan online": "manufaktur",
+		"bikin kopi susu sendiri, dijual di kafe":                             "jasa",
+		"jasa servis AC dan kulkas panggilan":                                 "jasa",
+	} {
+		k := CariKLU(teks, "", 3)
+		if len(k) == 0 || k[0].Jenis != want {
+			t.Errorf("CariKLU(%q) = %+v; want jenis %s", teks, k, want)
+		}
+	}
+}
