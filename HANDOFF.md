@@ -911,6 +911,28 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Form "Kalkulator gratis" di landing membawa nama/email/WA/PDP ke form Daftar (`AwalDaftar`). Setelah onboarding,
   layar bayar langsung membuka tab Alat Gratis.
 
+## Checklist tester "List Check Fitur Master Pajak.xlsx" (21 Okt 2026) — 4 PR
+Daftar 14 item dari tester (M. Alif); #6–#8 sudah beres sebelumnya, #9 Buku Besar sudah ada (PR #71/#80).
+Sisanya dikerjakan di 4 branch dari `main` f9adf68:
+- `fix/saldo-awal-akun-aset` (#1–#3): akun saldo awal tambahan (kas/bank, aset lancar lain, kewajiban lain)
+  jadi akun CoA sendiri, **diturunkan** dari `opening.Rincian` lewat `coa.AkunSaldoAwal` di `coaAkun()` (tanpa
+  tabel baru; penanda `Catatan == coa.CatatanSaldoAwal`). Kode diisi `coa.IsiKodeSaldo` saat simpan/impor.
+  Piutang/persediaan/utang usaha/pinjaman/modal sengaja tetap di akun peran (`// ponytail:` di `akunSendiri`).
+  Template Excel: kolom Jenis bebas (`xlsx.Tabel.Bebas`), status SEIMBANG di atas + berwarna (`Tabel.Status`),
+  kode Neraca dari CoA usaha. Impor aset bertanggal ≥ bulan mulai dilewati (dulu jadi "Tambahan modal").
+  Catatan: di template rinci, **Nama baris = uraian, akunnya ditentukan Jenis** — jangan turunkan akun dari Nama.
+- `fix/navigasi-rupiah-mutasi` (#4, #5, #12): view & periode di hash URL (`lib/rute.ts`), F5/Back aman;
+  PDF bersandi diminta sebagai info, Excel bersandi dijelaskan, baris bulan tutup buku tidak dicentang;
+  semua nilai uang rupiah penuh (`FormatJt`/`formatJt` dihapus, sumbu grafik tetap "jt"); kartu KPI pakai
+  container query (`11.8cqi`) supaya angka penuh muat.
+- `feat/jurnal-umum-impor-invoice` (#10, #11, #13): menu Jurnal Umum (`/reports/jurnal`, dari `jurnalPeriode`);
+  impor invoice Excel lewat `tambahInvoiceLocked` (sama dengan Buat Invoice); tagihan manual tidak bisa ditambah
+  /diimpor lagi (endpoint & template dihapus), tab lamanya hanya muncul bila ada data.
+- `feat/unduh-semua-daftar` (#14): `/reports/daftar.xlsx|pdf` (piutang, utang, invoice, barang, pelanggan,
+  pemasok) dari `daftarUsaha`; karyawan sengaja tidak ikut.
+Belum: tanah di saldo awal (butuh kelas aset tak disusutkan), dekripsi Excel bersandi (dipilih: pesan saja),
+sumbu grafik Dashboard masih skala tetap (6 jt / 100 jt) — tidak menyesuaikan omzet usaha besar.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 
