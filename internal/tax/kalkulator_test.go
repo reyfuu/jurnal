@@ -193,6 +193,15 @@ func TestHitungPotong_TolakMasukanNgawur(t *testing.T) {
 
 // === PPh Badan ===
 
+func TestHitungPPhBadan_PKPTidakMelebihiPeredaranBruto(t *testing.T) {
+	if _, err := tax.HitungPPhBadan(tax.PPhBadanInput{PeredaranBruto: 1_000_000_000, PenghasilanKenaPajak: 1_000_000_001}); err == nil {
+		t.Errorf("PKP > peredaran bruto harus ditolak: %v", err)
+	}
+	if _, err := tax.HitungPPhBadan(tax.PPhBadanInput{PeredaranBruto: 1_000_000_000, PenghasilanKenaPajak: 1_000_000_000}); err != nil {
+		t.Errorf("PKP = peredaran bruto sah: %v", err)
+	}
+}
+
 func TestHitungPPhBadan_FasilitasPasal31E(t *testing.T) {
 	// Omzet 4 miliar (di bawah 4,8 M): seluruh PKP dapat tarif efektif 11%.
 	kecil, _ := tax.HitungPPhBadan(tax.PPhBadanInput{PeredaranBruto: 4_000_000_000, PenghasilanKenaPajak: 500_000_000})

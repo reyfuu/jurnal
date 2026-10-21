@@ -1,3 +1,5 @@
+import { formatRp } from './format'
+
 export const AMBER = 'var(--text-warn)'
 export const RED = 'var(--text-danger)'
 export const GREEN = 'var(--accent-green)'
@@ -14,3 +16,20 @@ const IBUKOTA10 = ['medan', 'palembang', 'jakarta', 'bandung', 'semarang', 'sura
 export const wilayahDariKota = (kota?: string) =>
   kota && IBUKOTA10.some((k) => kota.toLowerCase().includes(k)) ? 'ibukota10' : ''
 export const SOROT = 'var(--text-brand)'
+
+// Batas masukan (sama dengan internal/tax/validasi.go): margin laba = laba bersih ÷ omzet harus di
+// antara -100% dan 100%. '' = sah; selain itu pesan
+// yang meminta pengguna merevisi input sebelum menghitung.
+const BATAS_MARGIN = 'Margin laba harus di antara -100% dan 100%'
+
+export function cekLabaOmzet(laba: number, omzet: number) {
+  if (laba <= omzet && laba >= -omzet) return ''
+  const margin = omzet > 0 ? ` (margin ${persen(Math.round((laba * 10_000) / omzet))})` : ''
+  return laba > omzet
+    ? `Laba bersih ${formatRp(laba)} lebih besar dari omzet ${formatRp(omzet)}${margin}. ${BATAS_MARGIN}, jadi periksa lagi angka laba atau omzet.`
+    : `Kerugian ${formatRp(-laba)} lebih besar dari omzet ${formatRp(omzet)}${margin}. ${BATAS_MARGIN}, jadi periksa lagi angka laba atau omzet.`
+}
+
+/** Margin dalam teks persen ("12,5", "-20"); kosong atau "-" saat mengetik dianggap sah. */
+export const cekMargin = (teks: string) => (Math.abs(keBps(teks)) > 10_000 ? `${BATAS_MARGIN}.` : '')
+

@@ -105,6 +105,11 @@ describe('answered', () => {
     expect(answered('omzet', a({ omzet: 'Rp750.000.000' }))).toBe(true)
     expect(answered('laba', a({ laba: '0' }))).toBe(true) // impas boleh
     expect(answered('laba', a({}))).toBe(false)
+    // margin laba di antara -100% dan 100%: laba atau rugi tidak boleh melebihi omzet
+    expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: 'Rp1.500.000.000' }))).toBe(false)
+    expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: '-1.000.000.001' }))).toBe(false)
+    expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: '-Rp200.000.000' }))).toBe(true)
+    expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: 'Rp1.000.000.000' }))).toBe(true)
   })
 })
 

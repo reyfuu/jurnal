@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getTaxPlanning, type BusinessProfile, type TaxPlanning } from '@/lib/api'
 import { formatJt, formatPct, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
+import { cekMargin } from '@/lib/kalkulator'
 
 const fieldClass = 'h-[38px] bg-[var(--bg-input)] tabular'
 
@@ -25,6 +26,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
   const [ptkp, setPtkp] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const masalah = cekMargin(margin)
 
   async function run(input: Parameters<typeof getTaxPlanning>[0]) {
     setBusy(true)
@@ -46,6 +48,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    if (masalah) return
     void run({ omzet: parseFloat(omzet || '0'), net_margin_bps: Math.round(parseFloat(margin || '0') * 100), ptkp })
   }
 
@@ -67,7 +70,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
           </div>
           <div>
             <Label htmlFor="tp-margin" className="kpi-label">Margin Laba Bersih (%)</Label>
-            <Input id="tp-margin" type="number" step="0.1" className={fieldClass + ' mt-1.5'} value={margin} onChange={(e) => setMargin(e.target.value)} />
+            <Input id="tp-margin" type="number" step="0.1" min="-100" max="100" className={fieldClass + ' mt-1.5'} value={margin} aria-invalid={!!masalah} onChange={(e) => setMargin(e.target.value)} />
           </div>
           <div>
             <Label htmlFor="tp-ptkp" className="kpi-label">Status PTKP Pemilik</Label>
@@ -77,10 +80,10 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
             </Select>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="btn-cta" style={{ width: '100%' }} type="submit" disabled={busy}>Hitung Ulang</button>
+            <button className="btn-cta" style={{ width: '100%' }} type="submit" disabled={busy || !!masalah}>Hitung Ulang</button>
           </div>
         </div>
-        {error && <p className="text-sm text-destructive" role="alert" style={{ marginTop: 12 }}>{error}</p>}
+        {(masalah || error) && <p className="text-sm text-destructive" role="alert" style={{ marginTop: 12 }}>{masalah || error}</p>}
       </form>
 
       {bu && best && (

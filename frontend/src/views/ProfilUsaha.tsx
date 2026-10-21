@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { getWilayah, saranKLU, saveBusiness, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
-import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { cekLabaOmzet } from '@/lib/kalkulator'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
 
@@ -295,9 +296,11 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<BusinessProfile>) => setP((x) => ({ ...x, ...patch }))
+  const masalahLabaOmzet = cekLabaOmzet(p.laba_sebelum_pajak ?? 0, p.omzet_tahunan ?? 0)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (masalahLabaOmzet) return
     setBusy(true)
     setError('')
     try {
@@ -379,6 +382,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
         </div>
         <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional dan Perencanaan Pajak selama belum ada data transaksi.</p>
+        {masalahLabaOmzet && <p className="text-sm text-destructive sm:col-span-2" role="alert">{masalahLabaOmzet}</p>}
       </div>
       <label className="flex items-center gap-3 text-sm" htmlFor="biz-pkp">
         <Switch id="biz-pkp" checked={p.pkp} onCheckedChange={(v) => set({ pkp: v })} />
@@ -398,7 +402,7 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
 
       <FakturFields p={p} set={set} />
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <Button type="submit" size="lg" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</Button>
+      <Button type="submit" size="lg" disabled={busy || !!masalahLabaOmzet}>{busy ? 'Menyimpan…' : submitLabel}</Button>
     </form>
   )
 }
@@ -506,6 +510,7 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
               )}
             </div>
           )}
+          {step === 'laba' && masalahLaba(a) && <p className="onboarding-error" role="alert">{masalahLaba(a)}</p>}
           <p className="onboarding-reason" id="onboarding-reason"><strong>Kenapa kami tanya ini?</strong> <Tebal teks={q!.alasan} /></p>
         </>
       )}
