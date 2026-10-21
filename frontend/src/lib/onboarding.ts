@@ -36,7 +36,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     options: [
       { value: 'perdagangan', label: 'Saya menjual barang yang saya beli dari orang lain', hint: 'Warung, toko, reseller, distributor, minimarket' },
       { value: 'jasa', label: 'Saya menjual jasa atau keahlian, bukan barang', hint: 'Salon, laundry, servis, konsultan, agensi' },
-      { value: 'manufaktur', label: 'Saya membuat atau mengolah barang sendiri lalu menjualnya', hint: 'Kue, catering, konveksi, kerajinan, kopi sangrai' },
+      { value: 'manufaktur', label: 'Saya membuat atau mengolah barang sendiri lalu menjualnya', hint: 'Kue, konveksi, kerajinan, kopi sangrai, juga peternakan, pertanian, dan perikanan' },
     ],
   },
   klu: {

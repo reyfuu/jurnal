@@ -28,7 +28,7 @@ var sinonim = map[string][]string{
 	"parfum": {"kosmetik"}, "kecantikan": {"kosmetik"},
 	"catering": {"boga"}, "katering": {"boga", "catering"},
 	"bengkel": {"reparasi"}, "servis": {"reparasi"}, "service": {"reparasi"},
-	"barbershop": {"pangkas", "rambut"}, "barber": {"pangkas", "rambut"}, "potong": {"pangkas"},
+	"barbershop": {"pangkas", "rambut"}, "barber": {"pangkas", "rambut"},
 	"warung": {"kedai", "eceran"}, "baju": {"pakaian"}, "fashion": {"pakaian"}, "kue": {"roti"},
 	"homestay": {"pondok"}, "konsultan": {"konsultasi"},
 }
@@ -44,7 +44,12 @@ var kataUmum = map[string]bool{
 var jualOnline = []string{"online", "olshop", "shopee", "tokopedia", "tiktok", "lazada", "bukalapak", "marketplace", "ecommerce", "daring", "instagram", "whatsapp"}
 
 // produksi: kata yang membuat KLU industri/pengolahan (golongan 10–33) masuk akal.
-var produksi = []string{"produksi", "pabrik", "bikin", "membuat", "olah", "mengolah", "industri", "konveksi", "jahit", "masak", "roasting", "sangrai", "cetak", "rakit"}
+var produksi = []string{"produksi", "pabrik", "bikin", "membuat", "olah", "mengolah", "industri", "konveksi", "jahit", "masak", "roasting", "sangrai", "cetak", "rakit",
+	// budidaya sendiri: pertanian, peternakan, perikanan (golongan 01–03, pembukuan produksi)
+	"ternak", "beternak", "tanam", "menanam", "budidaya", "membudidayakan", "panen", "tambak", "berkebun", "kebun", "hidroponik"}
+
+// jualLagi: tanda membeli barang jadi untuk dijual kembali (perdagangan), dicari sebagai frasa.
+var jualLagi = []string{"jual lagi", "dijual lagi", "jual kembali", "dijual kembali", "kulak", "reseller", "dropship", "beli dari", "ambil dari"}
 
 // jasaKata: kata yang menunjukkan yang dijual adalah tenaga / keahlian.
 var jasaKata = []string{"jasa", "servis", "service", "reparasi", "perbaikan", "bengkel", "binatu", "laundry", "cuci", "salon", "pangkas",
@@ -141,7 +146,11 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 	// kata kerjanya, supaya "bikin kue sendiri" tidak jatuh ke toko kue.
 	bonusJenis := 1.0
 	if jenis == "" {
+		low := " " + strings.Join(kata(teks), " ") + " "
+		beliJual := slices.ContainsFunc(jualLagi, func(f string) bool { return strings.Contains(low, " "+f) })
 		switch {
+		case beliJual && !buatSendiri:
+			jenis, bonusJenis = "perdagangan", 3
 		case buatSendiri && !ada(sajian):
 			jenis, bonusJenis = "manufaktur", 3
 		case ada(jasaKata):
