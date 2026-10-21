@@ -78,3 +78,37 @@ func TestWriteTabel_TanggalAngkaRumusKunci(t *testing.T) {
 		t.Errorf("baris contoh dibaca: %q", row)
 	}
 }
+
+// Dropdown "saran" (Bebas) tetap menerima ketikan di luar daftar; sel Status diwarnai merah
+// bila memuat BELUM dan hijau bila SEIMBANG, lewat conditional formatting.
+func TestTabel_PilihanBebasDanStatus(t *testing.T) {
+	sheets := []xlsx.Sheet{{Name: "Data", Rows: [][]string{
+		{"Judul"}, {"Status", `=IF(1=1,"SEIMBANG","BELUM SEIMBANG")`}, {"Jenis", "Nilai"}, {"Kas", "1"},
+	}, Tabel: &xlsx.Tabel{Header: 2, Kolom: 2, Pilihan: map[int][]string{0: {"Kas", "Bank"}}, Bebas: []int{0},
+		Status: []string{"B2"}, Kunci: true}}}
+	var buf bytes.Buffer
+	if err := xlsx.Write(&buf, sheets); err != nil {
+		t.Fatal(err)
+	}
+	zr, _ := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	isi := map[string]string{}
+	for _, f := range zr.File {
+		rc, _ := f.Open()
+		b, _ := io.ReadAll(rc)
+		_ = rc.Close()
+		isi[f.Name] = string(b)
+	}
+	data := isi["xl/worksheets/sheet1.xml"]
+	for _, want := range []string{`showErrorMessage="0"`, `<conditionalFormatting sqref="B2">`, `SEARCH(&#34;BELUM&#34;,B2)`} {
+		if !strings.Contains(data, want) {
+			t.Errorf("sheet tidak memuat %s:\n%s", want, data)
+		}
+	}
+	// Urutan elemen worksheet wajib: sheetProtection → conditionalFormatting → dataValidations.
+	if p, c, v := strings.Index(data, "<sheetProtection"), strings.Index(data, "<conditionalFormatting"), strings.Index(data, "<dataValidations"); !(p < c && c < v) {
+		t.Errorf("urutan elemen salah: proteksi %d, format %d, validasi %d", p, c, v)
+	}
+	if !strings.Contains(isi["xl/styles.xml"], `<dxfs count="2">`) {
+		t.Error("styles tanpa dxfs")
+	}
+}

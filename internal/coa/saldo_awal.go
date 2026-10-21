@@ -1,6 +1,7 @@
 package coa
 
 import (
+	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -123,8 +124,11 @@ func kataAkun(s string) []string {
 	}, s)
 	var out []string
 	for _, w := range strings.Fields(s) {
-		if w == "hutang" {
+		switch w {
+		case "hutang":
 			w = "utang"
+		case "dimuka": // "Dibayar Dimuka" = "Dibayar di Muka"
+			w = "muka"
 		}
 		if slices.Contains([]string{"dan", "di", "yang", "atau", "ke", "dari", "untuk", "lain", "lainnya", "rekening"}, w) {
 			continue
@@ -169,11 +173,8 @@ func CocokAkunSaldo(nama string, active []Account, peta Peta) (acc Account, pers
 func KodeBaruSaldo(kategori string, active []Account, peta Peta, dipakai []string) string {
 	// Kelompok kode mengikuti akun utama kategorinya (mis. aset lancar lain → Biaya Dibayar
 	// Dimuka 14xx), bukan akun pertama yang kebetulan berkategori sama.
-	utama := map[string]string{finance.KatKas: PeranKas, finance.KatPiutang: PeranPiutang, finance.KatPersediaan: PeranPersediaan,
-		finance.KatAsetLain: PeranDibayarDimuka, finance.KatUtang: PeranUtangUsaha, finance.KatPinjaman: PeranPinjaman,
-		finance.KatKewajibanLain: PeranUtangLain, finance.KatModal: PeranModal, finance.KatLabaDitahan: PeranLabaDitahan}
 	var awalan string
-	if k := peta.Kode(utama[kategori]); len(k) == 4 {
+	if k := peta.Kode(peranKategori[kategori]); len(k) == 4 {
 		awalan = k[:2]
 	}
 	for _, a := range active {
@@ -214,6 +215,21 @@ func KodeBaruSaldo(kategori string, active []Account, peta Peta, dipakai []strin
 	return ""
 }
 
+// peranKategori: akun peran tiap kategori saldo awal.
+var peranKategori = map[string]string{finance.KatKas: PeranKas, finance.KatPiutang: PeranPiutang, finance.KatPersediaan: PeranPersediaan,
+	finance.KatAsetLain: PeranDibayarDimuka, finance.KatUtang: PeranUtangUsaha, finance.KatPinjaman: PeranPinjaman,
+	finance.KatKewajibanLain: PeranUtangLain, finance.KatModal: PeranModal, finance.KatLabaDitahan: PeranLabaDitahan}
+
+// KodeSaldo: kode untuk baris saldo awal baru. Kategori yang boleh berakun sendiri mendapat kode
+// baru (baru = true); kategori lain dibukukan ke akun perannya, jadi kodenya kode akun itu.
+func KodeSaldo(kategori string, active []Account, peta Peta, dipakai []string) (kode string, baru bool) {
+	if _, ok := akunSendiri[kategori]; ok {
+		k := KodeBaruSaldo(kategori, active, peta, dipakai)
+		return k, k != ""
+	}
+	return peta.Kode(peranKategori[kategori]), false
+}
+
 // kataKategori: kata yang lazim diketik pemilik untuk nama akun, di luar istilah akuntansi.
 var kataKategori = []struct {
 	kategori string
@@ -244,4 +260,97 @@ func TebakKategoriNama(nama string) string {
 		return k.ID
 	}
 	return ""
+}
+
+// CatatanSaldoAwal menandai akun yang ditambahkan klien lewat Saldo Awal, bukan dari template.
+const CatatanSaldoAwal = "Ditambahkan sendiri di Saldo Awal"
+
+// akunSendiri: kategori saldo awal yang barisnya boleh menjadi akun tersendiri, beserta akun
+// peran yang ditiru (kelompok, saldo normal, subtype).
+//
+// ponytail: piutang, persediaan, utang usaha, pinjaman, dan modal tetap di akun perannya karena
+// sub-bukunya (pelunasan saldo awal, kartu stok, cicilan) menggerakkan akun peran. Akun
+// tersendiri untuk kategori itu baru masuk akal setelah sub-bukunya per akun.
+var akunSendiri = map[string]string{finance.KatKas: PeranKas, finance.KatAsetLain: PeranDibayarDimuka, finance.KatKewajibanLain: PeranUtangLain}
+
+// AkunSaldoAwal: daftar akun ditambah akun dari baris saldo awal yang kodenya belum ada di
+// daftar (akun yang ditambahkan sendiri). Diturunkan dari saldo awal tersimpan, jadi tidak perlu
+// tabel sendiri; all tidak diubah.
+func AkunSaldoAwal(rincian []finance.SaldoAkun, all []Account, peta Peta) []Account {
+	out := all
+	for _, r := range rincian {
+		peran, ok := akunSendiri[r.Kategori]
+		if !ok || len(r.Kode) != 4 {
+			continue
+		}
+		if _, ada := Find(out, r.Kode); ada {
+			continue
+		}
+		if len(out) == len(all) {
+			out = slices.Clone(all) // template dipakai bersama semua usaha
+		}
+		induk, _ := Find(all, peta.Kode(peran))
+		i := slices.IndexFunc(out, func(a Account) bool { return a.Kode > r.Kode })
+		if i < 0 {
+			i = len(out)
+		}
+		out = slices.Insert(out, i, Account{Kode: r.Kode, Nama: r.Nama, Subtype: induk.Subtype, Normal: induk.Normal,
+			Kelompok: induk.Kelompok, Kondisi: Selalu, Catatan: CatatanSaldoAwal})
+	}
+	return out
+}
+
+// IsiKodeSaldo memberi kode pada baris saldo awal tanpa kode (akun ditambah sendiri, atau jenis
+// yang diketik bebas di template Excel): nama sama dengan baris lain → kodenya; nama sama
+// dengan akun CoA berkategori sama → akun itu; selain itu kode baru di kelompoknya. Kategori
+// yang tetap di akun perannya tidak diberi kode.
+func IsiKodeSaldo(rincian []finance.SaldoAkun, active []Account, peta Peta) {
+	kode := map[string]string{} // nama (huruf kecil) → kode
+	var dipakai []string
+	for _, r := range rincian {
+		if r.Kode == "" {
+			continue
+		}
+		dipakai = append(dipakai, r.Kode)
+		if _, ok := akunSendiri[r.Kategori]; ok {
+			kode[strings.ToLower(strings.TrimSpace(r.Nama))] = cmp.Or(kode[strings.ToLower(strings.TrimSpace(r.Nama))], r.Kode)
+		}
+	}
+	for i := range rincian {
+		r := &rincian[i]
+		if _, ok := akunSendiri[r.Kategori]; !ok || r.Kode != "" {
+			continue
+		}
+		nama := strings.ToLower(strings.TrimSpace(r.Nama))
+		k := kode[nama]
+		if a, persis, ok := CocokAkunSaldo(r.Nama, active, peta); k == "" && ok && persis && KategoriSaldoAkun(a, peta) == r.Kategori {
+			k = a.Kode
+		}
+		if k == "" {
+			k = KodeBaruSaldo(r.Kategori, active, peta, dipakai)
+		}
+		r.Kode, kode[nama] = k, k
+		dipakai = append(dipakai, k)
+	}
+}
+
+// KasAwalLain: saldo awal baris kas yang punya akun sendiri (akun CoA bernama sama, mis. Bank,
+// atau akun tambahan), per kode. Sisanya tetap di akun Kas.
+func KasAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[string]int64 {
+	out := map[string]int64{}
+	for _, r := range ob.Rincian {
+		if r.Kategori == finance.KatKas && r.Kode != peta.Kode(PeranKas) && kodeSendiri(r, akun) {
+			out[r.Kode] += r.Nominal
+		}
+	}
+	return out
+}
+
+// kodeSendiri: baris saldo awal dibukukan ke akun berkodenya sendiri bila akun itu memang akun
+// yang sama (nama sama) atau ditambahkan sendiri lewat Saldo Awal. Kode template saldo awal lama
+// mengikuti CoA dagang; di CoA lain kode yang sama bisa berarti akun lain (manufaktur: 1401 =
+// Uang Muka Pembelian).
+func kodeSendiri(r finance.SaldoAkun, akun []Account) bool {
+	acc, ok := Find(akun, r.Kode)
+	return ok && r.Kode != "" && (acc.Catatan == CatatanSaldoAwal || strings.EqualFold(strings.TrimSpace(acc.Nama), strings.TrimSpace(r.Nama)))
 }

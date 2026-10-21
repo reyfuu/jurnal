@@ -72,8 +72,7 @@ func (s *Server) handleSaranSaldo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if out.Kategori != "" && out.Kode == "" && out.Kategori != finance.KatAsetTetap {
-		out.Kode = coa.KodeBaruSaldo(out.Kategori, active, peta, req.Dipakai)
-		out.Baru = out.Kode != ""
+		out.Kode, out.Baru = coa.KodeSaldo(out.Kategori, active, peta, req.Dipakai)
 	}
 	writeJSON(w, out)
 }

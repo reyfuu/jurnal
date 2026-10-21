@@ -1,6 +1,8 @@
 package finance_test
 
 import (
+	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -128,15 +130,14 @@ func TestParseOnboarding_RinciDihitungUlangDanError(t *testing.T) {
 		}
 		t.Fatalf("sheet %s tidak ada", nama)
 	}
-	set("Piutang", 4, 8, "500000")        // Cadangan Kerugian
-	set("Piutang", 7, 7, "999")           // Sisa Piutang (rumus) palsu: diabaikan
-	set("Modal", 8, 2, "Prive")           // saldo laba contoh → prive 10 jt
-	set("Utang", 8, 8, "900000")          // sudah dibayar > nilai 450 rb → error baris 8
-	set("Aset Tetap", 7, 3, "Tanah")      // tanah belum didukung → error baris 7
-	set("Kas dan Bank", 8, 2, "Deposito") // jenis tidak dikenal → error baris 8
+	set("Piutang", 4, 8, "500000")   // Cadangan Kerugian
+	set("Piutang", 7, 7, "999")      // Sisa Piutang (rumus) palsu: diabaikan
+	set("Modal", 8, 2, "Prive")      // saldo laba contoh → prive 10 jt
+	set("Utang", 8, 8, "900000")     // sudah dibayar > nilai 450 rb → error baris 8
+	set("Aset Tetap", 7, 3, "Tanah") // tanah belum didukung → error baris 7
 	d := finance.ParseOnboarding(sheets)
 
-	want := map[string]int{"Utang": 8, "Aset Tetap": 7, "Kas dan Bank": 8}
+	want := map[string]int{"Utang": 8, "Aset Tetap": 7}
 	for _, e := range d.Errors {
 		if want[e.Sheet] != e.Baris {
 			t.Errorf("error tak terduga: %+v", e)
@@ -150,7 +151,7 @@ func TestParseOnboarding_RinciDihitungUlangDanError(t *testing.T) {
 	if o == nil {
 		t.Fatal("saldo awal tetap terbentuk dari baris yang valid")
 	}
-	if o.Piutang != 8_000_000 || o.LabaDitahan != 0 || o.Kas != 5_000_000 || o.KewajibanLain != 0 {
+	if o.Piutang != 8_000_000 || o.LabaDitahan != 0 || o.Kas != 45_000_000 || o.KewajibanLain != 0 {
 		t.Errorf("piutang %d (8,5 jt − cadangan 0,5 jt), laba ditahan %d, kas %d, kewajiban lain %d",
 			o.Piutang, o.LabaDitahan, o.Kas, o.KewajibanLain)
 	}
@@ -521,5 +522,81 @@ func TestStokTemplate_RoundTrip(t *testing.T) {
 	s := finance.SummarizeStok(list)
 	if s.TotalItem != 3 || s.Menipis != 1 {
 		t.Errorf("rekap template: %+v", s)
+	}
+}
+
+// Jenis di luar daftar dropdown diterima (dropdown hanya saran): barisnya jadi akun bernama
+// jenis itu, uraiannya pindah ke keterangan; kode akun diberikan server dari CoA usaha.
+func TestRinci_JenisBebas(t *testing.T) {
+	sheets := finance.OnboardingTemplate("")
+	set := func(nama string, baris, kol int, v string) {
+		for _, sh := range sheets {
+			if sh.Nama == nama {
+				sh.Rows[baris-1][kol] = v
+				return
+			}
+		}
+		t.Fatalf("sheet %s tidak ada", nama)
+	}
+	set("Kas dan Bank", 8, 2, "Deposito Mandiri")
+	set("Aset Lancar Lain", 7, 2, "Uang Jaminan")
+	set("Utang", 8, 2, "Utang ke Pemegang Saham")
+	set("Utang", 9, 2, "Kredit Koperasi")
+	d := finance.ParseOnboarding(sheets)
+	if len(d.Errors) != 0 || d.Opening == nil {
+		t.Fatalf("jenis bebas harus diterima: %+v", d.Errors)
+	}
+	cari := func(nama string) finance.SaldoAkun {
+		for _, r := range d.Opening.Rincian {
+			if r.Nama == nama {
+				return r
+			}
+		}
+		t.Fatalf("baris %q tidak ada: %+v", nama, d.Opening.Rincian)
+		return finance.SaldoAkun{}
+	}
+	if r := cari("Deposito Mandiri"); r.Kategori != finance.KatKas || r.Kode != "" || r.Nominal != 40_000_000 || !strings.Contains(r.Keterangan, "Bank BCA Operasional") {
+		t.Errorf("deposito: %+v", r)
+	}
+	if r := cari("Uang Jaminan"); r.Kategori != finance.KatAsetLain || r.Kode != "" || !strings.Contains(r.Keterangan, "Sewa ruko") {
+		t.Errorf("uang jaminan: %+v", r)
+	}
+	if r := cari("Utang ke Pemegang Saham"); r.Kategori != finance.KatKewajibanLain || r.Kode != "" {
+		t.Errorf("utang pemegang saham: %+v", r)
+	}
+	if r := cari("Kredit Koperasi"); r.Kategori != finance.KatPinjaman {
+		t.Errorf("kredit koperasi harus kategori pinjaman: %+v", r)
+	}
+	// Total per pos tidak berubah: hanya pengelompokan akunnya.
+	if o := d.Opening; o.Kas != 45_000_000 || o.AsetLain != 7_050_000 || o.Pinjaman != 20_000_000 {
+		t.Errorf("total pos berubah: %+v", o)
+	}
+}
+
+// Status SEIMBANG tampil paling atas Neraca Saldo Awal (dan di Petunjuk), berwarna; kolom Jenis
+// menerima ketikan bebas.
+func TestOnboardingTemplate_StatusDiAtas(t *testing.T) {
+	byNama := map[string]finance.ImportSheet{}
+	for _, sh := range finance.OnboardingTemplate("") {
+		byNama[sh.Nama] = sh
+	}
+	n := byNama["Neraca Saldo Awal"]
+	if !strings.Contains(n.Rows[3][3], "SEIMBANG") || !slices.Contains(n.Format.Status, "D4") {
+		t.Fatalf("status di D4: %q, status %v", n.Rows[3], n.Format.Status)
+	}
+	p := byNama["Petunjuk"]
+	ada := false
+	for i, row := range p.Rows {
+		if len(row) > 2 && strings.Contains(row[2], "'Neraca Saldo Awal'!$D$4") {
+			ada = slices.Contains(p.Format.Status, fmt.Sprintf("C%d", i+1))
+		}
+	}
+	if !ada {
+		t.Error("Petunjuk harus menampilkan status Neraca Saldo Awal berwarna")
+	}
+	for nama, kol := range map[string]int{"Kas dan Bank": 2, "Aset Lancar Lain": 2, "Utang": 2, "Modal": 2} {
+		if f := byNama[nama].Format; !slices.Contains(f.Bebas, kol) {
+			t.Errorf("%s: kolom Jenis harus bebas: %v", nama, f.Bebas)
+		}
 	}
 }

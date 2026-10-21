@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,10 @@ type Tabel struct {
 	Contoh      int              // jumlah baris contoh di bawah header (teks biru)
 	BarisKosong int              // baris kosong bergaris di bawah data
 	Pilihan     map[int][]string // dropdown per kolom (total ≤255 huruf); satu nilai "=Sheet!$A$1:$A$9" = rentang sel
+	Bebas       []int            // kolom Pilihan yang hanya saran: ketikan di luar daftar tetap diterima
+	// Status: sel berisi teks status (mis. SEIMBANG / BELUM SEIMBANG); diwarnai merah bila memuat
+	// "BELUM", selain itu hijau.
+	Status []string
 	// Rumus: rumus per kolom untuk SETIAP baris data, termasuk baris kosong; "{r}" diganti nomor
 	// baris Excel. Sel yang sudah berisi di Rows tidak ditimpa.
 	Rumus map[int]string
@@ -138,7 +143,11 @@ func stylesXML() string {
 		}
 		b.WriteString(`</xf>`)
 	}
-	b.WriteString(`</cellXfs></styleSheet>`)
+	// dxf 0 = merah (belum seimbang), 1 = hijau (seimbang), untuk Tabel.Status.
+	b.WriteString(`</cellXfs><dxfs count="2">` +
+		`<dxf><font><b/><color rgb="FF9C0006"/></font><fill><patternFill><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf>` +
+		`<dxf><font><b/><color rgb="FF006100"/></font><fill><patternFill><bgColor rgb="FFC6EFCE"/></patternFill></fill></dxf>` +
+		`</dxfs></styleSheet>`)
 	return b.String()
 }
 
@@ -307,6 +316,11 @@ func sheetTabel(sh Sheet) string {
 		// Atribut bernilai 0 = boleh. insertColumns/deleteColumns tidak disebut = dilarang.
 		b.WriteString(`<sheetProtection sheet="1" objects="1" scenarios="1" formatCells="0" formatColumns="0" formatRows="0" insertRows="0" deleteRows="0" sort="0" autoFilter="0"/>`)
 	}
+	for i, ref := range t.Status {
+		fmt.Fprintf(&b, `<conditionalFormatting sqref="%s"><cfRule type="expression" dxfId="0" priority="%d" stopIfTrue="1"><formula>%s</formula></cfRule>`+
+			`<cfRule type="expression" dxfId="1" priority="%d"><formula>%s</formula></cfRule></conditionalFormatting>`,
+			ref, 2*i+1, esc(`ISNUMBER(SEARCH("BELUM",`+ref+`))`), 2*i+2, esc(`ISNUMBER(SEARCH("SEIMBANG",`+ref+`))`))
+	}
 	if len(t.Pilihan) > 0 && t.Header >= 0 {
 		cols := make([]int, 0, len(t.Pilihan))
 		for c := range t.Pilihan {
@@ -319,8 +333,12 @@ func sheetTabel(sh Sheet) string {
 			if p := t.Pilihan[c]; len(p) == 1 && strings.HasPrefix(p[0], "=") {
 				daftar = p[0][1:]
 			}
-			fmt.Fprintf(&b, `<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Pilihan tidak dikenal" error="Pilih dari daftar." sqref="%s%d:%s%d"><formula1>%s</formula1></dataValidation>`,
-				colName(c), t.Header+2, colName(c), maxRows, esc(daftar))
+			galat := `showErrorMessage="1" errorTitle="Pilihan tidak dikenal" error="Pilih dari daftar."`
+			if slices.Contains(t.Bebas, c) {
+				galat = `showErrorMessage="0"`
+			}
+			fmt.Fprintf(&b, `<dataValidation type="list" allowBlank="1" %s sqref="%s%d:%s%d"><formula1>%s</formula1></dataValidation>`,
+				galat, colName(c), t.Header+2, colName(c), maxRows, esc(daftar))
 		}
 		b.WriteString(`</dataValidations>`)
 	}

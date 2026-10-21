@@ -119,8 +119,13 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	}
 	opening := s.openingFor(period)
 	saldoLain := coa.SaldoAwalLain(s.bukuAwalLocked(), all, peta)
-	// Kas di bank / saldo marketplace & prive dibawa per akun; kas sisanya di akun Kas.
+	// Kas di bank / saldo marketplace & prive dibawa per akun; kas sisanya di akun Kas. Baris kas
+	// saldo awal yang berakun sendiri (Bank, rekening tambahan) tetap di akunnya.
 	kasAwal := opening.Cash
+	for kode, v := range coa.KasAwalLain(s.bukuAwalLocked(), all, peta) {
+		saldoLain[kode] += v
+		kasAwal -= v
+	}
 	for kode, v := range coa.SaldoBawaan(s.txs, period+"-01", p, peta) {
 		saldoLain[kode] += v
 		if kode != peta.Kode(coa.PeranPrive) {

@@ -343,7 +343,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
               <button type="button" className="nav-item" style={{ width: 'auto', padding: '7px 12px' }} onClick={() => setBaris((bs) => [...(bs ?? []), jadiBaris({ kode: '', nama: '', kategori: '', nominal: 0 }, { _baru: true })])}>
                 <Plus size={14} aria-hidden="true" /> Tambah akun
               </button>
-              <span className="text-xs text-muted-foreground" style={{ alignSelf: 'center' }}>Ketik nama akunnya; kategori &amp; kode terisi otomatis.</span>
+              <span className="text-xs text-muted-foreground" style={{ alignSelf: 'center' }}>Ketik nama akunnya; kategori &amp; kode terisi otomatis. Rekening kas/bank, aset lancar lain, dan kewajiban lain baru menjadi akun sendiri di Daftar Akun &amp; Buku Besar.</span>
             </div>
 
             <div className="list-rows tabular" style={{ marginTop: 16 }} aria-live="polite">
