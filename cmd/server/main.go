@@ -212,7 +212,12 @@ func NewServer() *Server {
 			s.saveAll()
 		}
 	}
-	segarkanBawaan(&s.katalog)
+	if segarkanBawaan(&s.katalog) {
+		// Katalog lama baru mendapat CoA manufaktur bawaan: simpan supaya ID-nya tetap.
+		if err := s.saveKatalog(s.katalog); err != nil {
+			log.Printf("PERINGATAN: gagal menyimpan CoA manufaktur bawaan ke katalog: %v", err)
+		}
+	}
 	pasangKatalog(s.katalog)
 	s.bootstrapMaster()
 	s.adoptOrphans()

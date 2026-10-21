@@ -184,7 +184,7 @@ export function TemplateCOAView() {
             {tampil.status === 'draft' && <Button size="sm" variant="outline" style={{ marginLeft: 'auto' }} onClick={() => setAkunBaru({ ...AKUN_KOSONG })}><Plus /> Tambah akun</Button>}
           </div>
           {tampil.status === 'draft' && k && (
-            <p className="text-xs text-muted-foreground" style={{ margin: '6px 0' }}>Akun yang dipakai jurnal otomatis wajib ada: {k.kode_wajib.join(', ')}. Diperiksa saat terbit.</p>
+            <p className="text-xs text-muted-foreground" style={{ margin: '6px 0' }}>Setiap template wajib menunjuk akun untuk {k.peran_wajib.length} peran jurnal otomatis (kolom <strong>Peran</strong>, mis. kas, bank, piutang, penjualan). Bila kolom Peran kosong, dipakai kode bawaan CoA dagang ({k.peran_wajib.slice(0, 4).map((r) => `${r.id}=${r.bawaan}`).join(', ')}, …). Diperiksa saat terbit.</p>
           )}
           <div className="table-scroll">
             <table className="data-table tabular" style={{ minWidth: 760 }}>
@@ -212,7 +212,7 @@ export function TemplateCOAView() {
         </div>
       )}
       <ImporDialog open={impor} onClose={() => setImpor(false)} judul={`Impor template COA ${JENIS_LABEL[jenis]}`}
-        keterangan="Kolom: Kode, Nama, Subtype, Saldo normal (debit/kredit), Kelompok, Kondisi, Catatan. Unduh versi yang ada sebagai contoh format."
+        keterangan="Kolom: Kode, Nama, Subtype, Saldo normal (debit/kredit), Kelompok, Kondisi, Catatan, Peran (akun pemegang peran jurnal otomatis, mis. kas, bank, piutang). Unduh versi yang ada sebagai contoh format."
         fields={[{ id: 'catatan', label: 'Catatan perubahan', placeholder: 'mis. Revisi akuntan Okt 2026' }]}
         onKirim={async (file, n) => { await imporDraftCOA(file, jenis, n.catatan ?? ''); setImpor(false); setInfo('Draft dari Excel tersimpan.'); await muat() }} />
       <Dialog open={akunBaru !== null} onOpenChange={(o) => !o && setAkunBaru(null)}>

@@ -40,7 +40,7 @@ func TestTemplate_DraftTerbitArsip(t *testing.T) {
 	}
 	// Draft kedua untuk jenis yang sama menggantikan draft pertama.
 	d2, _ := st.SimpanDraft("perdagangan", baru, "Tambah asuransi (revisi)", "Andi", t0)
-	if d2.ID != d.ID || len(st.Template) != 2 {
+	if d2.ID != d.ID || len(st.Template) != 3 { // dagang + manufaktur bawaan + 1 draft
 		t.Fatalf("draft ganda: %d template", len(st.Template))
 	}
 	terbit, lama, err := st.Terbitkan(d.ID, "Andi", t0)

@@ -38,6 +38,8 @@ var sinonim = map[string][]string{
 	"frozen": {"beku"}, "food": {"makanan"}, "percetakan": {"pencetakan"}, "undangan": {"pencetakan"}, "sablon": {"pencetakan"},
 	"desain": {"perancangan"}, "grafis": {"perancangan"}, "fotografer": {"fotografi"}, "foto": {"fotografi"},
 	"tambak": {"budidaya"}, "kontraktor": {"konstruksi"}, "renovasi": {"konstruksi"}, "cleaning": {"kebersihan"},
+	"kerang": {"perikanan", "biota"}, "mutiara": {"perikanan"}, "lele": {"ikan", "perikanan"}, "nila": {"ikan", "perikanan"},
+	"udang": {"perikanan"}, "kepiting": {"perikanan"}, "bandeng": {"ikan", "perikanan"}, "gurame": {"ikan", "perikanan"},
 	"sembako": {"berbagai"}, "laptop": {"komputer"}, "pc": {"komputer"}, "rental": {"persewaan", "sewa"},
 	"buku": {"budaya", "rekreasi"}, "musik": {"budaya", "rekreasi"}, "olahraga": {"rekreasi"}, "kulkas": {"rumah", "tangga"},
 	"sambal": {"bumbu", "makanan"}, "bensin": {"bahan", "bakar"}, "pertamini": {"bahan", "bakar"}, "elpiji": {"gas"}, "kelontong": {"berbagai"}, "kaos": {"pakaian"}, "hijab": {"pakaian"}, "sepatu": {"alas"},
@@ -93,6 +95,14 @@ func NiatUsaha(teks string) string {
 	}
 	return ""
 }
+
+// budidayaKata: kegiatan memelihara / menanam sendiri; KLU-nya golongan 01–03 (pertanian,
+// peternakan, perikanan), bukan industri pengolahan walau barangnya mirip ("kerang mutiara" ≠
+// industri perhiasan, "ternak lele" ≠ pengolahan ikan).
+var budidayaKata = []string{"ternak", "beternak", "peternak", "budidaya", "membudidayakan", "tanam", "menanam", "panen", "tambak", "berkebun", "kebun", "hidroponik", "kolam"}
+
+// airKata: budidaya di air → perikanan budidaya (032).
+var airKata = []string{"ikan", "lele", "nila", "udang", "kerang", "mutiara", "kepiting", "bandeng", "gurame", "tambak", "kolam", "rumput", "laut"}
 
 // jualLagi: tanda membeli barang jadi untuk dijual kembali (perdagangan), dicari sebagai frasa.
 var jualLagi = []string{"jual lagi", "dijual lagi", "jual kembali", "dijual kembali", "kulak", "reseller", "dropship", "beli dari", "ambil dari"}
@@ -200,6 +210,11 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 	if tebakan {
 		jenis = NiatUsaha(teks)
 	}
+	kataAsli := kata(teks)
+	adaAsli := func(daftar []string) bool {
+		return slices.ContainsFunc(kataAsli, func(w string) bool { return slices.Contains(daftar, w) })
+	}
+	budidaya := tebakan && jenis == "manufaktur" && adaAsli(budidayaKata)
 
 	var out []KandidatKLU
 	for i, k := range klu {
@@ -215,6 +230,9 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 		if online && k.Kode == "479" {
 			skor += 4
 		}
+		if budidaya && k.Kode == "032" && adaAsli(airKata) {
+			skor += 4
+		}
 		if skor == 0 {
 			continue
 		}
@@ -227,6 +245,10 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 		switch {
 		case tebakan && jenis != "" && j != jenis:
 			continue
+		case budidaya && k.Kode >= "100":
+			continue // budidaya: hanya pertanian / peternakan / perikanan (golongan 01–03)
+		case budidaya && k.Kode == "031" && !adaAsli([]string{"tangkap", "nelayan", "melaut", "menangkap"}):
+			continue // dipelihara sendiri = perikanan budidaya, bukan tangkap
 		case jenis != "" && j == jenis:
 			skor++
 		}
@@ -242,6 +264,18 @@ func CariKLU(teks, jenis string, n int) []KandidatKLU {
 	}
 	// Niat jelas tapi barangnya tidak ada di uraian KBLI (mis. metal detector): pakai kategori
 	// umum jenis itu, daripada tidak memberi saran sama sekali.
+	if len(out) == 0 && budidaya {
+		umum := "014" // peternakan
+		switch {
+		case adaAsli(airKata):
+			umum = "032"
+		case adaAsli([]string{"tanam", "menanam", "panen", "kebun", "berkebun", "hidroponik"}):
+			umum = "011"
+		}
+		if i := slices.IndexFunc(klu, func(k KLUBenchmark) bool { return k.Kode == umum }); i >= 0 {
+			out = append(out, KandidatKLU{KLUBenchmark: klu[i], Jenis: jenis, Skor: 1})
+		}
+	}
 	if len(out) == 0 && tebakan {
 		umum := map[string]string{"perdagangan": "477", "jasa": "969"}[jenis]
 		switch {

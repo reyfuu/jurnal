@@ -22,7 +22,7 @@ func TestAutoAccount(t *testing.T) {
 		{"Ambil Uang Pribadi", cvPer, "3102"},
 		{"Ambil Uang Pribadi", ptPerp, "3201"},
 	} {
-		if got := AutoAccount(c.jenis, c.p); got != c.want {
+		if got := AutoAccount(c.jenis, c.p, PetaMaster); got != c.want {
 			t.Errorf("AutoAccount(%q, %s/%s) = %s, want %s", c.jenis, c.p.BentukUsaha, c.p.MetodePersediaan, got, c.want)
 		}
 	}
@@ -30,8 +30,8 @@ func TestAutoAccount(t *testing.T) {
 	for _, p := range []finance.BusinessProfile{cvPer, ptPerp} {
 		active := Active(p)
 		for _, j := range finance.JenisList {
-			if _, ok := Find(active, AutoAccount(j.Nama, p)); !ok {
-				t.Errorf("%s/%s: jenis %q dipetakan ke akun tidak aktif %q", p.BentukUsaha, p.MetodePersediaan, j.Nama, AutoAccount(j.Nama, p))
+			if _, ok := Find(active, AutoAccount(j.Nama, p, PetaMaster)); !ok {
+				t.Errorf("%s/%s: jenis %q dipetakan ke akun tidak aktif %q", p.BentukUsaha, p.MetodePersediaan, j.Nama, AutoAccount(j.Nama, p, PetaMaster))
 			}
 		}
 	}
@@ -48,7 +48,7 @@ func TestCounterAccount(t *testing.T) {
 		{finance.Transaction{Jenis: "Penjualan", Channel: "B2B Tempo", Lunas: false}, "1201"},
 		{finance.Transaction{Jenis: "Beli Bahan / Stok", Lunas: false}, "2101"},
 	} {
-		if got := CounterAccount(c.tx); got != c.want {
+		if got := CounterAccount(c.tx, PetaMaster); got != c.want {
 			t.Errorf("CounterAccount(%+v) = %s, want %s", c.tx, got, c.want)
 		}
 	}
@@ -57,15 +57,15 @@ func TestCounterAccount(t *testing.T) {
 func TestJournalAndReports_SeedAugust(t *testing.T) {
 	p := profile("cv", "periodik")
 	txs := finance.ForPeriod(finance.SeedTransactions(), "2026-08")
-	lines := Journal(txs, p)
+	lines := Journal(txs, p, PetaMaster)
 	if len(lines) != 2*len(txs) {
 		t.Fatalf("setiap transaksi 2 baris jurnal, got %d for %d tx", len(lines), len(txs))
 	}
 	// Register aset ikut dijurnal: laporan per akun kini satu tab dengan laba rugi & neraca,
 	// jadi angkanya harus sama persis, bukan sekadar mirip.
 	rep := finance.BuildPeriodReport(txs, finance.SeedAssets(), "2026-08", finance.SeedOpening("2026-08"))
-	lines = append(lines, DepreciationJournal(rep.Assets, "2026-08")...)
-	opening := Opening(finance.OpeningCash("2026-08"), 8_250_000, OpeningAssets(rep.Assets, "2026-08"))
+	lines = append(lines, DepreciationJournal(rep.Assets, "2026-08", PetaMaster, p)...)
+	opening := Opening(finance.OpeningCash("2026-08"), 8_250_000, OpeningAssets(rep.Assets, "2026-08", PetaMaster), PetaMaster)
 	tb := TrialBalance(Active(p), opening, lines)
 	var d, k int64
 	for _, b := range tb {
@@ -76,7 +76,7 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 		t.Fatalf("neraca saldo tidak seimbang: debit %d kredit %d", d, k)
 	}
 
-	is := IncomeStatement(tb, p)
+	is := IncomeStatement(tb, p, PetaMaster)
 	old := rep.Income
 	if is.LabaBersih != old.NetProfit {
 		t.Fatalf("laba bersih CoA %d != laporan lama %d", is.LabaBersih, old.NetProfit)
@@ -100,7 +100,7 @@ func TestJournalAndReports_SeedAugust(t *testing.T) {
 
 func TestJournal_OverrideAkun(t *testing.T) {
 	p := profile("cv", "periodik")
-	lines := Journal([]finance.Transaction{{ID: 7, Tanggal: "2026-08-02", Jenis: "Biaya Lain", Nominal: 500, Lunas: true, Akun: "6114"}}, p)
+	lines := Journal([]finance.Transaction{{ID: 7, Tanggal: "2026-08-02", Jenis: "Biaya Lain", Nominal: 500, Lunas: true, Akun: "6114"}}, p, PetaMaster)
 	if lines[0].Kode != "6114" || lines[0].Debit != 500 || lines[1].Kode != "1101" || lines[1].Kredit != 500 {
 		t.Fatalf("override akun harus dipakai: %+v", lines)
 	}

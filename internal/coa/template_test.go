@@ -18,10 +18,9 @@ func TestActiveFrom_SamaDenganActiveUntukMaster(t *testing.T) {
 	}
 }
 
-// Setiap kode akun yang ditulis langsung di jurnal & laporan wajib ada di template terbit;
-// kalau tidak, jurnal otomatis memakai akun yang tidak ada.
-func TestKodeWajib_MencakupKodeDiKode(t *testing.T) {
-	wajib := KodeWajib()
+// Jurnal & laporan tidak boleh menulis kode akun langsung: semuanya lewat peran, supaya CoA
+// dengan penomoran lain (manufaktur) tetap dijurnal ke akun yang benar.
+func TestTidakAdaKodeAkunTetap(t *testing.T) {
 	re := regexp.MustCompile(`"([0-9]{4})"`)
 	for _, f := range []string{"journal.go", "reports.go"} {
 		src, err := os.ReadFile(f)
@@ -29,15 +28,11 @@ func TestKodeWajib_MencakupKodeDiKode(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, m := range re.FindAllStringSubmatch(string(src), -1) {
-			if !slices.Contains(wajib, m[1]) {
-				t.Errorf("%s memakai akun %s yang tidak ada di KodeWajib", f, m[1])
-			}
+			t.Errorf("%s menulis kode akun %s langsung; pakai peran (peran.go)", f, m[1])
 		}
 	}
-	for _, k := range wajib {
-		if _, ok := Find(Master, k); !ok {
-			t.Errorf("kode wajib %s tidak ada di Master", k)
-		}
+	if kurang := PeranKurang(Master); len(kurang) > 0 {
+		t.Errorf("Master tidak memegang peran: %v", kurang)
 	}
 }
 
@@ -83,5 +78,26 @@ func TestTemplateSaldoAwal_SesuaiCoA(t *testing.T) {
 		if !ok || acc.Nama != a.Nama {
 			t.Errorf("akun %s %q tidak sama dengan CoA Master (%q, ada=%v)", a.Kode, a.Nama, acc.Nama, ok)
 		}
+	}
+}
+
+// CoA manufaktur lolos validasi template dan setiap peran menunjuk akun yang memang ada.
+func TestManufaktur_TemplateSah(t *testing.T) {
+	if err := ValidateTemplate(Manufaktur); err != nil {
+		t.Fatal(err)
+	}
+	peta := PetaDari(Manufaktur)
+	for _, c := range []struct{ peran, kode string }{{PeranKas, "1102"}, {PeranBank, "1111"}, {PeranPinjaman, "2131"}, {PeranBebanAmortisasi, "6124"}} {
+		if peta.Kode(c.peran) != c.kode {
+			t.Errorf("peran %s = %s, want %s", c.peran, peta.Kode(c.peran), c.kode)
+		}
+	}
+	for kode, peran := range peranManufaktur {
+		if _, ok := Find(Manufaktur, kode); !ok {
+			t.Errorf("peran %s menunjuk akun %s yang tidak ada", peran, kode)
+		}
+	}
+	if len(Manufaktur) != 155 {
+		t.Errorf("jumlah akun %d, file 155", len(Manufaktur))
 	}
 }

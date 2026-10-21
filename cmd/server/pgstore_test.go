@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -357,8 +358,9 @@ func TestPostgresKatalog(t *testing.T) {
 	srv, m := serverMaster(t)
 	baru := append(slices.Clone(coa.Master), coa.Account{Kode: "6119", Nama: "Beban Asuransi", Subtype: "opex", Normal: coa.Debit, Kelompok: coa.BebanOperasional, Kondisi: coa.Selalu})
 	body, _ := json.Marshal(map[string]any{"jenis": "perdagangan", "akun": baru})
-	do(srv, m, http.MethodPost, "/api/v1/master/coa/draft", string(body))
-	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/2/terbitkan", ""); rec.Code != http.StatusOK {
+	var draft katalog.Template
+	_ = json.NewDecoder(do(srv, m, http.MethodPost, "/api/v1/master/coa/draft", string(body)).Body).Decode(&draft)
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/"+strconv.Itoa(draft.ID)+"/terbitkan", ""); rec.Code != http.StatusOK {
 		t.Fatalf("terbit: %d %s", rec.Code, rec.Body)
 	}
 	unggahXlsx(srv, m, "/api/v1/master/benchmark", katalog.BarisBenchmark(tax.KLUBenchmarks[:5]), map[string]string{"nama": "Uji"})

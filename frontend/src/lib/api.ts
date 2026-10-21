@@ -822,7 +822,8 @@ export type StatusKatalog = 'draft' | 'terbit' | 'aktif' | 'arsip'
 export interface TemplateCOA { id: number; jenis: string; versi: number; status: StatusKatalog; akun: Account[]; catatan?: string; oleh?: string; waktu: string }
 export interface KLUBenchmark { kode: string; nama: string; cttor_bps: number; npm_bps: number }
 export interface BenchmarkVersi { id: number; nama: string; sumber: string; status: StatusKatalog; baris: KLUBenchmark[]; oleh?: string; waktu: string }
-export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; kode_wajib: string[]; klien_per_template: Record<number, number> }
+export interface PeranAkun { id: string; label: string; bawaan: string }
+export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; peran_wajib: PeranAkun[]; klien_per_template: Record<number, number> }
 
 async function unggah<T>(path: string, file: File, fields: Record<string, string>): Promise<T> {
   const form = new FormData()

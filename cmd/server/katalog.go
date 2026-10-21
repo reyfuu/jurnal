@@ -38,13 +38,26 @@ func pasangKatalog(st katalog.State) {
 }
 
 // segarkanBawaan: versi 1 (bawaan) selalu mengikuti kode, jadi perbaikan coa.Master / data benchmark
-// di kode tetap berlaku sampai tim menerbitkan versi sendiri.
-func segarkanBawaan(st *katalog.State) {
+// di kode tetap berlaku sampai tim menerbitkan versi sendiri. Katalog lama yang belum punya CoA
+// manufaktur mendapat template bawaannya; true = katalog berubah dan perlu disimpan.
+func segarkanBawaan(st *katalog.State) bool {
 	baku := katalog.NewState()
+	berubah, adaManufaktur := false, false
 	for i := range st.Template {
-		if st.Template[i].ID == 1 {
+		switch {
+		case st.Template[i].ID == 1:
 			st.Template[i].Akun = baku.Template[0].Akun
+		case st.Template[i].Catatan == katalog.CatatanManufakturBawaan && st.Template[i].Versi == 1:
+			st.Template[i].Akun = slices.Clone(coa.Manufaktur)
 		}
+		if st.Template[i].Jenis == "manufaktur" {
+			adaManufaktur = true
+		}
+	}
+	if !adaManufaktur {
+		st.Template = append(st.Template, katalog.TemplateManufakturBawaan(max(st.NextTemplateID, 2)))
+		st.NextTemplateID = max(st.NextTemplateID, 2) + 1
+		berubah = true
 	}
 	for i := range st.Benchmark {
 		if st.Benchmark[i].ID == 1 {
@@ -57,6 +70,7 @@ func segarkanBawaan(st *katalog.State) {
 			st.Parameter[i].Isi, st.Parameter[i].Dasar = baku.Parameter[0].Isi, baku.Parameter[0].Dasar
 		}
 	}
+	return berubah
 }
 
 func katalogFile() string { return dataPath("katalog.json") }
@@ -70,8 +84,7 @@ func loadKatalogFile() katalog.State {
 			}
 		}
 	}
-	segarkanBawaan(&st)
-	return st
+	return st // versi bawaan disegarkan di NewServer (segarkanBawaan)
 }
 
 func (s *Server) saveKatalog(st katalog.State) error {
@@ -174,9 +187,10 @@ func (s *tenant) handlePerbaruiCOA(w http.ResponseWriter, r *http.Request) {
 // --- Panel Master ---
 
 type katalogCOAResp struct {
-	Jenis     []string           `json:"jenis"`
-	Template  []katalog.Template `json:"template"`
-	KodeWajib []string           `json:"kode_wajib"`
+	Jenis    []string           `json:"jenis"`
+	Template []katalog.Template `json:"template"`
+	// PeranWajib: peran akun yang harus dipegang tiap template (kode bawaannya untuk CoA dagang).
+	PeranWajib []coa.PeranInfo `json:"peran_wajib"`
 	// KlienPerTemplate: jumlah usaha yang memakai tiap versi.
 	KlienPerTemplate map[int]int `json:"klien_per_template"`
 }
@@ -185,7 +199,7 @@ func (s *Server) handleKatalogCOA(w http.ResponseWriter, r *http.Request) {
 	s.katalogMu.Lock()
 	st := s.katalog.Clone()
 	s.katalogMu.Unlock()
-	out := katalogCOAResp{Jenis: katalog.JenisUsaha, Template: st.Template, KodeWajib: coa.KodeWajib(), KlienPerTemplate: map[int]int{}}
+	out := katalogCOAResp{Jenis: katalog.JenisUsaha, Template: st.Template, PeranWajib: coa.PeranWajib(), KlienPerTemplate: map[int]int{}}
 	for _, t := range s.semuaTenant() {
 		if tm, ok := t.coaTemplate(t.currentProfile()); ok {
 			out.KlienPerTemplate[tm.ID]++
