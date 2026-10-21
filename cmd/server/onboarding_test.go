@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -49,10 +50,31 @@ func TestOnboardingTemplateEndpoint(t *testing.T) {
 	for _, sh := range sheets {
 		names = append(names, sh.Name)
 	}
-	for _, want := range []string{"Saldo Awal", "Aset", "Karyawan", "Transaksi", "Panduan"} {
-		if !strings.Contains(strings.Join(names, "|"), want) {
-			t.Errorf("sheet %q tidak ada di template; isi: %v", want, names)
+	want := []string{"Petunjuk", "Neraca Saldo Awal", "Kas dan Bank", "Piutang", "Persediaan", "Perlengkapan",
+		"Aset Lancar Lain", "Aset Tetap", "Utang", "Modal", "Karyawan", "Transaksi"}
+	if strings.Join(names, "|") != strings.Join(want, "|") {
+		t.Errorf("urutan sheet template:\nwant %v\ngot  %v", want, names)
+	}
+	// Tanggal Saldo Awal = sel tanggal Excel asli (nomor seri), dirujuk rumus sheet lain.
+	if row := sheets[0].Rows[5]; len(row) < 3 || row[1] != "Tanggal Saldo Awal" || row[2] != "46023" {
+		t.Errorf("Petunjuk baris 6: %q", row)
+	}
+	// Setiap bagian XML harus well-formed, kalau tidak Excel menolak membuka berkasnya.
+	zr, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zr.File {
+		rc, _ := f.Open()
+		dec := xml.NewDecoder(rc)
+		for {
+			if _, err := dec.Token(); err == io.EOF {
+				break
+			} else if err != nil {
+				t.Fatalf("%s tidak well-formed: %v", f.Name, err)
+			}
 		}
+		_ = rc.Close()
 	}
 }
 
@@ -302,8 +324,14 @@ func TestTemplateDataAwal_UnduhUnggahNeracaSeimbang(t *testing.T) {
 		t.Fatalf("commit: %d %s", code, raw)
 	}
 	bs := getJSON[finance.BalanceSheet](t, srv, owner, "/api/v1/reports/balance-sheet?period=2026-01")
-	if !bs.IsBalanced || bs.Assets.OtherAssets != 6_000_000 || bs.Liabilities.Other != 450_000 || bs.Equity.RetainedEarnings != 10_000_000 {
+	// Aset lancar lain = perlengkapan 850 rb + sewa dibayar di muka 6 jt + PPh 23 dibayar di muka 200 rb.
+	if !bs.IsBalanced || bs.Assets.OtherAssets != 7_050_000 || bs.Liabilities.Other != 450_000 || bs.Equity.RetainedEarnings != 10_000_000 ||
+		bs.Assets.Inventory != 8_250_000 || bs.Liabilities.Loans != 20_000_000 {
 		t.Fatalf("neraca Januari: %+v", bs)
+	}
+	// Persediaan template ikut mengisi Stok & Gudang.
+	if stok := getJSON[finance.StokSummary](t, srv, owner, "/api/v1/stok"); stok.TotalItem != 3 || stok.NilaiPersediaan != 8_250_000 {
+		t.Errorf("stok setelah impor: %d barang senilai %d", stok.TotalItem, stok.NilaiPersediaan)
 	}
 	info := getJSON[openingResp](t, srv, owner, "/api/v1/opening")
 	if info.Opening == nil || bs.Equity.OpeningCapital != info.Opening.ModalDisetor || info.SelisihModal != 0 {

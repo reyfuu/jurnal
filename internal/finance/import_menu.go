@@ -1,7 +1,7 @@
 package finance
 
 // Impor per menu. Halaman Piutang & Utang dan Stok & Gudang punya template satu sheet
-// masing-masing, terpisah dari template onboarding yang berisi tujuh sheet.
+// masing-masing, terpisah dari template onboarding (saldo awal rinci + Karyawan + Transaksi).
 //
 // Dipisah karena tujuannya berbeda: onboarding mengisi seluruh posisi awal sekali jalan dan
 // MENGGANTI register yang ada, sementara impor per menu dipakai berulang untuk daftar yang
@@ -90,7 +90,8 @@ func sheetTidakDitemukan(jenis string) []SheetError {
 }
 
 // ParseTagihanFile membaca sheet piutang/utang saja. Sheet lain dalam berkas yang sama
-// diabaikan, jadi template onboarding tujuh sheet pun aman diunggah di halaman ini.
+// diabaikan. Sheet Piutang / Utang template saldo awal rinci berbentuk lain (per faktur, masuk
+// saldo awal) dan tidak dibaca di sini.
 func ParseTagihanFile(sheets []ImportSheet) ([]Tagihan, []SheetError, string) {
 	sh, ok := pilihSheet(sheets, sheetTagihan)
 	if !ok {

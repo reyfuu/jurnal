@@ -408,6 +408,10 @@ export interface AssetInput {
   /** Cara aset dibayar bila tidak berasal dari transaksi: kas, utang (kredit/cicilan), atau
    *  modal (barang setoran pemilik). Kosong = belum dipilih. */
   sumber_dana?: SumberDanaAset
+  /** Akumulasi penyusutan yang sudah ada per tanggal saldo awal (impor template saldo awal);
+   *  dibawa apa adanya saat aset diedit supaya nilai buku awal tidak berubah. */
+  akumulasi_awal?: number
+  akumulasi_per?: string
 }
 
 export type SumberDanaAset = '' | 'kas' | 'utang' | 'modal'
@@ -941,6 +945,9 @@ export interface OnboardingResult {
   imported: boolean
   replaced_assets: number
   replaced_karyawan: number
+  /** Barang dari sheet Persediaan; mengganti daftar Stok & Gudang saat diimpor. */
+  stok?: { nama: string }[] | null
+  replaced_stok?: number
   /** Nilai buku aset tetap per tanggal mulai, pembanding baris Aset Tetap. */
   nilai_buku_aset?: number
   /** false: saldo awal belum seimbang / ada transaksi sebelum tanggal mulai. */
