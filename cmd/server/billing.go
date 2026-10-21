@@ -26,20 +26,49 @@ type paket struct {
 	Harga int64  `json:"harga"`
 	Hari  int    `json:"hari"`
 	Hemat string `json:"hemat,omitempty"`
+	// Tingkat: starter | pro | premium (kosong = paket lama satu tingkat).
+	Tingkat string `json:"tingkat,omitempty"`
+	// HargaNormal: harga sebelum promo, ditampilkan dicoret di halaman harga.
+	HargaNormal int64 `json:"harga_normal,omitempty"`
 }
 
-// Paket: harga contoh, ubah di sini saja.
+// paketList: paket yang dijual (3 tingkat × bulanan/tahunan, sama dengan landing page). Fitur
+// belum dibedakan per tingkat: semua paket membuka seluruh aplikasi. Ubah harga di sini saja.
 var paketList = []paket{
-	{"bulanan", "Bulanan", 99_000, 30, ""},
-	{"tahunan", "Tahunan", 990_000, 365, "Hemat 2 bulan"},
+	{"starter-bulanan", "Starter Bulanan", 199_000, 30, "", "starter", 399_000},
+	{"starter-tahunan", "Starter Tahunan", 1_990_000, 365, "Hemat 2 bulan", "starter", 4_790_000},
+	{"pro-bulanan", "Pro Bulanan", 499_000, 30, "", "pro", 999_000},
+	{"pro-tahunan", "Pro Tahunan", 5_000_000, 365, "Hemat 2 bulan", "pro", 11_990_000},
+	{"premium-bulanan", "Premium Master Bulanan", 1_490_000, 30, "", "premium", 2_990_000},
+	{"premium-tahunan", "Premium Master Tahunan", 14_900_000, 365, "Hemat 2 bulan", "premium", 35_900_000},
 }
 
-func findPaket(id string) (paket, bool) {
+// paketLama: tidak dijual lagi, tetap dikenali untuk order yang sudah ada (notifikasi Midtrans
+// yang terlambat, riwayat, MRR di Panel Master).
+var paketLama = []paket{
+	{ID: "bulanan", Nama: "Bulanan", Harga: 99_000, Hari: 30},
+	{ID: "tahunan", Nama: "Tahunan", Harga: 990_000, Hari: 365},
+}
+
+// paketDijual: hanya paket yang sedang dijual (checkout, aktivasi manual).
+func paketDijual(id string) (paket, bool) {
 	i := slices.IndexFunc(paketList, func(p paket) bool { return p.ID == id })
 	if i < 0 {
 		return paket{}, false
 	}
 	return paketList[i], true
+}
+
+// findPaket: paket dijual atau paket lama, untuk order yang sudah tercatat.
+func findPaket(id string) (paket, bool) {
+	if p, ok := paketDijual(id); ok {
+		return p, true
+	}
+	i := slices.IndexFunc(paketLama, func(p paket) bool { return p.ID == id })
+	if i < 0 {
+		return paket{}, false
+	}
+	return paketLama[i], true
 }
 
 type order struct {
@@ -232,7 +261,7 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	p, ok := findPaket(req.Paket)
+	p, ok := paketDijual(req.Paket)
 	if !ok {
 		http.Error(w, "paket tidak dikenal", http.StatusBadRequest)
 		return

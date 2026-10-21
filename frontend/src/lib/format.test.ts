@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatJt, formatPct, formatRelatif, formatRp, formatSignedJt, formatTanggal } from './format'
+import { formatJt, formatPct, formatRelatif, formatRp, formatRpRingkas, formatSignedJt, formatTanggal } from './format'
 
 describe('formatRp', () => {
   it('memakai titik ribuan dan tanda minus di depan', () => {
@@ -42,5 +42,16 @@ describe('formatTanggal', () => {
   it('tanggal singkat Indonesia; kosong jadi tanda strip', () => {
     expect(formatTanggal('2026-11-14T00:00:00Z')).toBe('14 Nov 2026')
     expect(formatTanggal(undefined)).toBe('—')
+  })
+})
+
+describe('formatRpRingkas', () => {
+  it('harga paket: rb di bawah sejuta, jt dengan koma', () => {
+    expect(formatRpRingkas(199_000)).toBe('Rp199 rb')
+    expect(formatRpRingkas(1_990_000)).toBe('Rp1,99 jt')
+    expect(formatRpRingkas(14_900_000)).toBe('Rp14,9 jt')
+    expect(formatRpRingkas(5_000_000)).toBe('Rp5 jt')
+    expect(formatRpRingkas(165_833)).toBe('Rp166 rb')
+    expect(formatRpRingkas(1_241_667)).toBe('Rp1,24 jt')
   })
 })

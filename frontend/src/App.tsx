@@ -13,7 +13,7 @@ import { Langganan, statusText } from '@/views/Langganan'
 import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
-import { Login } from '@/views/Login'
+import { Login, type AwalDaftar } from '@/views/Login'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
@@ -48,6 +48,7 @@ export default function App() {
   const [bugFrom, setBugFrom] = useState<View>('dashboard') // halaman asal saat membuka Lapor Bug
   const [bukaTab, setBukaTab] = useState<{ tab?: string; n: number }>({ n: 0 })
   const [auth, setAuth] = useState<'masuk' | 'daftar' | null>(null) // null = landing page
+  const [awal, setAwal] = useState<AwalDaftar>() // isian form Kalkulator gratis di landing
   const [period, setPeriod] = useState<string>('2026-08')
   const [periods, setPeriods] = useState<PeriodOption[]>([])
   // Bulan bawaan dari server dipasang sekali per sesi/usaha; signIn ikut berjalan ulang saat
@@ -117,8 +118,9 @@ export default function App() {
   if (session.status === 'checking') return null
   if (!me) {
     return auth
-      ? <Login key={auth} onLogin={signIn} initialDaftar={auth === 'daftar'} onBack={() => setAuth(null)} />
-      : <Landing onMasuk={() => setAuth('masuk')} onDaftar={() => setAuth('daftar')} />
+      ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={() => setAuth(null)}
+          onLogin={(m) => { if (awal?.alat) setLayarBayar('alat'); signIn(m) }} />
+      : <Landing onMasuk={() => setAuth('masuk')} onDaftar={(a) => { setAwal(a); setAuth('daftar') }} />
   }
   async function onLogout() {
     await logout().catch(() => {})

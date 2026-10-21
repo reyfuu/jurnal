@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -64,7 +65,8 @@ func TestBayarDuluSetelahOnboarding(t *testing.T) {
 	}
 }
 
-// fakeMidtrans: Snap & Status API palsu; status order bisa diatur dari test.
+// fakeMidtrans: Snap & Status API palsu; status order bisa diatur dari test, opsional dengan
+// jumlah bayar ("settlement:990000.00"); bawaan harga Starter Bulanan.
 func fakeMidtrans(t *testing.T, status map[string]string) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +80,8 @@ func fakeMidtrans(t *testing.T, status map[string]string) {
 			http.NotFound(w, r)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"order_id": id, "transaction_status": st, "gross_amount": "99000.00", "status_code": "200"})
+		st, jumlah, _ := strings.Cut(st, ":")
+		_ = json.NewEncoder(w).Encode(map[string]string{"order_id": id, "transaction_status": st, "gross_amount": cmp.Or(jumlah, "199000.00"), "status_code": "200"})
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("MIDTRANS_SERVER_KEY", "SK-uji")
@@ -106,7 +109,7 @@ func TestCheckoutDanNotifikasi(t *testing.T) {
 		OrderID string `json:"order_id"`
 		Token   string `json:"token"`
 	}
-	rec := do(srv, qa, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"bulanan"}`)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"starter-bulanan"}`)
 	_ = json.NewDecoder(rec.Body).Decode(&co)
 	if rec.Code != http.StatusOK || co.OrderID == "" {
 		t.Fatalf("checkout: %d %+v", rec.Code, co)
@@ -141,7 +144,7 @@ func TestCheckoutTanpaKonfigurasi(t *testing.T) {
 	t.Setenv("MIDTRANS_SERVER_KEY", "")
 	srv := NewServer()
 	qa := register(t, srv, registerBody)
-	if rec := do(srv, qa, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"bulanan"}`); rec.Code != http.StatusServiceUnavailable {
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"starter-bulanan"}`); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("tanpa key: want 503, got %d", rec.Code)
 	}
 	if body := do(srv, qa, http.MethodGet, "/api/v1/billing", "").Body.String(); !strings.Contains(body, `"orders":[]`) {

@@ -863,6 +863,25 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - **Piutang & Utang** kini dari buku besar (tab Piutang / Utang = umur + Catat pelunasan) — dashboard (kartu piutang, daftar kewajiban) dan utang per supplier di Produksi memakai `TagihanDariBuku` (jatuh tempo dianggap 30 hari). Daftar tagihan manual lama jadi tab "Tagihan manual (lama)" dengan peringatan tidak masuk laporan.
 - **Pelunasan saldo awal** piutang/utang (`OpeningBalance.Pelunasan`, `POST /api/v1/opening/pelunasan`, kolom `opening_balances.pelunasan`): mengurangi sisa saldo awal, kas bergerak di tanggal bayar, tercatat di arus kas & jurnal CoA; menyimpan ulang saldo awal tidak menghapusnya.
 
+## Landing page V2 & paket 3 tingkat (21 Okt 2026)
+
+- Landing mengikuti mockup "Master Pajak V2 Revisi" (`frontend/src/views/Landing.tsx` + `landing.css`,
+  gaya dibatasi `.lp`, warna lewat token brand jadi tema gelap tetap terbaca).
+- Fitur yang dijanjikan tetapi belum ada diberi `<SegeraHadir />`:
+  - foto nota via WhatsApp/OCR
+  - PKP/Non-PKP & pajak masukan otomatis (akun 1402 ada, belum diisi otomatis)
+  - rekonsiliasi bulanan vs tahunan
+  - ekspor XML Coretax
+
+  Lepas penandanya begitu fiturnya jadi. Slot jumlah UMKM, foto tim, dan testimoni belum ditampilkan sampai ada data asli.
+- Paket (`cmd/server/billing.go`): Starter / Pro / Premium Master × bulanan/tahunan, dengan `tingkat` dan
+  `harga_normal` (dicoret). Fitur belum dibedakan per tingkat: semua paket membuka seluruh aplikasi.
+  - ID lama `bulanan`/`tahunan` ada di `paketLama`: tetap dikenali untuk order lama (`findPaket`), tetapi tidak dijual lagi (`paketDijual` untuk checkout & aktivasi manual Panel Master).
+  - Komponen `PaketHarga` dipakai bersama oleh landing dan menu Langganan.
+  - Paket yang diklik di landing disimpan di `sessionStorage` `paket-pilihan` lalu disorot di Langganan.
+- Form "Kalkulator gratis" di landing membawa nama/email/WA/PDP ke form Daftar (`AwalDaftar`). Setelah onboarding,
+  layar bayar langsung membuka tab Alat Gratis.
+
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
 

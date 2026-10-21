@@ -312,7 +312,7 @@ func TestPostgresPanelMaster(t *testing.T) {
 	if rec := do(srv, m, http.MethodPut, "/api/v1/master/tiket/1", `{"status":"selesai","balasan":"Sudah diperbaiki."}`); rec.Code != http.StatusOK {
 		t.Fatalf("balas: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"bulanan","alasan":"Transfer"}`); rec.Code != http.StatusOK {
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/klien/2/langganan", `{"aksi":"aktifkan","paket":"starter-bulanan","alasan":"Transfer"}`); rec.Code != http.StatusOK {
 		t.Fatalf("langganan: %d %s", rec.Code, rec.Body)
 	}
 	if rec := do(srv, m, http.MethodPut, "/api/v1/master/pengingat", `{"aktif":true,"interval_hari":5,"tingkat_min":"penting"}`); rec.Code != http.StatusOK {

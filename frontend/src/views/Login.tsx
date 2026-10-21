@@ -16,14 +16,17 @@ const DEMO_ACCOUNTS = [
   { email: 'kasir@kedaikopisenja.id', role: 'Kasir' },
 ]
 
-export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me: Me) => void; initialDaftar?: boolean; onBack?: () => void }) {
+/** Isian dari form "Kalkulator gratis" di landing; alat: setelah daftar langsung ke Alat Gratis. */
+export interface AwalDaftar { name?: string; email?: string; wa?: string; setuju_pdp?: boolean; alat?: boolean }
+
+export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogin: (me: Me) => void; initialDaftar?: boolean; awal?: AwalDaftar; onBack?: () => void }) {
   // daftar: buat usaha baru (kosong), lalu langsung masuk wizard onboarding.
   const [daftar, setDaftar] = useState(initialDaftar)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState(awal?.name ?? '')
+  const [email, setEmail] = useState(awal?.email ?? '')
   const [password, setPassword] = useState('')
-  const [wa, setWa] = useState('')
-  const [setujuPDP, setSetujuPDP] = useState(false)
+  const [wa, setWa] = useState(awal?.wa ?? '')
+  const [setujuPDP, setSetujuPDP] = useState(awal?.setuju_pdp ?? false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -57,7 +60,9 @@ export function Login({ onLogin, initialDaftar = false, onBack }: { onLogin: (me
           <CardHeader>
             <CardTitle className="text-xl">{daftar ? 'Daftar' : 'Masuk'}</CardTitle>
             <CardDescription>
-              {daftar ? 'Buat akun Owner untuk usaha baru Anda. Datanya mulai kosong.' : 'Gunakan akun yang dibuat oleh Owner bisnis Anda.'}
+              {!daftar ? 'Gunakan akun yang dibuat oleh Owner bisnis Anda.'
+                : awal?.alat ? 'Data Anda sudah terisi. Buat password, lalu kenalkan usaha Anda untuk membuka kalkulator & perencanaan pajak gratis.'
+                  : 'Buat akun Owner untuk usaha baru Anda. Datanya mulai kosong.'}
             </CardDescription>
           </CardHeader>
           <CardContent>

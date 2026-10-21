@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { GARANSI_BELUM_BAYAR, checkout, getBilling, klaimGaransi, refreshBilling, type Billing, type GaransiStatus, type LanggananStatus } from '@/lib/api'
-import { formatRp } from '@/lib/format'
+import { formatRp, formatRpRingkas } from '@/lib/format'
+import { PaketHarga } from '@/components/PaketHarga'
 
 declare global {
   interface Window {
@@ -93,6 +93,8 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
   const [info, setInfo] = useState('')
+  // Paket yang diklik di landing page sebelum daftar: disorot di sini.
+  const [pilihan] = useState(() => { try { return sessionStorage.getItem('paket-pilihan') ?? undefined } catch { return undefined } })
 
   useEffect(() => {
     getBilling().then(setB, (e: Error) => setError(e.message))
@@ -144,26 +146,11 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
       <GaransiCard g={b.garansi} onDiklaim={onPaid} />
 
       {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Master Pajak untuk aktivasi.</p>}
-      <div className="grid gap-4 sm:grid-cols-2" style={{ maxWidth: 880 }}>
-        {b.paket.map((p) => (
-          <div key={p.id} className="card grid gap-3" style={{ padding: 22, justifyContent: 'stretch' }}>
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="text-base font-bold">{p.nama}</div>
-              {p.hemat && <span className="pill-status pill-green">{p.hemat}</span>}
-            </div>
-            <div><span className="text-2xl font-bold tabular">{formatRp(p.harga)}</span> <span className="text-sm text-muted-foreground">/ {p.hari === 365 ? 'tahun' : 'bulan'}</span></div>
-            <ul className="grid gap-1.5 text-sm text-muted-foreground">
-              {['Semua fitur laporan & pajak', 'Pengguna tanpa batas', 'Laporan AI & cek benchmark nasional'].map((x) => (
-                <li key={x} className="flex items-center gap-2"><Check className="size-4 text-[var(--accent-green)]" aria-hidden="true" />{x}</li>
-              ))}
-            </ul>
-            <Button variant={p.hemat ? 'accent' : 'outline'} disabled={!b.aktif || busy !== ''} onClick={() => void bayar(p.id)}>
-              {busy === p.id ? 'Membuka pembayaran…' : `Bayar ${p.nama.toLowerCase()}`}
-            </Button>
-          </div>
-        ))}
+      <div style={{ maxWidth: 1000 }}>
+        <PaketHarga paket={b.paket} pilihan={pilihan} disabled={!b.aktif} busy={busy}
+          label={(p) => `Bayar ${formatRpRingkas(p.harga)}`} onPilih={(p) => void bayar(p.id)} />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground" style={{ maxWidth: 880 }}>{SYARAT_GARANSI}</p>
+      <p className="mt-3 text-xs text-muted-foreground" style={{ maxWidth: 880 }}>{SYARAT_GARANSI} Fitur bertanda segera hadir belum bisa dipakai; semua paket saat ini membuka seluruh aplikasi.</p>
       {info && <p className="mt-4 text-sm" style={{ color: 'var(--accent-green)' }} role="status">{info}</p>}
       {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
 

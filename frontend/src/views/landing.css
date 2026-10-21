@@ -1,0 +1,114 @@
+/* Landing page (mockup "Master Pajak V2 Revisi"): satu kolom naratif 720px, blok lebar 1000px
+   untuk pratinjau produk, tabel perbandingan, dan harga. Garis tipis, angka besar, stabilo kuning.
+   Semua warna lewat token brand (index.css), jadi tema gelap tetap terbaca. */
+html:has(.lp) { scroll-behavior: smooth; }
+
+.lp {
+  --lp-line: var(--border-subtle);
+  --lp-tint: var(--bg-raised);
+  --lp-tint2: var(--bg-card-hover);
+  --lp-muted: var(--text-secondary);
+  --lp-soft: var(--text-muted);
+  --lp-brand: var(--text-brand);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 17px;
+  line-height: 1.65;
+}
+.lp h1, .lp h2, .lp h3 { font-family: var(--font-heading); letter-spacing: -0.015em; text-wrap: balance; }
+.lp mark { background: linear-gradient(transparent 58%, var(--yellow-500) 58% 92%, transparent 92%); color: inherit; padding: 0 0.05em; }
+.lp :focus-visible { outline: 3px solid var(--yellow-500); outline-offset: 2px; border-radius: 6px; }
+
+.lp-col { max-width: 720px; margin: 0 auto; padding-inline: 16px; }
+.lp-wide { max-width: 1000px; margin: 0 auto; padding-inline: 16px; }
+.lp main > section { padding-block: 88px; scroll-margin-top: 64px; }
+.lp main > section + section { border-top: 1px solid var(--lp-line); }
+.lp-kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lp-brand); }
+.lp-h2 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; font-weight: 600; margin-top: 14px; }
+.lp-lead { font-size: 19px; color: var(--lp-muted); margin-top: 18px; }
+.lp-muted { color: var(--lp-muted); }
+
+/* hero */
+.lp main > section.lp-hero { text-align: center; padding-block: 96px 48px; }
+.lp-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--lp-tint); border: 1px solid var(--lp-line); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-brand); }
+.lp-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow-500); display: block; flex: none; }
+.lp-hero h1 { font-size: clamp(44px, 7vw, 76px); line-height: 1.02; font-weight: 700; margin: 26px auto 0; max-width: 12ch; }
+.lp-hero .lp-sub { font-size: 20px; color: var(--lp-muted); margin: 24px auto 0; max-width: 34em; }
+.lp-hero .lp-sub b { color: var(--text-primary); }
+.lp-trust { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px; font-size: 14px; color: var(--lp-muted); }
+.lp-trust span { display: flex; align-items: center; gap: 7px; }
+.lp-trust svg { width: 16px; height: 16px; color: var(--accent-green); }
+
+/* pratinjau produk */
+.lp main > section.lp-preview { border-top: 0; padding-top: 16px; }
+.lp-frame { border: 1px solid var(--lp-line); border-radius: 18px; overflow: hidden; box-shadow: 0 40px 80px -48px rgba(22, 29, 58, 0.45); background: var(--bg-card); }
+.lp-chrome { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; background: var(--lp-tint); border-bottom: 1px solid var(--lp-line); }
+.lp-chrome i { width: 10px; height: 10px; border-radius: 50%; background: var(--neutral-200); display: block; }
+.lp-chrome span { margin-left: 12px; font-size: 12px; color: var(--lp-soft); }
+.lp-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+.lp-table th { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-soft); font-weight: 700; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--lp-line); }
+.lp-table td { padding: 12px; border-bottom: 1px solid var(--lp-line); font-variant-numeric: tabular-nums; }
+.lp-table .n { text-align: right; }
+.lp-table tr.flag td { background: color-mix(in srgb, var(--yellow-500) 9%, transparent); }
+.lp-tag { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.lp-tag.ok { background: var(--accent-green-soft); color: var(--text-profit); }
+.lp-tag.warn { background: color-mix(in srgb, var(--yellow-500) 22%, transparent); color: var(--text-warn); }
+
+/* rantai risiko */
+.lp-chain { list-style: none; margin: 36px 0 0; padding: 0; counter-reset: c; }
+.lp-chain li { position: relative; padding: 0 0 30px 64px; counter-increment: c; }
+.lp-chain li::before { content: counter(c); position: absolute; left: 0; top: 0; width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--ink); display: grid; place-items: center; font: 600 16px var(--font-heading); color: var(--ink); background: var(--bg-card); }
+.lp-chain li::after { content: ''; position: absolute; left: 20px; top: 44px; bottom: 4px; width: 1.5px; background: var(--lp-line); }
+.lp-chain li:last-child { padding-bottom: 0; }
+.lp-chain li:last-child::after { display: none; }
+.lp-chain li:last-child::before { background: var(--navy-700); color: var(--yellow-500); border-color: var(--navy-700); }
+.lp-chain h3 { font-size: 19px; font-weight: 600; padding-top: 8px; }
+.lp-chain p { color: var(--lp-muted); font-size: 16px; margin-top: 4px; }
+
+/* cara kerja: angka besar */
+.lp-stat { display: grid; grid-template-columns: 200px 1fr; gap: 28px; align-items: baseline; padding: 28px 0; border-bottom: 1px solid var(--lp-line); }
+.lp-stat .big { font: 700 clamp(44px, 6vw, 60px)/1 var(--font-heading); color: var(--lp-brand); letter-spacing: -0.02em; }
+.lp-stat .big small { font-size: 0.45em; font-weight: 600; margin-left: 4px; }
+@media (max-width: 600px) { .lp-stat { grid-template-columns: 1fr; gap: 10px; } }
+
+/* contoh percakapan Konsultan AI */
+.lp-chat { margin-top: 22px; background: var(--navy-900); border-radius: 24px; padding: 22px; color: var(--navy-100); box-shadow: 0 30px 60px -30px rgba(19, 27, 64, 0.55); }
+.lp-msg { max-width: 84%; padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.55; margin-bottom: 10px; }
+.lp-msg small { display: block; font-size: 11px; opacity: 0.6; margin-top: 6px; }
+.lp-msg.me { margin-left: auto; background: var(--yellow-500); color: var(--navy-900); border-bottom-right-radius: 4px; }
+.lp-msg.ai { background: rgba(255, 255, 255, 0.07); border-bottom-left-radius: 4px; }
+.lp-online { color: #7be0a6; }
+.lp-online i { width: 8px; height: 8px; border-radius: 50%; background: #7be0a6; display: block; animation: lp-pulse 1.6s infinite; }
+.lp-typing { display: inline-flex; gap: 5px; padding: 14px 16px; background: rgba(255, 255, 255, 0.07); border-radius: 16px; border-bottom-left-radius: 4px; }
+.lp-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--navy-200); animation: lp-dot 1.2s infinite; }
+.lp-typing i:nth-child(2) { animation-delay: 0.2s; }
+.lp-typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes lp-pulse { 0% { box-shadow: 0 0 0 0 rgba(123, 224, 166, 0.6); } 100% { box-shadow: 0 0 0 10px rgba(123, 224, 166, 0); } }
+@keyframes lp-dot { 0%, 60%, 100% { opacity: 0.3; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+
+/* tabel perbandingan */
+.lp-cmp { margin-top: 40px; overflow-x: auto; border: 1px solid var(--lp-line); border-radius: 18px; }
+.lp-cmp table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 15px; }
+.lp-cmp th, .lp-cmp td { padding: 16px 18px; text-align: center; border-bottom: 1px solid var(--lp-line); }
+.lp-cmp tr:last-child td { border-bottom: 0; }
+.lp-cmp th:first-child, .lp-cmp td:first-child { text-align: left; }
+.lp-cmp thead th { font: 600 15px var(--font-heading); background: var(--lp-tint); }
+.lp-cmp thead th.me { background: var(--navy-700); color: var(--neutral-0); }
+.lp-cmp td.me { background: color-mix(in srgb, var(--navy-500) 8%, transparent); font-weight: 600; color: var(--lp-brand); }
+.lp-cmp .y { color: var(--text-profit); font-weight: 700; }
+.lp-cmp .x { color: var(--text-danger); font-weight: 700; }
+.lp-cmp .m { color: var(--lp-soft); }
+
+/* FAQ */
+.lp details { border-bottom: 1px solid var(--lp-line); padding: 22px 0; }
+.lp details:first-of-type { border-top: 1px solid var(--lp-line); }
+.lp summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; font: 600 18px var(--font-heading); }
+.lp summary::-webkit-details-marker { display: none; }
+.lp summary::after { content: '+'; font: 400 26px/1 var(--font-sans); color: var(--lp-brand); }
+.lp details[open] summary::after { content: '\2212'; }
+.lp details p { color: var(--lp-muted); margin-top: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.lp) { scroll-behavior: auto; }
+  .lp *, .lp *::before { transition: none !important; animation: none !important; }
+}
