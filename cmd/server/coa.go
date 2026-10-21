@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"pajak/internal/coa"
@@ -51,27 +53,68 @@ type coaReport struct {
 	BalanceSheet    *coa.BalanceSheetResult    `json:"balance_sheet,omitempty"`
 }
 
-func (s *tenant) buildCoAReport(r *http.Request) coaReport {
+// entriJurnal: satu baris jurnal beserta keterangannya, untuk Buku Besar.
+type entriJurnal struct {
+	coa.Line
+	Ket string
+}
+
+// jurnalBulan: semua yang membentuk laporan per akun satu periode — saldo awal akun, baris jurnal
+// (transaksi, pelunasan saldo awal, penyusutan, penyesuaian kartu stok) dengan keterangannya, dan
+// neraca saldo. Laporan per akun dan Buku Besar memakai fungsi ini, jadi angkanya selalu sama.
+type jurnalBulan struct {
+	all, active []coa.Account
+	p           finance.BusinessProfile
+	peta        coa.Peta
+	saldoAwal   map[string]int64
+	entri       []entriJurnal
+	tb          []coa.Balance
+	penyesuaian int64
+	kartuAktif  bool
+}
+
+func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	all, active, p := s.coaAkun()
 	if active == nil {
-		return coaReport{}
+		return jurnalBulan{}, false
 	}
-	period := periodOrDefault(r)
+	j := jurnalBulan{all: all, active: active, p: p, peta: coa.PetaDari(all)}
+	peta := j.peta
 	// Buku berjalan: saldo awal akun = posisi akhir bulan lalu; transaksi bulan ini dan
 	// pelunasan transaksi bulan lalu dijurnal di bulan ini.
 	s.mu.RLock()
-	peta := coa.PetaDari(all)
-	lines := coa.JournalBerjalan(s.txs, period, p, peta)
+	ketTx, bulanTx := map[int]string{}, map[int]string{}
+	for _, t := range s.txs {
+		if len(t.Tanggal) >= 7 {
+			bulanTx[t.ID] = t.Tanggal[:7]
+		}
+		ket := t.Jenis
+		if k := strings.TrimSpace(cmp.Or(t.Keterangan, t.Item)); k != "" {
+			ket += " — " + k
+		}
+		if t.Pihak != "" {
+			ket += " (" + t.Pihak + ")"
+		}
+		ketTx[t.ID] = ket
+	}
+	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta) {
+		ket := ketTx[l.TxID]
+		if bulanTx[l.TxID] < period {
+			ket = "Pelunasan: " + ket // transaksi bulan lalu yang dibayar bulan ini
+		}
+		j.entri = append(j.entri, entriJurnal{l, ket})
+	}
 	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr Piutang, atau Dr Utang / Cr Kas.
 	kas, piutang, utang := peta.Kode(coa.PeranKas), peta.Kode(coa.PeranPiutang), peta.Kode(coa.PeranUtangUsaha)
 	for _, pa := range s.bukuAwalLocked().Pelunasan {
 		if len(pa.Tanggal) < 7 || pa.Tanggal[:7] != period {
 			continue
 		}
+		ket := cmp.Or(pa.Keterangan, "Pelunasan "+pa.Jenis+" saldo awal")
 		if pa.Jenis == "piutang" {
-			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: kas, Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: piutang, Kredit: pa.Nominal})
+			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: kas, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: piutang, Kredit: pa.Nominal}, ket})
 		} else {
-			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: utang, Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: kas, Kredit: pa.Nominal})
+			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: utang, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: kas, Kredit: pa.Nominal}, ket})
 		}
 	}
 	opening := s.openingFor(period)
@@ -82,27 +125,64 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
 	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
 	as := rep.Assets
-	lines = append(lines, coa.DepreciationJournal(as, period, peta, p)...)
-	saldoAwal := coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+	// DepreciationJournal menulis pasangan baris: beban/akumulasi (penyusutan) atau harta/modal
+	// (aset masuk tanpa transaksi kas).
+	susut := coa.DepreciationJournal(as, period, peta, p)
+	for i := 0; i+1 < len(susut); i += 2 {
+		ket := "Penyusutan & amortisasi bulan ini (register aset)"
+		if susut[i+1].Kode == kodeModal(peta, p) {
+			ket = "Aset masuk tanpa transaksi kas (setoran modal berupa aset)"
+		}
+		j.entri = append(j.entri, entriJurnal{susut[i], ket}, entriJurnal{susut[i+1], ket})
+	}
+	j.saldoAwal = coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
 		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
-	tb := coa.TrialBalanceFrom(all, active, saldoAwal, lines)
+	j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.
-	var penyesuaian int64
 	if sp.Aktif {
+		j.kartuAktif = true
 		var saldoPersediaan int64
-		for _, b := range tb {
+		for _, b := range j.tb {
 			if b.Kode == peta.Kode(coa.PeranPersediaan) {
 				saldoPersediaan = b.Saldo
 			}
 		}
-		if penyesuaian = sp.PersediaanAkhir - saldoPersediaan; penyesuaian != 0 {
-			lines = append(lines, coa.PenyesuaianPersediaan(period+"-28", penyesuaian, p, peta)...)
-			tb = coa.TrialBalanceFrom(all, active, saldoAwal, lines)
+		if j.penyesuaian = sp.PersediaanAkhir - saldoPersediaan; j.penyesuaian != 0 {
+			for _, l := range coa.PenyesuaianPersediaan(period+"-28", j.penyesuaian, p, peta) {
+				j.entri = append(j.entri, entriJurnal{l, "Penyesuaian persediaan ke nilai kartu stok"})
+			}
+			j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 		}
 	}
-	is := coa.IncomeStatementKartu(tb, p, sp.Aktif, penyesuaian, peta)
-	bs := coa.BalanceSheet(tb, is.LabaBersih)
-	return coaReport{true, tb, &is, &bs}
+	return j, true
+}
+
+// kodeModal: akun modal usaha ini (sama dengan pilihan jurnal otomatis).
+func kodeModal(peta coa.Peta, p finance.BusinessProfile) string {
+	if p.BentukUsaha == "pt" || p.BentukUsaha == "pt_perorangan" {
+		if k := peta["modal_pt"]; k != "" {
+			return k
+		}
+	}
+	return peta.Kode(coa.PeranModal)
+}
+
+func (j jurnalBulan) lines() []coa.Line {
+	out := make([]coa.Line, len(j.entri))
+	for i, e := range j.entri {
+		out[i] = e.Line
+	}
+	return out
+}
+
+func (s *tenant) buildCoAReport(r *http.Request) coaReport {
+	j, ok := s.jurnalPeriode(periodOrDefault(r))
+	if !ok {
+		return coaReport{}
+	}
+	is := coa.IncomeStatementKartu(j.tb, j.p, j.kartuAktif, j.penyesuaian, j.peta)
+	bs := coa.BalanceSheet(j.tb, is.LabaBersih)
+	return coaReport{true, j.tb, &is, &bs}
 }
 
 func (s *tenant) handleReportCoA(w http.ResponseWriter, r *http.Request) {

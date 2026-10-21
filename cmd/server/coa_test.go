@@ -104,3 +104,47 @@ func TestCoA_ManufakturMemakaiTemplateSendiri(t *testing.T) {
 		t.Fatalf("neraca per akun tidak seimbang: %+v", bs)
 	}
 }
+
+// Buku Besar: total debit = kredit, dan saldo akhir tiap akun = neraca saldo laporan per akun,
+// baik untuk CoA dagang maupun manufaktur.
+func TestBukuBesar_SamaDenganNeracaSaldo(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	cek := func(nama string) {
+		bb := getJSON[bukuBesarResp](t, srv, owner, "/api/v1/reports/buku-besar?period=2026-08")
+		rep := getJSON[coaReport](t, srv, owner, "/api/v1/reports/coa?period=2026-08")
+		if !bb.Supported || !bb.Seimbang || bb.TotalDebit == 0 {
+			t.Fatalf("%s: buku besar supported=%v seimbang=%v debit=%d kredit=%d akun=%d", nama, bb.Supported, bb.Seimbang, bb.TotalDebit, bb.TotalKredit, len(bb.Akun))
+		}
+		tb := map[string]int64{}
+		for _, b := range rep.TrialBalance {
+			tb[b.Kode] = b.Saldo
+		}
+		adaBaris := false
+		for _, a := range bb.Akun {
+			if a.SaldoAkhir != tb[a.Kode] {
+				t.Errorf("%s: akun %s %s saldo akhir %d, neraca saldo %d", nama, a.Kode, a.Nama, a.SaldoAkhir, tb[a.Kode])
+			}
+			if len(a.Baris) > 0 {
+				adaBaris = true
+				if last := a.Baris[len(a.Baris)-1]; last.Saldo != a.SaldoAkhir || last.Keterangan == "" {
+					t.Errorf("%s: baris terakhir akun %s: %+v", nama, a.Kode, last)
+				}
+			}
+		}
+		if !adaBaris {
+			t.Errorf("%s: tidak ada mutasi", nama)
+		}
+	}
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", strings.Replace(profileBody, "manufaktur", "perdagangan", 1)); rec.Code != http.StatusOK {
+		t.Fatalf("profil dagang: %d", rec.Code)
+	}
+	cek("dagang")
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", profileBody); rec.Code != http.StatusOK {
+		t.Fatalf("profil manufaktur: %d", rec.Code)
+	}
+	cek("manufaktur")
+	if rec := do(srv, owner, http.MethodGet, "/api/v1/reports/buku-besar.xlsx?period=2026-08", ""); rec.Code != http.StatusOK {
+		t.Fatalf("ekspor: %d %s", rec.Code, rec.Body)
+	}
+}

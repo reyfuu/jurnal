@@ -7,6 +7,9 @@ export function formatJt(rp: number) {
 
 export const formatSignedJt = (rp: number) => (rp >= 0 ? '+' : '-') + formatJt(Math.abs(rp))
 
+/** Rupiah penuh bertanda: +Rp1.250.000 / -Rp500.000 (laporan keuangan tidak dibulatkan ke juta). */
+export const formatSignedRp = (rp: number) => (rp >= 0 ? '+' : '-') + formatRp(Math.abs(rp))
+
 /** Basis poin (2608) → "26,1%". */
 export const formatPct = (bps: number) => (bps / 100).toFixed(1).replace('.', ',') + '%'
 

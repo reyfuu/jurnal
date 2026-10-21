@@ -33,6 +33,7 @@ import { AlatGratis } from '@/views/AlatGratis'
 import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
+import { BukuBesar } from '@/views/BukuBesar'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
 import { PanelMaster } from '@/views/master/PanelMaster'
@@ -343,6 +344,8 @@ export default function App() {
         return <ProfilUsaha info={business!} onSaved={onProfileSaved} />
       case 'master-data':
         return <DaftarAkun bisaPerbarui={canSee('profil-usaha') && !me!.lihat} />
+      case 'buku-besar':
+        return <BukuBesar period={period} bisaEkspor={!me!.lihat} />
       case 'saldo-awal':
         return <SaldoAwal onChanged={() => reload(me!, period)} navigate={navigate} bisaUbah={!me!.lihat} />
       case 'impor-data':
