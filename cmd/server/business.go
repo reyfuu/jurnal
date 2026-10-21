@@ -86,7 +86,9 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if err := cmp.Or(prof.Validate(), prof.ValidateWilayah()); err != nil {
+	// Laba vs omzet dicek di sini, bukan di Validate(): Validate juga dipakai saat memuat profil
+	// lama, dan profil yang terlanjur salah tidak boleh hilang diam-diam.
+	if err := cmp.Or(prof.Validate(), prof.ValidateWilayah(), tax.CekLabaOmzet(prof.LabaSebelumPajak, prof.OmzetTahunan)); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -148,6 +150,12 @@ func (s *tenant) handleTaxPlanning(w http.ResponseWriter, r *http.Request) {
 	var req taxPlanningReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	// Hanya margin yang diketik pengguna; margin dari transaksi/profil apa adanya (rugi besar
+	// tetap bisa dianalisis).
+	if err := tax.CekMarginBps(req.NetMarginBps); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	omzet, margin := s.annualized()

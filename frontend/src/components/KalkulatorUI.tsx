@@ -73,7 +73,7 @@ export function Persen({ label, v, set, hint }: { label: string; v: string; set:
   return (
     <label style={{ display: 'block', marginBottom: 12 }}>
       <span className="kpi-label" style={{ display: 'block', marginBottom: 4 }}>{label}</span>
-      <input className="input-field tabular" inputMode="decimal" value={v} onChange={(e) => set(e.target.value.replace(/[^\d.,]/g, ''))} />
+      <input className="input-field tabular" inputMode="decimal" value={v} onChange={(e) => set(e.target.value.replace(/[^\d.,-]/g, ''))} />
       {hint && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>{hint}</span>}
     </label>
   )
@@ -92,9 +92,9 @@ export function Centang({ v, set, children }: { v: boolean; set: (b: boolean) =>
 export function TombolHitung({ busy, error, salah }: { busy: boolean; error: string; salah?: string }) {
   return (
     <>
-      {salah && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10, whiteSpace: 'normal' }}>{salah}</p>}
+      {salah && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10, whiteSpace: 'normal', borderRadius: 10, lineHeight: 1.45 }}>{salah}</p>}
       <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy || !!salah}>{busy ? 'Menghitung…' : 'Hitung'}</button>
-      {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 12, whiteSpace: 'normal' }}>{error}</p>}
+      {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 12, whiteSpace: 'normal', borderRadius: 10, lineHeight: 1.45 }}>{error}</p>}
     </>
   )
 }

@@ -1,5 +1,6 @@
 import type { BentukUsaha, BusinessProfile, JenisUsaha, Option } from './api'
 import { formatRp } from './format'
+import { cekLabaOmzet } from './kalkulator'
 
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
@@ -148,8 +149,14 @@ export function steps(a: Answers): StepId[] {
   ]
 }
 
+/** Pesan bila laba/rugi melebihi omzet (margin di luar -100%..100%); '' = sah atau belum diisi. */
+export const masalahLaba = (a: Answers) => {
+  const laba = parseRp(a.laba)
+  return Number.isNaN(laba) ? '' : cekLabaOmzet(laba, parseRp(a.omzet) || 0)
+}
+
 export const answered = (s: StepId, a: Answers) =>
-  s === 'ringkasan' || (s === 'lokasi' ? LOKASI_FIELDS.every((f) => Boolean(a[f]?.trim())) : s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) : Boolean(a[s]?.trim()))
+  s === 'ringkasan' || (s === 'lokasi' ? LOKASI_FIELDS.every((f) => Boolean(a[f]?.trim())) : s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) && !masalahLaba(a) : Boolean(a[s]?.trim()))
 
 export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
