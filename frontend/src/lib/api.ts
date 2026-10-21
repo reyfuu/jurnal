@@ -1171,6 +1171,7 @@ export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DE
 
 export const TAGIHAN_TEMPLATE_URL = '/api/v1/tagihan/template'
 export const STOK_TEMPLATE_URL = '/api/v1/stok/template'
+export const INVOICE_TEMPLATE_URL = '/api/v1/invoice/template'
 
 /** 'tambah' menambah ke daftar; 'ganti' mengosongkan daftar lama lebih dulu. */
 export type ImportMode = 'tambah' | 'ganti'
@@ -1185,6 +1186,7 @@ export interface MenuImportResult {
   diganti: number
   tagihan?: Tagihan[] | null
   stok?: StokItem[] | null
+  invoice?: Invoice[] | null
 }
 
 /** commit=false hanya pratinjau (tidak menyimpan apa pun). */
@@ -1199,6 +1201,8 @@ async function importMenu(path: string, file: File, commit: boolean, mode: Impor
 
 export const importTagihan = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/tagihan', f, commit, mode)
 export const importStok = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/stok', f, commit, mode)
+/** Invoice selalu ditambahkan (tidak ada mode ganti: invoice lama sudah dibukukan). */
+export const importInvoice = (f: File, commit: boolean) => importMenu('/invoice', f, commit, 'tambah')
 
 // --- Impor mutasi bank: tebak jenis transaksi, periksa, baru simpan ---
 

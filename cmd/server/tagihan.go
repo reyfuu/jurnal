@@ -217,6 +217,7 @@ type menuImportResp struct {
 	Diganti  int                  `json:"diganti"` // baris lama yang ditimpa saat mode=ganti
 	Tagihan  []finance.Tagihan    `json:"tagihan,omitempty"`
 	Stok     []finance.StokItem   `json:"stok,omitempty"`
+	Invoice  []finance.Invoice    `json:"invoice,omitempty"`
 }
 
 func (s *tenant) handleImportTagihan(w http.ResponseWriter, r *http.Request) {

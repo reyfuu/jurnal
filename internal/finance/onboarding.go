@@ -105,6 +105,8 @@ func TemplateAkunSaldo() []SaldoAkun { return append([]SaldoAkun(nil), templateA
 func kindOfSheet(nama string) string {
 	n := norm(nama)
 	switch {
+	case strings.Contains(n, "invoice") || strings.Contains(n, "faktur"):
+		return sheetInvoice // impor menu Invoice, bukan bagian data awal
 	case strings.Contains(n, "saldo") || strings.Contains(n, "neraca awal") || strings.Contains(n, "awal"):
 		return sheetSaldoAwal
 	case strings.Contains(n, "aset") || strings.Contains(n, "harta") || strings.Contains(n, "aktiva tetap"):
@@ -139,7 +141,7 @@ func ParseOnboarding(sheets []ImportSheet) OnboardingData {
 			continue
 		}
 		kind := kindOfSheet(sh.Nama)
-		if kind == "" || len(sh.Rows) == 0 {
+		if kind == "" || kind == sheetInvoice || len(sh.Rows) == 0 {
 			continue
 		}
 		d.Terbaca = append(d.Terbaca, sh.Nama)

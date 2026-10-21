@@ -95,7 +95,7 @@ var daftarTopik = []topik{
 		tautan:  []Tautan{{View: "produksi-supplier", Label: "Buka Produksi & Supplier"}}},
 	{kode: "invoice", ringkas: "membuat invoice / faktur penjualan untuk pelanggan",
 		kata:    []string{"invoice", "faktur", "faktur penjualan", "tagih pelanggan", "nota penjualan", "kwitansi"},
-		jawaban: "Buat invoice di menu **Invoice** → **Buat invoice**, lalu unduh PDF-nya untuk dikirim ke pelanggan.",
+		jawaban: "Buat invoice di menu **Invoice** → **Buat invoice**, lalu unduh PDF-nya untuk dikirim ke pelanggan. Banyak invoice sekaligus bisa diunggah lewat **Impor Excel** (unduh templatenya di sana). Invoice yang dikirim otomatis masuk penjualan & Piutang.",
 		tautan:  []Tautan{{View: "invoice", Label: "Buka Invoice"}}},
 	{kode: "aset", ringkas: "aset tetap, peralatan, penyusutan",
 		kata:    []string{"aset", "asset", "penyusutan", "inventaris", "peralatan", "mesin", "kendaraan", "amortisasi"},

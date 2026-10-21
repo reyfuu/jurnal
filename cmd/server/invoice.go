@@ -1,7 +1,9 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -67,27 +69,75 @@ func (s *tenant) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	if inv.Nomor == "" {
-		inv.Nomor = finance.NextInvoiceNumber(s.invoices, inv.Tanggal)
-	}
-	if dupe := slices.ContainsFunc(s.invoices, func(x finance.Invoice) bool { return x.Nomor == inv.Nomor }); dupe {
-		s.mu.Unlock()
-		http.Error(w, "nomor faktur "+inv.Nomor+" sudah dipakai", http.StatusConflict)
-		return
-	}
-	inv.ID = s.nextInvoiceID
-	inv.Dibukukan = true // invoice baru selalu masuk pembukuan (lihat invoice_buku.go)
-	inv.TransaksiID, inv.TransaksiPPNID = 0, 0
-	if err := s.sinkronInvoiceLocked(&inv); err != nil {
-		s.mu.Unlock()
+	err := s.tambahInvoiceLocked(&inv)
+	s.mu.Unlock()
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	s.nextInvoiceID++
-	s.invoices = append(s.invoices, inv)
-	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, inv)
+}
+
+// tambahInvoiceLocked menerbitkan invoice baru yang sudah divalidasi: nomor otomatis bila kosong,
+// nomor ganda ditolak, dan langsung dibukukan (lihat invoice_buku.go). Gagal = tidak ada yang
+// berubah. Dipanggil dengan s.mu terkunci.
+func (s *tenant) tambahInvoiceLocked(inv *finance.Invoice) error {
+	if inv.Nomor == "" {
+		inv.Nomor = finance.NextInvoiceNumber(s.invoices, inv.Tanggal)
+	}
+	if slices.ContainsFunc(s.invoices, func(x finance.Invoice) bool { return x.Nomor == inv.Nomor }) {
+		return errors.New("nomor faktur " + inv.Nomor + " sudah dipakai")
+	}
+	inv.ID = s.nextInvoiceID
+	inv.Dibukukan = true
+	inv.TransaksiID, inv.TransaksiPPNID = 0, 0
+	txs, nextTx := s.txs, s.nextTxID
+	if err := s.sinkronInvoiceLocked(inv); err != nil {
+		s.txs, s.nextTxID = txs, nextTx // transaksi DPP yang sempat dibuat ikut dibatalkan
+		return err
+	}
+	s.nextInvoiceID++
+	s.invoices = append(s.invoices, *inv)
+	return nil
+}
+
+func (s *Server) handleInvoiceTemplate(w http.ResponseWriter, r *http.Request) {
+	writeTemplate(w, "template-invoice.xlsx", finance.InvoiceTemplate())
+}
+
+// handleImportInvoice: impor invoice dari Excel. Pratinjau menjalankan langkah yang sama dengan
+// commit lalu mengembalikan semuanya, jadi nomor ganda & bulan tutup buku sudah terlihat sebelum
+// menyimpan. Invoice yang gagal dilewati; sisanya tetap masuk.
+func (s *tenant) handleImportInvoice(w http.ResponseWriter, r *http.Request) {
+	sheets, ok := uploadedSheets(w, r)
+	if !ok {
+		return
+	}
+	list, errs, nama := finance.ParseInvoiceFile(sheets, s.currentProfile().TarifPPNBps())
+	commit := r.URL.Query().Get("commit") == "1"
+	resp := menuImportResp{Sheet: nama, Errors: errs, Invoice: []finance.Invoice{}}
+	s.mu.Lock()
+	txs, nextTx, invs, nextInv := s.txs, s.nextTxID, s.invoices, s.nextInvoiceID
+	for _, x := range list {
+		inv := x.Invoice
+		if err := s.tambahInvoiceLocked(&inv); err != nil {
+			resp.Errors = append(resp.Errors, finance.SheetError{Sheet: nama, Baris: x.Baris, Pesan: "invoice " + cmp.Or(inv.Nomor, inv.PelangganNama) + ": " + err.Error()})
+			continue
+		}
+		resp.Invoice = append(resp.Invoice, inv)
+	}
+	if !commit {
+		s.txs, s.nextTxID, s.invoices, s.nextInvoiceID = txs, nextTx, invs, nextInv
+	}
+	s.mu.Unlock()
+	resp.Valid = len(resp.Invoice)
+	if commit && resp.Valid == 0 {
+		http.Error(w, "tidak ada invoice yang bisa diimpor; periksa pesan di pratinjau", http.StatusBadRequest)
+		return
+	}
+	resp.Imported = commit
+	writeJSON(w, resp)
 }
 
 // invoiceIndex harus dipanggil dengan s.mu terkunci.

@@ -170,3 +170,53 @@ func TestInvoice_DraftLamaDibukukanSaatDikirim(t *testing.T) {
 		t.Fatalf("draft lama yang dikirim harus jadi piutang: %+v %+v", inv, tx)
 	}
 }
+
+// Impor invoice dari Excel: pratinjau tidak mengubah apa pun; commit menerbitkan & membukukan
+// invoice yang sah (nomor otomatis bila kosong), nomor ganda dan bulan tutup buku dilewati.
+func TestImporInvoice_PratinjauLaluCommit(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	pkp := strings.Replace(strings.Replace(profileBody, "manufaktur", "perdagangan", 1), `"pkp":false`, `"pkp":true`, 1)
+	do(srv, owner, http.MethodPut, "/api/v1/business", pkp)
+	ten := srv.tenants[1]
+	ten.tutupBuku = "2026-08"
+	nInv, nTx := len(ten.invoices), len(ten.txs)
+	lama := ten.invoices[0].Nomor
+	rows := [][]string{{"Nomor", "Tanggal", "Jatuh Tempo", "Pelanggan", "Status", "Tanggal Lunas", "Deskripsi", "Qty", "Harga Satuan", "PPN (%)"},
+		{"INV-IMP-1", "2026-09-01", "2026-09-30", "PT Impor Satu", "", "", "Kopi", "10", "100000", ""},
+		{"INV-IMP-1", "", "", "", "", "", "Gula", "2", "50000", ""},
+		{"", "2026-09-02", "2026-09-02", "CV Tunai", "Lunas", "2026-09-02", "Katering", "1", "500000", "0"},
+		{lama, "2026-09-03", "2026-09-30", "PT Ganda", "", "", "Kopi", "1", "1000", ""},
+		{"INV-IMP-4", "2026-08-15", "2026-09-15", "PT Agustus", "", "", "Kopi", "1", "1000", ""},
+	}
+	kirim := func(q string) menuImportResp {
+		body, ctype := workbookUpload(t, []finance.ImportSheet{{Nama: "Invoice", Rows: rows}})
+		rec := upload(srv, owner, "/api/v1/invoice/import"+q, body, ctype)
+		var res menuImportResp
+		if err := json.NewDecoder(rec.Body).Decode(&res); err != nil || rec.Code != http.StatusOK {
+			t.Fatalf("impor%s: %d %s", q, rec.Code, rec.Body)
+		}
+		return res
+	}
+	pr := kirim("")
+	if pr.Valid != 2 || len(pr.Errors) != 2 || pr.Imported || len(ten.invoices) != nInv || len(ten.txs) != nTx {
+		t.Fatalf("pratinjau: valid %d errors %+v imported %v; invoice %d→%d, tx %d→%d", pr.Valid, pr.Errors, pr.Imported, nInv, len(ten.invoices), nTx, len(ten.txs))
+	}
+	res := kirim("?commit=1")
+	if !res.Imported || res.Valid != 2 || len(ten.invoices) != nInv+2 {
+		t.Fatalf("commit: %+v", res)
+	}
+	// INV-IMP-1: DPP 1.100.000 + PPN 11% = dua transaksi; CV Tunai tanpa PPN, lunas = satu.
+	if got := len(ten.txs) - nTx; got != 3 {
+		t.Errorf("transaksi baru: %d, mau 3", got)
+	}
+	baru := ten.invoices[len(ten.invoices)-1]
+	if baru.PelangganNama != "CV Tunai" || !strings.HasPrefix(baru.Nomor, "INV-2026-") || baru.Status != finance.StatusLunas || !baru.Dibukukan {
+		t.Errorf("invoice bernomor otomatis: %+v", baru)
+	}
+	for _, e := range res.Errors {
+		if !strings.Contains(e.Pesan, lama) && !strings.Contains(e.Pesan, "INV-IMP-4") {
+			t.Errorf("galat tak terduga: %+v", e)
+		}
+	}
+}
