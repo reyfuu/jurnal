@@ -58,7 +58,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
 
   return (
     <>
-      <PageHeader title="Impor Data Awal" subtitle="Satu berkas Excel untuk neraca awal, aset, karyawan, dan transaksi">
+      <PageHeader title="Impor Data Awal" subtitle="Satu berkas Excel untuk saldo awal rinci, aset tetap, stok, karyawan, dan transaksi">
         <a className="btn-cta" style={{ padding: '9px 18px', fontSize: 13, textDecoration: 'none' }} href={ONBOARDING_TEMPLATE_URL}>
           Unduh Template
         </a>
@@ -69,15 +69,18 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
       <div className="note-box" style={{ marginTop: 0, marginBottom: 14 }}>
         <strong>Yang diimpor dari laporan keuangan adalah posisi awalnya, bukan laporannya.</strong> Neraca dan
         arus kas di aplikasi ini dihitung dari transaksi + register aset, jadi kalau angka jadi ikut diimpor,
-        dia akan langsung bertabrakan dengan hasil hitung begitu ada satu transaksi baru. Isi sheet{' '}
-        <strong>Saldo Awal</strong> dengan posisi di hari pertama pakai aplikasi — sisanya terbentuk sendiri.
+        dia akan langsung bertabrakan dengan hasil hitung begitu ada satu transaksi baru. Isi Tanggal Saldo Awal
+        di sheet <strong>Petunjuk</strong>, lalu sheet rincian <strong>Kas dan Bank</strong> s.d. <strong>Modal</strong>{' '}
+        hingga sheet <strong>Neraca Saldo Awal</strong> berstatus SEIMBANG — sisanya terbentuk sendiri.
       </div>
 
       {/* --- Langkah 1: unggah --- */}
       <div className="card" style={{ padding: 20, marginBottom: 14 }}>
         <div className="chart-title">1. Unggah Berkas</div>
         <div className="chart-subtitle">
-          Format .xlsx, maksimal 5 MB. Nama sheet bebas selama memuat kata Saldo Awal / Aset / Karyawan / Transaksi.
+          Format .xlsx, maksimal 5 MB. Pakai template: Petunjuk, Neraca Saldo Awal, Kas dan Bank, Piutang, Persediaan,
+          Perlengkapan, Aset Lancar Lain, Aset Tetap, Utang, Modal, plus Karyawan &amp; Transaksi (opsional). Berkas format
+          lama (sheet Saldo Awal / Aset) tetap bisa dibaca.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
           <input
@@ -121,8 +124,12 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
               </div>
             )}
             <div className="list-row">
-              <span>Aset</span>
+              <span>Aset Tetap</span>
               <span className="tabular">{preview.assets?.length ?? 0} baris</span>
+            </div>
+            <div className="list-row">
+              <span>Persediaan → Stok &amp; Gudang</span>
+              <span className="tabular">{preview.stok?.length ?? 0} barang</span>
             </div>
             <div className="list-row">
               <span>Karyawan</span>
@@ -159,7 +166,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
           {preview.bisa_disimpan === false && (
             <div className="note-box warn">
               <strong>Belum bisa disimpan.</strong> Perbaiki masalah bertanda <em>Saldo Awal</em> di tabel di bawah (saldo awal harus seimbang dan
-              aset tetapnya sama dengan nilai buku sheet Aset), lalu unggah ulang berkasnya.
+              aset tetapnya sama dengan nilai buku sheet Aset Tetap), lalu unggah ulang berkasnya.
             </div>
           )}
 
@@ -189,10 +196,10 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
             </>
           )}
 
-          {preview.imported && (preview.replaced_assets > 0 || preview.replaced_karyawan > 0) && (
+          {preview.imported && (preview.replaced_assets > 0 || preview.replaced_karyawan > 0 || (preview.replaced_stok ?? 0) > 0) && (
             <div className="note-box">
-              Mengganti {preview.replaced_assets} aset dan {preview.replaced_karyawan} karyawan yang sebelumnya
-              tercatat. Transaksi tidak diganti, hanya ditambahkan.
+              Mengganti {preview.replaced_assets} aset, {preview.replaced_stok ?? 0} barang stok, dan {preview.replaced_karyawan} karyawan
+              yang sebelumnya tercatat. Transaksi tidak diganti, hanya ditambahkan.
             </div>
           )}
 
@@ -202,7 +209,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
                 {busy ? 'Mengimpor…' : 'Impor Sekarang'}
               </button>
               <span className="chart-subtitle">
-                Aset &amp; karyawan hasil impor <strong>mengganti</strong> yang sekarang; transaksi ditambahkan.
+                Aset, stok &amp; karyawan hasil impor <strong>mengganti</strong> yang sekarang; transaksi ditambahkan.
               </span>
             </div>
           )}

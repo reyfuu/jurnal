@@ -54,7 +54,7 @@ func fill(v reflect.Value, n int) {
 			if !f.IsExported() {
 				continue
 			}
-			if f.Type.Kind() == reflect.String && (strings.HasPrefix(f.Name, "Tanggal") || f.Name == "JatuhTempo") {
+			if f.Type.Kind() == reflect.String && (strings.HasPrefix(f.Name, "Tanggal") || f.Name == "JatuhTempo" || f.Name == "PerTanggal") {
 				v.Field(i).SetString("2026-08-2" + string(rune('0'+n%10)))
 				continue
 			}

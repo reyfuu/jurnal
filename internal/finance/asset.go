@@ -132,6 +132,12 @@ type Asset struct {
 	// Kosong = belum dipilih (data lama / impor), sementara dicatat sebagai tambahan modal.
 	SumberDana string `json:"sumber_dana,omitempty"`
 	Keterangan string `json:"keterangan,omitempty"`
+	// AkumulasiAwal: akumulasi penyusutan yang sudah ada per PerTanggal (tanggal saldo awal),
+	// mis. dari pembukuan lama atau template saldo awal. Diisi = bulan sebelum PerTanggal
+	// berjumlah tepat AkumulasiAwal dan sisanya disusutkan di sisa masa manfaat, supaya nilai
+	// buku awal sama dengan yang dinyatakan di saldo awal. PerTanggal kosong = dihitung sistem.
+	AkumulasiAwal int64  `json:"akumulasi_awal,omitempty"`
+	PerTanggal    string `json:"akumulasi_per,omitempty"`
 }
 
 func KelompokOf(id string) (KelompokAset, bool) {
@@ -152,7 +158,7 @@ func jenisHartaOf(id string) (JenisHarta, bool) {
 
 // ValidateAsset merapikan isian dan mengisi kelompok dari jenis harta bila dipilih.
 func ValidateAsset(a *Asset) error {
-	for _, s := range []*string{&a.Nama, &a.JenisHarta, &a.Kelompok, &a.Metode, &a.TanggalPerolehan, &a.Keterangan} {
+	for _, s := range []*string{&a.Nama, &a.JenisHarta, &a.Kelompok, &a.Metode, &a.TanggalPerolehan, &a.Keterangan, &a.PerTanggal} {
 		*s = strings.TrimSpace(*s)
 	}
 	if a.Nama == "" {
@@ -163,6 +169,16 @@ func ValidateAsset(a *Asset) error {
 	}
 	if a.HargaPerolehan <= 0 {
 		return errors.New("harga perolehan harus lebih dari 0")
+	}
+	if a.PerTanggal != "" {
+		if _, err := time.Parse(time.DateOnly, a.PerTanggal); err != nil {
+			return errors.New("tanggal akumulasi penyusutan awal tidak valid (format YYYY-MM-DD)")
+		}
+	} else if a.AkumulasiAwal != 0 {
+		return errors.New("akumulasi penyusutan awal butuh tanggal per (tanggal saldo awal)")
+	}
+	if a.AkumulasiAwal < 0 || a.AkumulasiAwal > a.HargaPerolehan {
+		return errors.New("akumulasi penyusutan awal harus antara 0 dan harga perolehan")
 	}
 	switch a.SumberDana {
 	case "", SumberKas, SumberUtang, SumberModal:
@@ -291,17 +307,29 @@ func AssetSchedule(a Asset) []int64 {
 		return nil
 	}
 	n := k.MasaManfaat
-	if a.Metode != MetodeSaldoMenurun || k.TarifSMBps == 0 {
-		return spread(make([]int64, 0, n), a.HargaPerolehan, n)
-	}
-	// Saldo menurun: tarif tahunan atas sisa nilai buku. Dihitung per tahun kalender karena
-	// penyusutan dimulai bulan pengeluaran, jadi tahun pertama sering tidak genap 12 bulan.
+	gl := a.Metode != MetodeSaldoMenurun || k.TarifSMBps == 0
 	_, bulanAwal, ok := parseYM(a.TanggalPerolehan)
 	if !ok {
 		return nil
 	}
 	out := make([]int64, 0, n)
-	sisa, done, bulan := a.HargaPerolehan, 0, 13-bulanAwal
+	sisa, done := a.HargaPerolehan, 0
+	// Akumulasi awal yang dinyatakan: bulan sebelum tanggal saldo awal (m0) berjumlah tepat
+	// AkumulasiAwal; sisa harga disusutkan di sisa masa manfaat. Bila m0 sudah melewati masa
+	// manfaat, aset habis disusutkan secara fiskal dan angka itu diabaikan.
+	if len(a.PerTanggal) >= 7 && a.AkumulasiAwal >= 0 && a.AkumulasiAwal <= a.HargaPerolehan {
+		if m0 := monthsElapsed(a.TanggalPerolehan, prevPeriod(a.PerTanggal[:7])); m0 > 0 && m0 < n {
+			out = spread(out, a.AkumulasiAwal, m0)
+			sisa, done = a.HargaPerolehan-a.AkumulasiAwal, m0
+		}
+	}
+	if gl {
+		return spread(out, sisa, n-done)
+	}
+	// Saldo menurun: tarif tahunan atas sisa nilai buku. Dihitung per tahun kalender karena
+	// penyusutan dimulai bulan pengeluaran, jadi tahun pertama sering tidak genap 12 bulan.
+	// Setelah akumulasi awal, blok berjalan dari bulan kalender ke-(done) sampai Desember.
+	bulan := 12 - (bulanAwal-1+done)%12
 	for done < n {
 		bulan = min(bulan, n-done)
 		amount := sisa * int64(k.TarifSMBps) * int64(bulan) / (10_000 * 12)

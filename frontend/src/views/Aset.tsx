@@ -32,6 +32,7 @@ function toInput(a: Asset): AssetInput {
     metode: a.metode || 'garis_lurus', tanggal_perolehan: a.tanggal_perolehan,
     harga_perolehan: a.harga_perolehan, tak_berwujud: a.tak_berwujud, transaksi_id: a.transaksi_id,
     sumber_dana: a.sumber_dana ?? '',
+    akumulasi_awal: a.akumulasi_awal, akumulasi_per: a.akumulasi_per,
   }
 }
 

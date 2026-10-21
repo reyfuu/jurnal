@@ -235,6 +235,9 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wa TEXT;
 -- sumber dana aset tanpa transaksi (kas | utang | modal); kosong = belum dipilih
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS sumber_dana TEXT;
+-- akumulasi penyusutan yang sudah ada per tanggal saldo awal (template saldo awal / pembukuan lama)
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS akumulasi_awal BIGINT;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS akumulasi_per DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS persetujuan_pdp TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS versi_pdp TEXT;
 

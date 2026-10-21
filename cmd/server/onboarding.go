@@ -12,14 +12,15 @@ import (
 	"pajak/internal/xlsx"
 )
 
-// Impor data awal onboarding: satu workbook .xlsx berisi sheet Saldo Awal, Aset, Karyawan,
-// dan Transaksi. Tanpa ?commit=1 hanya pratinjau — tidak ada yang disimpan.
+// Impor data awal onboarding: satu workbook .xlsx berisi saldo awal rinci (Kas dan Bank,
+// Piutang, …, Modal), Karyawan, dan Transaksi. Tanpa ?commit=1 hanya pratinjau — tidak ada
+// yang disimpan.
 
 func (s *tenant) handleOnboardingTemplate(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	metode := s.metodeUsaha()
 	s.mu.RUnlock()
-	sheets := make([]xlsx.Sheet, 0, 7)
+	sheets := make([]xlsx.Sheet, 0, 12)
 	for _, sh := range finance.OnboardingTemplate(metode) {
 		sheets = append(sheets, xlsx.Sheet{Name: sh.Nama, Rows: sh.Rows, Tabel: tabelXLSX(sh.Format)})
 	}
@@ -33,7 +34,9 @@ func tabelXLSX(f *finance.FormatTabel) *xlsx.Tabel {
 	if f == nil {
 		return nil
 	}
-	return &xlsx.Tabel{Header: f.Header, Kolom: f.Kolom, Lebar: f.Lebar, Angka: f.Angka, BarisKosong: f.BarisKosong, Pilihan: f.Pilihan, Kunci: f.Kunci}
+	return &xlsx.Tabel{Header: f.Header, Kolom: f.Kolom, Lebar: f.Lebar, Angka: f.Angka, Bilangan: f.Bilangan, Tanggal: f.Tanggal,
+		Contoh: f.Contoh, BarisKosong: f.BarisKosong, Pilihan: f.Pilihan, Rumus: f.Rumus, Gaya: f.Gaya, Akhir: f.Akhir,
+		Referensi: f.Referensi, Kunci: f.Kunci}
 }
 
 // onboardingResp: ringkasan per sheet + contoh baris, supaya user bisa memeriksa sebelum commit.
@@ -106,6 +109,9 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 			s.mu.RUnlock()
 		}
 		nbv := finance.AssetsForPeriod(as, d.Transaksi, d.Opening.Period()).NilaiBukuAwal
+		// Berkas tanpa baris aset tetap (nilai buku template rinci hanya ada setelah disimpan
+		// Excel): pakai nilai buku hitungan sistem, lalu tetap wajib seimbang.
+		d.Opening.LengkapiAsetTetap(nbv)
 		resp.ModalAwal = d.Opening.ModalAwal(nbv)
 		resp.SelisihModal = d.Opening.SelisihModal(nbv)
 		resp.NilaiBukuAset = nbv
