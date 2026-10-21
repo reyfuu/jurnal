@@ -815,6 +815,35 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
 - Urutan: kata kunci dulu (gratis). Bila tidak cocok tapi jelas pertanyaan menu dan LLM aktif → `ai.PilihPanduan` (model memilih kode topik dari daftar, divalidasi; kuota 40/user/24 jam). Pertanyaan analisis (mis. "kondisi arus kas saya") tetap dijawab mesin biasa, plus satu tautan pelengkap.
 - `QueryResponse.tautan`; frontend `AIAgentBubble` menerima `onBuka(view, tab)`; `App.navigate(view, tab)` meneruskan `tabAwal` ke Laporan Keuangan.
 
+## Primbon Pajak: katalog peraturan resmi (21 Okt 2026)
+
+- Menu **Primbon Pajak** (grup Pajak, setelah Pustaka Pajak) untuk Owner & Admin usaha yang
+  berlangganan; usaha `habis` melihat menu bergembok dan API menolak 402 (`wajibLangganan`, karena
+  `lockedWrite` sengaja tidak mengunci GET). Alur meniru primbonpajak.id: katalog + filter
+  (kategori, jenis, status, rentang tahun, urutan, cari; 20 per halaman), detail dengan naskah resmi
+  di halaman, bookmark, dan catatan pribadi. Rangkuman/tag/logo Primbon **tidak** disalin (hak cipta
+  CV Abadi Tax); yang tampil hanya metadata faktual + naskah resmi pemerintah.
+- Data: `index.csv` + naskah dari `scripts/peraturan/` (gitignored, ±2,5 GB). Server membaca
+  `REGULASI_DIR` (bawaan `docs/peraturan`) dan memuat ulang sendiri saat `index.csv` berubah, jadi
+  naskah yang baru diunduh tim muncul tanpa restart. Folder kosong = 503 "katalog belum tersedia".
+- Kode: `internal/primbon` (muat, normalisasi jenis/status/kategori, cari: semua kata harus ada,
+  angka utuh, kode & label kategori ikut dicari; facet dari seluruh katalog), `cmd/server/primbon.go`
+  (API `/api/v1/primbon/*`; rute berkas `X-Frame-Options: SAMEORIGIN` untuk iframe, HTML JDIH
+  dengan CSP `sandbox`, `?unduh=1`, `?lampiran=1`), frontend `frontend/src/views/primbon/`.
+- Bookmark & catatan per user: tabel `primbon_bookmark` / `primbon_catatan` (atau `primbon.json`).
+  Tanpa FK ke `users` karena `saveAuthDB` menulis ulang tabel itu; data user yang sudah dihapus
+  dibuang saat boot (ID user bisa terpakai ulang setelah restart).
+- Tanya AI: topik `primbon` di `internal/ai/panduan.go` (kata "peraturan", "naskah", "pmk", …).
+- **Memperbarui katalog di server** (setelah tim menambah naskah dan `index.csv`):
+  ```bash
+  warp-cli disconnect   # VPS menolak SSH dari IP WARP
+  rsync -a --info=progress2 -e "ssh -o IdentitiesOnly=yes -i ~/.ssh/aipreneur_vps" \
+    docs/peraturan/ root@31.97.66.119:/var/www/peraturan/
+  ```
+  Tanpa `--delete` dan tanpa restart. Bila rsync tidak ada di VPS (scp/SFTP mati):
+  `tar -C docs/peraturan -cz . | ssh -o IdentitiesOnly=yes -i ~/.ssh/aipreneur_vps root@31.97.66.119 'tar -xz -C /var/www/peraturan'`.
+  `deploy.sh` memasang `PERATURAN_DIR` (bawaan `/var/www/peraturan`) read-only ke `/peraturan`.
+
 ## Kartu stok: beli, produksi, jual, opname, laporan mutasi (21 Okt 2026) — PR A, operasional
 
 - **Titik nol**: Stok & Gudang → "Mulai kartu stok" = hitung fisik pertama + harga pokok (`GerakStok` jenis `awal`, satu per usaha). Sebelum titik nol perilaku lama tetap (jumlah diketik).

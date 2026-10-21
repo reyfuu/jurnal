@@ -38,6 +38,7 @@ import { AIAgentBubble } from '@/components/AIAgentBubble'
 import { PanelMaster } from '@/views/master/PanelMaster'
 import { UsulanKoreksi } from '@/views/UsulanKoreksi'
 import { Pustaka } from '@/views/Pustaka'
+import { PrimbonPajak } from '@/views/primbon/PrimbonPajak'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -353,6 +354,8 @@ export default function App() {
         return <Langganan onPaid={onPaid} />
       case 'pustaka':
         return <Pustaka />
+      case 'primbon-pajak':
+        return <PrimbonPajak />
       case 'usulan-koreksi':
         return <UsulanKoreksi onChanged={() => { void reload(me!, period); getMe().then((m) => setSession({ status: 'in', me: m }), fail) }} />
       case 'lapor-bug':

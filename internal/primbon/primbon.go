@@ -253,7 +253,7 @@ func Muat(dir string) (*Data, error) {
 			p.Tahun, _ = strconv.Atoi(m[len(m)-1])
 		}
 		p.Halaman, _ = strconv.Atoi(get("halaman"))
-		if p.SumberLN == "tanpa slug JDIH" { // catatan skrip unduh, bukan sumber LN/BN
+		if p.SumberLN == "tanpa slug JDIH" || p.SumberLN == "-" { // catatan skrip unduh / kosong
 			p.SumberLN = ""
 		}
 		file := get("file")

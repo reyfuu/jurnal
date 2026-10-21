@@ -65,7 +65,7 @@ func TestMuatMenormalkanData(t *testing.T) {
 		{"a5", func(p Peraturan) bool { return p.Tahun == 2024 && p.Status == "" && p.Format == "" },
 			"tahun dari tanggal penetapan, path ../ ditolak"},
 		{"a6", func(p Peraturan) bool { return p.Jenis == "PP" && p.Abstrak && p.Status == "Dicabut" }, "hanya abstrak"},
-		{"a7", func(p Peraturan) bool { return p.Jenis == "KMK" }, "Keputusan Menteri = KMK"},
+		{"a7", func(p Peraturan) bool { return p.Jenis == "KMK" && p.SumberLN == "" }, "Keputusan Menteri = KMK, sumber LN \"-\" = kosong"},
 		{"a8", func(p Peraturan) bool { return p.Jenis == "SE_DJP" && p.Tahun == 2022 }, "tahun dari kode"},
 	}
 	for _, c := range cek {

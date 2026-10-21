@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, CalendarCheck, LibraryBig, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
   Landmark, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
@@ -47,6 +47,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: SquarePercent },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Target },
       { view: 'pustaka', label: 'Pustaka Pajak', icon: Library },
+      { view: 'primbon-pajak', label: 'Primbon Pajak', icon: LibraryBig },
     ],
   },
   {

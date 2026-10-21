@@ -14,6 +14,9 @@ APP_PORT="${1:-8085}"
 # sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
 # dbeaver_ro untuk DBeaver. Buat dengan `openssl rand -hex 24` dan simpan di .env.
+# PERATURAN_DIR (opsional): katalog Primbon Pajak (index.csv + naskah, ±2,5 GB) di host, di luar
+# repo supaya git pull tidak menyentuhnya; diisi lewat rsync (lihat HANDOFF.md). Kosong = menu
+# Primbon menampilkan "katalog belum tersedia".
 [ -f .env ] && . ./.env
 : "${SEED_PASSWORD:?SEED_PASSWORD wajib di-set (export atau .env) sebelum deploy}"
 : "${PG_PASSWORD:?PG_PASSWORD wajib di-set (.env) sebelum deploy}"
@@ -22,6 +25,7 @@ CONTAINER_NAME="laporan-bisnis"
 NETWORK="laporan-bisnis-net"
 DB_CONTAINER="laporan-bisnis-db"
 DB_PORT="${PG_HOST_PORT:-5432}" # hanya 127.0.0.1: akses dari luar lewat SSH tunnel
+PERATURAN_DIR="${PERATURAN_DIR:-/var/www/peraturan}"
 
 echo "=== [1/4] Pulling latest updates from origin main ==="
 git pull origin main
@@ -30,6 +34,7 @@ echo "=== [2/4] Building Docker container ==="
 docker build -t "$IMAGE_NAME" .
 
 echo "=== [3/4] Postgres + restarting container on port $APP_PORT ==="
+mkdir -p "$PERATURAN_DIR"
 docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NETWORK"
 if ! docker container inspect "$DB_CONTAINER" >/dev/null 2>&1; then
   docker run -d \
@@ -67,6 +72,8 @@ docker run -d \
   -e LLM_TIMEOUT="${LLM_TIMEOUT:-}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
+  -e REGULASI_DIR=/peraturan \
+  -v "${PERATURAN_DIR}:/peraturan:ro" \
   "$IMAGE_NAME"
 
 echo "=== [4/4] Verifying deployment ==="

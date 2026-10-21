@@ -47,6 +47,9 @@ func TestCariPanduan_TopikLain(t *testing.T) {
 		"gimana cara berlangganan":           "langganan#",
 		"hitung harga jual gofood dimana":    "simulasi-harga#",
 		"dimana lihat stok barang":           "stok-gudang#",
+		"di mana baca naskah PMK":            "primbon-pajak#",
+		"dimana cari peraturan pph 21":       "primbon-pajak#",
+		"di mana artikel pajak":              "pustaka#",
 	}
 	for q, mau := range cek {
 		p, ok := CariPanduan(q, semuaBoleh)
