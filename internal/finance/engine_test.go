@@ -12,8 +12,8 @@ func TestCalculateDashboardKPIs_Agustus2026(t *testing.T) {
 	if snapshot.KPIs.Omzet.Value != 92_000_000 {
 		t.Fatalf("expected Omzet 92_000_000, got %d", snapshot.KPIs.Omzet.Value)
 	}
-	if snapshot.KPIs.Omzet.Display != "Rp92 jt" {
-		t.Fatalf("expected Omzet display 'Rp92 jt', got %q", snapshot.KPIs.Omzet.Display)
+	if snapshot.KPIs.Omzet.Display != "Rp92.000.000" {
+		t.Fatalf("expected Omzet display 'Rp92.000.000' (rupiah penuh), got %q", snapshot.KPIs.Omzet.Display)
 	}
 	if snapshot.KPIs.LabaBersih.Value != 25_000_000 {
 		t.Fatalf("expected LabaBersih 25_000_000, got %d", snapshot.KPIs.LabaBersih.Value)

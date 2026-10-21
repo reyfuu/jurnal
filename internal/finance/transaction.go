@@ -255,9 +255,9 @@ func formatTanggal(d string) string {
 func ApplyKPIs(snap *DashboardSnapshot, is IncomeStatement, cf CashFlow, periodTxs []Transaction, seedPeriodTx int) {
 	k := &snap.KPIs
 	target := k.Omzet.Value - k.TargetOmzet.SurplusValue
-	k.Omzet.Value, k.Omzet.Display = is.Omzet, FormatJt(is.Omzet)
-	k.LabaBersih.Value, k.LabaBersih.Display = is.NetProfit, FormatJt(is.NetProfit)
-	k.SaldoKas.Value, k.SaldoKas.Display = cf.ClosingBalance, FormatJt(cf.ClosingBalance)
+	k.Omzet.Value, k.Omzet.Display = is.Omzet, FormatRupiahPenuh(is.Omzet)
+	k.LabaBersih.Value, k.LabaBersih.Display = is.NetProfit, FormatRupiahPenuh(is.NetProfit)
+	k.SaldoKas.Value, k.SaldoKas.Display = cf.ClosingBalance, FormatRupiahPenuh(cf.ClosingBalance)
 	k.MarginLaba.Value = 0
 	if is.Omzet > 0 {
 		k.MarginLaba.Value = (is.NetProfit*100 + is.Omzet/2) / is.Omzet
@@ -270,9 +270,9 @@ func ApplyKPIs(snap *DashboardSnapshot, is IncomeStatement, cf CashFlow, periodT
 	k.TargetOmzet.Display = fmt.Sprintf("%d%%", k.TargetOmzet.AchievedPct)
 	k.TargetOmzet.SurplusValue = is.Omzet - target
 	if k.TargetOmzet.SurplusValue >= 0 {
-		k.TargetOmzet.SurplusDisplay = "Lebih " + FormatJt(k.TargetOmzet.SurplusValue)
+		k.TargetOmzet.SurplusDisplay = "Lebih " + FormatRupiahPenuh(k.TargetOmzet.SurplusValue)
 	} else {
-		k.TargetOmzet.SurplusDisplay = "Kurang " + FormatJt(-k.TargetOmzet.SurplusValue)
+		k.TargetOmzet.SurplusDisplay = "Kurang " + FormatRupiahPenuh(-k.TargetOmzet.SurplusValue)
 	}
 
 	snap.Tenant.TotalTransactions += len(periodTxs) - seedPeriodTx

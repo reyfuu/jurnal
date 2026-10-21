@@ -2,7 +2,6 @@ package finance
 
 import (
 	"fmt"
-	"strings"
 
 	"pajak/internal/tax"
 )
@@ -162,14 +161,6 @@ type PriceSimulationResult struct {
 	NetMarginPct     int   `json:"net_margin_pct"`
 }
 
-func FormatJt(rp int64) string {
-	jt := float64(rp) / 1_000_000.0
-	if rp%1_000_000 == 0 {
-		return fmt.Sprintf("Rp%d jt", rp/1_000_000)
-	}
-	return strings.Replace(fmt.Sprintf("Rp%.1f jt", jt), ".", ",", 1) // desimal Indonesia: Rp6,8 jt
-}
-
 func CalculateUMKMTax(entityType string, monthlyOmzet []int64) UMKMTaxReport {
 	pr := tax.P()
 	opExemption := pr.UMKMBebasOP
@@ -206,7 +197,7 @@ func CalculateUMKMTax(entityType string, monthlyOmzet []int64) UMKMTaxReport {
 
 		status := "Kena PPh " + persen(int(pr.UMKMTarifBps))
 		if pph == 0 {
-			status = "Bebas Pajak (Kuota ≤ " + FormatJt(opExemption) + ")"
+			status = "Bebas Pajak (Kuota ≤ " + FormatRupiahPenuh(opExemption) + ")"
 		}
 
 		mName := fmt.Sprintf("Bulan %d", i+1)

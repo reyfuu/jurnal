@@ -360,9 +360,9 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 	marginPct := m.MarginBps / 100
 	achievedPct := int((m.Omzet * 100) / m.TargetOmzet)
 	surplus := m.Omzet - m.TargetOmzet
-	surplusDisplay := fmt.Sprintf("Lebih %s", FormatJt(surplus))
+	surplusDisplay := fmt.Sprintf("Lebih %s", FormatRupiahPenuh(surplus))
 	if surplus < 0 {
-		surplusDisplay = fmt.Sprintf("Kurang %s", FormatJt(-surplus))
+		surplusDisplay = fmt.Sprintf("Kurang %s", FormatRupiahPenuh(-surplus))
 	}
 
 	return DashboardSnapshot{
@@ -378,7 +378,7 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 		KPIs: DashboardKPIs{
 			Omzet: MetricCard{
 				Value:     m.Omzet,
-				Display:   FormatJt(m.Omzet),
+				Display:   FormatRupiahPenuh(m.Omzet),
 				BadgeText: "▲ Stabil",
 				SubText:   "vs target",
 				Trend:     "up",
@@ -386,7 +386,7 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 			},
 			LabaBersih: MetricCard{
 				Value:     m.LabaBersih,
-				Display:   FormatJt(m.LabaBersih),
+				Display:   FormatRupiahPenuh(m.LabaBersih),
 				BadgeText: fmt.Sprintf("%d%% Margin", marginPct),
 				SubText:   "laba bersih riil",
 				Trend:     "up",
@@ -402,7 +402,7 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 			},
 			SaldoKas: MetricCard{
 				Value:     m.ClosingCash,
-				Display:   FormatJt(m.ClosingCash),
+				Display:   FormatRupiahPenuh(m.ClosingCash),
 				BadgeText: "Likuid",
 				SubText:   "kas operasional",
 				Trend:     "up",
@@ -416,12 +416,12 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 			},
 			Piutang: PiutangCard{
 				UnpaidTotal:          m.UnpaidAR,
-				UnpaidDisplay:        FormatJt(m.UnpaidAR),
+				UnpaidDisplay:        FormatRupiahPenuh(m.UnpaidAR),
 				InvoiceCount:         8,
 				Overdue30dTotal:      m.Overdue30d,
-				Overdue30dDisplay:    fmt.Sprintf("%s lewat 30 hari", FormatJt(m.Overdue30d)),
+				Overdue30dDisplay:    fmt.Sprintf("%s lewat 30 hari", FormatRupiahPenuh(m.Overdue30d)),
 				PayableUnpaidTotal:   m.UnpaidAP,
-				PayableUnpaidDisplay: fmt.Sprintf("Utang supplier %s", FormatJt(m.UnpaidAP)),
+				PayableUnpaidDisplay: fmt.Sprintf("Utang supplier %s", FormatRupiahPenuh(m.UnpaidAP)),
 			},
 		},
 		MonthlyTrend11M: trend,
@@ -437,7 +437,7 @@ func SeedKedaiKopiSenja(period string) DashboardSnapshot {
 			{Name: "Kopi Literan Keluarga 1L", Qty: 148, Omzet: (m.Omzet * 11) / 100, Pct: 11},
 		},
 		TotalAppFees:       m.FeeApp,
-		TotalAppFeesLabel:  fmt.Sprintf("Potongan aplikasi bulan ini %s", FormatJt(m.FeeApp)),
+		TotalAppFeesLabel:  fmt.Sprintf("Potongan aplikasi bulan ini %s", FormatRupiahPenuh(m.FeeApp)),
 		Channels:           m.Channels,
 		RecentTransactions: m.RecentTxs,
 		// Dirender dari record contoh yang sama dengan halaman Piutang & Utang dan Stok &

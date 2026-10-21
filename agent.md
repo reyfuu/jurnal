@@ -90,7 +90,7 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
     - Gunakan primitif `shadcn/ui` (Radix + Tailwind) yang diperkaya dengan komponen finansial dari `Kokonut UI` dan micro-interactions dari `21st.dev`.
     - Setiap KPI card di Dashboard wajib menampilkan:
       1. Label metrik yang jelas (`Omzet`, `Laba bersih`, `Margin laba`, `Saldo kas & bank`, `Target omzet`, `Piutang belum tertagih`).
-      2. Nilai utama singkat & mudah dibaca (`Rp92 jt`, `Rp25 jt`, `27%`, `108%`).
+      2. Nilai utama dalam rupiah penuh (`Rp92.450.000`, `Rp25.000.000`, `27%`, `108%`). Singkatan `jt` hanya untuk label sumbu grafik (keputusan pengguna 21 Oktober 2026, checklist tester #12).
       3. Badge perbandingan periode (`▲ 4% vs bulan lalu`, `+1,7 poin vs bulan lalu`) + mini sparkline / progress bar.
 15. **`agent browser`**
     - Setiap perubahan frontend wajib diverifikasi secara visual menggunakan browser agent untuk memastikan tata letak 6 KPI card atas, 3 grafik tengah, 2 kartu bawah, dan sidebar navigasi presisi di desktop & mobile.

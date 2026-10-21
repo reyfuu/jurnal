@@ -57,7 +57,6 @@ export function DailyChart({ days, target }: { days: DailyOmzet[]; target: numbe
         <rect key={i} x={b.x.toFixed(1)} y={b.y.toFixed(1)} width={b.w.toFixed(1)} height={b.h.toFixed(1)} rx="1.5" fill={b.fill} />
       ))}
       <line x1={padL} y1={c.yTarget} x2={w - padR} y2={c.yTarget} stroke="var(--text-secondary)" strokeWidth="1" strokeDasharray="3 3" />
-      <text x={w - padR - 2} y={c.yTarget - 4} textAnchor="end" fill="var(--text-secondary)" fontSize="8.5">Target Rp3 jt</text>
       {[5, 10, 15, 20, 25, 30].map((d, i) => (
         <text key={d} x={padL + 14 + i * 50 + (i > 0 ? 1 : 0)} y={h - 3} fill={AXIS} fontSize="9">{d}</text>
       ))}

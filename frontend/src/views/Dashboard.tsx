@@ -1,11 +1,15 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { CalendarDays, ChevronDown } from 'lucide-react'
 import { CashChart, DailyChart, MainChart, Sparkline } from '@/components/charts'
+import { rataHarian } from '@/lib/charts'
 import { PageHeader } from '@/components/PageHeader'
 import type { Dashboard as Data, View } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
 const Dot = ({ color }: { color: string }) => <span className="dot" style={{ background: color }} />
+
+// Angka rupiah penuh ≥ Rp1 miliar (lebih dari 13 huruf) diperkecil supaya tetap satu baris.
+const kelasAngka = (s: string) => `kpi-value tabular${s.length > 13 ? ' kpi-value-panjang' : ''}`
 
 export function Dashboard({
   d,
@@ -61,7 +65,7 @@ export function Dashboard({
           <div className="card" key={t.label}>
             <div>
               <div className="kpi-label">{t.label}</div>
-              <div className="kpi-value tabular">{t.kpi.display}</div>
+              <div className={kelasAngka(t.kpi.display)}>{t.kpi.display}</div>
               <div className="kpi-meta-row">
                 <span className={t.badge}>{t.kpi.badge_text}</span>
                 <span>{t.kpi.sub_text}</span>
@@ -74,7 +78,7 @@ export function Dashboard({
         <div className="card">
           <div>
             <div className="kpi-label">Saldo kas &amp; bank</div>
-            <div className="kpi-value tabular">{k.saldo_kas.display}</div>
+            <div className={kelasAngka(k.saldo_kas.display)}>{k.saldo_kas.display}</div>
             <div className="kpi-meta-row">
               <span className="badge-up">{k.saldo_kas.badge_text}</span>
               <div style={{ width: '100%', marginTop: 2 }}>{k.saldo_kas.sub_text}</div>
@@ -103,7 +107,7 @@ export function Dashboard({
         >
           <div>
             <div className="kpi-label">Piutang belum tertagih</div>
-            <div className="kpi-value tabular">{k.piutang.unpaid_display}</div>
+            <div className={kelasAngka(k.piutang.unpaid_display)}>{k.piutang.unpaid_display}</div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{k.piutang.invoice_count} tagihan</div>
             <div className="overdue-alert tabular">{k.piutang.overdue_30d_display}</div>
             <div className="payable-note tabular">{k.piutang.payable_unpaid_display}</div>
@@ -129,7 +133,7 @@ export function Dashboard({
           <div className="card" style={{ padding: '18px 20px' }}>
             <div>
               <div className="chart-title">Omzet harian {d.period_label}</div>
-              <div className="chart-subtitle">Rata-rata Rp3 jt per hari.</div>
+              <div className="chart-subtitle">Rata-rata {formatRp(rataHarian(d.daily_omzet))} per hari, target {formatRp(d.daily_target)}.</div>
               <div className="legend-row" style={{ marginTop: 8, marginBottom: 6 }}>
                 <span className="legend-item"><Dot color="var(--chart-1)" />Di atas target</span>
                 <span className="legend-item"><Dot color="var(--chart-1-dim)" />Di bawah target</span>

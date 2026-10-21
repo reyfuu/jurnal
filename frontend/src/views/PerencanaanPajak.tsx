@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getTaxPlanning, type BusinessProfile, type TaxPlanning } from '@/lib/api'
-import { formatJt, formatPct, formatRp } from '@/lib/format'
+import { formatPct, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 import { cekMargin } from '@/lib/kalkulator'
 
@@ -92,7 +92,7 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
             <div className="kpi-label">Skema paling hemat</div>
             <div className="kpi-value" style={{ color: 'var(--accent-green)', fontSize: 22 }}>{best.nama}</div>
             <div className="kpi-meta-row">
-              Pajak {formatRp(best.pajak)} per tahun · laba bersih {formatJt(bu.laba)} · PTKP {formatJt(bu.ptkp)}
+              Pajak {formatRp(best.pajak)} per tahun · laba bersih {formatRp(bu.laba)} · PTKP {formatRp(bu.ptkp)}
             </div>
           </div>
 

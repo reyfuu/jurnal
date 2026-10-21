@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getSalesReport, type Granularity, type SalesGroup, type SalesReport } from '@/lib/api'
 import { TREND, trendBars } from '@/lib/charts'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 
 const GRANULARITY: { value: Granularity; label: string }[] = [
   { value: 'day', label: 'Harian' },
@@ -69,10 +69,10 @@ export function LaporanPenjualan({ period, periodLabel }: { period: string; peri
   }, [period, granularity])
 
   const cards = r ? [
-    { label: 'Total Omzet Penjualan', value: formatJt(r.summary.omzet) },
+    { label: 'Total Omzet Penjualan', value: formatRp(r.summary.omzet) },
     { label: 'Jumlah Transaksi', value: r.summary.transaksi.toLocaleString('id-ID') },
     { label: 'Rata-rata per Transaksi', value: formatRp(r.summary.rata_rata) },
-    { label: 'Penjualan Belum Lunas', value: formatJt(r.summary.piutang), color: r.summary.piutang > 0 ? 'var(--text-warn)' : undefined },
+    { label: 'Penjualan Belum Lunas', value: formatRp(r.summary.piutang), color: r.summary.piutang > 0 ? 'var(--text-warn)' : undefined },
   ] : []
 
   return (

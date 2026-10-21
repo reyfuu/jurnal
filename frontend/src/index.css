@@ -508,8 +508,21 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   /* 6 KPI Grid */
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 12px;
+  }
+
+  /* Rupiah penuh (Rp172.500.000) harus muat satu baris di kartu tersempit: angka KPI ikut lebar
+     kartunya, paling besar 25px. */
+  .kpi-grid > * {
+    container-type: inline-size;
+  }
+  .kpi-grid .kpi-value {
+    font-size: clamp(14px, 11.8cqi, 25px);
+    white-space: nowrap;
+  }
+  .kpi-grid .kpi-value-panjang {
+    font-size: clamp(12px, 10.4cqi, 25px);
   }
 
   .card {
@@ -788,7 +801,7 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
 
   @media (max-width: 1150px) {
     .kpi-grid {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .charts-middle {
       grid-template-columns: 1fr;

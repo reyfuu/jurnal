@@ -46,6 +46,10 @@ export function mainChart(points: MonthPoint[]) {
   }
 }
 
+/** Rata-rata omzet per hari dari data harian grafik (dibulatkan ke rupiah). */
+export const rataHarian = (days: DailyOmzet[]) =>
+  days.length ? Math.round(days.reduce((s, d) => s + d.omzet, 0) / days.length) : 0
+
 export const DAILY = { w: 340, h: 115, padL: 24, padR: 8, padT: 10, padB: 18, max: 6_000_000 }
 
 export function dailyBars(days: DailyOmzet[], target: number) {

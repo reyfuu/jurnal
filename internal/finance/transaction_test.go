@@ -133,7 +133,7 @@ func TestApplyKPIs(t *testing.T) {
 	low := finance.ToLedger([]finance.Transaction{tx("2026-08-01", "Penjualan", 50_000_000, true)})
 	lowIS := finance.BuildIncomeStatement(low, 0, 0)
 	finance.ApplyKPIs(&snap, lowIS, finance.BuildCashFlow(low, lowIS, 80_000_000), nil, 1)
-	if snap.KPIs.Omzet.Display != "Rp50 jt" || snap.KPIs.TargetOmzet.SurplusDisplay[:6] != "Kurang" {
+	if snap.KPIs.Omzet.Display != "Rp50.000.000" || snap.KPIs.TargetOmzet.SurplusDisplay[:6] != "Kurang" {
 		t.Fatalf("low omzet KPIs: %+v", snap.KPIs)
 	}
 }

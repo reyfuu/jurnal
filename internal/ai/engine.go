@@ -85,11 +85,11 @@ func (e *Engine) answerSummary(snap finance.DashboardSnapshot, is finance.Income
 			"- **Biaya Operasional (OPEX):** Rp %s\n"+
 			"- **Laba Bersih:** %s (Net Margin: **%.1f%%**)\n\n"+
 			"**2. Posisi Likuiditas & Kas:**\n"+
-			"- **Saldo Kas Akhir:** %s (Kenaikan kas bersih: Rp %s dari saldo awal Rp 80,0 jt)\n"+
+			"- **Saldo Kas Akhir:** %s (Kenaikan kas bersih: Rp %s dari saldo awal Rp80.000.000)\n"+
 			"- **Rekonsiliasi Arus Kas:** Laba Bersih (%s) - Piutang Baru (%s) + Utang Baru (%s) = Kenaikan Kas (%s). **Status: Invarian 100%% Terpenuhi.**\n\n"+
 			"**3. Rekomendasi & Catatan Kritis Master Pajak:**\n"+
-			"- **Piutang Tertahan:** Terdapat piutang ShopeePay sebesar Rp 11,0 jt yang sudah lewat 30 hari. Segera lakukan penagihan/rekonsiliasi ke kanal pembayaran.\n"+
-			"- **Pajak UMKM PP 55/2022:** Omzet kumulatif saat ini Rp 190,0 jt masih di bawah ambang batas bebas pajak Rp 500 jt. Pajak terutang bulan ini: **Rp 0 (Nihil)**.",
+			"- **Piutang Tertahan:** Terdapat piutang ShopeePay sebesar Rp11.000.000 yang sudah lewat 30 hari. Segera lakukan penagihan/rekonsiliasi ke kanal pembayaran.\n"+
+			"- **Pajak UMKM PP 55/2022:** Omzet kumulatif saat ini Rp190.000.000 masih di bawah ambang batas bebas pajak Rp500.000.000. Pajak terutang bulan ini: **Rp 0 (Nihil)**.",
 		snap.PeriodLabel,
 		snap.KPIs.Omzet.Display,
 		snap.Tenant.TotalTransactions,
@@ -153,7 +153,7 @@ func (e *Engine) answerCashflow(snap finance.DashboardSnapshot, cf finance.CashF
 	answer := fmt.Sprintf(
 		"### Analisis Arus Kas, Likuiditas & Piutang\n\n"+
 			"**1. Posisi Kas Terkini:**\n"+
-			"- **Saldo Kas Akhir:** %s (Saldo Awal: Rp 80,0 jt)\n"+
+			"- **Saldo Kas Akhir:** %s (Saldo Awal: Rp80.000.000)\n"+
 			"- **Pertumbuhan Kas Bersih:** +Rp %s\n\n"+
 			"**2. Rekonsiliasi Laba vs Kas:**\n"+
 			"- Laba Bersih Operasional: Rp %s\n"+
