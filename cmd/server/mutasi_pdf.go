@@ -21,8 +21,9 @@ func init() { pdfapi.DisableConfigDir() }
 
 var (
 	errPDFTerkunci   = errors.New("PDF tidak bisa dibuka; berkasnya rusak atau bukan PDF biasa")
-	errPDFPerluSandi = errors.New("PDF ini dikunci kata sandi. Isi kata sandi PDF (biasanya yang diberikan bank, mis. tanggal lahir), lalu pilih berkasnya lagi")
+	errPDFPerluSandi = errors.New("PDF ini dikunci kata sandi. Isi kata sandinya (biasanya dari bank, mis. tanggal lahir), lalu tekan Buka")
 	errPDFSandiSalah = errors.New("kata sandi PDF salah. Periksa lagi kata sandi dari bank Anda")
+	errExcelTerkunci = errors.New("file Excel ini dikunci kata sandi (atau format .xls lama). Buka di Excel, simpan ulang tanpa kata sandi sebagai .xlsx, lalu unggah lagi; atau unggah PDF / CSV mutasinya dari bank")
 	errPDFGambar     = errors.New("PDF ini tidak berisi teks (hasil scan / foto), jadi belum bisa dibaca. Unduh e-statement asli dari internet banking, atau pakai mutasi .xlsx / .csv")
 )
 

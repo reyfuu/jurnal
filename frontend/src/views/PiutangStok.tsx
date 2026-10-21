@@ -9,7 +9,7 @@ import {
   STOK_TEMPLATE_URL, TAGIHAN_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
   type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
-import { formatJt, formatRp, formatTanggal } from '@/lib/format'
+import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
@@ -434,7 +434,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
       {(!mulai || tab === 'daftar') && <>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 16 }}>
         <Kpi label="Item Tercatat" value={String(data.total_item)} meta={`${tampil.length} tampil sesuai filter`} />
-        <Kpi label="Nilai Persediaan" value={formatJt(data.nilai_persediaan)} color={BLUE} meta="jumlah × harga pokok" />
+        <Kpi label="Nilai Persediaan" value={formatRp(data.nilai_persediaan)} color={BLUE} meta="jumlah × harga pokok" />
         <Kpi label="Stok Menipis" value={String(data.menipis)} color={data.menipis > 0 ? 'var(--text-warn)' : undefined} meta="sudah di bawah batas minimum" />
         <Kpi label="Stok Habis" value={String(data.habis)} color={data.habis > 0 ? RED : undefined} meta="jumlahnya nol" />
         {mulai && <Kpi label="Stok Minus" value={String(data.minus)} color={data.minus > 0 ? RED : undefined} meta="keluar lebih banyak dari yang tercatat masuk — cek pembelian/produksi" />}

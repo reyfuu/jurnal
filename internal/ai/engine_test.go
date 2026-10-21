@@ -32,6 +32,9 @@ func TestAnswer_SummarizeReport(t *testing.T) {
 	if len(resp.ActionSuggestions) == 0 {
 		t.Fatal("expected action suggestions")
 	}
+	if strings.Contains(resp.Answer, " jt") {
+		t.Fatalf("nilai uang ditulis rupiah penuh, bukan singkatan jt: %s", resp.Answer)
+	}
 }
 
 func TestAnswer_TaxPP55Rules(t *testing.T) {

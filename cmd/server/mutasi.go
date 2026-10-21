@@ -10,7 +10,6 @@ import (
 	"maps"
 	"net/http"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -41,6 +40,10 @@ func bacaTabel(nama string, data []byte, sandi string) (rows [][]string, peringa
 			return nil, nil, errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
 		}
 		return rows, peringatan, nil
+	}
+	// Excel berkata sandi bukan zip .xlsx, melainkan berkas OLE terenkripsi (sama dengan .xls lama).
+	if bytes.HasPrefix(data, []byte{0xD0, 0xCF, 0x11, 0xE0}) {
+		return nil, nil, errExcelTerkunci
 	}
 	if strings.EqualFold(filepath.Ext(nama), ".csv") || !bytes.HasPrefix(data, []byte("PK")) {
 		rows, err := bacaCSV(data)
@@ -141,7 +144,7 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		return finance.MutasiHasil{}, false
 	}
 	rows, peringatanPDF, err := bacaTabel(fh.Filename, data, r.FormValue("sandi"))
-	if err != nil && isiPDF(data) {
+	if err != nil && (isiPDF(data) || errors.Is(err, errExcelTerkunci)) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
@@ -152,14 +155,28 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
 	s.mu.RLock()
 	existing := append([]finance.Transaction(nil), s.txs...)
-	awal := ""
+	awal, ditutup := "", s.tutupBuku
 	if s.opening != nil {
 		awal = s.opening.Tanggal
 	}
 	s.mu.RUnlock()
 	h := finance.ParseMutasi(rows, tahun, existing)
-	if n := len(slices.DeleteFunc(slices.Clone(h.Rows), func(x finance.MutasiRow) bool { return x.Tanggal >= awal })); awal != "" && n > 0 {
-		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris bertanggal sebelum tanggal saldo awal (%s) dan tidak bisa dibukukan. Mundurkan tanggal saldo awal di menu Saldo Awal bila mutasi lama ini memang mau dicatat.", n, awal))
+	// Baris yang pasti ditolak saat disimpan tidak dicentang, supaya baris lainnya tetap bisa
+	// dibukukan (simpan menolak seluruh kiriman bila ada satu baris yang terkunci).
+	var nAwal, nTutup int
+	for i := range h.Rows {
+		switch r := &h.Rows[i]; {
+		case awal != "" && r.Tanggal < awal:
+			r.Pilih, nAwal = false, nAwal+1
+		case ditutup != "" && r.Tanggal[:min(7, len(r.Tanggal))] <= ditutup:
+			r.Pilih, nTutup = false, nTutup+1
+		}
+	}
+	if nAwal > 0 {
+		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris bertanggal sebelum tanggal saldo awal (%s) dan tidak dicentang. Mundurkan tanggal saldo awal di menu Saldo Awal bila mutasi lama ini memang mau dicatat.", nAwal, awal))
+	}
+	if nTutup > 0 {
+		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris jatuh di bulan yang bukunya sudah ditutup (sampai %s) dan tidak dicentang. Buka kembali bulan itu di menu Tutup Buku bila memang mau dicatat.", nTutup, finance.LabelPeriode(ditutup)))
 	}
 	if isiPDF(data) {
 		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks.

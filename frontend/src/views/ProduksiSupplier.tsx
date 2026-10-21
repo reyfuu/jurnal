@@ -7,7 +7,7 @@ import {
   type HPP, type ProdukInput, type ProdukRow, type ProduksiSummary, type ResepBahan,
   type StokRow, type SupplierInput, type SupplierRow,
 } from '@/lib/api'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 import { LaporanProduksiPanel, ProduksiDialog } from '@/views/KartuStok'
 
@@ -369,7 +369,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
         </div>
         <div className="card" style={{ padding: '14px 18px' }}>
           <div className="kpi-label">Utang ke Supplier</div>
-          <div className="kpi-value tabular" style={{ fontSize: 20, color: RED }}>{formatJt(data.utang_supplier)}</div>
+          <div className="kpi-value tabular" style={{ fontSize: 20, color: RED }}>{formatRp(data.utang_supplier)}</div>
           <div className="kpi-meta-row"><span>{data.total_supplier} supplier terdaftar</span></div>
         </div>
       </div>

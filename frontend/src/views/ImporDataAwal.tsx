@@ -4,7 +4,7 @@ import {
   getOpening, importOnboarding, ONBOARDING_TEMPLATE_URL,
   type OnboardingResult, type OpeningInfo,
 } from '@/lib/api'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 
 const RED = 'var(--text-danger)'
 
@@ -120,7 +120,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
             {preview.opening && (
               <div className="list-row">
                 <span>Saldo Awal — mulai {preview.opening.tanggal}</span>
-                <span className="tabular">Kas {formatJt(preview.opening.kas)}</span>
+                <span className="tabular">Kas {formatRp(preview.opening.kas)}</span>
               </div>
             )}
             <div className="list-row">

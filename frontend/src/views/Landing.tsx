@@ -7,7 +7,7 @@ import { SegeraHadir } from '@/components/SegeraHadir'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getPlans, type Paket } from '@/lib/api'
-import { formatRpRingkas } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 import type { AwalDaftar } from '@/views/Login'
 import './landing.css'
 
@@ -208,7 +208,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
                     {[
                       ['Juli', 'Nota WhatsApp + bank', '412.500.000', '412.500.000', ''],
                       ['Agustus', 'Marketplace + bank', '438.200.000', '438.200.000', ''],
-                      ['September', 'Marketplace + kasir', '451.000.000', '466.750.000', 'Selisih Rp15,7 jt'],
+                      ['September', 'Marketplace + kasir', '451.000.000', '466.750.000', 'Selisih Rp15.750.000'],
                       ['Oktober', 'Nota WhatsApp + bank', '429.900.000', '429.900.000', ''],
                     ].map(([masa, sumber, bulanan, buku, selisih]) => (
                       <tr key={masa} className={selisih ? 'flag' : undefined}>
@@ -343,8 +343,8 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
                     <tr key={hal}><td>{hal}</td><td className={ks}>{kv}</td><td className={ts}>{tv}</td><td className="me">{mp}</td></tr>
                   ))}
                   <tr>
-                    <td>Biaya</td><td className="m">Lisensi + waktu belajar</td><td className="x">Rp5 sampai 10 jt / bulan</td>
-                    <td className="me">Mulai {formatRpRingkas(termurah)} / bulan</td>
+                    <td>Biaya</td><td className="m">Lisensi + waktu belajar</td><td className="x">Rp5 sampai 10 juta / bulan</td>
+                    <td className="me">Mulai {formatRp(termurah)} / bulan</td>
                   </tr>
                 </tbody>
               </table>

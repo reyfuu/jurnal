@@ -98,14 +98,14 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 		um := finance.UmurSaldo(ob, s.txs, akhir, piutang)
 		lama := um.Kelompok[1].Nilai + um.Kelompok[2].Nilai + um.Kelompok[3].Nilai
 		c := cekTutup{Kode: "piutang", Judul: "Piutang lewat 30 hari ditindaklanjuti", View: "piutang-utang", Status: "ok",
-			Detail: fmt.Sprintf("Piutang belum lunas %s.", finance.FormatJt(um.Total))}
+			Detail: fmt.Sprintf("Piutang belum lunas %s.", finance.FormatRupiahPenuh(um.Total))}
 		if !piutang {
 			c = cekTutup{Kode: "utang", Judul: "Utang lewat 30 hari dibayar / dijadwalkan", View: "piutang-utang", Status: "ok",
-				Detail: fmt.Sprintf("Utang belum dibayar %s.", finance.FormatJt(um.Total))}
+				Detail: fmt.Sprintf("Utang belum dibayar %s.", finance.FormatRupiahPenuh(um.Total))}
 		}
 		if lama > 0 {
 			c.Status = "peringatan"
-			c.Detail += fmt.Sprintf(" %s sudah lebih dari 30 hari — catat pelunasannya bila sudah dibayar.", finance.FormatJt(lama))
+			c.Detail += fmt.Sprintf(" %s sudah lebih dari 30 hari — catat pelunasannya bila sudah dibayar.", finance.FormatRupiahPenuh(lama))
 		}
 		out.Cek = append(out.Cek, c)
 	}
@@ -136,10 +136,10 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 	}
 
 	out.Cek = append(out.Cek, cekTutup{Kode: "penyusutan", Judul: "Penyusutan & amortisasi dicatat", View: "laporan-keuangan", Status: "ok",
-		Detail: fmt.Sprintf("Otomatis dari register aset: %s bulan ini.", finance.FormatJt(out.Penyusutan))})
+		Detail: fmt.Sprintf("Otomatis dari register aset: %s bulan ini.", finance.FormatRupiahPenuh(out.Penyusutan))})
 
 	kasMinus := len(finance.CashWarnings(finance.ForPeriod(s.txs, period), rep.CashFlow.OpeningBalance))
-	c = cekTutup{Kode: "kas", Judul: "Saldo kas tidak pernah minus", View: "transaksi", Status: "ok", Detail: fmt.Sprintf("Kas akhir bulan %s.", finance.FormatJt(out.KasAkhir))}
+	c = cekTutup{Kode: "kas", Judul: "Saldo kas tidak pernah minus", View: "transaksi", Status: "ok", Detail: fmt.Sprintf("Kas akhir bulan %s.", finance.FormatRupiahPenuh(out.KasAkhir))}
 	if kasMinus > 0 {
 		c.Status, c.Detail = "peringatan", fmt.Sprintf("Kas sempat minus di %d hari — biasanya ada pemasukan yang belum dicatat.", kasMinus)
 	}

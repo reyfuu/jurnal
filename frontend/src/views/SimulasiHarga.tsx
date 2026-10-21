@@ -15,7 +15,7 @@ const SKENARIO: [string, Skenario][] = [
   ['Naik harga 5%', { ...NOL, harga_bps: 500 }],
   ['Naik harga 10%, pembeli turun 5%', { ...NOL, harga_bps: 1000, volume_bps: -500 }],
   ['Hemat bahan 10%', { ...NOL, modal_bps: -1000 }],
-  ['Tambah 1 karyawan (Rp3 jt)', { ...NOL, tambah_tetap: 3_000_000 }],
+  ['Tambah 1 karyawan (Rp3.000.000)', { ...NOL, tambah_tetap: 3_000_000 }],
   ['Jualan naik 20%', { ...NOL, volume_bps: 2000 }],
 ]
 // Komisi contoh; tetap bisa diubah di kolom Komisi.

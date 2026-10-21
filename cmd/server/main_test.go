@@ -28,8 +28,8 @@ func TestDashboardEndpoint(t *testing.T) {
 	if snap.Tenant.Name != "Kedai Kopi Senja" {
 		t.Fatalf("expected tenant 'Kedai Kopi Senja', got %q", snap.Tenant.Name)
 	}
-	if snap.KPIs.Omzet.Display != "Rp92 jt" {
-		t.Fatalf("expected Omzet 'Rp92 jt', got %q", snap.KPIs.Omzet.Display)
+	if snap.KPIs.Omzet.Display != "Rp92.000.000" {
+		t.Fatalf("expected Omzet 'Rp92.000.000', got %q", snap.KPIs.Omzet.Display)
 	}
 }
 

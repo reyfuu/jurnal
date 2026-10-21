@@ -100,7 +100,7 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
   const kpis = [
     { label: 'Akumulasi Omzet 2026', value: tr.total_gross, meta: <span className="badge-up">Jan – Agu 2026</span> },
     { label: 'Kuota Bebas Pajak WP OP', value: tr.yearly_exemption, meta: <span>PP 55/2022 Pasal 60</span> },
-    { label: 'Omzet Kena Pajak (Di atas Rp500 jt)', value: tr.total_taxable, color: 'var(--text-warn)', meta: <span>Mulai terlewati di bulan Juli</span> },
+    { label: 'Omzet Kena Pajak (Di atas Rp500.000.000)', value: tr.total_taxable, color: 'var(--text-warn)', meta: <span>Mulai terlewati di bulan Juli</span> },
     { label: 'Total PPh Final 0,5% Terutang', value: tr.total_tax_due, color: 'var(--accent-green)', meta: <span>Siap dilampirkan ke SPT Tahunan</span> },
   ]
   return (
@@ -109,7 +109,7 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
         title="Pajak UMKM (PP 55 Tahun 2022)"
         subtitle="Kalkulasi PPh Final 0,5% & Pemantauan Kuota Bebas Pajak Rp500 Juta/Tahun (WP Orang Pribadi)"
       >
-        <span className="pill-status pill-brand">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500 jt)</span>
+        <span className="pill-status pill-brand">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500.000.000)</span>
       </PageHeader>
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

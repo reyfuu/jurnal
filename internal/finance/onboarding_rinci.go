@@ -260,7 +260,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 			header: []string{"No", "Uraian", "Jenis", "Pihak Terkait", "Tgl Bayar / Dokumen", "Nilai Awal (Rp)", "Sudah Dibebankan / Dikreditkan (Rp)", "Sisa per Tgl Saldo Awal (Rp)", "Keterangan"},
 			total:  []string{"", "", "", "", "", "", "Total", fmt.Sprintf("=SUM(F$7:F$%d)-SUM(G$7:G$%d)", barisAkhirRumus, barisAkhirRumus)},
 			contoh: [][]string{
-				{"", "Sewa ruko Jan–Jun 2026", "Biaya Dibayar di Muka", "CV Graha Ruko", "2025-12-20", "6000000", "0", "", "Dibebankan Rp1 jt / bulan"},
+				{"", "Sewa ruko Jan–Jun 2026", "Biaya Dibayar di Muka", "CV Graha Ruko", "2025-12-20", "6000000", "0", "", "Dibebankan Rp1.000.000 / bulan"},
 				{"", "PPh 23 dipotong pelanggan (bukti potong)", "Pajak Dibayar di Muka", "PT Karya Digital Mandiri", "2025-12-10", "200000", "", "", "Dikreditkan di SPT Tahunan"},
 			},
 			lebar: []float64{5, 34, 22, 24, 14, 16, 20, 18, 30}, angka: []int{5, 6, 7}, tanggal: []int{4},

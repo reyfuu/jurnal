@@ -1,18 +1,5 @@
 export const formatRp = (n: number) => (n < 0 ? '-' : '') + 'Rp' + Math.abs(n).toLocaleString('id-ID')
 
-/** Harga paket ringkas: 199000 → "Rp199 rb", 1990000 → "Rp1,99 jt", 5000000 → "Rp5 jt". */
-export function formatRpRingkas(n: number) {
-  if (n < 1_000_000) return `Rp${Math.round(n / 1000)} rb`
-  return `Rp${String(Math.round(n / 10_000) / 100).replace('.', ',')} jt`
-}
-
-export function formatJt(rp: number) {
-  const jt = rp / 1_000_000
-  return 'Rp' + (Number.isInteger(jt) ? jt : jt.toFixed(1).replace('.', ',')) + ' jt'
-}
-
-export const formatSignedJt = (rp: number) => (rp >= 0 ? '+' : '-') + formatJt(Math.abs(rp))
-
 /** Rupiah penuh bertanda: +Rp1.250.000 / -Rp500.000 (laporan keuangan tidak dibulatkan ke juta). */
 export const formatSignedRp = (rp: number) => (rp >= 0 ? '+' : '-') + formatRp(Math.abs(rp))
 

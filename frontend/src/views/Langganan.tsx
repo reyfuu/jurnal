@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { GARANSI_BELUM_BAYAR, checkout, getBilling, klaimGaransi, refreshBilling, type Billing, type GaransiStatus, type LanggananStatus } from '@/lib/api'
-import { formatRp, formatRpRingkas } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 import { PaketHarga } from '@/components/PaketHarga'
 
 declare global {
@@ -148,7 +148,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
       {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Master Pajak untuk aktivasi.</p>}
       <div style={{ maxWidth: 1000 }}>
         <PaketHarga paket={b.paket} pilihan={pilihan} disabled={!b.aktif} busy={busy}
-          label={(p) => `Bayar ${formatRpRingkas(p.harga)}`} onPilih={(p) => void bayar(p.id)} />
+          label={(p) => `Bayar ${formatRp(p.harga)}`} onPilih={(p) => void bayar(p.id)} />
       </div>
       <p className="mt-3 text-xs text-muted-foreground" style={{ maxWidth: 880 }}>{SYARAT_GARANSI} Fitur bertanda segera hadir belum bisa dipakai; semua paket saat ini membuka seluruh aplikasi.</p>
       {info && <p className="mt-4 text-sm" style={{ color: 'var(--accent-green)' }} role="status">{info}</p>}

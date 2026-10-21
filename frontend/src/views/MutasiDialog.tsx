@@ -47,7 +47,9 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   // Kata sandi PDF e-statement: hanya di memori dialog ini, dikosongkan saat dialog ditutup.
   const [sandi, setSandi] = useState('')
   const pdf = berkas?.name.toLowerCase().endsWith('.pdf') ?? false
-  const perluSandi = /kata sandi/i.test(error)
+  const perluSandi = pdf && /kata sandi/i.test(error)
+  // PDF terkunci & sandi belum diisi: ajakan mengisi sandi, bukan galat.
+  const mintaSandi = pdf && /dikunci kata sandi/i.test(error)
 
   function reset(next: boolean) {
     if (!next) {
@@ -134,7 +136,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 hanya untuk tanggal tanpa tahun (mis. 15/01). Mutasi Des–Jan: isi tahun Januari-nya.
               </span>
             </label>
-            {(pdf || perluSandi) && (
+            {pdf && (
               <form className="grid gap-1" style={{ width: 220 }} onSubmit={(e) => { e.preventDefault(); if (berkas) void pilihBerkas(berkas) }}>
                 <label className="kpi-label" htmlFor="mutasi-sandi">Kata sandi PDF (bila dikunci)</label>
                 <div className="flex gap-1.5">
@@ -151,7 +153,9 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
           </div>
 
           {busy && !hasil && <p className="text-sm text-muted-foreground">Membaca mutasi…</p>}
-          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          {error && (mintaSandi
+            ? <div className="note-box" role="status">{error}</div>
+            : <p className="text-sm text-destructive" role="alert">{error}</p>)}
 
           {hasil && (
             <>

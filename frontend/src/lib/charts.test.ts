@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cashChart, dailyBars, mainChart, sparklinePoints, trendBars } from './charts'
+import { cashChart, dailyBars, mainChart, rataHarian, sparklinePoints, trendBars } from './charts'
 
 describe('sparklinePoints', () => {
   it('memetakan min ke bawah dan max ke atas dengan padding 4px', () => {
@@ -53,5 +53,12 @@ describe('trendBars', () => {
   it('aman untuk data kosong / nol', () => {
     expect(trendBars([])).toEqual([])
     expect(trendBars([0])[0].h).toBe(0)
+  })
+})
+
+describe('rataHarian', () => {
+  it('rata-rata omzet harian, kosong = 0', () => {
+    expect(rataHarian([{ day: 1, omzet: 2_000_000, above_target: false }, { day: 2, omzet: 4_500_001, above_target: true }])).toBe(3_250_001)
+    expect(rataHarian([])).toBe(0)
   })
 })

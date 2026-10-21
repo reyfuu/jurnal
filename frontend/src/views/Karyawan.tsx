@@ -4,7 +4,7 @@ import {
   createKaryawan, deleteKaryawan, getKaryawan, updateKaryawan,
   type Karyawan, type KaryawanInput, type KaryawanSummary,
 } from '@/lib/api'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
@@ -88,7 +88,7 @@ export function KaryawanView() {
         </div>
         <div className="card">
           <div className="kpi-label">Beban Gaji per Bulan</div>
-          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatJt(data.beban_gaji_bulanan)}</div>
+          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatRp(data.beban_gaji_bulanan)}</div>
           <div className="kpi-meta-row"><span>gaji pokok + tunjangan, karyawan aktif</span></div>
         </div>
       </div>

@@ -15,7 +15,7 @@ Desain **Master Pajak** memakai permukaan terang dan netral dengan biru DJP seba
 3. *"Siapa yang belum bayar tagihan dan apa yang harus segera ditagih?"* → Dijawab oleh kartu **Piutang belum tertagih (`Rp11 jt`)** dengan highlight merah menyala **`Rp9,6 jt lewat 30 hari`**.
 
 ### 1.2 Prinsip Utama (`Taste` & `Impeccable`)
-- **Glanceable Indonesian Currency Formatting**: Angka utama menggunakan format ringkas berbahasa Indonesia (`Rp92 jt`, `Rp25 jt`, `Rp6,8 jt`) agar tidak memenuhi kartu dengan deretan nol (`Rp92.000.000,00`), namun tetap presisi.
+- **Rupiah penuh**: Semua nilai uang ditulis lengkap dengan titik ribuan (`Rp92.450.000`), tanpa desimal sen. Singkatan `jt` hanya untuk label sumbu grafik. Keputusan pengguna 21 Oktober 2026 (checklist tester #12) menggantikan format ringkas `Rp92 jt`; contoh `jt` di bagian lain dokumen ini berasal dari mockup lama.
 - **Educational Micro-Copy**: Setiap metrik berisiko salah paham disertai penjelasan singkat langsung di dalam kartu (contoh: *"Kas bisa turun walau laba positif: cek halaman Arus Kas."*).
 - **Color-Coded Financial Semantics**: Warna tidak pernah dipakai sebagai dekorasi kosong; setiap warna mewakili satu konsep finansial yang konsisten di seluruh layar.
 

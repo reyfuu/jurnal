@@ -3,7 +3,7 @@ import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SegeraHadir } from '@/components/SegeraHadir'
 import type { Paket } from '@/lib/api'
-import { formatRpRingkas } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 
 type Periode = 'bulanan' | 'tahunan'
 
@@ -53,8 +53,8 @@ export function PaketHarga({ paket, onPilih, label, busy, disabled, pilihan }: {
           if (!p) return null
           const lain = cari(t.id, periode === 'bulanan' ? 'tahunan' : 'bulanan')
           const alt = periode === 'bulanan'
-            ? lain && `atau ${formatRpRingkas(lain.harga)} per tahun`
-            : `setara ${formatRpRingkas(Math.round(p.harga / 12_000) * 1000)} per bulan`
+            ? lain && `atau ${formatRp(lain.harga)} per tahun`
+            : `setara ${formatRp(Math.round(p.harga / 12_000) * 1000)} per bulan`
           return (
             <article key={t.id}
               className={`relative flex flex-col gap-3.5 rounded-[18px] bg-[var(--bg-card)] p-[26px] ${t.populer ? 'border-2 border-[var(--ink)] shadow-[var(--shadow-3)]' : 'border border-[var(--border-subtle)]'} ${pilihan === p.id ? 'ring-2 ring-[var(--yellow-500)] ring-offset-2 ring-offset-[var(--bg-card)]' : ''}`}>
@@ -63,10 +63,10 @@ export function PaketHarga({ paket, onPilih, label, busy, disabled, pilihan }: {
               )}
               <h3 className="font-heading text-[19px] font-semibold">{t.nama}</h3>
               {p.harga_normal ? (
-                <div className="text-base font-medium text-[var(--text-secondary)] line-through decoration-[var(--error)] decoration-2">{formatRpRingkas(p.harga_normal)}</div>
+                <div className="text-base font-medium text-[var(--text-secondary)] line-through decoration-[var(--error)] decoration-2">{formatRp(p.harga_normal)}</div>
               ) : null}
               <div className="font-heading text-4xl font-bold leading-none text-[var(--text-brand)] tabular">
-                {formatRpRingkas(p.harga)} <small className="font-sans text-sm font-medium text-[var(--text-secondary)]">/ {periode === 'bulanan' ? 'bulan' : 'tahun'}</small>
+                {formatRp(p.harga)} <small className="font-sans text-sm font-medium text-[var(--text-secondary)]">/ {periode === 'bulanan' ? 'bulan' : 'tahun'}</small>
               </div>
               <p className="-mt-1.5 min-h-[1.4em] text-[13px] text-[var(--text-muted)]">{alt}</p>
               <ul className="grid gap-2.5 border-t border-[var(--border-subtle)] pt-3.5 text-[15px]">

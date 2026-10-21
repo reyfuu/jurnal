@@ -267,12 +267,12 @@ func (s TagihanSummary) ToPiutangCard() PiutangCard {
 	}
 	return PiutangCard{
 		UnpaidTotal:          s.TotalPiutang,
-		UnpaidDisplay:        FormatJt(s.TotalPiutang),
+		UnpaidDisplay:        FormatRupiahPenuh(s.TotalPiutang),
 		InvoiceCount:         jumlah,
 		Overdue30dTotal:      s.PiutangTerlambat,
-		Overdue30dDisplay:    fmt.Sprintf("%s lewat jatuh tempo", FormatJt(s.PiutangTerlambat)),
+		Overdue30dDisplay:    fmt.Sprintf("%s lewat jatuh tempo", FormatRupiahPenuh(s.PiutangTerlambat)),
 		PayableUnpaidTotal:   s.TotalUtang,
-		PayableUnpaidDisplay: fmt.Sprintf("Utang supplier %s", FormatJt(s.TotalUtang)),
+		PayableUnpaidDisplay: fmt.Sprintf("Utang supplier %s", FormatRupiahPenuh(s.TotalUtang)),
 	}
 }
 
