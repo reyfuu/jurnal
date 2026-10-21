@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { MenuImportDialog } from '@/views/MenuImportDialog'
 import {
-  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, invoicePdfUrl, updateInvoice,
+  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
   type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow,
 } from '@/lib/api'
 import { ekspor } from '@/lib/garansi'
@@ -56,6 +57,7 @@ export function InvoiceView() {
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [impor, setImpor] = useState(false)
 
   const muat = () => getInvoices().then(setInfo, (e) => setError((e as Error).message))
   useEffect(() => { void muat() }, [])
@@ -121,11 +123,38 @@ export function InvoiceView() {
 
   return (
     <>
-      <PageHeader title="Invoice" subtitle="Terbitkan faktur penjualan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan & piutang.">
+      <PageHeader title="Invoice" subtitle="Terbitkan tagihan ke pelanggan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan dan muncul di Piutang & Utang untuk dipantau & ditagih.">
+        <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={() => setImpor(true)}>
+          Impor Excel
+        </button>
         <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => buka()}>
           + Buat Invoice
         </button>
       </PageHeader>
+
+      <MenuImportDialog
+        open={impor} onOpenChange={setImpor} onImported={() => void muat()}
+        title="Impor invoice dari Excel"
+        description="Satu baris per item; baris bernomor sama jadi satu invoice. Status kosong = Terkirim (langsung masuk penjualan & piutang). Nomor yang sudah ada dan bulan yang sudah tutup buku dilewati."
+        templateUrl={INVOICE_TEMPLATE_URL} templateName="template-invoice.xlsx"
+        existing={0} satuan="invoice"
+        doImport={(f, commit) => importInvoice(f, commit)}
+        renderPreview={(r) => (
+          <table className="data-table tabular" style={{ marginTop: 0 }}>
+            <thead><tr><th>Nomor</th><th>Tanggal</th><th>Pelanggan</th><th>Status</th><th style={{ textAlign: 'right' }}>Item</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+            <tbody>
+              {(r.invoice ?? []).slice(0, 10).map((x, i) => (
+                <tr key={i}>
+                  <td>{x.nomor}</td><td>{x.tanggal}</td><td>{x.pelanggan_nama}</td>
+                  <td>{STATUS_LABEL[x.status] ?? x.status}</td>
+                  <td style={{ textAlign: 'right' }}>{x.items.length}</td>
+                  <td style={{ textAlign: 'right' }}>{formatRp(hitung(x).total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      />
 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
 

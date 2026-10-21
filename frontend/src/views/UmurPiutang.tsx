@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getInvoices, getUmurSaldo, lunasiTransaksi, pelunasanSaldoAwal, type InvoiceRow, type UmurSaldo, type View } from '@/lib/api'
+import { getInvoices, getTagihan, getUmurSaldo, lunasiTransaksi, pelunasanSaldoAwal, type InvoiceRow, type UmurSaldo, type View } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { PiutangUtang } from '@/views/PiutangStok'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -27,6 +27,9 @@ export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boole
   useEffect(() => {
     getInvoices().then((i) => setInvoiceLuar((i.summary.invoices ?? []).filter((r) => r.status === 'draft' || (!r.dibukukan && r.status !== 'lunas'))), () => {})
   }, [muatUlang])
+  // Tab tagihan manual (lama) hanya untuk usaha yang masih punya datanya.
+  const [adaManual, setAdaManual] = useState(false)
+  useEffect(() => { getTagihan().then((t) => setAdaManual((t.items ?? []).length > 0), () => {}) }, [])
   const [hasil, setHasil] = useState<{ kunci: string; d?: UmurSaldo; error?: string } | null>(null)
   const [lunasi, setLunasi] = useState<UmurSaldo['baris'][number] | null>(null)
   const kunci = `${jenis}|${per}|${muatUlang}`
@@ -41,8 +44,10 @@ export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boole
   return (
     <>
       {tab !== 'manual' && <PageHeader title="Piutang & Utang"
-        subtitle={jenis === 'piutang' ? 'Tagihan ke pelanggan yang belum dibayar (dari transaksi belum lunas), dikelompokkan menurut lamanya. Tagih yang paling lama dulu.'
-          : 'Kewajiban ke supplier yang belum dibayar (dari transaksi belum lunas), dikelompokkan menurut lamanya.'} />}
+        subtitle={jenis === 'piutang' ? 'Pantau & tagih: piutang pelanggan dari invoice terkirim dan penjualan belum lunas, dikelompokkan menurut lamanya. Tagih yang paling lama dulu.'
+          : 'Pantau & bayar: utang ke supplier dari pembelian belum lunas, dikelompokkan menurut lamanya.'}>
+        {tab === 'piutang' && navigate && <Button onClick={() => navigate('invoice')}>+ Buat Invoice</Button>}
+      </PageHeader>}
       {tab === 'piutang' && invoiceLuar.length > 0 && (
         <div className="note-box warn" style={{ marginTop: 0, marginBottom: 12 }}>
           Belum termasuk di sini: {invoiceLuar.map((r) => `${r.nomor} (${r.status === 'draft' ? 'masih draft' : 'belum dibukukan'})`).join(', ')}.
@@ -54,14 +59,14 @@ export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boole
         <div className="tabbar" role="tablist" aria-label="Jenis">
           <button role="tab" className="tab-btn" aria-selected={tab === 'piutang'} onClick={() => setTab('piutang')}>Piutang (pelanggan)</button>
           <button role="tab" className="tab-btn" aria-selected={tab === 'utang'} onClick={() => setTab('utang')}>Utang (supplier)</button>
-          <button role="tab" className="tab-btn" aria-selected={tab === 'manual'} onClick={() => setTab('manual')}>Tagihan manual (lama)</button>
+          {adaManual && <button role="tab" className="tab-btn" aria-selected={tab === 'manual'} onClick={() => setTab('manual')}>Tagihan manual (lama)</button>}
         </div>
         {tab !== 'manual' && <div className="grid gap-1" style={{ marginLeft: 'auto' }}>
           <Label htmlFor="umur-per" className="text-xs">Per tanggal</Label>
           <Input id="umur-per" type="date" value={per} onChange={(e) => e.target.value && setPer(e.target.value)} />
         </div>}
       </div>
-      {tab === 'manual' && <PiutangUtang manual />}
+      {tab === 'manual' && <PiutangUtang />}
       {hasil?.error && <div className="pill-status pill-red" role="alert">{hasil.error}</div>}
 
       {d && tab !== 'manual' && <>
@@ -94,7 +99,7 @@ export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boole
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatRp(p.total)}</td>
                   </tr>
                 ))}
-                {d.pihak.length === 0 && <tr><td colSpan={6} className="text-center text-muted-foreground" style={{ padding: 20 }}>Tidak ada {kata} yang belum lunas. 🎉</td></tr>}
+                {d.pihak.length === 0 && <tr><td colSpan={6} className="text-center text-muted-foreground" style={{ padding: 20 }}>Tidak ada {kata} yang belum lunas.</td></tr>}
               </tbody>
             </table>
           </div>

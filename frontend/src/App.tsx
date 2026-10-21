@@ -34,6 +34,7 @@ import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
 import { BukuBesar } from '@/views/BukuBesar'
+import { JurnalUmum } from '@/views/JurnalUmum'
 import { LaporanTransaksi } from '@/views/LaporanTransaksi'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
@@ -376,6 +377,8 @@ export default function App() {
         return <LaporanTransaksi period={period} bisaEkspor={!me!.lihat} />
       case 'buku-besar':
         return <BukuBesar period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
+      case 'jurnal-umum':
+        return <JurnalUmum period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
       case 'saldo-awal':
         return <SaldoAwal onChanged={() => reload(me!, period)} navigate={navigate} bisaUbah={!me!.lihat} />
       case 'impor-data':

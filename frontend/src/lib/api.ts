@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'laporan-transaksi'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'jurnal-umum' | 'laporan-transaksi'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -1034,6 +1034,19 @@ const qBukuBesar = (f: FilterBukuBesar) => new URLSearchParams({ dari: f.dari, s
 export const getBukuBesar = (f: FilterBukuBesar) => api<BukuBesar>(`/reports/buku-besar?${qBukuBesar(f)}`)
 export const bukuBesarXlsxUrl = (f: FilterBukuBesar) => `/api/v1/reports/buku-besar.xlsx?${qBukuBesar(f)}`
 
+export interface BarisJurnalUmum { kode: string; nama: string; debit: number; kredit: number }
+/** bukti: SA saldo awal, TRX-id transaksi, BYR-id pelunasan, JU-yyyymm-n entri sistem (penyusutan, penyesuaian). */
+export interface EntriJurnalUmum { bukti: string; tanggal: string; tx_id?: number; keterangan: string; baris: BarisJurnalUmum[]; debit: number; kredit: number }
+export interface JurnalUmum {
+  supported: boolean; period_label: string; dari: string; sampai: string
+  entri: EntriJurnalUmum[]; total_debit: number; total_kredit: number; seimbang: boolean
+  pilihan: { kode: string; nama: string }[]
+}
+export interface FilterJurnalUmum { dari: string; sampai: string; akun?: string; q?: string }
+const qJurnal = (f: FilterJurnalUmum) => new URLSearchParams({ dari: f.dari, sampai: f.sampai, ...(f.akun ? { akun: f.akun } : {}), ...(f.q ? { q: f.q } : {}) }).toString()
+export const getJurnalUmum = (f: FilterJurnalUmum) => api<JurnalUmum>(`/reports/jurnal?${qJurnal(f)}`)
+export const jurnalUmumXlsxUrl = (f: FilterJurnalUmum) => `/api/v1/reports/jurnal.xlsx?${qJurnal(f)}`
+
 export interface FilterTransaksi { dari: string; sampai: string; jenis?: string; arah?: string; status?: string; channel?: string; cari?: string }
 export interface LaporanTransaksi {
   dari: string; sampai: string; transaksi: Tx[]; jumlah: number
@@ -1155,7 +1168,6 @@ export const mutasiStokXlsxUrl = (dari: string, sampai: string) => `/api/v1/stok
 export const getPilihanBarang = () => api<{ mulai: string; barang: PilihanBarang[] }>('/stok/pilihan')
 
 export const getTagihan = () => api<TagihanSummary>('/tagihan')
-export const createTagihan = (t: TagihanInput) => api<Tagihan>('/tagihan', { method: 'POST', body: t })
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
 export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
 
@@ -1164,8 +1176,8 @@ export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'PO
 export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
 export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })
 
-export const TAGIHAN_TEMPLATE_URL = '/api/v1/tagihan/template'
 export const STOK_TEMPLATE_URL = '/api/v1/stok/template'
+export const INVOICE_TEMPLATE_URL = '/api/v1/invoice/template'
 
 /** 'tambah' menambah ke daftar; 'ganti' mengosongkan daftar lama lebih dulu. */
 export type ImportMode = 'tambah' | 'ganti'
@@ -1180,6 +1192,7 @@ export interface MenuImportResult {
   diganti: number
   tagihan?: Tagihan[] | null
   stok?: StokItem[] | null
+  invoice?: Invoice[] | null
 }
 
 /** commit=false hanya pratinjau (tidak menyimpan apa pun). */
@@ -1192,8 +1205,9 @@ async function importMenu(path: string, file: File, commit: boolean, mode: Impor
   return res.json()
 }
 
-export const importTagihan = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/tagihan', f, commit, mode)
 export const importStok = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/stok', f, commit, mode)
+/** Invoice selalu ditambahkan (tidak ada mode ganti: invoice lama sudah dibukukan). */
+export const importInvoice = (f: File, commit: boolean) => importMenu('/invoice', f, commit, 'tambah')
 
 // --- Impor mutasi bank: tebak jenis transaksi, periksa, baru simpan ---
 

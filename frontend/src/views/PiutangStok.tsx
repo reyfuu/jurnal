@@ -5,8 +5,8 @@ import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MulaiKartuDialog, MutasiStokPanel, OpnameDialog, RiwayatGerakPanel } from '@/views/KartuStok'
 import { formatQty } from '@/lib/qty'
 import {
-  createStok, createTagihan, deleteStok, deleteTagihan, importStok, importTagihan,
-  STOK_TEMPLATE_URL, TAGIHAN_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
+  createStok, deleteStok, deleteTagihan, importStok,
+  STOK_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
   type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -61,17 +61,15 @@ function Kpi({ label, value, color, meta }: { label: string; value: string; colo
 
 // --- Piutang & Utang ---
 
-const TAGIHAN_KOSONG: TagihanInput = {
-  nomor: '', pihak: '', jenis: 'RECEIVABLE', jatuh_tempo: '', nominal: 0, lunas: false, keterangan: '',
-}
-
-/** Daftar tagihan yang diketik manual (versi lama). Tidak masuk laporan keuangan — laporan
- *  memakai transaksi yang belum lunas (tab Piutang & Utang). */
-export function PiutangUtang({ manual = false }: { manual?: boolean }) {
+/**
+ * Tagihan manual (lama): daftar yang dulu diketik terpisah dan tidak masuk pembukuan. Tidak bisa
+ * ditambah lagi — tagihan baru diterbitkan lewat Invoice atau dicatat sebagai transaksi belum
+ * lunas — tetapi yang lama masih bisa diubah, ditandai lunas, atau dihapus.
+ */
+export function PiutangUtang() {
   const [data, setData] = useState<TagihanSummary | null>(null)
   const [form, setForm] = useState<TagihanInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
-  const [impor, setImpor] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [cari, setCari] = useState('')
@@ -83,10 +81,10 @@ export function PiutangUtang({ manual = false }: { manual?: boolean }) {
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
-    if (!form) return
+    if (!form || editId === null) return
     setBusy(true)
     try {
-      await (editId === null ? createTagihan(form) : updateTagihan(editId, form))
+      await updateTagihan(editId, form)
       setForm(null)
       setEditId(null)
       muat()
@@ -132,25 +130,11 @@ export function PiutangUtang({ manual = false }: { manual?: boolean }) {
 
   return (
     <>
-      {manual && (
-        <div className="note-box warn" style={{ marginBottom: 12 }}>
-          Daftar ini diketik terpisah dan <strong>tidak masuk laporan keuangan</strong>. Supaya tercatat di Neraca & arus kas, catat penjualan/pembelian
-          sebagai transaksi dengan status <em>belum lunas</em>, lalu catat pelunasannya di tab Piutang / Utang.
-        </div>
-      )}
-      <PageHeader title={manual ? 'Tagihan manual' : 'Piutang & Utang'} subtitle="Pantau tagihan pelanggan dan kewajiban ke supplier supaya arus kas tidak macet.">
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
-            <Upload size={15} aria-hidden /> Impor Excel
-          </button>
-          <button
-            className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }}
-            onClick={() => { setError(''); setEditId(null); setForm({ ...TAGIHAN_KOSONG }) }}
-          >
-            + Tambah Tagihan
-          </button>
-        </div>
-      </PageHeader>
+      <div className="note-box warn" style={{ marginBottom: 12 }}>
+        Daftar lama ini diketik terpisah dan <strong>tidak masuk laporan keuangan</strong>. Tagihan baru: terbitkan lewat menu <strong>Invoice</strong> (piutang)
+        atau catat pembelian <em>belum lunas</em> di Transaksi (utang). Yang di sini tinggal ditandai lunas atau dihapus setelah dicatat ulang.
+      </div>
+      <PageHeader title="Tagihan manual (lama)" subtitle="Hanya baca, ubah, dan hapus; tidak bisa ditambah lagi." />
 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
 
@@ -246,7 +230,7 @@ export function PiutangUtang({ manual = false }: { manual?: boolean }) {
               {tampil.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ color: 'var(--text-muted)' }}>
-                    {list.length === 0 ? 'Belum ada tagihan tercatat. Tambah satu per satu atau impor dari Excel.' : 'Tidak ada tagihan yang cocok dengan filter.'}
+                    {list.length === 0 ? 'Tidak ada tagihan manual.' : 'Tidak ada tagihan yang cocok dengan filter.'}
                   </td>
                 </tr>
               )}
@@ -270,31 +254,6 @@ export function PiutangUtang({ manual = false }: { manual?: boolean }) {
         </div>
       </div>
 
-      <MenuImportDialog
-        open={impor} onOpenChange={setImpor} onImported={muat}
-        title="Impor piutang & utang dari Excel"
-        description="Wajib: Pelanggan/Supplier, Jatuh Tempo, Nominal. Kolom Jenis menentukan arah tagihan — periksa pengelompokannya di pratinjau sebelum diimpor."
-        templateUrl={TAGIHAN_TEMPLATE_URL} templateName="template-piutang-utang.xlsx"
-        existing={list.length} satuan="tagihan"
-        doImport={importTagihan}
-        renderPreview={(r) => (
-          <table className="data-table tabular" style={{ marginTop: 0 }}>
-            <thead><tr><th>Jenis</th><th>No.</th><th>Pihak</th><th>Jatuh Tempo</th><th style={{ textAlign: 'right' }}>Nominal</th></tr></thead>
-            <tbody>
-              {(r.tagihan ?? []).slice(0, 8).map((t, i) => (
-                <tr key={i}>
-                  <td style={{ color: t.jenis === 'RECEIVABLE' ? GREEN : RED, fontWeight: 600 }}>{t.jenis === 'RECEIVABLE' ? 'Piutang' : 'Utang'}</td>
-                  <td>{t.nomor || '—'}</td><td>{t.pihak}</td><td>{t.jatuh_tempo}</td>
-                  <td style={{ textAlign: 'right' }}>{formatRp(t.nominal)}</td>
-                </tr>
-              ))}
-              {(r.tagihan ?? []).length > 8 && (
-                <tr><td colSpan={5} style={{ color: 'var(--text-muted)' }}>…dan {(r.tagihan ?? []).length - 8} baris lainnya</td></tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      />
     </>
   )
 }

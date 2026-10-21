@@ -359,6 +359,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/transaksi", s.guard("laporan-transaksi", s.on((*tenant).handleLaporanTransaksi)))
 	s.mux.HandleFunc("GET /api/v1/reports/transaksi.xlsx", s.guard("laporan-transaksi", s.exporting(s.on((*tenant).handleLaporanTransaksiXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/buku-besar.xlsx", s.guard("buku-besar", s.exporting(s.on((*tenant).handleBukuBesarXlsx))))
+	s.mux.HandleFunc("GET /api/v1/reports/jurnal", s.guard("jurnal-umum", s.on((*tenant).handleJurnalUmum)))
+	s.mux.HandleFunc("GET /api/v1/reports/jurnal.xlsx", s.guard("jurnal-umum", s.exporting(s.on((*tenant).handleJurnalUmumXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("GET /api/v1/reports/pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleLaporanPDF))))
@@ -392,9 +394,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleDeleteKaryawan))))
 
 	s.mux.HandleFunc("GET /api/v1/tagihan", s.guard("piutang-utang", s.on((*tenant).handleListTagihan)))
-	s.mux.HandleFunc("POST /api/v1/tagihan", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleCreateTagihan))))
-	s.mux.HandleFunc("GET /api/v1/tagihan/template", s.guard("piutang-utang", s.handleTagihanTemplate))
-	s.mux.HandleFunc("POST /api/v1/tagihan/import", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleImportTagihan))))
+	// Tagihan manual (di luar pembukuan) hanya dibaca, diubah, dihapus: tagihan baru diterbitkan
+	// lewat menu Invoice atau dicatat sebagai transaksi belum lunas.
 	s.mux.HandleFunc("PUT /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleUpdateTagihan))))
 	s.mux.HandleFunc("DELETE /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleDeleteTagihan))))
 
@@ -416,6 +417,8 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/invoice", s.guard("invoice", s.on((*tenant).handleListInvoice)))
 	s.mux.HandleFunc("POST /api/v1/invoice", s.persisting(s.guard("invoice", s.on((*tenant).handleCreateInvoice))))
+	s.mux.HandleFunc("GET /api/v1/invoice/template", s.guard("invoice", s.handleInvoiceTemplate))
+	s.mux.HandleFunc("POST /api/v1/invoice/import", s.persisting(s.guard("invoice", s.on((*tenant).handleImportInvoice))))
 	s.mux.HandleFunc("POST /api/v1/invoice/bukukan", s.persisting(s.guard("invoice", s.on((*tenant).handleBukukanInvoice))))
 	s.mux.HandleFunc("PUT /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdateInvoice))))
 	s.mux.HandleFunc("DELETE /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeleteInvoice))))
