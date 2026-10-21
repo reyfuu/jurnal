@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { FileDown } from 'lucide-react'
+import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
 import { Aset } from '@/views/Aset'
 import { LaporanAI } from '@/views/LaporanAI'
 import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
-import { laporanPdfUrl, type AssetSummary, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
+import { daftarUrl, laporanPdfUrl, type AssetSummary, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
 
 const RED = 'var(--text-danger)'
@@ -74,6 +74,14 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
           </Button>
         )}
       </PageHeader>
+
+      {bisaEkspor && tab !== 'banding' && (
+        <div className="flex flex-wrap items-center justify-end gap-2" style={{ marginBottom: 10 }}>
+          <span className="text-sm text-muted-foreground">Daftar piutang, utang, invoice, barang, pelanggan &amp; pemasok {periodLabel}:</span>
+          <Button size="sm" variant="outline" onClick={() => void ekspor(daftarUrl(period, 'xlsx'))}><FileSpreadsheet /> Unduh Excel</Button>
+          <Button size="sm" variant="outline" onClick={() => void ekspor(daftarUrl(period, 'pdf'))}><FileDown /> Unduh PDF</Button>
+        </div>
+      )}
 
       <div className="tabbar" role="tablist" aria-label="Bagian laporan keuangan">
         {TABS.map((t) => (

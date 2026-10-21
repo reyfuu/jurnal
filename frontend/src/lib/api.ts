@@ -1786,6 +1786,8 @@ export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>
 // --- Ekspor PDF & perbandingan multi-bulan Laporan Keuangan ---
 
 export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
+/** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
+export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
 export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung') =>
   `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}`
 export interface BarisBanding {
