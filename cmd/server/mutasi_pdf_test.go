@@ -203,3 +203,17 @@ func TestMutasi_PDFBerkataSandiLewatAPI(t *testing.T) {
 		t.Fatalf("dengan sandi: %d %+v", rec.Code, h)
 	}
 }
+
+// Unduhan internet banking yang diawali sampah HTML ("<br><br>") dan terpotong di ujung
+// sepanjang sampah itu (startxref & %%EOF hilang) tetap terbaca.
+func TestBarisPDF_SampahDiDepanDanTerpotong(t *testing.T) {
+	asli := rekeningKoranPDF(t)
+	rusak := append([]byte("<br><br>"), asli[:len(asli)-8]...)
+	baris, err := barisPDF(rusak, "")
+	if err != nil || !slices.Contains(baris, "02/09 TRSF E-BANKING CR BUDI 1,500,000.00 11,500,000.00") {
+		t.Fatalf("%v %q", err, baris)
+	}
+	if !isiPDF(rusak) {
+		t.Error("berkas berawalan sampah tetap harus dikenali sebagai PDF")
+	}
+}

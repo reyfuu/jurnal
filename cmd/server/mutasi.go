@@ -28,32 +28,35 @@ import (
 // seluruh gunanya langkah pratinjau justru supaya tebakan itu bisa diperbaiki.
 
 // bacaTabel membaca .xlsx, .csv, maupun PDF e-statement jadi baris-baris sel.
-func bacaTabel(nama string, data []byte, sandi string) ([][]string, error) {
-	if bytes.HasPrefix(data, []byte("%PDF")) {
+//
+// peringatan: hasil pemeriksaan saldo berjalan untuk PDF (tabel Excel/CSV dibaca apa adanya).
+func bacaTabel(nama string, data []byte, sandi string) (rows [][]string, peringatan []string, err error) {
+	if isiPDF(data) {
 		baris, err := barisPDF(data, sandi)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		rows := finance.MutasiDariTeks(baris)
+		rows, peringatan := finance.MutasiDariTeksCek(baris)
 		if rows == nil {
-			return nil, errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
+			return nil, nil, errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
 		}
-		return rows, nil
+		return rows, peringatan, nil
 	}
 	if strings.EqualFold(filepath.Ext(nama), ".csv") || !bytes.HasPrefix(data, []byte("PK")) {
-		return bacaCSV(data)
+		rows, err := bacaCSV(data)
+		return rows, nil, err
 	}
 	sheets, err := xlsx.ReadAll(data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Mutasi bank selalu satu sheet; kalau lebih, yang pertama berisi yang dipakai.
 	for _, sh := range sheets {
 		if len(sh.Rows) > 0 {
-			return sh.Rows, nil
+			return sh.Rows, nil, nil
 		}
 	}
-	return nil, errors.New("berkas .xlsx tidak berisi baris apa pun")
+	return nil, nil, errors.New("berkas .xlsx tidak berisi baris apa pun")
 }
 
 // bacaCSV menebak pemisah kolomnya. Excel berbahasa Indonesia menyimpan CSV dengan titik
@@ -137,8 +140,8 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
-	rows, err := bacaTabel(fh.Filename, data, r.FormValue("sandi"))
-	if err != nil && bytes.HasPrefix(data, []byte("%PDF")) {
+	rows, peringatanPDF, err := bacaTabel(fh.Filename, data, r.FormValue("sandi"))
+	if err != nil && isiPDF(data) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
@@ -158,8 +161,9 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 	if n := len(slices.DeleteFunc(slices.Clone(h.Rows), func(x finance.MutasiRow) bool { return x.Tanggal >= awal })); awal != "" && n > 0 {
 		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris bertanggal sebelum tanggal saldo awal (%s) dan tidak bisa dibukukan. Mundurkan tanggal saldo awal di menu Saldo Awal bila mutasi lama ini memang mau dicatat.", n, awal))
 	}
-	if bytes.HasPrefix(data, []byte("%PDF")) {
+	if isiPDF(data) {
 		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks.
+		h.Peringatan = append(h.Peringatan, peringatanPDF...)
 		h.Peringatan = append(h.Peringatan, "Dibaca dari PDF: cocokkan jumlah baris serta total uang masuk dan keluar di atas dengan rekening koran Anda sebelum menyimpan.")
 	}
 	return h, true
