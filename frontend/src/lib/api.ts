@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'laporan-transaksi'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -275,6 +275,9 @@ export interface Tx {
   lunas: boolean
   tanggal_lunas: string
   akun?: string // kode CoA koreksi; kosong = otomatis dari jenis
+  /** Dibuat otomatis dari invoice ini (Penjualan DPP / PPN Keluaran); diubah lewat menu Invoice. */
+  invoice_id?: number
+  jatuh_tempo?: string
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
@@ -409,6 +412,10 @@ export interface AssetInput {
   /** Cara aset dibayar bila tidak berasal dari transaksi: kas, utang (kredit/cicilan), atau
    *  modal (barang setoran pemilik). Kosong = belum dipilih. */
   sumber_dana?: SumberDanaAset
+  /** Akumulasi penyusutan yang sudah ada per tanggal saldo awal (impor template saldo awal);
+   *  dibawa apa adanya saat aset diedit supaya nilai buku awal tidak berubah. */
+  akumulasi_awal?: number
+  akumulasi_per?: string
 }
 
 export type SumberDanaAset = '' | 'kas' | 'utang' | 'modal'
@@ -823,7 +830,8 @@ export type StatusKatalog = 'draft' | 'terbit' | 'aktif' | 'arsip'
 export interface TemplateCOA { id: number; jenis: string; versi: number; status: StatusKatalog; akun: Account[]; catatan?: string; oleh?: string; waktu: string }
 export interface KLUBenchmark { kode: string; nama: string; cttor_bps: number; npm_bps: number }
 export interface BenchmarkVersi { id: number; nama: string; sumber: string; status: StatusKatalog; baris: KLUBenchmark[]; oleh?: string; waktu: string }
-export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; kode_wajib: string[]; klien_per_template: Record<number, number> }
+export interface PeranAkun { id: string; label: string; bawaan: string }
+export interface KatalogCOA { jenis: string[]; template: TemplateCOA[]; peran_wajib: PeranAkun[]; klien_per_template: Record<number, number> }
 
 async function unggah<T>(path: string, file: File, fields: Record<string, string>): Promise<T> {
   const form = new FormData()
@@ -941,6 +949,9 @@ export interface OnboardingResult {
   imported: boolean
   replaced_assets: number
   replaced_karyawan: number
+  /** Barang dari sheet Persediaan; mengganti daftar Stok & Gudang saat diimpor. */
+  stok?: { nama: string }[] | null
+  replaced_stok?: number
   /** Nilai buku aset tetap per tanggal mulai, pembanding baris Aset Tetap. */
   nilai_buku_aset?: number
   /** false: saldo awal belum seimbang / ada transaksi sebelum tanggal mulai. */
@@ -978,6 +989,33 @@ export async function importOnboarding(file: File, commit: boolean): Promise<Onb
   if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
   return res.json()
 }
+
+export interface BarisBukuBesar { tanggal: string; tx_id?: number; keterangan: string; debit: number; kredit: number; saldo: number }
+export interface AkunBukuBesar {
+  kode: string; nama: string; kelompok: string; normal: 'debit' | 'kredit'
+  saldo_awal: number; debit: number; kredit: number; saldo_akhir: number; baris: BarisBukuBesar[]
+}
+export interface BukuBesar {
+  supported: boolean; period: string; period_label: string; dari: string; sampai: string
+  akun: AkunBukuBesar[]; total_debit: number; total_kredit: number; seimbang: boolean
+  pilihan: { kode: string; nama: string }[]
+}
+/** Rentang tanggal (YYYY-MM-DD) dan opsional satu akun (riwayat). */
+export interface FilterBukuBesar { dari: string; sampai: string; akun?: string }
+const qBukuBesar = (f: FilterBukuBesar) => new URLSearchParams({ dari: f.dari, sampai: f.sampai, ...(f.akun ? { akun: f.akun } : {}) }).toString()
+export const getBukuBesar = (f: FilterBukuBesar) => api<BukuBesar>(`/reports/buku-besar?${qBukuBesar(f)}`)
+export const bukuBesarXlsxUrl = (f: FilterBukuBesar) => `/api/v1/reports/buku-besar.xlsx?${qBukuBesar(f)}`
+
+export interface FilterTransaksi { dari: string; sampai: string; jenis?: string; arah?: string; status?: string; channel?: string; cari?: string }
+export interface LaporanTransaksi {
+  dari: string; sampai: string; transaksi: Tx[]; jumlah: number
+  total_masuk: number; total_keluar: number; belum_lunas: number
+  per_jenis: { jenis: string; arah: string; jumlah: number; total: number }[]
+  channel: string[] | null; jenis_pilihan: { nama: string; arah: string }[]
+}
+const qTransaksi = (f: FilterTransaksi) => new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString()
+export const getLaporanTransaksi = (f: FilterTransaksi) => api<LaporanTransaksi>(`/reports/transaksi?${qTransaksi(f)}`)
+export const laporanTransaksiXlsxUrl = (f: FilterTransaksi) => `/api/v1/reports/transaksi.xlsx?${qTransaksi(f)}`
 
 /** tanggal: tanggal pembanding nilai buku aset (saat tanggal mulai di form diganti). */
 export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (tanggal ? `?tanggal=${encodeURIComponent(tanggal)}` : ''))
@@ -1339,11 +1377,17 @@ export interface InvoiceInput {
   diskon_rp: number
   ppn_bps: number
   catatan?: string
+  /** Tanggal pelanggan membayar (wajib untuk status lunas). */
+  tanggal_lunas?: string
+  /** true = tercatat di pembukuan (Penjualan + PPN Keluaran otomatis). */
+  dibukukan?: boolean
 }
 
 export interface Invoice extends InvoiceInput {
   id: number
   nomor: string
+  transaksi_id?: number
+  transaksi_ppn_id?: number
 }
 
 export interface InvoiceRow extends Invoice {
@@ -1763,6 +1807,14 @@ export interface TutupBuku {
 export const getTutupBuku = (period: string) => api<TutupBuku>(`/tutup-buku?period=${period}`)
 export const tutupBulan = (periode: string) => api<TutupBuku>('/tutup-buku', { method: 'POST', body: { periode } })
 export const bukaBulan = () => api<TutupBuku>('/tutup-buku', { method: 'DELETE' })
-export interface LangkahMulai { kode: string; judul: string; penjelasan: string; selesai: boolean; view: View; aksi?: string }
+export interface LangkahMulai { kode: string; judul: string; penjelasan: string; selesai: boolean; view: View; aksi?: string; peringatan?: string }
 export const getLangkahMulai = () => api<LangkahMulai[]>('/mulai')
+
+/** Kecocokan saldo awal dengan daftar aset, daftar barang & kartu stok, dan Harta = Kewajiban + Modal. */
+export interface CekKecocokan {
+  kode: string; judul: string; status: 'ok' | 'selisih' | 'info'
+  saldo_awal: number; pembanding: number; label_banding: string; selisih: number
+  pesan: string; view: View; langkah: string
+}
+export const getCekSaldoAwal = () => api<CekKecocokan[]>('/saldo-awal/cek')
 export const pelunasanSaldoAwal = (b: { jenis: 'piutang' | 'utang'; tanggal: string; nominal: number }) => api<unknown>('/opening/pelunasan', { method: 'POST', body: b })

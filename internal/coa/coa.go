@@ -65,6 +65,8 @@ type Account struct {
 	Kondisi  Kondisi  `json:"kondisi"`
 	Catatan  string   `json:"catatan,omitempty"`
 	Opsional bool     `json:"opsional,omitempty"`
+	// Peran: peran akun di jurnal otomatis (lihat peran.go); kosong = bukan pemegang peran.
+	Peran string `json:"peran,omitempty"`
 }
 
 func a(kode, nama, subtype string, n Normal, k Kelompok, kon Kondisi, catatan string) Account {

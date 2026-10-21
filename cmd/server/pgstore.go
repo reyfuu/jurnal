@@ -345,8 +345,7 @@ func loadKatalogDB(db *sql.DB) (katalog.State, error) {
 	for _, b := range st.Benchmark {
 		st.NextBenchmarkID = max(st.NextBenchmarkID, b.ID+1)
 	}
-	segarkanBawaan(&st)
-	return st, nil
+	return st, nil // versi bawaan disegarkan di NewServer (segarkanBawaan)
 }
 
 // savePengetahuanDB menulis ulang artikel & sumber pengetahuan.

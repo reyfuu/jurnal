@@ -235,6 +235,9 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wa TEXT;
 -- sumber dana aset tanpa transaksi (kas | utang | modal); kosong = belum dipilih
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS sumber_dana TEXT;
+-- akumulasi penyusutan yang sudah ada per tanggal saldo awal (template saldo awal / pembukuan lama)
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS akumulasi_awal BIGINT;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS akumulasi_per DATE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS persetujuan_pdp TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS versi_pdp TEXT;
 
@@ -449,19 +452,10 @@ ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS kewajiban_lain BIGINT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS aset_tetap BIGINT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS rincian JSONB;
 
--- Primbon Pajak (Okt 2026): bookmark & catatan pribadi per pengguna atas peraturan katalog.
--- Tanpa FK ke users: saveAuthDB menulis ulang tabel users setiap simpan. Baris milik user
--- yang sudah dihapus dibuang saat boot (loadPrimbon).
-CREATE TABLE IF NOT EXISTS primbon_bookmark (
-	user_id INT NOT NULL,
-	uuid    TEXT NOT NULL,
-	waktu   TIMESTAMPTZ NOT NULL,
-	PRIMARY KEY (user_id, uuid)
-);
-CREATE TABLE IF NOT EXISTS primbon_catatan (
-	user_id INT NOT NULL,
-	uuid    TEXT NOT NULL,
-	isi     TEXT NOT NULL,
-	diubah  TIMESTAMPTZ NOT NULL,
-	PRIMARY KEY (user_id, uuid)
-);
+-- Invoice ↔ pembukuan (Okt 2026): transaksi Penjualan & PPN Keluaran dibuat otomatis dari invoice.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS invoice_id INT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS jatuh_tempo DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tanggal_lunas DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dibukukan BOOLEAN;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_id INT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_ppn_id INT;

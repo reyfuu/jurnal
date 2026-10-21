@@ -117,15 +117,17 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 	}
 }
 
-// kluKebutuhanPokok: bidang usaha yang umumnya menjual bahan kebutuhan pokok yang PPN-nya
-// dibebaskan (PP 49/2022: beras, gabah, jagung, sagu, kedelai, garam, daging, telur, susu,
-// buah, sayur, ubi, bumbu, gula konsumsi). Perlu diverifikasi tim pajak per usaha.
+// kluKebutuhanPokok: bidang usaha yang umumnya menjual barang kebutuhan pokok yang PPN-nya
+// dibebaskan (PP 49/2022 Pasal 7 & Lampiran: beras, gabah, jagung, sagu, kedelai, garam,
+// daging, telur, susu, buah-buahan, sayur-sayuran, gula konsumsi kristal putih dari tebu),
+// sesuai kriteria lampiran (umumnya segar / belum diolah). Perlu diverifikasi tim pajak.
 var kluKebutuhanPokok = map[string]bool{
 	"011": true, // pertanian tanaman semusim (padi, jagung, sayur)
 	"012": true, // tanaman tahunan (buah)
 	"014": true, // peternakan (telur, daging, susu)
 	"106": true, // penggilingan padi (beras)
 	"462": true, // perdagangan besar hasil pertanian & hewan hidup
+	"463": true, // perdagangan besar makanan (beras, gula, telur grosir)
 	"472": true, // eceran khusus makanan di toko
 	"478": true, // kaki lima & los pasar
 }
@@ -171,7 +173,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 			// barang itu tidak memungut PPN. Bidang usaha ini bisa juga menjual barang lain yang
 			// kena PPN, jadi ini peringatan untuk diperiksa, bukan kepastian wajib PKP.
 			add("sedang", "Omzet di atas batas PKP: cek fasilitas PPN dibebaskan",
-				"Omzet di atas "+rp(pr.BatasPKP)+" per tahun. Bila yang dijual bahan kebutuhan pokok (mis. beras, telur, daging, susu, sayur, buah, gula konsumsi), PPN-nya dibebaskan (PP 49/2022) sehingga tidak ada PPN yang dipungut dari pembeli. Bila ada penjualan barang lain yang kena PPN, usaha wajib dikukuhkan sebagai PKP. Pastikan bersama konsultan pajak.")
+				"Omzet di atas "+rp(pr.BatasPKP)+" per tahun. Barang kebutuhan pokok (beras, gabah, jagung, sagu, kedelai, garam, daging, telur, susu, buah-buahan, sayur-sayuran, dan gula konsumsi) dibebaskan PPN berdasarkan PP 49/2022 sesuai kriteria lampirannya (umumnya segar / belum diolah), jadi tidak ada PPN yang dipungut dari pembeli. Bila ada penjualan barang lain yang kena PPN (mis. barang olahan), usaha wajib dikukuhkan sebagai PKP. Pastikan bersama konsultan pajak.")
 		} else {
 			add("tinggi", "Wajib menjadi PKP", "Omzet di atas "+rp(pr.BatasPKP)+" per tahun wajib dikukuhkan sebagai PKP dan memungut PPN, kecuali seluruh penjualannya barang / jasa yang tidak dikenai atau dibebaskan PPN.")
 		}

@@ -111,6 +111,14 @@ func (o OpeningBalance) Period() string {
 	return o.Tanggal[:7]
 }
 
+// FormatRupiahPenuh: 5000000 → "Rp5.000.000" (tanpa pembulatan ke juta).
+func FormatRupiahPenuh(n int64) string {
+	if n < 0 {
+		return "-Rp" + rupiah(-n)
+	}
+	return "Rp" + rupiah(n)
+}
+
 // ModalAwal = aktiva awal − kewajiban awal. nilaiBukuAset diambil dari register aset.
 func (o OpeningBalance) ModalAwal(nilaiBukuAset int64) int64 {
 	return o.Harta(nilaiBukuAset) - o.Kewajiban()

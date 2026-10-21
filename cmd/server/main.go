@@ -216,7 +216,12 @@ func NewServer() *Server {
 			s.saveAll()
 		}
 	}
-	segarkanBawaan(&s.katalog)
+	if segarkanBawaan(&s.katalog) {
+		// Katalog lama baru mendapat CoA manufaktur bawaan: simpan supaya ID-nya tetap.
+		if err := s.saveKatalog(s.katalog); err != nil {
+			log.Printf("PERINGATAN: gagal menyimpan CoA manufaktur bawaan ke katalog: %v", err)
+		}
+	}
 	pasangKatalog(s.katalog)
 	s.bootstrapMaster()
 	s.adoptOrphans()
@@ -348,6 +353,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/ai", s.guard("laporan-keuangan", s.on(s.handleAIReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/coa", s.guard("laporan-keuangan", s.on((*tenant).handleReportCoA)))
 	s.mux.HandleFunc("GET /api/v1/reports/coa.xlsx", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleReportCoAXlsx))))
+	s.mux.HandleFunc("GET /api/v1/reports/buku-besar", s.guard("buku-besar", s.on((*tenant).handleBukuBesar)))
+	s.mux.HandleFunc("GET /api/v1/reports/transaksi", s.guard("laporan-transaksi", s.on((*tenant).handleLaporanTransaksi)))
+	s.mux.HandleFunc("GET /api/v1/reports/transaksi.xlsx", s.guard("laporan-transaksi", s.exporting(s.on((*tenant).handleLaporanTransaksiXlsx))))
+	s.mux.HandleFunc("GET /api/v1/reports/buku-besar.xlsx", s.guard("buku-besar", s.exporting(s.on((*tenant).handleBukuBesarXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("GET /api/v1/reports/pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleLaporanPDF))))
@@ -992,9 +1001,10 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 	return t, true
 }
 
-// decodeTx + cek akun koreksi terhadap CoA aktif.
+// decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
+	t.InvoiceID = 0
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1056,6 +1066,10 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
 		return
 	}
+	if s.txs[i].InvoiceID != 0 {
+		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
+		return
+	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1079,6 +1093,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if s.txs[i].InvoiceID != 0 {
+		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
 		return
 	}
 	// Transaksi yang menjadi pembayaran aset terdaftar: menghapusnya membuat aset di neraca

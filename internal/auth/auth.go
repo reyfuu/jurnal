@@ -40,7 +40,7 @@ var financeViews = []string{
 	// "arus-kas" dihapus: Arus Kas jadi tab di dalam Laporan Keuangan, bukan menu sendiri.
 	"dashboard", "laporan-keuangan", "laporan-penjualan", "transaksi", "piutang-utang", "stok-gudang",
 	"produksi-supplier", "invoice", "simulasi-harga", "pajak-umkm", "perencanaan-pajak", "kalkulator-pajak", "karyawan", "master-data", "panduan", "pustaka", "lapor-bug",
-	"umur-piutang", "tutup-buku", "primbon-pajak",
+	"umur-piutang", "tutup-buku", "buku-besar", "laporan-transaksi",
 }
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.

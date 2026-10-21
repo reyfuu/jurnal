@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type SumberDanaAset, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
-import { formatJt, formatRp } from '@/lib/format'
+import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const SOROT = 'var(--text-brand)'
@@ -32,6 +32,7 @@ function toInput(a: Asset): AssetInput {
     metode: a.metode || 'garis_lurus', tanggal_perolehan: a.tanggal_perolehan,
     harga_perolehan: a.harga_perolehan, tak_berwujud: a.tak_berwujud, transaksi_id: a.transaksi_id,
     sumber_dana: a.sumber_dana ?? '',
+    akumulasi_awal: a.akumulasi_awal, akumulasi_per: a.akumulasi_per,
   }
 }
 
@@ -165,24 +166,24 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))' }}>
         <div className="card">
           <div className="kpi-label">Harga Perolehan</div>
-          <div className="kpi-value tabular">{formatJt(data.total_harga_perolehan)}</div>
+          <div className="kpi-value tabular">{formatRp(data.total_harga_perolehan)}</div>
           <div className="kpi-meta-row"><span>{assets.length} aset tercatat</span></div>
         </div>
         <div className="card">
           <div className="kpi-label">Akumulasi Penyusutan</div>
-          <div className="kpi-value tabular" style={{ color: RED }}>{formatJt(data.total_akumulasi)}</div>
+          <div className="kpi-value tabular" style={{ color: RED }}>{formatRp(data.total_akumulasi)}</div>
           <div className="kpi-meta-row"><span>Sejak perolehan s/d akhir periode</span></div>
         </div>
         <div className="card">
           <div className="kpi-label">Nilai Buku</div>
-          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatJt(data.total_nilai_buku)}</div>
+          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatRp(data.total_nilai_buku)}</div>
           <div className="kpi-meta-row"><span>Masuk Neraca sebagai aset</span></div>
         </div>
         <div className="card">
           <div className="kpi-label">Beban Bulan Ini</div>
-          <div className="kpi-value tabular" style={{ color: SOROT }}>{formatJt(data.beban_total)}</div>
+          <div className="kpi-value tabular" style={{ color: SOROT }}>{formatRp(data.beban_total)}</div>
           <div className="kpi-meta-row">
-            <span>Penyusutan {formatJt(data.beban_penyusutan)} + amortisasi {formatJt(data.beban_amortisasi)}</span>
+            <span>Penyusutan {formatRp(data.beban_penyusutan)} + amortisasi {formatRp(data.beban_amortisasi)}</span>
           </div>
         </div>
       </div>

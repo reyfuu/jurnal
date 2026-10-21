@@ -58,6 +58,17 @@ func (s *tenant) handleLunasi(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "tanggal pelunasan tidak boleh sebelum tanggal transaksi", http.StatusBadRequest)
 		return
 	}
+	if t.InvoiceID != 0 {
+		// Piutang dari invoice: invoice ikut lunas, transaksi DPP & PPN-nya lunas bersama.
+		if err := s.lunasiInvoiceLocked(t.InvoiceID, b.Tanggal); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if j := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return x.ID == id }); j >= 0 {
+			writeJSON(w, s.withWarnings(s.txs[j]))
+			return
+		}
+	}
 	t.Lunas = true
 	if b.Tanggal != t.Tanggal {
 		t.TanggalLunas = b.Tanggal

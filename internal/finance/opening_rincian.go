@@ -3,6 +3,7 @@ package finance
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -122,8 +123,10 @@ func (o *OpeningBalance) TerapkanRincian() error {
 		if r.Nama == "" {
 			r.Nama = k.Label
 		}
-		if r.Nominal < 0 && k.ID != KatLabaDitahan {
-			return fmt.Errorf("baris %d (%s): nominal tidak boleh negatif; hanya Laba Ditahan yang boleh minus (rugi)", i+1, r.Nama)
+		// Baris minus hanya untuk akun pengurang: Laba Ditahan (rugi), Piutang Usaha (cadangan
+		// kerugian piutang), dan Modal (prive / dividen). Total pos-nya diperiksa di bawah.
+		if r.Nominal < 0 && k.ID != KatLabaDitahan && k.ID != KatPiutang && k.ID != KatModal {
+			return fmt.Errorf("baris %d (%s): nominal tidak boleh negatif; yang boleh minus hanya Laba Ditahan (rugi), cadangan kerugian piutang, dan prive / dividen", i+1, r.Nama)
 		}
 		switch k.ID {
 		case KatKas:
@@ -153,5 +156,23 @@ func (o *OpeningBalance) TerapkanRincian() error {
 	if len(out) == 0 {
 		return errors.New("saldo awal belum diisi")
 	}
+	if o.Piutang < 0 {
+		return errors.New("cadangan kerugian piutang melebihi total piutang usaha")
+	}
+	if o.ModalDisetor < 0 {
+		return errors.New("prive / dividen melebihi modal disetor; sisanya catat sebagai pengurang Laba Ditahan")
+	}
 	return nil
+}
+
+// LengkapiAsetTetap: saldo awal per akun yang tidak menyatakan aset tetap memakai nilai buku
+// register aset (dihitung sistem). Dipakai impor template rinci: nilai buku di Excel adalah
+// hasil rumus, jadi bila belum tersimpan di berkas, angka sistemlah yang dipakai.
+func (o *OpeningBalance) LengkapiAsetTetap(nilaiBukuAset int64) {
+	if len(o.Rincian) == 0 || nilaiBukuAset == 0 || slices.ContainsFunc(o.Rincian, func(r SaldoAkun) bool { return r.Kategori == KatAsetTetap }) {
+		return
+	}
+	o.Rincian = append(o.Rincian, SaldoAkun{Kode: "1501", Nama: "Aset tetap (nilai buku register aset)", Kategori: KatAsetTetap,
+		Nominal: nilaiBukuAset, Keterangan: "dihitung dari daftar aset per tanggal saldo awal"})
+	o.AsetTetap += nilaiBukuAset
 }

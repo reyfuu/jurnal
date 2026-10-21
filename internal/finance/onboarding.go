@@ -22,13 +22,16 @@ type ImportSheet struct {
 	Format *FormatTabel
 }
 
-// FormatTabel dicerminkan server ke xlsx.Tabel (paket finance tidak mengenal xlsx).
+// FormatTabel dicerminkan server ke xlsx.Tabel (paket finance tidak mengenal xlsx); arti tiap
+// field ada di xlsx.Tabel. Gaya memakai nama gaya xlsx ("isi", "isi_tanggal", "rumus", …).
 type FormatTabel struct {
-	Header, Kolom, BarisKosong int
-	Lebar                      []float64
-	Angka                      []int
-	Pilihan                    map[int][]string
-	Kunci                      bool
+	Header, Kolom, BarisKosong, Contoh, Akhir int
+	Lebar                                     []float64
+	Angka, Bilangan, Tanggal                  []int
+	Pilihan                                   map[int][]string
+	Rumus                                     map[int]string
+	Gaya                                      map[string]string
+	Referensi, Kunci                          bool
 }
 
 // SheetError menunjuk sheet dan baris Excel (1-based) yang gagal; Baris 0 = masalah header.
@@ -61,97 +64,7 @@ const (
 	sheetPanduan   = "Panduan"
 )
 
-var saldoAwalLabels = []struct {
-	Label string
-	Hint  string
-}{
-	{"Tanggal Mulai Pembukuan", "hari pertama pakai aplikasi; transaksi sebelum tanggal ini tidak perlu diimpor"},
-	{"Kas & Bank", "saldo tunai + seluruh rekening bank usaha"},
-	{"Piutang Usaha", "total tagihan pelanggan yang belum dibayar"},
-	{"Persediaan", "nilai stok bahan baku & barang dagang"},
-	{"Utang Usaha", "total tagihan supplier & biaya yang belum dibayar"},
-	{"Pinjaman", "sisa pokok pinjaman bank / koperasi"},
-	{"Modal Disetor", "opsional: untuk dicocokkan; kosongkan bila tidak tahu"},
-}
-
-var asetHeaders = []string{"Nama Aset", "Jenis Harta", "Kelompok PMK", "Metode", "Tanggal Perolehan", "Harga Perolehan"}
-
 var karyawanHeaders = []string{"Nama", "Jabatan", "Tanggal Masuk", "Gaji Pokok", "Tunjangan", "Status PTKP", "NPWP", "Status"}
-
-// OnboardingTemplate: workbook contoh yang isinya lolos ParseOnboarding apa adanya.
-func OnboardingTemplate(metode string) []ImportSheet {
-	// Contoh aset dibeli sebelum tanggal mulai, jadi nilai bukunya masuk saldo awal.
-	aset := [][]string{asetHeaders,
-		{"Mesin Espresso 2 Group", "Mesin pengolah makanan & minuman", "", "Garis Lurus", "2025-02-01", "90000000"},
-		{"Kulkas & Chiller Display", "Peralatan usaha restoran / rumah makan", "", "Garis Lurus", "2025-03-01", "18000000"},
-		{"Renovasi Ruko Sewa", "Bangunan tidak permanen (renovasi ruko sewa)", "", "Garis Lurus", "2025-02-01", "36000000"},
-		{"Software Kasir & Lisensi", "Harta tak berwujud — software & lisensi", "", "Garis Lurus", "2025-02-01", "18000000"},
-	}
-	saldo := saldoAwalTemplateRows(aset, metode)
-
-	karyawan := [][]string{karyawanHeaders,
-		{"Dewi Lestari", "Kepala Barista", "2026-01-05", "5500000", "750000", "K/1", "", "Aktif"},
-		{"Bagus Pratama", "Barista", "2026-02-01", "4200000", "500000", "TK/0", "", "Aktif"},
-		{"Sari Andini", "Kasir", "2026-02-15", "4000000", "400000", "TK/0", "", "Aktif"},
-	}
-
-	// Barisnya dipakai juga oleh template per-menu (lihat import_menu.go), jadi satu sumber saja.
-	tagihan := tagihanTemplateRows()
-	stok := stokTemplateRows()
-
-	panduan := [][]string{
-		{"Sheet", "Wajib?", "Catatan"},
-		{sheetSaldoAwal, "Disarankan", "Posisi keuangan di hari pertama pakai aplikasi. Neraca & arus kas dihitung dari sini + transaksi."},
-		{sheetAset, "Opsional", "Isi Jenis Harta saja; Kelompok PMK & tarif terisi otomatis. Bangunan hanya boleh Garis Lurus."},
-		{sheetKaryawan, "Opsional", "Status PTKP memakai kode seperti TK/0, K/1, K/3."},
-		{sheetTransaksi, "Opsional", "Format sama dengan template transaksi biasa."},
-		{sheetTagihan, "Opsional", "Jenis diisi Piutang atau Utang. Tanpa kolom Jenis, nomor berawalan PO dianggap utang."},
-		{sheetStok, "Opsional", "Stok Minimum menentukan peringatan stok menipis; kosongkan bila tidak dipakai."},
-		{"", "", ""},
-		{"Daftar Jenis Harta", "Kelompok", "Masa Manfaat", "Rujukan Lampiran PMK", "Status Pemetaan"},
-	}
-	for _, j := range JenisHartaList {
-		k, _ := KelompokOf(j.Kelompok)
-		jenis := j.Nama
-		if j.TakBerwujud {
-			jenis += " (amortisasi)"
-		}
-		status := "PERLU DICEK"
-		if j.Terverifikasi {
-			status = "Terverifikasi"
-		}
-		panduan = append(panduan, []string{jenis, k.Nama, fmt.Sprintf("%d bulan", k.MasaManfaat), j.Lampiran, status})
-	}
-	panduan = append(panduan, []string{"", "", ""}, []string{"Daftar Jenis Transaksi", "Arah uang", ""})
-	for _, j := range JenisList {
-		panduan = append(panduan, []string{j.Nama, j.Arah, ""})
-	}
-
-	jenisTx := make([]string, 0, len(JenisList))
-	for _, j := range JenisList {
-		jenisTx = append(jenisTx, j.Nama)
-	}
-	tabel := func(kolom int, lebar []float64, angka []int, pilihan map[int][]string) *FormatTabel {
-		return &FormatTabel{Kolom: kolom, Lebar: lebar, Angka: angka, Pilihan: pilihan, BarisKosong: 50, Kunci: true}
-	}
-	kategori := make([]string, 0, len(KategoriSaldoList))
-	for _, k := range KategoriSaldoList {
-		kategori = append(kategori, k.Label)
-	}
-	return []ImportSheet{
-		{sheetSaldoAwal, saldo, &FormatTabel{Header: saldoHeaderRow, Kolom: 5, Lebar: []float64{12, 40, 32, 20, 48}, Angka: []int{3},
-			Pilihan: map[int][]string{2: kategori}, BarisKosong: 30, Kunci: true}},
-		{sheetAset, aset, tabel(6, []float64{32, 46, 16, 16, 18, 18}, []int{5}, map[int][]string{3: {"Garis Lurus", "Saldo Menurun"}})},
-		{sheetKaryawan, karyawan, tabel(8, []float64{26, 20, 16, 16, 14, 13, 22, 12}, []int{3, 4}, map[int][]string{7: {"Aktif", "Nonaktif"}})},
-		{sheetTagihan, tagihan, tabel(7, []float64{12, 18, 34, 16, 18, 14, 34}, []int{4}, map[int][]string{0: {"Piutang", "Utang"}, 5: {"Belum Lunas", "Lunas"}})},
-		{sheetStok, stok, tabel(8, []float64{12, 36, 16, 12, 10, 14, 16, 16}, []int{3, 5, 6, 7}, nil)},
-		{sheetTransaksi, TemplateRows(), tabel(10, []float64{14, 24, 16, 28, 22, 10, 14, 24, 14, 14}, []int{2, 5}, map[int][]string{1: jenisTx, 8: {"Lunas", "Belum Lunas"}})},
-		{sheetPanduan, panduan, &FormatTabel{Kolom: 5, Lebar: []float64{44, 30, 18, 40, 18}}},
-	}
-}
-
-// saldoHeaderRow: baris judul kolom di sheet Saldo Awal; di atasnya tanggal mulai & ringkasan.
-const saldoHeaderRow = 7
 
 // templateAkunSaldo: akun neraca CoA di sheet Saldo Awal (nama sama dengan CoA Master; dijaga
 // tes di paket coa). Aset tetap per jenis tidak dirinci di sini: nilai bukunya satu baris yang
@@ -188,63 +101,6 @@ var templateAkunSaldo = []SaldoAkun{
 // TemplateAkunSaldo: salinan daftar akun template (dipakai layar Saldo Awal & tes CoA).
 func TemplateAkunSaldo() []SaldoAkun { return append([]SaldoAkun(nil), templateAkunSaldo...) }
 
-// labelKategori: label tampilan kategori saldo.
-func labelKategori(id string) string {
-	for _, k := range KategoriSaldoList {
-		if k.ID == id {
-			return k.Label
-		}
-	}
-	return id
-}
-
-// saldoAwalTemplateRows: sheet Saldo Awal contoh yang SEIMBANG — nilai buku aset dihitung dari
-// contoh sheet Aset (dengan metode usaha), modal disetor menjadi penyeimbangnya.
-func saldoAwalTemplateRows(asetRows [][]string, metode string) [][]string {
-	const mulai = "2026-01-01"
-	as, _ := parseAsetRows(asetRows)
-	TerapkanMetode(as, metode)
-	nbv := AssetsForPeriod(as, nil, mulai[:7]).NilaiBukuAwal
-	contoh := map[string]int64{"1101": 5_000_000, "1102": 40_000_000, "1201": 8_500_000, "1301": 8_250_000, "1401": 6_000_000,
-		"2101": 5_200_000, "2102": 20_000_000, "2110": 450_000, "3201": 10_000_000}
-	o := OpeningBalance{Tanggal: mulai}
-	for _, a := range templateAkunSaldo {
-		a.Nominal = contoh[a.Kode]
-		if a.Kategori == KatAsetTetap {
-			a.Nominal = nbv
-		}
-		o.Rincian = append(o.Rincian, a)
-	}
-	_ = o.TerapkanRincian()
-	modal := o.Harta(nbv) - o.Kewajiban() - o.LabaDitahan
-
-	rows := [][]string{
-		{"Saldo Awal (Neraca Pembukaan)"},
-		{"Tanggal mulai pembukuan", mulai, "Format TAHUN-BULAN-TANGGAL. Isi posisi usaha di pagi hari tanggal ini."},
-		{"Total Harta", `=SUMIF(C:C,"Harta*",D:D)`},
-		{"Total Kewajiban", `=SUMIF(C:C,"Kewajiban*",D:D)`},
-		{"Total Modal", `=SUMIF(C:C,"Modal*",D:D)`},
-		{"Selisih (harus 0)", "=B3-B4-B5", "Harta harus sama dengan Kewajiban + Modal. Bila belum 0, saldo awal ditolak saat impor."},
-		{"", "", "Tambah baris untuk akun yang belum ada (mis. rekening bank kedua); pilih Kategori Akun dari daftar."},
-		{"Kode Akun", "Nama Akun", "Kategori Akun", "Nominal (Rp)", "Keterangan"},
-	}
-	for _, a := range templateAkunSaldo {
-		n := contoh[a.Kode]
-		switch a.Kategori {
-		case KatAsetTetap:
-			n = nbv
-		case KatModal:
-			n = modal
-		}
-		nominal := ""
-		if n != 0 {
-			nominal = fmt.Sprint(n)
-		}
-		rows = append(rows, []string{a.Kode, a.Nama, labelKategori(a.Kategori), nominal, a.Keterangan})
-	}
-	return rows
-}
-
 // kindOfSheet mengenali sheet dari namanya; nama bebas selama mengandung kata kuncinya.
 func kindOfSheet(nama string) string {
 	n := norm(nama)
@@ -267,9 +123,21 @@ func kindOfSheet(nama string) string {
 
 // ParseOnboarding membaca seluruh sheet yang dikenali. Sheet yang tidak dikenali diabaikan,
 // baris bermasalah dilaporkan dan tidak ikut diimpor.
+//
+// Workbook format rinci (template saldo awal sekarang: Petunjuk, Kas dan Bank, …, Modal) dibaca
+// per sheet rincian lebih dulu; sisanya (Karyawan, Transaksi) lewat pengenal nama biasa.
+// Workbook lama (sheet Saldo Awal satu tabel / dua kolom, Aset, Piutang & Utang, Stok) tetap
+// terbaca seperti dulu.
 func ParseOnboarding(sheets []ImportSheet) OnboardingData {
 	var d OnboardingData
+	rinci := formatRinci(sheets)
+	if rinci {
+		parseRinci(sheets, &d)
+	}
 	for _, sh := range sheets {
+		if rinci && kindRinci(sh.Nama) != "" {
+			continue
+		}
 		kind := kindOfSheet(sh.Nama)
 		if kind == "" || len(sh.Rows) == 0 {
 			continue
@@ -303,7 +171,7 @@ func ParseOnboarding(sheets []ImportSheet) OnboardingData {
 		}
 	}
 	if len(d.Terbaca) == 0 {
-		d.Errors = append(d.Errors, SheetError{Pesan: "tidak ada sheet yang dikenali; pakai template (Saldo Awal, Aset, Karyawan, Piutang & Utang, Stok, Transaksi)"})
+		d.Errors = append(d.Errors, SheetError{Pesan: "tidak ada sheet yang dikenali; pakai template (Petunjuk, Kas dan Bank, Piutang, Persediaan, Perlengkapan, Aset Lancar Lain, Aset Tetap, Utang, Modal, Karyawan, Transaksi)"})
 	}
 	return d
 }

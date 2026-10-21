@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
-import { getOpening, saveOpening, type KategoriSaldo, type OpeningBalance, type OpeningInfo, type SaldoAkun, type View } from '@/lib/api'
+import { getCekSaldoAwal, getOpening, saveOpening, type CekKecocokan, type KategoriSaldo, type OpeningBalance, type OpeningInfo, type SaldoAkun, type View } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
@@ -31,9 +31,13 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const [cek, setCek] = useState<CekKecocokan[]>([])
+
   useEffect(() => {
     getOpening().then(setInfo, (e: Error) => setError(e.message))
   }, [])
+  // Diperiksa ulang tiap saldo awal tersimpan, supaya selisih yang baru terlihat langsung.
+  useEffect(() => { getCekSaldoAwal().then(setCek, () => setCek([])) }, [info])
 
   // Nilai buku aset mengikuti tanggal mulai yang dipilih (aset dibeli sebelum tanggal itu).
   useEffect(() => {
@@ -226,6 +230,45 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
           Isi sekali di awal, bukan tiap bulan. Piutang dan utang awal yang dibayar kemudian dicatat di <strong>Piutang &amp; Utang</strong>.
         </div>
       </div>
+      {info?.aktif && cek.length > 0 && <PemeriksaanKecocokan cek={cek} navigate={navigate} />}
     </>
+  )
+}
+
+/** Panel kecocokan: saldo awal dibandingkan dengan daftar aset, daftar barang/kartu stok, dan neraca. */
+function PemeriksaanKecocokan({ cek, navigate }: { cek: CekKecocokan[]; navigate: (v: View, tab?: string) => void }) {
+  const selisih = cek.filter((c) => c.status === 'selisih').length
+  return (
+    <div className="card" style={{ padding: 20, marginTop: 14 }}>
+      <div className="chart-title">Pemeriksaan kecocokan</div>
+      <div className="chart-subtitle">
+        {selisih ? `${selisih} selisih perlu dibereskan supaya laporan dan pajak tidak keliru.` : 'Saldo awal cocok dengan daftar aset dan daftar barang.'}
+      </div>
+      <div className="grid gap-2" style={{ marginTop: 12 }}>
+        {cek.map((c) => {
+          const warna = c.status === 'selisih' ? 'var(--accent-amber)' : c.status === 'ok' ? 'var(--accent-green)' : 'var(--text-muted)'
+          const Ikon = c.status === 'selisih' ? AlertTriangle : c.status === 'ok' ? CheckCircle2 : Info
+          return (
+            <div key={c.kode} className="flex items-start gap-3 rounded-lg border px-3 py-2.5" style={{ borderColor: c.status === 'selisih' ? 'var(--accent-amber)' : 'var(--border-shell)' }}>
+              <Ikon size={18} style={{ color: warna, flexShrink: 0, marginTop: 2 }} aria-label={c.status} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="text-sm font-semibold">{c.judul}</div>
+                {c.status !== 'info' && (
+                  <div className="text-xs" style={{ marginTop: 2 }}>
+                    Saldo awal <strong>{formatRp(c.saldo_awal)}</strong> · {c.label_banding} <strong>{formatRp(c.pembanding)}</strong>
+                    {c.selisih !== 0 && <> · selisih <strong style={{ color: warna }}>{formatRp(c.selisih)}</strong></>}
+                  </div>
+                )}
+                {c.pesan && <div className="text-xs text-muted-foreground" style={{ marginTop: 2 }}>{c.pesan}</div>}
+              </div>
+              {c.status === 'selisih' && c.view !== 'saldo-awal' && (
+                <button type="button" className="text-xs underline underline-offset-4" style={{ flexShrink: 0 }}
+                  onClick={() => navigate(c.view, c.kode === 'aset' ? 'aset' : undefined)}>Buka</button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

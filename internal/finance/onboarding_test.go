@@ -1,8 +1,10 @@
 package finance_test
 
 import (
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"pajak/internal/finance"
 )
@@ -15,29 +17,41 @@ func TestOnboardingTemplate_LolosParsernyaSendiri(t *testing.T) {
 		t.Fatalf("template harus bebas error, got %+v", d.Errors)
 	}
 	if d.Opening == nil {
-		t.Fatal("sheet Saldo Awal tidak terbaca")
+		t.Fatal("saldo awal rinci tidak terbaca")
 	}
-	if d.Opening.Tanggal != "2026-01-01" || d.Opening.Kas != 45_000_000 || d.Opening.Piutang != 8_500_000 {
-		t.Errorf("saldo awal: %+v", d.Opening)
+	o := d.Opening
+	if o.Tanggal != "2026-01-01" || o.Kas != 45_000_000 || o.Piutang != 8_500_000 || o.Persediaan != 8_250_000 ||
+		o.AsetLain != 7_050_000 || o.Utang != 5_200_000 || o.Pinjaman != 20_000_000 || o.KewajibanLain != 450_000 || o.LabaDitahan != 10_000_000 {
+		t.Errorf("saldo awal: %+v", o)
 	}
-	if len(d.Assets) != 4 || len(d.Karyawan) != 3 || len(d.Transaksi) != 3 {
-		t.Fatalf("jumlah baris: %d aset, %d karyawan, %d transaksi", len(d.Assets), len(d.Karyawan), len(d.Transaksi))
+	if len(d.Assets) != 5 || len(d.Karyawan) != 3 || len(d.Transaksi) != 3 || len(d.Stok) != 3 {
+		t.Fatalf("jumlah baris: %d aset, %d karyawan, %d transaksi, %d stok", len(d.Assets), len(d.Karyawan), len(d.Transaksi), len(d.Stok))
 	}
-	// Kelompok & metode terisi dari jenis harta, bukan diisi manual di sheet.
-	if d.Assets[0].Kelompok != "k1" || d.Assets[0].Metode != finance.MetodeGarisLurus {
-		t.Errorf("aset pertama: %+v", d.Assets[0])
+	// Persediaan ikut mengisi Stok & Gudang (kode barang → SKU, harga pokok per satuan).
+	if s := d.Stok[0]; s.SKU != "RM-001" || s.Jumlah != 30 || s.HargaPokok != 185_000 || s.Satuan != "kg" || s.Kategori != "Bahan Baku" {
+		t.Errorf("stok pertama: %+v", s)
 	}
-	if !d.Assets[3].TakBerwujud {
-		t.Errorf("software harus ditandai harta tak berwujud: %+v", d.Assets[3])
+	// Kelompok dari Kelompok Fiskal, jenis harta tetap tertaut bila cocok.
+	if a := d.Assets[0]; a.Nama != "Laptop Kasir" || a.Kelompok != "k1" || a.JenisHarta != "komputer" || a.Metode != finance.MetodeGarisLurus {
+		t.Errorf("aset pertama: %+v", a)
+	}
+	if !d.Assets[4].TakBerwujud {
+		t.Errorf("software harus ditandai harta tak berwujud: %+v", d.Assets[4])
 	}
 	// Renovasi ruko = bangunan tidak permanen, wajib garis lurus.
-	if d.Assets[2].Kelompok != "bangunan_tidak_permanen" || d.Assets[2].Metode != finance.MetodeGarisLurus {
-		t.Errorf("renovasi: %+v", d.Assets[2])
+	if d.Assets[3].Kelompok != "bangunan_tidak_permanen" || d.Assets[3].Metode != finance.MetodeGarisLurus {
+		t.Errorf("renovasi: %+v", d.Assets[3])
+	}
+	terbaca := strings.Join(d.Terbaca, "|")
+	for _, s := range []string{"Petunjuk", "Kas dan Bank", "Piutang", "Persediaan", "Perlengkapan", "Aset Lancar Lain", "Aset Tetap", "Utang", "Modal", "Karyawan", "Transaksi"} {
+		if !strings.Contains(terbaca, s) {
+			t.Errorf("sheet %s tidak terbaca: %s", s, terbaca)
+		}
 	}
 }
 
 // Contoh template harus seimbang (Harta = Kewajiban + Modal) dan aset tetapnya sama dengan
-// nilai buku sheet Aset, untuk metode penyusutan apa pun yang dipakai usaha.
+// nilai buku sheet Aset Tetap, untuk metode penyusutan apa pun yang dipakai usaha.
 func TestOnboardingTemplate_SaldoAwalSeimbang(t *testing.T) {
 	for _, metode := range []string{"", finance.MetodeGarisLurus, finance.MetodeSaldoMenurun} {
 		d := finance.ParseOnboarding(finance.OnboardingTemplate(metode))
@@ -46,15 +60,124 @@ func TestOnboardingTemplate_SaldoAwalSeimbang(t *testing.T) {
 		}
 		finance.TerapkanMetode(d.Assets, metode)
 		nbv := finance.AssetsForPeriod(d.Assets, d.Transaksi, d.Opening.Period()).NilaiBukuAwal
+		d.Opening.LengkapiAsetTetap(nbv)
 		if nbv == 0 || d.Opening.AsetTetap != nbv {
-			t.Errorf("%q: aset tetap %d, nilai buku sheet Aset %d", metode, d.Opening.AsetTetap, nbv)
+			t.Errorf("%q: aset tetap %d, nilai buku sheet Aset Tetap %d", metode, d.Opening.AsetTetap, nbv)
 		}
 		if err := d.Opening.CekSeimbang(nbv); err != nil {
 			t.Errorf("%q: %v", metode, err)
 		}
-		if d.Opening.Kas != 45_000_000 || d.Opening.AsetLain != 6_000_000 || d.Opening.KewajibanLain != 450_000 || d.Opening.LabaDitahan != 10_000_000 {
-			t.Errorf("%q: pos saldo awal %+v", metode, d.Opening)
+		// Saldo menurun: akumulasi manual contoh = hitungan sistem, selain bangunan (garis lurus).
+		for _, a := range d.Assets {
+			manual := a.AkumulasiAwal > 0 && a.PerTanggal == "2026-01-01"
+			if want := metode == finance.MetodeSaldoMenurun && a.Kelompok != "bangunan_tidak_permanen"; manual != want {
+				t.Errorf("%q: %s akumulasi manual %d per %q", metode, a.Nama, a.AkumulasiAwal, a.PerTanggal)
+			}
 		}
+	}
+}
+
+// Berkas yang sudah disimpan Excel membawa nilai rumus (Akumulasi Dipakai, Nilai Buku). Nilai
+// itu dipakai sebagai akumulasi awal & nilai buku yang dinyatakan, dan harus tetap seimbang.
+func TestOnboardingTemplate_NilaiRumusTersimpanExcel(t *testing.T) {
+	sheets := finance.OnboardingTemplate("")
+	for _, sh := range sheets {
+		if sh.Nama != "Aset Tetap" {
+			continue
+		}
+		for _, row := range sh.Rows[6:] {
+			harga, _ := strconv.ParseInt(row[5], 10, 64)
+			p, _ := time.Parse(time.DateOnly, row[4])
+			bulan := (2026-p.Year())*12 + 1 - int(p.Month())
+			n := map[string]int64{"Kelompok 1 (4 th)": 48, "Bangunan Tidak Permanen (10 th)": 120}[row[3]]
+			akum := harga / n * int64(bulan) // rumus Excel: INT(harga/n) × bulan
+			row[9], row[10] = strconv.FormatInt(akum, 10), strconv.FormatInt(harga-akum, 10)
+		}
+	}
+	d := finance.ParseOnboarding(sheets)
+	if len(d.Errors) != 0 || d.Opening == nil {
+		t.Fatalf("%+v", d.Errors)
+	}
+	nbv := finance.AssetsForPeriod(d.Assets, nil, "2026-01").NilaiBukuAwal
+	if d.Opening.AsetTetap != nbv || d.Assets[0].AkumulasiAwal != 3_750_000 {
+		t.Fatalf("aset tetap dinyatakan %d, register %d, akumulasi laptop %d", d.Opening.AsetTetap, nbv, d.Assets[0].AkumulasiAwal)
+	}
+	if err := d.Opening.CekSeimbang(nbv); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Isian rincian: nilai turunan dihitung ulang dari kolom isian; cadangan kerugian & prive
+// mengurangi pos-nya; baris bermasalah dilaporkan dengan nomor baris Excel.
+func TestParseOnboarding_RinciDihitungUlangDanError(t *testing.T) {
+	sheets := finance.OnboardingTemplate("")
+	set := func(nama string, baris int, kol int, v string) {
+		for _, sh := range sheets {
+			if sh.Nama == nama {
+				for len(sh.Rows) < baris {
+					sh.Rows = append(sh.Rows, nil)
+				}
+				row := sh.Rows[baris-1]
+				for len(row) <= kol {
+					row = append(row, "")
+				}
+				row[kol] = v
+				sh.Rows[baris-1] = row
+				return
+			}
+		}
+		t.Fatalf("sheet %s tidak ada", nama)
+	}
+	set("Piutang", 4, 8, "500000")        // Cadangan Kerugian
+	set("Piutang", 7, 7, "999")           // Sisa Piutang (rumus) palsu: diabaikan
+	set("Modal", 8, 2, "Prive")           // saldo laba contoh → prive 10 jt
+	set("Utang", 8, 8, "900000")          // sudah dibayar > nilai 450 rb → error baris 8
+	set("Aset Tetap", 7, 3, "Tanah")      // tanah belum didukung → error baris 7
+	set("Kas dan Bank", 8, 2, "Deposito") // jenis tidak dikenal → error baris 8
+	d := finance.ParseOnboarding(sheets)
+
+	want := map[string]int{"Utang": 8, "Aset Tetap": 7, "Kas dan Bank": 8}
+	for _, e := range d.Errors {
+		if want[e.Sheet] != e.Baris {
+			t.Errorf("error tak terduga: %+v", e)
+		}
+		delete(want, e.Sheet)
+	}
+	if len(want) != 0 {
+		t.Fatalf("error tidak dilaporkan: %v (semua: %+v)", want, d.Errors)
+	}
+	o := d.Opening
+	if o == nil {
+		t.Fatal("saldo awal tetap terbentuk dari baris yang valid")
+	}
+	if o.Piutang != 8_000_000 || o.LabaDitahan != 0 || o.Kas != 5_000_000 || o.KewajibanLain != 0 {
+		t.Errorf("piutang %d (8,5 jt − cadangan 0,5 jt), laba ditahan %d, kas %d, kewajiban lain %d",
+			o.Piutang, o.LabaDitahan, o.Kas, o.KewajibanLain)
+	}
+	prive := false
+	for _, r := range o.Rincian {
+		prive = prive || (r.Kategori == finance.KatModal && r.Nominal == -10_000_000)
+	}
+	if !prive {
+		t.Errorf("prive 10 jt harus jadi baris modal minus: %+v", o.Rincian)
+	}
+	if len(d.Assets) != 4 {
+		t.Errorf("aset tanah tidak ikut: %d aset", len(d.Assets))
+	}
+}
+
+// Tanggal Saldo Awal wajib; tanpa itu tidak ada saldo awal yang dibentuk.
+func TestParseOnboarding_RinciTanpaTanggal(t *testing.T) {
+	sheets := finance.OnboardingTemplate("")
+	sheets[0].Rows[5][2] = ""
+	d := finance.ParseOnboarding(sheets)
+	if d.Opening != nil || len(d.Errors) != 1 || d.Errors[0].Sheet != "Petunjuk" || d.Errors[0].Baris != 6 {
+		t.Fatalf("opening %+v, errors %+v", d.Opening, d.Errors)
+	}
+	// Nomor seri tanggal Excel (sel tanggal asli) juga diterima.
+	sheets[0].Rows[5][2] = "46023"
+	if d := finance.ParseOnboarding(sheets); d.Opening == nil || d.Opening.Tanggal != "2026-01-01" {
+		t.Fatalf("seri Excel: %+v %+v", d.Opening, d.Errors)
 	}
 }
 
@@ -345,9 +468,15 @@ func TestImporStok_KolomOpsionalDanStokMinimum(t *testing.T) {
 }
 
 func TestParseTagihanFile_AbaikanSheetLain(t *testing.T) {
-	// Template onboarding tujuh sheet diunggah di halaman Piutang & Utang: hanya sheet
+	// Berkas berisi beberapa sheet diunggah di halaman Piutang & Utang: hanya sheet
 	// piutang/utang yang dibaca, sheet lain tidak boleh jadi error.
-	list, errs, nama := finance.ParseTagihanFile(finance.OnboardingTemplate(""))
+	var karyawan finance.ImportSheet
+	for _, sh := range finance.OnboardingTemplate("") {
+		if sh.Nama == "Karyawan" {
+			karyawan = sh
+		}
+	}
+	list, errs, nama := finance.ParseTagihanFile(append(finance.TagihanTemplate(), karyawan))
 	if len(errs) != 0 {
 		t.Fatalf("tidak boleh ada error, got %+v", errs)
 	}

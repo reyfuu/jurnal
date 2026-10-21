@@ -37,6 +37,9 @@ var JenisList = []Jenis{
 	{"Beli Alat / Aset", "keluar", "aset"},
 	{"Bayar Cicilan", "keluar", "cicilan"},
 	{"Ambil Uang Pribadi", "keluar", "prive"},
+	// PPN keluaran (usaha PKP): dipungut dari pembeli bersama invoice, lalu disetor ke negara.
+	{"PPN Keluaran", "masuk", "ppn"},
+	{"Setor PPN", "keluar", "setor_ppn"},
 }
 
 // LookupJenis: info arah & pos untuk nama jenis transaksi.
@@ -53,7 +56,7 @@ func jenisOf(nama string) (Jenis, bool) {
 var posCategory = map[string]string{
 	"omzet": CatSales, "lain": CatOtherIncome, "modal": CatCapital, "pinjaman": CatLoan,
 	"hpp": CatCOGS, "potongan": CatChannelFee, "biaya": CatOpex,
-	"aset": CatAsset, "cicilan": CatLoanPayment, "prive": CatPrive,
+	"aset": CatAsset, "cicilan": CatLoanPayment, "prive": CatPrive, "ppn": CatPPN, "setor_ppn": CatPPN,
 }
 
 type Transaction struct {
@@ -69,6 +72,10 @@ type Transaction struct {
 	Lunas        bool   `json:"lunas"`
 	TanggalLunas string `json:"tanggal_lunas"`  // kosong = lunas di tanggal transaksi
 	Akun         string `json:"akun,omitempty"` // kode CoA koreksi user; kosong = otomatis dari jenis
+	// InvoiceID: transaksi dibuat & dijaga otomatis oleh invoice ini (penjualan DPP atau PPN
+	// keluarannya); JatuhTempo dari invoice, dipakai daftar piutang.
+	InvoiceID  int    `json:"invoice_id,omitempty"`
+	JatuhTempo string `json:"jatuh_tempo,omitempty"`
 	// StokID & QtyStok: barang yang dibeli (Beli Bahan / Stok) atau dijual (Penjualan) dan
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
@@ -231,6 +238,9 @@ func seedJenis(e LedgerEntry) string {
 }
 
 var bulanSingkat = [...]string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
+
+// FormatTanggalID: "2026-08-05" → "05 Agu 2026".
+func FormatTanggalID(d string) string { return formatTanggal(d) }
 
 func formatTanggal(d string) string {
 	t, err := time.Parse(time.DateOnly, d)

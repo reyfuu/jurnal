@@ -22,7 +22,7 @@ func tanggalKas(t Transaction) string { return cmp.Or(t.TanggalLunas, t.Tanggal)
 
 func lunasPada(t Transaction, sampai string) bool { return t.Lunas && tanggalKas(t) <= sampai }
 
-var posOperasi = map[string]bool{"omzet": true, "lain": true, "hpp": true, "potongan": true, "biaya": true}
+var posOperasi = map[string]bool{"omzet": true, "lain": true, "hpp": true, "potongan": true, "biaya": true, "ppn": true, "setor_ppn": true}
 
 // Posisi: saldo akun neraca (selain persediaan & aset tetap) pada akhir suatu tanggal.
 type Posisi struct {
@@ -30,6 +30,7 @@ type Posisi struct {
 	// Bagian operasional piutang/utang (modal kerja) — selebihnya dari pendanaan/investasi.
 	PiutangOps, UtangOps int64
 	SetorModal, Prive    int64 // kumulatif sejak saldo awal
+	UtangPPN             int64 // PPN keluaran dipungut − disetor
 }
 
 // PosisiPada menghitung saldo pada akhir tanggal sampai (YYYY-MM-DD; "YYYY-MM-00" = sebelum
@@ -71,6 +72,10 @@ func PosisiPada(ob OpeningBalance, txs []Transaction, sampai string) Posisi {
 			p.SetorModal += n
 		case "prive":
 			p.Prive += n
+		case "ppn":
+			p.UtangPPN += n
+		case "setor_ppn":
+			p.UtangPPN -= n
 		}
 	}
 	return p
@@ -120,6 +125,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 	}
 	cf := BuildCashFlow(kas, is, p0.Kas)
 	cf.NewReceivables = p1.PiutangOps - p0.PiutangOps
+	cf.KenaikanUtangPPN = p1.UtangPPN - p0.UtangPPN
 	cf.NewPayables = p1.UtangOps - p0.UtangOps
 	cf.NewReceivablesOther = (p1.Piutang - p1.PiutangOps) - (p0.Piutang - p0.PiutangOps)
 	cf.NewPayablesOther = (p1.Utang - p1.UtangOps) - (p0.Utang - p0.UtangOps)
@@ -150,7 +156,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 		OtherAssets: ob.AsetLain,
 	}
 	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets + a.OtherAssets
-	l := BalanceSheetLiabilities{Payables: p1.Utang, Loans: p1.Pinjaman, Other: ob.KewajibanLain}
+	l := BalanceSheetLiabilities{Payables: p1.Utang, Loans: p1.Pinjaman, Other: ob.KewajibanLain + p1.UtangPPN}
 	l.Total = l.Payables + l.Loans + l.Other
 	// Modal awal = yang dimiliki − kewajiban − laba ditahan saldo awal; untuk saldo awal yang
 	// seimbang sama dengan modal disetor. Laba ditahan saldo awal digabung dengan laba
@@ -186,6 +192,8 @@ type BarisUmur struct {
 	Nilai       int64  `json:"nilai"`
 	Hari        int    `json:"hari"`
 	Kelompok    int    `json:"kelompok"`
+	InvoiceID   int    `json:"invoice_id,omitempty"`
+	JatuhTempo  string `json:"jatuh_tempo,omitempty"`
 }
 
 type PihakUmur struct {
@@ -237,12 +245,26 @@ func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) U
 	if awal := ob.sisaAwal(piutang, per); awal > 0 && ob.Tanggal <= per {
 		tambah(BarisUmur{Tanggal: ob.Tanggal, Pihak: "Saldo awal", Keterangan: "Saldo awal pembukuan", Nilai: awal})
 	}
+	// Satu invoice = satu baris tagihan: penjualan (DPP) dan PPN keluarannya digabung.
+	var baris []BarisUmur
+	perInvoice := map[int]int{}
 	for _, t := range txs {
 		j, ok := jenisOf(t.Jenis)
 		if !ok || t.Tanggal > per || lunasPada(t, per) || (j.Arah == "masuk") != piutang {
 			continue
 		}
-		tambah(BarisUmur{TransaksiID: t.ID, Tanggal: t.Tanggal, Pihak: cmp.Or(t.Pihak, "(tanpa nama)"), Keterangan: cmp.Or(t.Keterangan, t.Item), Jenis: t.Jenis, Nilai: t.Nominal})
+		if i, ada := perInvoice[t.InvoiceID]; ada && t.InvoiceID != 0 {
+			baris[i].Nilai += t.Nominal
+			continue
+		}
+		if t.InvoiceID != 0 {
+			perInvoice[t.InvoiceID] = len(baris)
+		}
+		baris = append(baris, BarisUmur{TransaksiID: t.ID, Tanggal: t.Tanggal, Pihak: cmp.Or(t.Pihak, "(tanpa nama)"), Keterangan: cmp.Or(t.Keterangan, t.Item),
+			Jenis: t.Jenis, Nilai: t.Nominal, InvoiceID: t.InvoiceID, JatuhTempo: t.JatuhTempo})
+	}
+	for _, b := range baris {
+		tambah(b)
 	}
 	slices.SortStableFunc(out.Baris, func(a, b BarisUmur) int { return cmp.Compare(b.Hari, a.Hari) })
 	idx := map[string]int{}

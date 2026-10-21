@@ -274,7 +274,7 @@ function BantuJenis({ value, onPakai }: { value: string; onPakai: (jenis: JenisU
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="text-sm">
                 Rekomendasi: <strong>{sektor.nama}</strong>
-                {sektor !== SEKTOR[s.jenis] && <span className="block text-xs text-muted-foreground">Dicatat sebagai: {SEKTOR[s.jenis].nama}</span>}
+                {sektor !== SEKTOR[s.jenis] && <span className="block text-xs text-muted-foreground">Pembukuannya sama dengan usaha produksi (pilihan ketiga di atas)</span>}
               </div>
               <Button type="button" size="sm" variant={value === s.jenis ? 'default' : 'outline'} className="rounded-full" onClick={() => onPakai(s.jenis, s.kode)}>
                 {value === s.jenis ? 'Dipakai' : 'Pakai rekomendasi ini'}
