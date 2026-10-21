@@ -1730,6 +1730,14 @@ export interface TutupBuku {
 export const getTutupBuku = (period: string) => api<TutupBuku>(`/tutup-buku?period=${period}`)
 export const tutupBulan = (periode: string) => api<TutupBuku>('/tutup-buku', { method: 'POST', body: { periode } })
 export const bukaBulan = () => api<TutupBuku>('/tutup-buku', { method: 'DELETE' })
-export interface LangkahMulai { kode: string; judul: string; penjelasan: string; selesai: boolean; view: View; aksi?: string }
+export interface LangkahMulai { kode: string; judul: string; penjelasan: string; selesai: boolean; view: View; aksi?: string; peringatan?: string }
 export const getLangkahMulai = () => api<LangkahMulai[]>('/mulai')
+
+/** Kecocokan saldo awal dengan daftar aset, daftar barang & kartu stok, dan Harta = Kewajiban + Modal. */
+export interface CekKecocokan {
+  kode: string; judul: string; status: 'ok' | 'selisih' | 'info'
+  saldo_awal: number; pembanding: number; label_banding: string; selisih: number
+  pesan: string; view: View; langkah: string
+}
+export const getCekSaldoAwal = () => api<CekKecocokan[]>('/saldo-awal/cek')
 export const pelunasanSaldoAwal = (b: { jenis: 'piutang' | 'utang'; tanggal: string; nominal: number }) => api<unknown>('/opening/pelunasan', { method: 'POST', body: b })
