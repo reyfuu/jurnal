@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
+import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type SumberDanaAset, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
@@ -15,14 +15,23 @@ const formatMasaManfaat = (bulan: number) => `${bulan} bln (${bulan / 12} th)`
 
 const KOSONG: AssetInput = {
   nama: '', jenis_harta: '', kelompok: 'k1', metode: 'garis_lurus',
-  tanggal_perolehan: '', harga_perolehan: 0, tak_berwujud: false,
+  tanggal_perolehan: '', harga_perolehan: 0, tak_berwujud: false, sumber_dana: '',
 }
+
+// Pilihan sumber dana: menentukan pasangan aset di neraca (kas berkurang, utang, atau modal).
+const SUMBER: { value: SumberDanaAset; label: string; hint: string }[] = [
+  { value: 'kas', label: 'Dibayar tunai / transfer', hint: 'Kas berkurang. Transaksi "Beli Alat / Aset" dibuat otomatis.' },
+  { value: 'utang', label: 'Dibeli kredit / dicicil', hint: 'Tercatat sebagai utang. Lunasi nanti dari menu Piutang & Utang.' },
+  { value: 'modal', label: 'Barang dari pemilik (setoran modal)', hint: 'Barang pribadi pemilik yang dipakai usaha; menambah modal.' },
+]
+const NAMA_SUMBER: Record<string, string> = { kas: 'dibayar kas', utang: 'kredit / utang', modal: 'setoran modal' }
 
 function toInput(a: Asset): AssetInput {
   return {
     nama: a.nama, jenis_harta: a.jenis_harta, kelompok: a.kelompok || 'k1',
     metode: a.metode || 'garis_lurus', tanggal_perolehan: a.tanggal_perolehan,
     harga_perolehan: a.harga_perolehan, tak_berwujud: a.tak_berwujud, transaksi_id: a.transaksi_id,
+    sumber_dana: a.sumber_dana ?? '',
   }
 }
 
@@ -136,6 +145,14 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
 
       {!metodeUsaha && <PilihMetode key={data.metode_saran ?? ''} data={data} onChanged={onChanged} />}
 
+      {!!data.sumber_belum_dipilih && (
+        <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14 }}>
+          <strong>{data.sumber_belum_dipilih} aset belum dipilih sumber dananya.</strong>{' '}
+          Sementara dicatat sebagai tambahan modal supaya neraca seimbang, padahal bisa saja dibayar kas atau dicicil.
+          Klik <strong>Ubah</strong> pada aset bertanda <em>Sumber dana?</em> lalu pilih cara pembayarannya.
+        </div>
+      )}
+
       {data.pemetaan_belum_dicek > 0 && (
         <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14 }}>
           <strong>{data.pemetaan_belum_dicek} jenis harta belum diverifikasi</strong> ke Lampiran PMK 72/2023.
@@ -226,6 +243,28 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                 onChange={(e) => setForm({ ...form, tanggal_perolehan: e.target.value })}
               />
             </label>
+
+            {(() => {
+              const dariTransaksi = !!form.transaksi_id && form.sumber_dana !== 'kas' && form.sumber_dana !== 'utang'
+              const saldoAwal = !!data.tanggal_saldo_awal && !!form.tanggal_perolehan && form.tanggal_perolehan < data.tanggal_saldo_awal
+              if (dariTransaksi) {
+                return <div><span className="kpi-label">Sumber dana</span><div className="input-field" style={{ borderStyle: 'dashed' }}>Dari transaksi pembelian #{form.transaksi_id}</div></div>
+              }
+              if (saldoAwal) {
+                return <div><span className="kpi-label">Sumber dana</span><div className="input-field" style={{ borderStyle: 'dashed' }}>Sudah dimiliki sebelum saldo awal</div></div>
+              }
+              const pilih = SUMBER.find((x) => x.value === form.sumber_dana)
+              return (
+                <label>
+                  <span className="kpi-label">Dibayar dengan</span>
+                  <select className="input-field" required value={form.sumber_dana ?? ''} onChange={(e) => setForm({ ...form, sumber_dana: e.target.value as SumberDanaAset })}>
+                    <option value="" disabled>Pilih cara pembayaran…</option>
+                    {SUMBER.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+                  </select>
+                  {pilih && <span style={{ fontSize: 11, lineHeight: 1.3, color: 'var(--text-muted)' }}>{pilih.hint}</span>}
+                </label>
+              )
+            })()}
 
             <label>
               <span className="kpi-label">Harga Perolehan</span>
@@ -324,6 +363,10 @@ export function Aset({ data, onChanged }: { data: AssetSummary; onChanged: () =>
                   <td>
                     <div style={{ fontWeight: 600 }}>{a.nama}</div>
                     {a.draft && <span className="pill-status pill-amber" style={{ fontSize: 10 }}>Perlu dilengkapi</span>}
+                    {!a.draft && a.sumber_dana && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{NAMA_SUMBER[a.sumber_dana]}</div>}
+                    {!a.draft && !a.sumber_dana && !a.transaksi_id && data.tanggal_saldo_awal && a.tanggal_perolehan >= data.tanggal_saldo_awal && (
+                      <span className="pill-status pill-amber" style={{ fontSize: 10 }}>Sumber dana?</span>
+                    )}
                   </td>
                   <td>{a.draft ? '—' : `${a.kelompok_nama} · ${formatMasaManfaat(a.masa_manfaat)}`}</td>
                   <td>{a.tanggal_perolehan}</td>

@@ -1070,6 +1070,12 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	// Transaksi yang menjadi pembayaran aset terdaftar: menghapusnya membuat aset di neraca
+	// kehilangan pasangan kas/utangnya, jadi harus lewat menu Aset.
+	if j := slices.IndexFunc(s.assets, func(a finance.Asset) bool { return a.TransaksiID == s.txs[i].ID }); j >= 0 {
+		http.Error(w, "transaksi ini adalah pembelian aset \""+s.assets[j].Nama+"\"; ubah atau hapus dari menu Aset supaya neraca tetap seimbang", http.StatusConflict)
+		return
+	}
 	s.txs = slices.Delete(s.txs, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
 }

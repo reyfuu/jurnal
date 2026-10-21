@@ -233,6 +233,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Kolom tambahan users (Okt 2026): nomor WA & persetujuan UU PDP saat daftar mandiri.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wa TEXT;
+-- sumber dana aset tanpa transaksi (kas | utang | modal); kosong = belum dipilih
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS sumber_dana TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS persetujuan_pdp TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS versi_pdp TEXT;
 

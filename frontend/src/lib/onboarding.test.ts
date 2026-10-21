@@ -63,11 +63,20 @@ describe('steps', () => {
     expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'susut', 'ringkasan'])
   })
 
-  it('istri yang sudah menikah melewati tanggungan & gabung, PTKP K/0', () => {
+  it('istri yang masih menikah melewati tanggungan & gabung, PTKP TK/0', () => {
     const ans = a({ jenis: 'jasa', bentuk: 'op', kelamin: 'perempuan', menikah: 'sudah', tanggungan: '2', gabung: 'ya' })
     expect(steps(ans)).not.toContain('tanggungan')
     expect(steps(ans)).not.toContain('gabung')
-    expect(toProfile(ans).ptkp).toBe('K/0')
+    expect(toProfile(ans).ptkp).toBe('TK/0')
+  })
+
+  it('janda / duda: TK, tanggungan ditanya & dihitung, tanpa pertanyaan gabung', () => {
+    for (const kelamin of ['perempuan', 'laki']) {
+      const ans = a({ jenis: 'jasa', bentuk: 'op', kelamin, menikah: 'cerai', tanggungan: '2', gabung: 'ya' })
+      expect(steps(ans)).toContain('tanggungan')
+      expect(steps(ans)).not.toContain('gabung')
+      expect(toProfile(ans).ptkp).toBe('TK/2')
+    }
   })
 
   it('perempuan belum menikah tetap ditanya tanggungan', () => {

@@ -72,7 +72,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   },
   kelamin: {
     judul: 'Apa jenis kelamin Anda?',
-    alasan: 'Dalam aturan pajak penghasilan, tanggungan keluarga melekat pada **suami sebagai kepala keluarga**. Untuk **istri yang sudah menikah**, statusnya **K/0** dan tidak ada tanggungan yang dihitung, jadi pertanyaan tanggungan dilewati.',
+    alasan: 'Dalam aturan pajak penghasilan, tanggungan keluarga melekat pada **suami sebagai kepala keluarga**. **Istri yang masih menikah** memakai status **TK/0** tanpa tanggungan, jadi pertanyaan tanggungan dilewati. **Janda** (cerai atau suami meninggal) boleh menghitung tanggungannya lagi.',
     options: [
       { value: 'laki', label: 'Laki-laki' },
       { value: 'perempuan', label: 'Perempuan' },
@@ -84,6 +84,7 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     options: [
       { value: 'belum', label: 'Belum menikah' },
       { value: 'sudah', label: 'Sudah menikah' },
+      { value: 'cerai', label: 'Cerai, atau pasangan sudah meninggal', hint: 'Janda / duda: status TK, tanggungan tetap dihitung' },
     ],
   },
   tanggungan: {
@@ -123,7 +124,8 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
 }
 
 const pribadi = (a: Answers) => a.bentuk === 'op' || a.bentuk === 'tidak_tahu'
-// istri: perempuan menikah; tanggungan melekat pada suami, statusnya K/0.
+// istri: perempuan yang masih menikah; tanggungan melekat pada suami, statusnya TK/0.
+// Janda/duda (cerai hidup atau mati) berstatus TK dan boleh menghitung tanggungan.
 const istri = (a: Answers) => a.kelamin === 'perempuan' && a.menikah === 'sudah'
 const jualBarang = (a: Answers) => a.jenis === 'perdagangan' || a.jenis === 'manufaktur'
 
@@ -153,7 +155,7 @@ export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
   const bentuk = (pribadi(a) ? 'op' : a.bentuk) as BentukUsaha
   const n = istri(a) ? 0 : Math.min(Number(a.tanggungan) || 0, 3)
-  const status = a.menikah !== 'sudah' ? 'TK' : !istri(a) && a.gabung === 'ya' ? 'K/I' : 'K'
+  const status = a.menikah !== 'sudah' || istri(a) ? 'TK' : a.gabung === 'ya' ? 'K/I' : 'K'
   return {
     nama_usaha: (a.nama ?? '').trim(),
     alamat: (a.alamat ?? '').trim(),
