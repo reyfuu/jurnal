@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Combobox } from '@/components/ui/combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { getWilayah, saranKLU, saveBusiness, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
+import { getMetodeStok, getWilayah, saranKLU, saveBusiness, type MetodeNilaiStok, type MetodeStok, type Option, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 import { cekLabaOmzet } from '@/lib/kalkulator'
@@ -341,6 +341,10 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <p className="text-xs text-muted-foreground">Belum yakin? Pilih Periodik, yang paling umum dipakai UMKM.</p>
         </div>
       )}
+      {(p.jenis_usaha === 'perdagangan' || p.jenis_usaha === 'manufaktur') && (
+        <MetodeStokField options={info.options.metode_nilai_stok ?? []} value={p.metode_nilai_stok || ''}
+          onChange={(v) => set({ metode_nilai_stok: v })} />
+      )}
       <div className="grid gap-1.5">
         <Label>Metode penyusutan aset</Label>
         {info.profile?.metode_penyusutan ? (
@@ -615,6 +619,31 @@ function FakturFields({ p, set }: { p: BusinessProfile; set: (patch: Partial<Bus
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Metode nilai stok: sama seperti metode penyusutan — dipilih sekali lalu dikunci. Status kunci
+ *  dari server, karena usaha yang sudah memulai kartu stok terkunci walau profilnya belum mencatat. */
+function MetodeStokField({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: MetodeNilaiStok) => void }) {
+  const [status, setStatus] = useState<MetodeStok | null>(null)
+  useEffect(() => { getMetodeStok().then(setStatus, () => setStatus(null)) }, [])
+  const label = (v: string) => options.find((o) => o.value === v)?.label ?? v
+  return (
+    <div className="grid gap-1.5">
+      <Label>Cara menghitung nilai stok &amp; modal barang terjual</Label>
+      {status?.terkunci ? (
+        <p className="text-sm">
+          <b>{label(status.metode)}</b> untuk semua barang.{' '}
+          <span className="text-muted-foreground">Sudah dikunci; perubahan metode memerlukan persetujuan DJP.</span>
+        </p>
+      ) : (
+        <>
+          <ChoiceGrid name="Metode nilai stok" options={options} value={value || status?.metode || 'fifo'}
+            onChange={(v) => onChange(v as MetodeNilaiStok)} />
+          <p className="text-xs" style={{ color: 'var(--text-warn)' }}>Berlaku untuk semua barang dan tidak bisa diubah setelah disimpan. Belum yakin? Pilih FIFO.</p>
+        </>
       )}
     </div>
   )

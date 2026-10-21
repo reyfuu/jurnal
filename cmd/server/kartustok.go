@@ -20,7 +20,8 @@ import (
 
 // kartuLocked: s.mu harus terkunci (baca).
 func (s *tenant) kartuLocked() finance.KartuStok {
-	return finance.HitungKartu(s.stok, s.txs, s.gerak)
+	m, _ := s.metodeStokLocked()
+	return finance.HitungKartuMetode(m, s.stok, s.txs, s.gerak)
 }
 
 func (s *tenant) kartu() (finance.KartuStok, []finance.StokItem) {
@@ -146,6 +147,11 @@ func (s *tenant) handleStokAwal(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.cekBarisFisik(b.Baris); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Kartu stok dimulai: metode nilai stok (pilihan atau bawaan FIFO) dikunci sejak titik nol.
+	if err := s.kunciMetodeStokLocked(); err != nil {
+		http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 		return
 	}
 	s.simpanGerak(w, r, finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakAwal, Baris: b.Baris, Keterangan: b.Keterangan})
@@ -370,7 +376,7 @@ func (s *tenant) handleMutasiStokXlsx(w http.ResponseWriter, r *http.Request) {
 	l := k.Mutasi(stok, dari, sampai)
 	rows := [][]string{
 		{"Laporan Mutasi Stok", dari + " s.d. " + sampai},
-		{"Jumlah dalam satuan barang; nilai dalam rupiah (rata-rata bergerak)."},
+		{"Jumlah dalam satuan barang; nilai dalam rupiah (" + finance.NamaMetodeStok(k.Metode) + ")."},
 		{},
 		{"SKU", "Barang", "Satuan", "Awal", "Beli", "Hasil produksi", "Terjual", "Dipakai produksi", "Selisih opname", "Akhir",
 			"Nilai awal", "Nilai beli", "Nilai produksi", "HPP terjual", "Nilai dipakai", "Nilai selisih opname", "Nilai akhir"},
@@ -517,9 +523,12 @@ func (s *tenant) handleLaporanProduksiXlsx(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	l := s.laporanProduksi(dari, sampai)
+	s.mu.RLock()
+	metode, _ := s.metodeStokLocked()
+	s.mu.RUnlock()
 	rows := [][]string{
 		{"Laporan Produksi", dari + " s.d. " + sampai},
-		{"Nilai barang jadi = nilai bahan dari stok yang terpakai (rata-rata bergerak)."},
+		{"Nilai barang jadi = nilai bahan dari stok yang terpakai (" + finance.NamaMetodeStok(metode) + ")."},
 		{},
 		{"Tanggal", "Produk", "Batch", "Hasil", "Satuan", "Nilai", "Nilai per unit", "Bahan terpakai", "Dicatat oleh"},
 	}

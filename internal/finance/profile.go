@@ -22,6 +22,9 @@ type BusinessProfile struct {
 	// lurus). Dipilih sekali; kosong = belum dipilih (profil lama, metode masih per aset).
 	// Setelah terisi tidak bisa diganti dari aplikasi — perubahan metode butuh persetujuan DJP.
 	MetodePenyusutan string `json:"metode_penyusutan,omitempty"`
+	// MetodeNilaiStok: fifo | rata_rata — cara menilai persediaan & HPP (Pasal 10 ayat 6 UU
+	// PPh). Sama seperti metode penyusutan: dipilih sekali lalu dikunci; kosong = belum dipilih.
+	MetodeNilaiStok string `json:"metode_nilai_stok,omitempty"`
 	// KLU: kelompok KLU 3 digit (tax.KLUBenchmarks); dasar pembanding NPM & CTTOR nasional.
 	KLU string `json:"klu,omitempty"`
 
@@ -80,6 +83,11 @@ type Option struct {
 var MetodePenyusutanOptions = []Option{
 	{MetodeGarisLurus, "Garis lurus", "Beban penyusutan sama setiap tahun. Paling umum; pilih ini kalau ragu."},
 	{MetodeSaldoMenurun, "Saldo menurun", "Beban besar di tahun-tahun awal lalu mengecil. Bangunan tetap garis lurus."},
+}
+
+var MetodeNilaiStokOptions = []Option{
+	{MetodeFIFO, "FIFO — masuk pertama, keluar pertama", "Barang yang dibeli lebih dulu dianggap terjual lebih dulu. Nilai stok mengikuti harga beli terbaru. Pilihan bawaan."},
+	{MetodeRataRata, "Rata-rata bergerak", "Setiap pembelian dirata-rata dengan stok yang ada; barang keluar dinilai harga rata-rata saat itu."},
 }
 
 var JenisUsahaOptions = []Option{
@@ -144,6 +152,9 @@ func (p *BusinessProfile) Validate() error {
 	}
 	if p.MetodePenyusutan != "" && !hasOption(MetodePenyusutanOptions, p.MetodePenyusutan) {
 		return errors.New("metode penyusutan harus garis_lurus atau saldo_menurun")
+	}
+	if p.MetodeNilaiStok != "" && !hasOption(MetodeNilaiStokOptions, p.MetodeNilaiStok) {
+		return errors.New("metode nilai stok harus fifo atau rata_rata")
 	}
 	if p.BentukUsaha != "op" {
 		p.PTKP = "" // PTKP hanya berlaku untuk wajib pajak orang pribadi

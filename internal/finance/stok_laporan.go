@@ -2,7 +2,7 @@ package finance
 
 // Kartu stok → laporan keuangan. Mulai titik nol, pembelian barang yang dilacak tidak lagi
 // langsung jadi HPP tapi masuk persediaan; HPP = modal barang yang benar-benar terjual
-// (rata-rata bergerak) ditambah barang hilang/rusak dari opname. Persediaan di neraca = nilai
+// (FIFO / rata-rata bergerak) ditambah barang hilang/rusak dari opname. Persediaan di neraca = nilai
 // kartu stok akhir periode, dan arus kas metode tidak langsung memuat kenaikan persediaan.
 // Periode sebelum titik nol tidak berubah.
 

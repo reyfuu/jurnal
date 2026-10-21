@@ -21,7 +21,7 @@ func (s *tenant) handleListProduksi(w http.ResponseWriter, _ *http.Request) {
 	s.mu.RLock()
 	produk := slices.Clone(s.produk)
 	supplier := slices.Clone(s.supplier)
-	// Setelah titik nol, harga bahan & HPP di stok memakai rata-rata kartu stok.
+	// Setelah titik nol, harga bahan & HPP di stok memakai nilai kartu stok (FIFO / rata-rata).
 	stok := finance.TerapkanKartu(slices.Clone(s.stok), s.kartuLocked())
 	// Utang per supplier dari buku besar (pembelian belum dibayar), sama dengan Neraca.
 	tagihan := s.tagihanBukuLocked(time.Now().In(finance.WIB).Format(time.DateOnly))
