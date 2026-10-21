@@ -27,6 +27,7 @@ import (
 	"pajak/internal/llm"
 	"pajak/internal/master"
 	"pajak/internal/pengetahuan"
+	"pajak/internal/primbon"
 	"pajak/internal/xlsx"
 )
 
@@ -110,6 +111,9 @@ type Server struct {
 	// pengetahuan: artikel pajak & sumber yang dibaca AI (Panel Master, Pustaka Pajak klien).
 	pengetahuanMu sync.Mutex
 	pengetahuan   pengetahuan.State
+	// primbon: katalog peraturan resmi (REGULASI_DIR); primbonUser: bookmark & catatan per pengguna.
+	primbon     *primbon.Katalog
+	primbonUser *primbonStore
 }
 
 // newTenant membuat usaha kosong (hasil register).
@@ -216,6 +220,8 @@ func NewServer() *Server {
 	pasangKatalog(s.katalog)
 	s.bootstrapMaster()
 	s.adoptOrphans()
+	s.primbon = primbon.Buka(cmp.Or(os.Getenv("REGULASI_DIR"), filepath.Join("docs", "peraturan")))
+	s.loadPrimbon()
 	s.routes()
 	return s
 }
@@ -423,6 +429,7 @@ func (s *Server) routes() {
 	s.masterRoutes()
 	s.katalogRoutes()
 	s.pengetahuanRoutes()
+	s.primbonRoutes()
 	s.mux.HandleFunc("GET /api/v1/koreksi", s.guard("usulan-koreksi", s.on((*tenant).handleListKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/setujui", s.persisting(s.guard("usulan-koreksi", s.handleSetujuiKoreksi)))
 	s.mux.HandleFunc("POST /api/v1/koreksi/{id}/tolak", s.persisting(s.guard("usulan-koreksi", s.handleTolakKoreksi)))
