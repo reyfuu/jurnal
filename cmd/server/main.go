@@ -392,9 +392,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/karyawan/{id}", s.persisting(s.guard("karyawan", s.on((*tenant).handleDeleteKaryawan))))
 
 	s.mux.HandleFunc("GET /api/v1/tagihan", s.guard("piutang-utang", s.on((*tenant).handleListTagihan)))
-	s.mux.HandleFunc("POST /api/v1/tagihan", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleCreateTagihan))))
-	s.mux.HandleFunc("GET /api/v1/tagihan/template", s.guard("piutang-utang", s.handleTagihanTemplate))
-	s.mux.HandleFunc("POST /api/v1/tagihan/import", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleImportTagihan))))
+	// Tagihan manual (di luar pembukuan) hanya dibaca, diubah, dihapus: tagihan baru diterbitkan
+	// lewat menu Invoice atau dicatat sebagai transaksi belum lunas.
 	s.mux.HandleFunc("PUT /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleUpdateTagihan))))
 	s.mux.HandleFunc("DELETE /api/v1/tagihan/{id}", s.persisting(s.guard("piutang-utang", s.on((*tenant).handleDeleteTagihan))))
 

@@ -35,23 +35,6 @@ func decodeTagihan(w http.ResponseWriter, r *http.Request) (finance.Tagihan, boo
 	return t, true
 }
 
-func (s *tenant) handleCreateTagihan(w http.ResponseWriter, r *http.Request) {
-	t, ok := decodeTagihan(w, r)
-	if !ok {
-		return
-	}
-	s.mu.Lock()
-	if s.nextTagihanID == 0 {
-		s.nextTagihanID = 1
-	}
-	t.ID = s.nextTagihanID
-	s.nextTagihanID++
-	s.tagihan = append(s.tagihan, t)
-	s.mu.Unlock()
-	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, t)
-}
-
 // tagihanIndex harus dipanggil dengan s.mu terkunci.
 func (s *tenant) tagihanIndex(r *http.Request) int {
 	id, _ := strconv.Atoi(r.PathValue("id"))
@@ -200,10 +183,6 @@ func writeTemplate(w http.ResponseWriter, nama string, tpl []finance.ImportSheet
 	_ = xlsx.Write(w, sheets)
 }
 
-func (s *Server) handleTagihanTemplate(w http.ResponseWriter, r *http.Request) {
-	writeTemplate(w, "template-piutang-utang.xlsx", finance.TagihanTemplate())
-}
-
 func (s *Server) handleStokTemplate(w http.ResponseWriter, r *http.Request) {
 	writeTemplate(w, "template-stok-gudang.xlsx", finance.StokTemplate())
 }
@@ -215,38 +194,8 @@ type menuImportResp struct {
 	Errors   []finance.SheetError `json:"errors"`
 	Imported bool                 `json:"imported"`
 	Diganti  int                  `json:"diganti"` // baris lama yang ditimpa saat mode=ganti
-	Tagihan  []finance.Tagihan    `json:"tagihan,omitempty"`
 	Stok     []finance.StokItem   `json:"stok,omitempty"`
 	Invoice  []finance.Invoice    `json:"invoice,omitempty"`
-}
-
-func (s *tenant) handleImportTagihan(w http.ResponseWriter, r *http.Request) {
-	sheets, ok := uploadedSheets(w, r)
-	if !ok {
-		return
-	}
-	list, errs, nama := finance.ParseTagihanFile(sheets)
-	resp := menuImportResp{Sheet: nama, Valid: len(list), Errors: errs, Tagihan: list}
-	if r.URL.Query().Get("commit") != "1" {
-		writeJSON(w, resp)
-		return
-	}
-	s.mu.Lock()
-	if r.URL.Query().Get("mode") == "ganti" {
-		resp.Diganti = len(s.tagihan)
-		s.tagihan = nil
-	}
-	if s.nextTagihanID == 0 {
-		s.nextTagihanID = 1
-	}
-	for _, t := range list {
-		t.ID = s.nextTagihanID
-		s.nextTagihanID++
-		s.tagihan = append(s.tagihan, t)
-	}
-	s.mu.Unlock()
-	resp.Imported = true
-	writeJSON(w, resp)
 }
 
 func (s *tenant) handleImportStok(w http.ResponseWriter, r *http.Request) {

@@ -1160,7 +1160,6 @@ export const mutasiStokXlsxUrl = (dari: string, sampai: string) => `/api/v1/stok
 export const getPilihanBarang = () => api<{ mulai: string; barang: PilihanBarang[] }>('/stok/pilihan')
 
 export const getTagihan = () => api<TagihanSummary>('/tagihan')
-export const createTagihan = (t: TagihanInput) => api<Tagihan>('/tagihan', { method: 'POST', body: t })
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
 export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
 
@@ -1169,7 +1168,6 @@ export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'PO
 export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
 export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })
 
-export const TAGIHAN_TEMPLATE_URL = '/api/v1/tagihan/template'
 export const STOK_TEMPLATE_URL = '/api/v1/stok/template'
 export const INVOICE_TEMPLATE_URL = '/api/v1/invoice/template'
 
@@ -1199,7 +1197,6 @@ async function importMenu(path: string, file: File, commit: boolean, mode: Impor
   return res.json()
 }
 
-export const importTagihan = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/tagihan', f, commit, mode)
 export const importStok = (f: File, commit: boolean, mode: ImportMode = 'tambah') => importMenu('/stok', f, commit, mode)
 /** Invoice selalu ditambahkan (tidak ada mode ganti: invoice lama sudah dibukukan). */
 export const importInvoice = (f: File, commit: boolean) => importMenu('/invoice', f, commit, 'tambah')

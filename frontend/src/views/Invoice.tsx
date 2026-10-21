@@ -123,7 +123,7 @@ export function InvoiceView() {
 
   return (
     <>
-      <PageHeader title="Invoice" subtitle="Terbitkan faktur penjualan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan & piutang.">
+      <PageHeader title="Invoice" subtitle="Terbitkan tagihan ke pelanggan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan dan muncul di Piutang & Utang untuk dipantau & ditagih.">
         <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={() => setImpor(true)}>
           Impor Excel
         </button>

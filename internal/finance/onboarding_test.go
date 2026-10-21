@@ -467,38 +467,6 @@ func TestImporStok_KolomOpsionalDanStokMinimum(t *testing.T) {
 	}
 }
 
-func TestParseTagihanFile_AbaikanSheetLain(t *testing.T) {
-	// Berkas berisi beberapa sheet diunggah di halaman Piutang & Utang: hanya sheet
-	// piutang/utang yang dibaca, sheet lain tidak boleh jadi error.
-	var karyawan finance.ImportSheet
-	for _, sh := range finance.OnboardingTemplate("") {
-		if sh.Nama == "Karyawan" {
-			karyawan = sh
-		}
-	}
-	list, errs, nama := finance.ParseTagihanFile(append(finance.TagihanTemplate(), karyawan))
-	if len(errs) != 0 {
-		t.Fatalf("tidak boleh ada error, got %+v", errs)
-	}
-	if nama != "Piutang & Utang" {
-		t.Errorf("sheet terbaca %q", nama)
-	}
-	if len(list) != 3 {
-		t.Fatalf("3 baris contoh, got %d", len(list))
-	}
-	var piutang, utang int
-	for _, x := range list {
-		if x.Jenis == finance.TagihanPiutang {
-			piutang++
-		} else {
-			utang++
-		}
-	}
-	if piutang != 2 || utang != 1 {
-		t.Errorf("want 2 piutang 1 utang, got %d/%d", piutang, utang)
-	}
-}
-
 func TestParseStokFile_SheetTanpaNamaYangDikenali(t *testing.T) {
 	rows := finance.StokTemplate()[0].Rows
 	// "Sheet1" dari Google Sheets / Save As harus tetap terbaca selama itu satu-satunya sheet.
