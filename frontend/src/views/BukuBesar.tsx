@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
-import { bukuBesarXlsxUrl, getBukuBesar, type AkunBukuBesar, type BukuBesar as DataBukuBesar, type FilterBukuBesar } from '@/lib/api'
+import { bukuBesarXlsxUrl, getBukuBesar, type AkunBukuBesar, type BukuBesar as DataBukuBesar, type FilterBukuBesar, type View } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
@@ -14,7 +14,7 @@ const RED = 'var(--text-danger)'
  * dan rincian tiap akun dengan saldo berjalan saat barisnya dibuka. Saldo mengikuti saldo normal
  * akun, jadi akun kredit (utang, modal, pendapatan) tampil positif seperti di neraca.
  */
-export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: boolean }) {
+export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bisaEkspor: boolean; navigate?: (v: View) => void }) {
   const [f, setF] = useState<FilterBukuBesar>(() => rentangBulan(period))
   const [data, setData] = useState<DataBukuBesar | null>(null)
   const [error, setError] = useState('')
@@ -43,6 +43,9 @@ export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: 
       (semua || a.saldo_awal !== 0 || a.debit !== 0 || a.kredit !== 0 || a.saldo_akhir !== 0) &&
       (!q || a.kode.includes(q) || a.nama.toLowerCase().includes(q)))
   }, [data, cari, semua])
+
+  // Rentang tanpa saldo & mutasi sama sekali (usaha baru): jelaskan kenapa kosong.
+  const kosong = !!data && data.akun.every((a) => !a.saldo_awal && !a.debit && !a.kredit && !a.saldo_akhir)
 
   const kelompok = useMemo(() => {
     const out: { nama: string; akun: AkunBukuBesar[] }[] = []
@@ -128,7 +131,23 @@ export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: 
                   </tr>
                 </thead>
                 <tbody>
-                  {kelompok.length === 0 && <tr><td colSpan={6} className="text-muted-foreground">Tidak ada akun yang cocok.</td></tr>}
+                  {kelompok.length === 0 && (
+                    <tr><td colSpan={6} className="text-muted-foreground" style={{ whiteSpace: 'normal' }}>
+                      {kosong && !cari.trim() ? (
+                        <div style={{ padding: '10px 0' }}>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Belum ada saldo awal maupun transaksi di {data.period_label}.</div>
+                          <div className="text-sm" style={{ marginTop: 4 }}>
+                            Buku Besar terisi dari saldo awal dan transaksi. Isi saldo awal dulu, lalu catat transaksi (atau impor mutasi rekening).
+                          </div>
+                          <div className="flex flex-wrap gap-2" style={{ marginTop: 10 }}>
+                            {navigate && <Button size="sm" onClick={() => navigate('saldo-awal')}>Isi saldo awal</Button>}
+                            {navigate && <Button size="sm" variant="outline" onClick={() => navigate('transaksi')}>Catat transaksi</Button>}
+                            <Button size="sm" variant="outline" onClick={() => setSemua(true)}>Lihat semua akun (CoA)</Button>
+                          </div>
+                        </div>
+                      ) : 'Tidak ada akun yang cocok.'}
+                    </td></tr>
+                  )}
                   {kelompok.map((g) => (
                     <Fragment key={g.nama}>
                       <tr><td colSpan={6} className="section-head" style={{ background: 'var(--bg-raised)' }}>{g.nama}</td></tr>

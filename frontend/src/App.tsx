@@ -351,7 +351,7 @@ export default function App() {
       case 'laporan-transaksi':
         return <LaporanTransaksi period={period} bisaEkspor={!me!.lihat} />
       case 'buku-besar':
-        return <BukuBesar period={period} bisaEkspor={!me!.lihat} />
+        return <BukuBesar period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
       case 'saldo-awal':
         return <SaldoAwal onChanged={() => reload(me!, period)} navigate={navigate} bisaUbah={!me!.lihat} />
       case 'impor-data':

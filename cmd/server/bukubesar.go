@@ -65,6 +65,7 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 	out := bukuBesarResp{Period: dari[:7], PeriodLabel: labelRentang(dari, sampai), Dari: dari, Sampai: sampai, Akun: []akunBukuBesar{}, Pilihan: []pilihanAkun{}}
 	var urutan []coa.Account
 	akunMap := map[string]*akunBukuBesar{}
+	pengisi := map[string]bool{} // akun nol yang ditambahkan, belum pernah muncul di neraca saldo
 	for bulan := dari[:7]; bulan <= sampai[:7]; bulan = bulanBerikut(bulan) {
 		j, ok := s.jurnalPeriode(bulan)
 		if !ok {
@@ -78,13 +79,22 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 			}
 		}
 		for _, b := range j.tb {
-			if akunMap[b.Kode] == nil {
+			if a := akunMap[b.Kode]; a == nil || (pengisi[b.Kode] && a.Debit == 0 && a.Kredit == 0 && a.SaldoAwal == 0) {
+				delete(pengisi, b.Kode)
 				a := &akunBukuBesar{Kode: b.Kode, Nama: b.Nama, Kelompok: b.Kelompok, Normal: b.Normal, Baris: []barisBukuBesar{}}
 				// Akun yang baru muncul di bulan berikutnya: saldo awalnya dari bulan itu (0
 				// sebelum ada mutasi apa pun).
 				a.SaldoAwal = tandaNormal(b.Normal) * j.saldoAwal[b.Kode]
 				a.SaldoAkhir = a.SaldoAwal
 				akunMap[b.Kode] = a
+			}
+		}
+		// Akun aktif tanpa saldo & mutasi tetap dikirim (bernilai nol) supaya "Tampilkan akun
+		// tanpa saldo" menampilkan seluruh CoA, termasuk usaha yang belum punya transaksi.
+		for _, a := range j.active {
+			if akunMap[a.Kode] == nil {
+				akunMap[a.Kode] = &akunBukuBesar{Kode: a.Kode, Nama: a.Nama, Kelompok: a.Kelompok, Normal: a.Normal, Baris: []barisBukuBesar{}}
+				pengisi[a.Kode] = true
 			}
 		}
 		entri := slices.Clone(j.entri)
