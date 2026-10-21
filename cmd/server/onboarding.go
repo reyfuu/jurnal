@@ -90,7 +90,42 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 	d := finance.ParseOnboarding(sheets)
 	s.mu.RLock()
 	finance.TerapkanMetode(d.Assets, s.metodeUsaha()) // kolom Metode di Excel kalah oleh metode usaha
+	awal, simpanan := s.bukuAwalLocked().Period(), s.opening
 	s.mu.RUnlock()
+	if d.Opening != nil {
+		awal = d.Opening.Period()
+	} else if simpanan == nil {
+		// Tanggal mulai turunan transaksi ikut mundur bila transaksi impor lebih tua.
+		for _, t := range d.Transaksi {
+			if len(t.Tanggal) >= 7 && t.Tanggal[:7] < awal {
+				awal = t.Tanggal[:7]
+			}
+		}
+	}
+	// Aset impor = aset per saldo awal. Yang diperoleh pada/sesudah bulan mulai tidak punya
+	// transaksi kas, jadi laporan membacanya sebagai "Tambahan modal": daftarkan lewat menu Aset.
+	n := 0
+	for _, a := range d.Assets {
+		if a.TanggalPerolehan[:7] >= awal {
+			d.Errors = append(d.Errors, finance.SheetError{Sheet: "Aset", Pesan: a.Nama + " diperoleh " + a.TanggalPerolehan +
+				", tidak sebelum bulan mulai pembukuan (" + awal + "). Daftarkan lewat menu Aset dan pilih sumber dananya (kas, utang, atau modal) supaya tidak terbaca sebagai tambahan modal"})
+			continue
+		}
+		d.Assets[n] = a
+		n++
+	}
+	d.Assets = d.Assets[:n]
+	// Daftar aset baru tanpa saldo awal di berkas: saldo awal tersimpan bisa jadi tidak cocok
+	// (sama seperti menambah aset lama lewat menu Aset, cukup diperingatkan).
+	if d.Opening == nil && simpanan != nil && len(simpanan.Rincian) > 0 && len(d.Assets) > 0 {
+		s.mu.RLock()
+		nbv := finance.AssetsForPeriod(d.Assets, s.txs, simpanan.Period()).NilaiBukuAwal
+		s.mu.RUnlock()
+		if nbv != simpanan.AsetTetap {
+			d.Errors = append(d.Errors, finance.SheetError{Sheet: "Aset", Pesan: "nilai buku daftar aset ini per saldo awal " + finance.FormatRupiahPenuh(nbv) +
+				", sedangkan Saldo Awal mencatat aset tetap " + finance.FormatRupiahPenuh(simpanan.AsetTetap) + ". Sesuaikan menu Saldo Awal sesudah impor"})
+		}
+	}
 
 	resp := onboardingResp{
 		Opening: d.Opening, Assets: d.Assets, Karyawan: d.Karyawan,

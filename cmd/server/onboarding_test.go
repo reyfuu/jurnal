@@ -96,8 +96,8 @@ func TestOnboardingImport_PratinjauLaluCommit(t *testing.T) {
 		}},
 		{Nama: "Aset", Rows: [][]string{
 			{"Nama Aset", "Jenis Harta", "Metode", "Tanggal Perolehan", "Harga Perolehan"},
-			{"Oven Deck 2 Pintu", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2026-02-01", "24000000"},
-			{"Pesawat Jet", "Pesawat terbang", "Garis Lurus", "2026-02-01", "1000000"},
+			{"Oven Deck 2 Pintu", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2025-02-01", "24000000"},
+			{"Pesawat Jet", "Pesawat terbang", "Garis Lurus", "2025-02-01", "1000000"},
 		}},
 		{Nama: "Karyawan", Rows: [][]string{
 			{"Nama", "Jabatan", "Tanggal Masuk", "Gaji Pokok", "Tunjangan", "Status PTKP"},
@@ -171,6 +171,97 @@ func TestOnboardingImport_PratinjauLaluCommit(t *testing.T) {
 	if bs.Assets.Inventory != 8_250_000 {
 		t.Errorf("persediaan dari neraca awal: got %d", bs.Assets.Inventory)
 	}
+}
+
+// Aset hasil impor data awal adalah aset per saldo awal. Aset yang diperoleh pada/sesudah bulan
+// mulai pembukuan tidak punya transaksi kas, sehingga laporan membukukannya sebagai
+// "Tambahan modal" (temuan tester). Baris itu dilewati dengan pesan; aset lama tetap masuk.
+func TestOnboardingImport_AsetSesudahTanggalMulaiBukanTambahanModal(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	sheets := []finance.ImportSheet{
+		{Nama: "Saldo Awal", Rows: [][]string{
+			{"Keterangan", "Nilai"},
+			{"Tanggal Mulai Pembukuan", "2026-01-01"},
+			{"Kas & Bank", "45.000.000"},
+		}},
+		{Nama: "Aset", Rows: [][]string{
+			{"Nama Aset", "Jenis Harta", "Metode", "Tanggal Perolehan", "Harga Perolehan"},
+			{"Oven Deck 2 Pintu", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2026-02-01", "24000000"},
+			{"Mixer Planetary", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2025-06-01", "6000000"},
+		}},
+	}
+	body, ctype := workbookUpload(t, sheets)
+	var res onboardingResp
+	_ = json.NewDecoder(upload(srv, owner, "/api/v1/onboarding/import", body, ctype).Body).Decode(&res)
+	if len(res.Assets) != 1 || res.Assets[0].Nama != "Mixer Planetary" {
+		t.Fatalf("hanya aset sebelum tanggal mulai yang masuk pratinjau: %+v", res.Assets)
+	}
+	if !adaError(res.Errors, "Aset", "Oven Deck 2 Pintu") {
+		t.Fatalf("oven harus dilaporkan di sheet Aset: %+v", res.Errors)
+	}
+
+	body, ctype = workbookUpload(t, sheets)
+	if rec := upload(srv, owner, "/api/v1/onboarding/import?commit=1", body, ctype); rec.Code != http.StatusOK {
+		t.Fatalf("commit: %d %s", rec.Code, rec.Body)
+	}
+	for _, p := range []string{"2026-01", "2026-02"} {
+		var as finance.AssetSummary
+		_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/assets?period="+p, "").Body).Decode(&as)
+		if as.TambahanTanpaKas != 0 {
+			t.Errorf("%s: aset impor tidak boleh jadi tambahan modal, got %d", p, as.TambahanTanpaKas)
+		}
+		if len(as.Assets) != 1 {
+			t.Errorf("%s: register setelah impor: %+v", p, as.Assets)
+		}
+	}
+}
+
+// Tanpa sheet Saldo Awal, batasnya tanggal mulai buku usaha (data demo: 2026-01-01).
+func TestOnboardingImport_AsetSajaMemakaiTanggalMulaiUsaha(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	body, ctype := workbookUpload(t, []finance.ImportSheet{{Nama: "Aset", Rows: [][]string{
+		{"Nama Aset", "Jenis Harta", "Metode", "Tanggal Perolehan", "Harga Perolehan"},
+		{"Oven Deck 2 Pintu", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2026-02-01", "24000000"},
+	}}})
+	var res onboardingResp
+	_ = json.NewDecoder(upload(srv, owner, "/api/v1/onboarding/import", body, ctype).Body).Decode(&res)
+	if len(res.Assets) != 0 || !adaError(res.Errors, "Aset", "Oven Deck 2 Pintu") {
+		t.Fatalf("oven sesudah tanggal mulai buku harus dilewati: aset %+v, error %+v", res.Assets, res.Errors)
+	}
+}
+
+// Saldo awal sudah tersimpan, lalu daftar aset saja yang diimpor: nilai bukunya berubah,
+// selisihnya diperingatkan (tidak diam-diam jadi modal).
+func TestOnboardingImport_AsetSajaMemperingatkanSaldoAwalTersimpan(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	saldo := `{"tanggal":"2026-01-01","rincian":[
+		{"nama":"Bank","kategori":"kas","nominal":20000000},
+		{"nama":"Modal Pemilik","kategori":"modal","nominal":20000000}]}`
+	srv.tenants[1].assets = nil // register kosong: aset tetap di saldo awal 0
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", saldo); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	body, ctype := workbookUpload(t, []finance.ImportSheet{{Nama: "Aset", Rows: [][]string{
+		{"Nama Aset", "Jenis Harta", "Metode", "Tanggal Perolehan", "Harga Perolehan"},
+		{"Mixer Planetary", "Peralatan usaha restoran / rumah makan", "Garis Lurus", "2025-06-01", "6000000"},
+	}}})
+	var res onboardingResp
+	_ = json.NewDecoder(upload(srv, owner, "/api/v1/onboarding/import", body, ctype).Body).Decode(&res)
+	if len(res.Assets) != 1 || !res.BisaDisimpan || !adaError(res.Errors, "Aset", "Sesuaikan menu Saldo Awal") {
+		t.Fatalf("aset lama boleh masuk tapi diperingatkan: aset %d, bisa %v, error %+v", len(res.Assets), res.BisaDisimpan, res.Errors)
+	}
+}
+
+func adaError(errs []finance.SheetError, sheet, isi string) bool {
+	for _, e := range errs {
+		if e.Sheet == sheet && strings.Contains(e.Pesan, isi) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestOpeningEndpoint_ManualDanSelisihModal(t *testing.T) {

@@ -381,7 +381,7 @@ func petunjukSheet() (ImportSheet, [2]int, [2]int) {
 		{"", "5. Timpa atau hapus baris contoh (teks biru) dengan data Anda. Butuh baris lebih? Sisipkan baris di tengah tabel."},
 		{"", "6. Buka sheet Neraca Saldo Awal: Status harus SEIMBANG. Bila belum, lihat Selisih-nya."},
 		{"", "7. Selisih yang tersisa biasanya Saldo Laba (laba ditahan) — sheet Modal menampilkan angka yang disarankan."},
-		{"", "8. Aset Tetap: Akumulasi Dihitung = garis lurus fiskal seperti di aplikasi. Usaha dengan saldo menurun, atau yang sudah punya angka dari pembukuan lama, isi Akumulasi Manual."},
+		{"", "8. Aset Tetap: hanya aset yang dibeli SEBELUM Tanggal Saldo Awal (yang sesudahnya dicatat di menu Aset beserta sumber dananya). Aset yang belum lunas: sisa utangnya diisi di sheet Utang, bukan dianggap modal. Akumulasi Dihitung = garis lurus fiskal seperti di aplikasi; usaha dengan saldo menurun, atau yang sudah punya angka dari pembukuan lama, isi Akumulasi Manual."},
 		{"", "9. Opsional: sheet Karyawan dan Transaksi (transaksi mulai Tanggal Saldo Awal). Lalu unggah berkas ini di menu Impor Data Awal."},
 		{},
 		{"", "AKUN TAMBAHAN YANG DISARANKAN"},
