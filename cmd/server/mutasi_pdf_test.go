@@ -217,3 +217,43 @@ func TestBarisPDF_SampahDiDepanDanTerpotong(t *testing.T) {
 		t.Error("berkas berawalan sampah tetap harus dikenali sebagai PDF")
 	}
 }
+
+// E-statement yang hanya berkata sandi pemilik (dibatasi cetak/salin, dibuka tanpa sandi)
+// langsung terbaca tanpa meminta kata sandi.
+func TestBarisPDF_SandiPemilikSaja(t *testing.T) {
+	data := kunciPDF(t, rekeningKoranPDF(t), pdfmodel.NewAESConfiguration("", "pemilik-bank", 256))
+	baris, err := barisPDF(data, "")
+	if err != nil || !slices.Contains(baris, "02/09 TRSF E-BANKING CR BUDI 1,500,000.00 11,500,000.00") {
+		t.Fatalf("%v %q", err, baris)
+	}
+}
+
+// Excel yang dikunci sandi (bukan zip .xlsx biasa) dijelaskan, bukan "berkas tidak terbaca".
+func TestMutasi_ExcelBersandiPesanJelas(t *testing.T) {
+	srv := NewServer()
+	c := login(t, srv, "owner@kedaikopisenja.id")
+	ole := append([]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}, bytes.Repeat([]byte{0}, 512)...)
+	code, raw, _ := unggahBerkasMutasi(srv, c, "mutasi.xlsx", ole)
+	if code != http.StatusBadRequest || !strings.Contains(raw, "dikunci kata sandi") || !strings.Contains(raw, "simpan ulang") {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+// Baris di bulan yang sudah ditutup bukunya tidak dicentang di pratinjau (diberi tahu), jadi
+// menyimpan baris lainnya tidak gagal seluruhnya.
+func TestMutasi_BulanDitutupTidakDipilih(t *testing.T) {
+	srv := NewServer()
+	c := login(t, srv, "owner@kedaikopisenja.id")
+	srv.tenants[1].tutupBuku = "2026-08"
+	h := unggahMutasi(t, srv, c, "Tanggal;Keterangan;Debet;Kredit\n31/08/2026;BIAYA ADM;10.000;\n02/09/2026;TRSF CR 1234567890 BUDI;;5.000.000\n")
+	if len(h.Rows) != 2 || h.Rows[0].Pilih || !h.Rows[1].Pilih {
+		t.Fatalf("baris Agustus (ditutup) tidak dipilih, September dipilih: %+v", h.Rows)
+	}
+	if !slices.ContainsFunc(h.Peringatan, func(p string) bool { return strings.Contains(p, "sudah ditutup") }) {
+		t.Fatalf("peringatan bulan ditutup: %q", h.Peringatan)
+	}
+	b, _ := json.Marshal(mutasiCommitReq{Rows: h.Rows})
+	if rec := do(srv, c, http.MethodPost, "/api/v1/transactions/mutasi/commit", string(b)); rec.Code != http.StatusOK {
+		t.Fatalf("simpan baris yang dipilih: %d %s", rec.Code, rec.Body)
+	}
+}
