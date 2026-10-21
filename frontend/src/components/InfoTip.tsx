@@ -34,7 +34,7 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
         <CircleHelp size={15} aria-hidden="true" />
       </button>
       {buka && (
-        <span role="tooltip" id={id} className="absolute left-0 top-full z-50 mt-1 grid w-80 max-w-[80vw] gap-1.5 rounded-md border border-border bg-popover p-3 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-lg">
+        <span role="tooltip" id={id} className="absolute right-0 top-full z-50 mt-1 grid w-80 max-w-[80vw] gap-1.5 rounded-md border border-border bg-popover p-3 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-lg">
           {children}
         </span>
       )}

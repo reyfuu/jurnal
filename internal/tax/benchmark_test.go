@@ -2,6 +2,7 @@ package tax
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -91,5 +92,25 @@ func TestAktifkanBenchmark_DipakaiFindKLU(t *testing.T) {
 	}
 	if n := len(BenchmarkAktif()); n != 1 {
 		t.Errorf("BenchmarkAktif = %d baris", n)
+	}
+}
+
+// Jual telur (peternakan) beromzet 15 M: PPN telur dibebaskan, jadi bukan "wajib PKP" pasti.
+func TestCekAwal_KebutuhanPokokBukanPastiWajibPKP(t *testing.T) {
+	l := levels(CekAwal(CekAwalInput{BentukUsaha: "op", PTKP: "TK/0", KLU: "014", Omzet: 15_000_000_000, Laba: 900_000_000}))
+	if _, ada := l["Wajib menjadi PKP"]; ada || l["Omzet di atas batas PKP: cek fasilitas PPN dibebaskan"] != "sedang" {
+		t.Fatalf("%+v", l)
+	}
+}
+
+// Laba (penghasilan kena pajak) tidak mungkin melebihi omzet: ditolak dengan pesan berangka.
+func TestKalkulator_LabaMelebihiOmzetDitolak(t *testing.T) {
+	if _, err := HitungPPhBadan(PPhBadanInput{PeredaranBruto: 250_000_000, PenghasilanKenaPajak: 1_500_000_000}); err == nil || !strings.Contains(err.Error(), "tidak boleh lebih besar") {
+		t.Fatalf("PPh badan: %v", err)
+	}
+	laba := int64(1_500_000_000)
+	_, err := HitungMarketplace(MarketplaceInput{OmzetMarketplace: 50_000_000, OmzetLain: 300_000_000, NPMBps: 42_857, Laba: &laba, Bentuk: "badan", Skema: "umum"})
+	if err == nil || !strings.Contains(err.Error(), "lebih besar dari total omzet") {
+		t.Fatalf("marketplace: %v", err)
 	}
 }

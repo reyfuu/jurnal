@@ -243,6 +243,9 @@ type PPhBadanResult struct {
 // PKP dari peredaran bruto sampai Batas31EPenuh, selama peredaran bruto setahun tidak melebihi
 // Batas31E (bawaan 22%, 50%, Rp4,8 M, Rp50 M).
 func HitungPPhBadan(in PPhBadanInput) (PPhBadanResult, error) {
+	if in.PenghasilanKenaPajak > in.PeredaranBruto && in.PeredaranBruto >= 0 {
+		return PPhBadanResult{}, fmt.Errorf("penghasilan kena pajak (%s) tidak boleh lebih besar dari peredaran bruto (%s): laba tidak mungkin melebihi omzet", rp(in.PenghasilanKenaPajak), rp(in.PeredaranBruto))
+	}
 	if in.PeredaranBruto < 0 || in.PenghasilanKenaPajak < 0 {
 		return PPhBadanResult{}, fmt.Errorf("nilai tidak boleh negatif")
 	}

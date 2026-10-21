@@ -117,6 +117,19 @@ func skemaSaatIni(bentuk string, omzet int64) string {
 	}
 }
 
+// kluKebutuhanPokok: bidang usaha yang umumnya menjual bahan kebutuhan pokok yang PPN-nya
+// dibebaskan (PP 49/2022: beras, gabah, jagung, sagu, kedelai, garam, daging, telur, susu,
+// buah, sayur, ubi, bumbu, gula konsumsi). Perlu diverifikasi tim pajak per usaha.
+var kluKebutuhanPokok = map[string]bool{
+	"011": true, // pertanian tanaman semusim (padi, jagung, sayur)
+	"012": true, // tanaman tahunan (buah)
+	"014": true, // peternakan (telur, daging, susu)
+	"106": true, // penggilingan padi (beras)
+	"462": true, // perdagangan besar hasil pertanian & hewan hidup
+	"472": true, // eceran khusus makanan di toko
+	"478": true, // kaki lima & los pasar
+}
+
 // CekAwal: NPM & CTTOR usaha vs rata-rata nasional KLU-nya, plus risiko pemeriksaan / bentuk
 // usaha, untuk ringkasan onboarding dan Perencanaan Pajak.
 func CekAwal(in CekAwalInput) CekAwalResult {
@@ -152,7 +165,16 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	}
 	pr := P()
 	if in.Omzet > pr.BatasPKP && !in.PKP {
-		add("tinggi", "Wajib menjadi PKP", "Omzet di atas "+rp(pr.BatasPKP)+" per tahun wajib dikukuhkan sebagai PKP dan memungut PPN.")
+		if kluKebutuhanPokok[in.KLU] {
+			// Bahan kebutuhan pokok (beras, telur, daging, susu, sayur, buah, gula konsumsi, …)
+			// mendapat fasilitas PPN dibebaskan (PP 49/2022), jadi pengusaha yang hanya menjual
+			// barang itu tidak memungut PPN. Bidang usaha ini bisa juga menjual barang lain yang
+			// kena PPN, jadi ini peringatan untuk diperiksa, bukan kepastian wajib PKP.
+			add("sedang", "Omzet di atas batas PKP: cek fasilitas PPN dibebaskan",
+				"Omzet di atas "+rp(pr.BatasPKP)+" per tahun. Bila yang dijual bahan kebutuhan pokok (mis. beras, telur, daging, susu, sayur, buah, gula konsumsi), PPN-nya dibebaskan (PP 49/2022) sehingga tidak ada PPN yang dipungut dari pembeli. Bila ada penjualan barang lain yang kena PPN, usaha wajib dikukuhkan sebagai PKP. Pastikan bersama konsultan pajak.")
+		} else {
+			add("tinggi", "Wajib menjadi PKP", "Omzet di atas "+rp(pr.BatasPKP)+" per tahun wajib dikukuhkan sebagai PKP dan memungut PPN, kecuali seluruh penjualannya barang / jasa yang tidak dikenai atau dibebaskan PPN.")
+		}
 	}
 	umkm := persenBps(int(pr.UMKMTarifBps))
 	if in.Omzet > pr.BatasOmzetUMKM {

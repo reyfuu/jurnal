@@ -53,13 +53,13 @@ func HitungMarketplace(in MarketplaceInput) (MarketplaceResult, error) {
 		return MarketplaceResult{}, errors.New("bentuk usaha harus op atau badan")
 	case in.Skema != "final" && in.Skema != "umum":
 		return MarketplaceResult{}, errors.New("skema harus final (PPh final UMKM) atau umum (pembukuan)")
-	case in.NPMBps < -10_000 || in.NPMBps > 10_000:
-		return MarketplaceResult{}, errors.New("margin laba harus di antara -100% dan 100%")
+	case in.Laba == nil && (in.NPMBps < -10_000 || in.NPMBps > 10_000):
+		return MarketplaceResult{}, errors.New("margin laba bersih di atas 100% berarti laba lebih besar dari omzet; periksa lagi margin atau omzetnya")
 	}
 	if in.Laba != nil {
 		total := in.OmzetMarketplace + in.OmzetLain
 		if *in.Laba > total || *in.Laba < -total {
-			return MarketplaceResult{}, errors.New("laba bersih tidak boleh melebihi total omzet")
+			return MarketplaceResult{}, fmt.Errorf("laba bersih (%s) lebih besar dari total omzet (%s); laba tidak mungkin melebihi omzet, periksa lagi isiannya", rp(*in.Laba), rp(total))
 		}
 		if total > 0 {
 			in.NPMBps = mulDiv(*in.Laba, 10_000, total)

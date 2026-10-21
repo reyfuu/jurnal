@@ -274,7 +274,12 @@ export function FormPPhBadan({ m, profile }: { m: KalkulatorMaster; profile?: Bu
           {dariProfil(profile) && <p className="kpi-meta-row" style={{ marginBottom: 8 }}>{dariProfil(profile)}</p>}
           <Uang label="Peredaran bruto setahun" v={omzet} set={setOmzet} hint="Menentukan besarnya fasilitas Pasal 31E" />
           <Uang label="Penghasilan kena pajak setahun" v={pkp} set={setPkp} hint="Laba fiskal setelah koreksi" />
-          <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy}>
+          {pkp > omzet && (
+            <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10, whiteSpace: 'normal' }}>
+              Penghasilan kena pajak ({formatRp(pkp)}) lebih besar dari peredaran bruto ({formatRp(omzet)}). Laba tidak mungkin melebihi omzet; periksa lagi isiannya.
+            </p>
+          )}
+          <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy || pkp > omzet}>
             {busy ? 'Menghitung…' : 'Hitung'}
           </button>
           {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 12 }}>{error}</p>}
