@@ -459,3 +459,20 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tanggal_lunas DATE;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dibukukan BOOLEAN;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_id INT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_ppn_id INT;
+
+-- Primbon Pajak (Okt 2026): bookmark & catatan pribadi per pengguna atas peraturan katalog.
+-- Tanpa FK ke users: saveAuthDB menulis ulang tabel users setiap simpan. Baris milik user
+-- yang sudah dihapus dibuang saat boot (loadPrimbon).
+CREATE TABLE IF NOT EXISTS primbon_bookmark (
+	user_id INT NOT NULL,
+	uuid    TEXT NOT NULL,
+	waktu   TIMESTAMPTZ NOT NULL,
+	PRIMARY KEY (user_id, uuid)
+);
+CREATE TABLE IF NOT EXISTS primbon_catatan (
+	user_id INT NOT NULL,
+	uuid    TEXT NOT NULL,
+	isi     TEXT NOT NULL,
+	diubah  TIMESTAMPTZ NOT NULL,
+	PRIMARY KEY (user_id, uuid)
+);
