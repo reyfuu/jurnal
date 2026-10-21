@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -21,8 +22,31 @@ func (s *tenant) handleOnboardingTemplate(w http.ResponseWriter, r *http.Request
 	s.mu.RLock()
 	metode := s.metodeUsaha()
 	s.mu.RUnlock()
+	// Kode akun Neraca Saldo Awal (template memakai kode CoA dagang) diganti kode CoA usaha: lewat
+	// peran akun, selain itu nama akun yang sama persis; tidak ada akun yang cocok = kosong (lebih
+	// baik daripada kode yang salah, mis. 1102 di CoA manufaktur adalah Kas Besar).
+	all, active, _ := s.akunSaldoAwal()
+	peta := coa.PetaDari(all)
+	kode := func(bawaan, nama string) string {
+		for _, pi := range coa.DaftarPeran {
+			if pi.Bawaan == bawaan {
+				return peta.Kode(pi.ID)
+			}
+		}
+		if a, persis, ok := coa.CocokAkunSaldo(nama, active, peta); ok && persis {
+			return a.Kode
+		}
+		return ""
+	}
 	sheets := make([]xlsx.Sheet, 0, 12)
 	for _, sh := range finance.OnboardingTemplate(metode) {
+		if sh.Nama == "Neraca Saldo Awal" {
+			for _, row := range sh.Rows {
+				if len(row) > 1 && len(row[0]) == 4 && row[0][0] >= '1' && row[0][0] <= '9' {
+					row[0] = kode(row[0], row[1])
+				}
+			}
+		}
 		sheets = append(sheets, xlsx.Sheet{Name: sh.Nama, Rows: sh.Rows, Tabel: tabelXLSX(sh.Format)})
 	}
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -36,8 +60,8 @@ func tabelXLSX(f *finance.FormatTabel) *xlsx.Tabel {
 		return nil
 	}
 	return &xlsx.Tabel{Header: f.Header, Kolom: f.Kolom, Lebar: f.Lebar, Angka: f.Angka, Bilangan: f.Bilangan, Tanggal: f.Tanggal,
-		Contoh: f.Contoh, BarisKosong: f.BarisKosong, Pilihan: f.Pilihan, Rumus: f.Rumus, Gaya: f.Gaya, Akhir: f.Akhir,
-		Referensi: f.Referensi, Kunci: f.Kunci}
+		Contoh: f.Contoh, BarisKosong: f.BarisKosong, Pilihan: f.Pilihan, Bebas: f.Bebas, Status: f.Status, Rumus: f.Rumus, Gaya: f.Gaya,
+		Akhir: f.Akhir, Referensi: f.Referensi, Kunci: f.Kunci}
 }
 
 // onboardingResp: ringkasan per sheet + contoh baris, supaya user bisa memeriksa sebelum commit.
@@ -88,6 +112,10 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		sheets = append(sheets, finance.ImportSheet{Nama: sh.Name, Rows: sh.Rows})
 	}
 	d := finance.ParseOnboarding(sheets)
+	var akun []coa.Account
+	if d.Opening != nil {
+		akun = s.isiKodeSaldoAwal(d.Opening)
+	}
 	s.mu.RLock()
 	finance.TerapkanMetode(d.Assets, s.metodeUsaha()) // kolom Metode di Excel kalah oleh metode usaha
 	awal, simpanan := s.bukuAwalLocked().Period(), s.opening
@@ -186,6 +214,11 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if d.Opening != nil {
+		if err := s.akunHilangDipakaiLocked(d.Opening.Rincian, akun); err != nil {
+			s.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		o := *d.Opening
 		if s.opening != nil {
 			o.Pelunasan = s.opening.Pelunasan
@@ -332,6 +365,7 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	akun := s.isiKodeSaldoAwal(&o)
 	s.mu.Lock()
 	// Saldo awal per akun wajib seimbang: Harta (termasuk nilai buku register aset) =
 	// Kewajiban + Modal. Selisih yang lolos akan diam-diam menjadi modal di semua laporan.
@@ -347,6 +381,11 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "saldo awal tidak bisa diubah setelah ada bulan yang ditutup bukunya", http.StatusConflict)
 		return
 	}
+	if err := s.akunHilangDipakaiLocked(o.Rincian, akun); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	// Saldo awal = posisi di pagi hari tanggal mulai. Transaksi sebelum tanggal itu sudah
 	// tercermin di saldo awal, jadi kalau tetap dihitung, uangnya terhitung dua kali.
 	if p := s.transaksiPertamaLocked(); p != "" && p < o.Tanggal {
@@ -360,6 +399,39 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 	s.opening = &o
 	s.mu.Unlock()
 	writeJSON(w, s.openingSummary(""))
+}
+
+// isiKodeSaldoAwal memberi kode akun pada baris saldo awal tanpa kode (dari CoA usaha ini) dan
+// mengembalikan daftar akun saat ini. Jangan dipanggil dengan s.mu terkunci.
+func (s *tenant) isiKodeSaldoAwal(o *finance.OpeningBalance) []coa.Account {
+	all, active, _ := s.akunSaldoAwal()
+	coa.IsiKodeSaldo(o.Rincian, active, coa.PetaDari(all))
+	return all
+}
+
+// akunHilangDipakaiLocked: akun tambahan Saldo Awal yang hilang dari saldo awal baru tetapi
+// masih dipakai transaksi (koreksi akun). Akun itu ikut hilang dari daftar akun, jadi
+// transaksinya tidak punya akun lagi di neraca saldo.
+func (s *tenant) akunHilangDipakaiLocked(baru []finance.SaldoAkun, akun []coa.Account) error {
+	if s.opening == nil {
+		return nil
+	}
+	for _, r := range s.opening.Rincian {
+		a, ok := coa.Find(akun, r.Kode)
+		if !ok || a.Catatan != coa.CatatanSaldoAwal || slices.ContainsFunc(baru, func(b finance.SaldoAkun) bool { return b.Kode == r.Kode }) {
+			continue
+		}
+		n := 0
+		for _, t := range s.txs {
+			if t.Akun == r.Kode {
+				n++
+			}
+		}
+		if n > 0 {
+			return fmt.Errorf("akun %s %s dipakai %d transaksi; pindahkan transaksinya ke akun lain dulu, baru hapus barisnya", r.Kode, a.Nama, n)
+		}
+	}
+	return nil
 }
 
 // --- Karyawan ---

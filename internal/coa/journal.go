@@ -2,7 +2,6 @@ package coa
 
 import (
 	"slices"
-	"strings"
 
 	"pajak/internal/finance"
 )
@@ -325,10 +324,7 @@ func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[str
 		default:
 			continue
 		}
-		// Kode rincian dipakai hanya bila akun itu memang akun yang sama di CoA usaha ini (nama
-		// sama): kode template saldo awal mengikuti CoA dagang, dan di CoA lain kode yang sama
-		// bisa berarti akun lain (manufaktur: 1401 = Uang Muka Pembelian).
-		if acc, ok := Find(akun, r.Kode); ok && r.Kode != "" && strings.EqualFold(strings.TrimSpace(acc.Nama), strings.TrimSpace(r.Nama)) {
+		if kodeSendiri(r, akun) {
 			kode = r.Kode
 		}
 		out[kode] += tanda * r.Nominal

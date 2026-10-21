@@ -118,6 +118,7 @@ type rinciDef struct {
 	angka, bilangan, tanggal []int
 	rumus                    map[int]string
 	pilihan                  map[int][]string
+	bebas                    []int // kolom pilihan yang hanya saran
 	gaya                     map[string]string
 }
 
@@ -138,7 +139,7 @@ func (r rinciDef) sheet() ImportSheet {
 	}
 	return ImportSheet{Nama: r.nama, Rows: rows, Format: &FormatTabel{
 		Header: barisHeaderRinci, Kolom: len(r.header), Lebar: r.lebar, Angka: r.angka, Bilangan: r.bilangan, Tanggal: r.tanggal,
-		Contoh: len(r.contoh), BarisKosong: barisKosongRinci, Pilihan: r.pilihan, Rumus: rumus, Gaya: gaya, Kunci: true,
+		Contoh: len(r.contoh), BarisKosong: barisKosongRinci, Pilihan: r.pilihan, Bebas: r.bebas, Rumus: rumus, Gaya: gaya, Kunci: true,
 	}}
 }
 
@@ -157,7 +158,8 @@ var asetContoh = []struct {
 
 // OnboardingTemplate: workbook contoh yang isinya lolos ParseOnboarding apa adanya dan
 // SEIMBANG untuk metode penyusutan usaha mana pun: akumulasi contoh aset dihitung sistem
-// dengan metode usaha, lalu Modal Disetor menjadi penyeimbangnya.
+// dengan metode usaha, lalu Modal Disetor menjadi penyeimbangnya. Kode akun Neraca Saldo Awal
+// mengikuti CoA dagang; server menggantinya dengan kode CoA usaha (lihat handleOnboardingTemplate).
 func OnboardingTemplate(metode string) []ImportSheet {
 	petunjuk, jh, kf := petunjukSheet()
 	// Tabel acuan di Petunjuk: Jenis Harta → Kelompok Fiskal, Kelompok Fiskal → masa manfaat.
@@ -201,7 +203,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 		petunjuk,
 		{}, // Neraca Saldo Awal, diisi di bawah
 		rinciDef{nama: sheetKasBank, judul: "RINCIAN KAS DAN BANK",
-			sub:    "Satu baris per kas fisik / rekening bank / e-wallet. Bank: pakai saldo rekening koran per tanggal saldo awal.",
+			sub:    "Satu baris per kas fisik / rekening bank / e-wallet. Bank: pakai saldo rekening koran per tanggal saldo awal. Jenis boleh diketik sendiri (mis. Deposito): jadi akun tersendiri.",
 			header: []string{"No", "Nama Kas / Bank", "Jenis", "No. Rekening", "Atas Nama", "Saldo (Rp)", "Dasar Saldo", "Keterangan"},
 			total: []string{"", "Total Kas", fmt.Sprintf(`=SUMIFS(F$7:F$%d,C$7:C$%d,"Kas")`, barisAkhirRumus, barisAkhirRumus),
 				"Total Bank", fmt.Sprintf(`=SUMIFS(F$7:F$%d,C$7:C$%d,"Bank")`, barisAkhirRumus, barisAkhirRumus)},
@@ -210,7 +212,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 				{"", "Bank BCA Operasional", "Bank", "1234567890", "Kedai Kopi Senja", "40000000", "Rekening koran", "Saldo akhir Des 2025"},
 			},
 			lebar: []float64{5, 30, 10, 18, 24, 18, 18, 32}, angka: []int{5},
-			pilihan: map[int][]string{2: {"Kas", "Bank"}},
+			pilihan: map[int][]string{2: {"Kas", "Bank"}}, bebas: []int{2},
 		}.sheet(),
 		rinciDef{nama: sheetPiutang, judul: "RINCIAN PIUTANG USAHA",
 			sub:    "Satu baris per faktur yang belum lunas. Umur dihitung otomatis dari jatuh tempo ke tanggal saldo awal.",
@@ -254,7 +256,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 			rumus: map[int]string{5: `=IF(OR(D{r}="",E{r}=""),"",D{r}*E{r})`},
 		}.sheet(),
 		rinciDef{nama: sheetAsetLancar, judul: "RINCIAN ASET LANCAR LAIN",
-			sub:    "Biaya dibayar di muka, pajak dibayar di muka, uang muka pembelian, dan piutang lain-lain.",
+			sub:    "Biaya dibayar di muka, pajak dibayar di muka, uang muka pembelian, dan piutang lain-lain. Jenis lain boleh diketik sendiri (mis. Uang Jaminan): jadi akun tersendiri.",
 			header: []string{"No", "Uraian", "Jenis", "Pihak Terkait", "Tgl Bayar / Dokumen", "Nilai Awal (Rp)", "Sudah Dibebankan / Dikreditkan (Rp)", "Sisa per Tgl Saldo Awal (Rp)", "Keterangan"},
 			total:  []string{"", "", "", "", "", "", "Total", fmt.Sprintf("=SUM(F$7:F$%d)-SUM(G$7:G$%d)", barisAkhirRumus, barisAkhirRumus)},
 			contoh: [][]string{
@@ -263,7 +265,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 			},
 			lebar: []float64{5, 34, 22, 24, 14, 16, 20, 18, 30}, angka: []int{5, 6, 7}, tanggal: []int{4},
 			rumus:   map[int]string{7: `=IF(F{r}="","",F{r}-N(G{r}))`},
-			pilihan: map[int][]string{2: jenisAsetLancarList},
+			pilihan: map[int][]string{2: jenisAsetLancarList}, bebas: []int{2},
 		}.sheet(),
 		rinciDef{nama: sheetAsetTetap, judul: "RINCIAN ASET TETAP (TERMASUK PERALATAN & HARTA TAK BERWUJUD)",
 			sub: "Satu baris per aset. Akumulasi Dihitung = garis lurus fiskal per bulan (sama dengan aplikasi). Sudah punya angka dari pembukuan lama atau memakai saldo menurun? Isi Akumulasi Manual.",
@@ -285,7 +287,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 			pilihan: map[int][]string{2: {"=" + jhDaftar}, 3: kelompok},
 		}.sheet(),
 		rinciDef{nama: sheetUtang, judul: "DAFTAR UTANG",
-			sub:    "Semua kewajiban yang belum dibayar per tanggal saldo awal: ke supplier, pajak, bank, gaji, dan DP pelanggan.",
+			sub:    "Semua kewajiban yang belum dibayar per tanggal saldo awal: ke supplier, pajak, bank, gaji, dan DP pelanggan. Jenis lain boleh diketik sendiri (mis. Utang ke Pemegang Saham).",
 			header: []string{"No", "Uraian", "Jenis Utang", "Nama Kreditur / Pihak", "No. Dokumen", "Tgl Dokumen", "Jatuh Tempo", "Nilai Awal (Rp)", "Sudah Dibayar (Rp)", "Sisa Utang (Rp)", "Keterangan"},
 			total:  []string{"", "", "", "", "", "", "", "", "Total Utang", fmt.Sprintf("=SUM(H$7:H$%d)-SUM(I$7:I$%d)", barisAkhirRumus, barisAkhirRumus)},
 			contoh: [][]string{
@@ -295,7 +297,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 			},
 			lebar: []float64{5, 32, 26, 24, 16, 13, 13, 16, 16, 16, 28}, angka: []int{7, 8, 9}, tanggal: []int{5, 6},
 			rumus:   map[int]string{9: `=IF(H{r}="","",H{r}-N(I{r}))`},
-			pilihan: map[int][]string{2: jenisUtangList},
+			pilihan: map[int][]string{2: jenisUtangList}, bebas: []int{2},
 		}.sheet(),
 	}
 
@@ -315,7 +317,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 		total: []string{"", "", "Total Ekuitas (bersih)", fmt.Sprintf(`=SUM(E$7:E$%d)-2*SUMIFS(E$7:E$%d,C$7:C$%d,"Prive")-2*SUMIFS(E$7:E$%d,C$7:C$%d,"Dividen")`,
 			barisAkhirRumus, barisAkhirRumus, barisAkhirRumus, barisAkhirRumus, barisAkhirRumus)},
 		lebar: []float64{5, 30, 24, 26, 18, 40, 30}, angka: []int{4},
-		pilihan: map[int][]string{2: jenisEkuitasList},
+		pilihan: map[int][]string{2: jenisEkuitasList}, bebas: []int{2},
 	}
 	modal.contoh = modalRows("0")
 	draft := append(slices.Clone(sheets), modal.sheet())
@@ -358,7 +360,7 @@ func OnboardingTemplate(metode string) []ImportSheet {
 // awal–akhir tabel Jenis Harta (Jenis → Kelompok Fiskal) dan Kelompok Fiskal (Kelompok → bulan).
 func petunjukSheet() (ImportSheet, [2]int, [2]int) {
 	gaya := map[string]string{"B1": "judul", "B3": "tebal", "C4": "isi", "C5": "isi", "C6": "isi_tanggal",
-		"D6": "catatan", "D7": "catatan", "B9": "tebal", "B10": "isi", "B11": "rumus", "B12": "biru", "B14": "tebal"}
+		"D6": "catatan", "D7": "catatan", "B8": "tebal", "C8": "rumus_tebal", "D8": "catatan", "B9": "tebal", "B10": "isi", "B11": "rumus", "B12": "biru", "B14": "tebal"}
 	rows := [][]string{
 		{"", "TEMPLATE PENGISIAN SALDO AWAL"},
 		{"", "Isi rincian di tiap sheet — Neraca Saldo Awal terbentuk otomatis dan dicek keseimbangannya."},
@@ -367,7 +369,7 @@ func petunjukSheet() (ImportSheet, [2]int, [2]int) {
 		{"", "NPWP", ""},
 		{"", labelTanggalSaldo, tanggalContoh, "Posisi di pagi hari tanggal ini (= saldo akhir hari sebelumnya), biasanya tanggal 1. Dipakai menghitung umur piutang & penyusutan; transaksi mulai tanggal ini."},
 		{"", "Mata Uang", "Rupiah (Rp)", "Isi angka tanpa titik / koma / Rp, mis. 1500000."},
-		{},
+		{"", "Status Neraca Saldo Awal", "='" + sheetNeraca + "'!$D$4", "Terisi otomatis. Harus SEIMBANG sebelum diunggah; bila belum, lihat Selisih di sheet Neraca Saldo Awal."},
 		{"", "ARTI WARNA"},
 		{"", "Kuning muda", "Kolom yang DIISI pengguna"},
 		{"", "Abu-abu", "Terisi otomatis oleh rumus — jangan diketik"},
@@ -452,7 +454,7 @@ func petunjukSheet() (ImportSheet, [2]int, [2]int) {
 	tabel("DAFTAR JENIS TRANSAKSI (sheet Transaksi)", []string{"Jenis", "Arah uang"}, jt)
 
 	sh := ImportSheet{Nama: sheetPetunjuk, Rows: rows, Format: &FormatTabel{Header: -1, Kolom: 5,
-		Lebar: []float64{3, 34, 30, 64, 16}, Gaya: gaya, Kunci: true}}
+		Lebar: []float64{3, 34, 30, 64, 16}, Gaya: gaya, Status: []string{"C8"}, Kunci: true}}
 	return sh, [2]int{jhAwal, jhAkhir}, [2]int{kfAwal, kfAkhir}
 }
 
@@ -472,23 +474,30 @@ func neracaSheet() (ImportSheet, int) {
 	at := func(k string) string { return rentang(sheetAsetTetap, k) }
 	ut := func(k string) string { return rentang(sheetUtang, k) }
 	md := func(k string) string { return rentang(sheetModal, k) }
-	sisaAL := func(j string) string {
-		return fmt.Sprintf(`=SUMIFS(%s,%s,"%s")-SUMIFS(%s,%s,"%s")`, al("F"), al("C"), j, al("G"), al("C"), j)
+	// Rumus tanpa "=" supaya bisa dijumlah untuk baris "jenis lain".
+	sumifs := func(nilai, kriteria, j string) string { return fmt.Sprintf(`SUMIFS(%s,%s,"%s")`, nilai, kriteria, j) }
+	kasJ := func(j string) string { return sumifs(kb("F"), kb("C"), j) }
+	alJ := func(j string) string { return sumifs(al("F"), al("C"), j) + "-" + sumifs(al("G"), al("C"), j) }
+	utJ := func(j string) string { return sumifs(ut("H"), ut("C"), j) + "-" + sumifs(ut("I"), ut("C"), j) }
+	mdJ := func(j string) string { return sumifs(md("E"), md("C"), j) }
+	// lain: total sheet dikurangi jenis yang punya baris sendiri = jenis yang diketik bebas.
+	lain := func(total string, f func(string) string, jenis []string) string {
+		var b strings.Builder
+		for _, j := range jenis {
+			b.WriteString("-(" + f(j) + ")")
+		}
+		return "=" + total + b.String()
 	}
-	sisaUt := func(j string) string {
-		return fmt.Sprintf(`=SUMIFS(%s,%s,"%s")-SUMIFS(%s,%s,"%s")`, ut("H"), ut("C"), j, ut("I"), ut("C"), j)
-	}
-	nilaiMd := func(j string) string { return fmt.Sprintf(`=SUMIFS(%s,%s,"%s")`, md("E"), md("C"), j) }
 
 	rows := [][]string{
 		{"NERACA SALDO AWAL"},
 		{"Terisi otomatis dari sheet rincian — tidak perlu diketik. Status harus SEIMBANG sebelum diunggah."},
 		{rumusPerTanggal},
-		{},
-		{},
+		{}, // Status, diisi setelah baris TOTAL diketahui
+		{}, // Selisih
 		{"Kode Akun", "Nama Akun", "Kelompok", "Debit (Rp)", "Kredit (Rp)", "Sumber Rincian"},
 	}
-	gaya := map[string]string{"A3": "catatan"}
+	gaya := map[string]string{"A3": "catatan", "B4": "tebal", "D4": "rumus_tebal", "F4": "catatan", "B5": "tebal", "D5": "rumus_tebal"}
 	grup := func(nama string) {
 		r := len(rows) + 1
 		for _, c := range "ABCDEF" {
@@ -496,35 +505,43 @@ func neracaSheet() (ImportSheet, int) {
 		}
 		rows = append(rows, []string{nama})
 	}
+	// kode kosong = tidak ada satu akun yang pasti (mis. Utang Pajak menggabung beberapa akun PPh).
 	akun := func(kode, nama, kelompok, debit, kredit, sumber string) {
 		rows = append(rows, []string{kode, nama, kelompok, debit, kredit, sumber})
 	}
+	jenisKas := []string{"Kas", "Bank"}
 	grup("ASET")
-	akun("1101", "Kas", "Aset Lancar", fmt.Sprintf(`=SUMIFS(%s,%s,"Kas")`, kb("F"), kb("C")), "", sheetKasBank)
-	akun("1102", "Bank", "Aset Lancar", fmt.Sprintf(`=SUMIFS(%s,%s,"Bank")`, kb("F"), kb("C")), "", sheetKasBank)
+	akun("1101", "Kas", "Aset Lancar", "="+kasJ("Kas"), "", sheetKasBank)
+	akun("1102", "Bank", "Aset Lancar", "="+kasJ("Bank"), "", sheetKasBank)
+	akun("", "Kas & bank jenis lain (akun tersendiri)", "Aset Lancar", lain("SUM("+kb("F")+")", kasJ, jenisKas), "", sheetKasBank)
 	akun("1201", "Piutang Usaha", "Aset Lancar", fmt.Sprintf("=SUM(%s)-SUM(%s)", pt("F"), pt("G")), "", sheetPiutang)
 	akun("1201", "Cadangan Kerugian Piutang (pengurang)", "Aset Lancar", "", "=N(Piutang!$I$4)", sheetPiutang)
-	akun("1202", "Piutang Lain-lain", "Aset Lancar", sisaAL("Piutang Lain-lain"), "", sheetAsetLancar)
 	akun("1301", "Persediaan", "Aset Lancar", fmt.Sprintf("=SUMPRODUCT(%s,%s)", rentang(sheetPersediaan, "F"), rentang(sheetPersediaan, "G")), "", sheetPersediaan)
 	akun("1302", "Perlengkapan", "Aset Lancar", fmt.Sprintf("=SUMPRODUCT(%s,%s)", rentang(sheetPerlengkapan, "D"), rentang(sheetPerlengkapan, "E")), "", sheetPerlengkapan)
-	akun("1401", "Biaya Dibayar di Muka", "Aset Lancar", sisaAL("Biaya Dibayar di Muka"), "", sheetAsetLancar)
-	akun("1403", "Pajak Dibayar di Muka", "Aset Lancar", sisaAL("Pajak Dibayar di Muka"), "", sheetAsetLancar)
-	akun("1404", "Uang Muka Pembelian", "Aset Lancar", sisaAL("Uang Muka Pembelian"), "", sheetAsetLancar)
+	akun("1401", "Biaya Dibayar di Muka", "Aset Lancar", "="+alJ("Biaya Dibayar di Muka"), "", sheetAsetLancar)
+	akun("1403", "Pajak Dibayar di Muka (PPh)", "Aset Lancar", "="+alJ("Pajak Dibayar di Muka"), "", sheetAsetLancar)
+	akun("1404", "Uang Muka Pembelian", "Aset Lancar", "="+alJ("Uang Muka Pembelian"), "", sheetAsetLancar)
+	akun("", "Piutang Lain-lain", "Aset Lancar", "="+alJ("Piutang Lain-lain"), "", sheetAsetLancar)
+	akun("", "Aset lancar jenis lain (akun tersendiri)", "Aset Lancar",
+		lain(fmt.Sprintf("SUM(%s)-SUM(%s)", al("F"), al("G")), alJ, jenisAsetLancarList), "", sheetAsetLancar)
 	akun("1501", "Aset Tetap (harga perolehan)", "Aset Tetap", fmt.Sprintf("=SUM(%s)", at("F")), "", sheetAsetTetap)
 	akun("1502", "Akumulasi Penyusutan & Amortisasi", "Aset Tetap", "", fmt.Sprintf("=SUM(%s)", at("J")), sheetAsetTetap)
 	grup("LIABILITAS")
-	akun("2101", "Utang Usaha", "Liabilitas", "", sisaUt("Utang Usaha"), sheetUtang)
-	akun("2110", "Utang Pajak", "Liabilitas", "", sisaUt("Utang Pajak"), sheetUtang)
-	akun("2104", "Biaya Masih Harus Dibayar", "Liabilitas", "", sisaUt("Biaya Masih Harus Dibayar"), sheetUtang)
-	akun("2105", "Pendapatan Diterima di Muka", "Liabilitas", "", sisaUt("Pendapatan Diterima di Muka"), sheetUtang)
-	akun("2105", "Utang Lain-lain", "Liabilitas", "", sisaUt("Utang Lain-lain"), sheetUtang)
-	akun("2102", "Utang Bank / Pinjaman", "Liabilitas", "", sisaUt("Utang Bank / Pinjaman"), sheetUtang)
+	akun("2101", "Utang Usaha", "Liabilitas", "", "="+utJ("Utang Usaha"), sheetUtang)
+	akun("", "Utang Pajak", "Liabilitas", "", "="+utJ("Utang Pajak"), sheetUtang)
+	akun("2104", "Beban Yang Masih Harus Dibayar", "Liabilitas", "", "="+utJ("Biaya Masih Harus Dibayar"), sheetUtang)
+	akun("", "Pendapatan Diterima di Muka", "Liabilitas", "", "="+utJ("Pendapatan Diterima di Muka"), sheetUtang)
+	akun("2105", "Hutang Lain-lain", "Liabilitas", "", "="+utJ("Utang Lain-lain"), sheetUtang)
+	akun("2102", "Hutang Bank", "Liabilitas", "", "="+utJ("Utang Bank / Pinjaman"), sheetUtang)
+	akun("", "Utang jenis lain (akun tersendiri)", "Liabilitas", "",
+		lain(fmt.Sprintf("SUM(%s)-SUM(%s)", ut("H"), ut("I")), utJ, jenisUtangList), sheetUtang)
 	grup("EKUITAS")
-	akun("3101", "Modal Disetor", "Ekuitas", "", nilaiMd("Modal Disetor"), sheetModal)
-	akun("3101", "Tambahan Modal Disetor", "Ekuitas", "", nilaiMd("Tambahan Modal Disetor"), sheetModal)
-	akun("3201", "Saldo Laba (Laba Ditahan)", "Ekuitas", "", nilaiMd("Saldo Laba"), sheetModal)
-	akun("3102", "Prive", "Ekuitas", nilaiMd("Prive"), "", sheetModal)
-	akun("3201", "Dividen", "Ekuitas", nilaiMd("Dividen"), "", sheetModal)
+	akun("3101", "Modal Disetor", "Ekuitas", "", "="+mdJ("Modal Disetor"), sheetModal)
+	akun("3101", "Tambahan Modal Disetor", "Ekuitas", "", "="+mdJ("Tambahan Modal Disetor"), sheetModal)
+	akun("", "Ekuitas jenis lain", "Ekuitas", "", lain("SUM("+md("E")+")", mdJ, jenisEkuitasList), sheetModal)
+	akun("3201", "Saldo Laba (Laba Ditahan)", "Ekuitas", "", "="+mdJ("Saldo Laba"), sheetModal)
+	akun("3102", "Prive", "Ekuitas", "="+mdJ("Prive"), "", sheetModal)
+	akun("3201", "Dividen", "Ekuitas", "="+mdJ("Dividen"), "", sheetModal)
 	akhirAkun := len(rows) // baris Excel terakhir akun
 	total := akhirAkun + 1
 	rows = append(rows, []string{"", "TOTAL", "", fmt.Sprintf("=SUM(D7:D%d)", akhirAkun), fmt.Sprintf("=SUM(E7:E%d)", akhirAkun), ""})
@@ -532,24 +549,22 @@ func neracaSheet() (ImportSheet, int) {
 	gaya[fmt.Sprintf("D%d", total)] = "rumus_tebal"
 	gaya[fmt.Sprintf("E%d", total)] = "rumus_tebal"
 	akhirTabel := len(rows)
-	d, e := fmt.Sprintf("D%d", total), fmt.Sprintf("E%d", total)
+	d, e := fmt.Sprintf("$D$%d", total), fmt.Sprintf("$E$%d", total)
+	// Status & selisih di atas tabel, supaya terlihat tanpa menggulir ke bawah.
+	rows[3] = []string{"", "Status", "", fmt.Sprintf(`=IF(ROUND(%s-%s,0)=0,"SEIMBANG ✓","BELUM SEIMBANG")`, d, e), "",
+		"Bila belum seimbang: cek kelengkapan rincian, lalu lihat 'Saran Saldo Laba' di sheet Modal."}
+	rows[4] = []string{"", "Selisih (Debit − Kredit)", "", fmt.Sprintf("=%s-%s", d, e)}
 	rng := func(kol string) string { return fmt.Sprintf("%s7:%s%d", kol, kol, akhirAkun) }
 	rows = append(rows,
-		[]string{},
-		[]string{"", "Status", "", fmt.Sprintf(`=IF(ROUND(%s-%s,0)=0,"SEIMBANG ✓","BELUM SEIMBANG")`, d, e)},
-		[]string{"", "Selisih (Debit − Kredit)", "", fmt.Sprintf("=%s-%s", d, e)},
-		[]string{"", "Bila belum seimbang: cek kelengkapan rincian, lalu lihat 'Saran Saldo Laba' di sheet Modal."},
 		[]string{},
 		[]string{"", "Ringkasan Posisi"},
 		[]string{"", "Total Aset (bersih)", "", fmt.Sprintf(`=SUMIFS(%s,%s,"Aset*")-SUMIFS(%s,%s,"Aset*")`, rng("D"), rng("C"), rng("E"), rng("C"))},
 		[]string{"", "Total Liabilitas", "", fmt.Sprintf(`=SUMIFS(%s,%s,"Liabilitas")`, rng("E"), rng("C"))},
 		[]string{"", "Total Ekuitas", "", fmt.Sprintf(`=SUMIFS(%s,%s,"Ekuitas")-SUMIFS(%s,%s,"Ekuitas")`, rng("E"), rng("C"), rng("D"), rng("C"))},
 	)
-	gaya[fmt.Sprintf("D%d", total+2)] = "rumus_tebal"
-	gaya[fmt.Sprintf("B%d", total+4)] = "catatan"
-	gaya[fmt.Sprintf("B%d", total+6)] = "tebal"
+	gaya[fmt.Sprintf("B%d", total+2)] = "tebal"
 	return ImportSheet{Nama: sheetNeraca, Rows: rows, Format: &FormatTabel{Header: barisHeaderRinci, Kolom: 6, Akhir: akhirTabel,
-		Lebar: []float64{10, 38, 14, 18, 18, 18}, Angka: []int{3, 4}, Gaya: gaya, Referensi: true, Kunci: true}}, total
+		Lebar: []float64{10, 38, 14, 18, 18, 18}, Angka: []int{3, 4}, Gaya: gaya, Status: []string{"D4"}, Referensi: true, Kunci: true}}, total
 }
 
 // ---------------------------------------------------------------------------------------
@@ -763,16 +778,18 @@ func rinciKas(rows [][]string) ([]SaldoAkun, []ImportError) {
 		case strings.Contains(j, "bank") || (j == "" && b.get(i, "rek") != ""):
 			kode, nama = "1102", "Bank"
 		case strings.Contains(j, "kas") || j == "":
-		default:
-			errs.add(i, "Jenis %q tidak dikenal; pilih Kas atau Bank", b.get(i, "jenis"))
-			continue
+		default: // jenis diketik sendiri (deposito, e-wallet, …): akun tersendiri bernama jenisnya
+			kode, nama = "", b.get(i, "jenis")
 		}
 		rek := ""
 		if r := b.get(i, "rek"); r != "" {
 			rek = gabungIsi(" a.n. ", "Rek. "+r, b.get(i, "atas"))
 		}
-		out = append(out, SaldoAkun{Kode: kode, Nama: cmp.Or(b.get(i, "nama"), nama), Kategori: KatKas, Nominal: n,
-			Keterangan: gabungIsi("; ", rek, b.get(i, "dasar"), b.get(i, "ket"))})
+		akun, ket := cmp.Or(b.get(i, "nama"), nama), gabungIsi("; ", rek, b.get(i, "dasar"), b.get(i, "ket"))
+		if kode == "" {
+			akun, ket = nama, gabungIsi("; ", b.get(i, "nama"), ket)
+		}
+		out = append(out, SaldoAkun{Kode: kode, Nama: akun, Kategori: KatKas, Nominal: n, Keterangan: ket})
 	}
 	return out, errs
 }
@@ -1039,16 +1056,17 @@ func rinciAsetLancar(rows [][]string) ([]SaldoAkun, []ImportError) {
 			kode = "1404"
 		case strings.Contains(j, "piutang"):
 			kode = "1202"
-		default:
-			errs.add(i, "Jenis %q tidak dikenal; pilih %s", b.get(i, "jenis"), strings.Join(jenisAsetLancarList, " / "))
-			continue
 		}
 		sisa, okS := sisaRinci(b, i, &errs, "nilai", "beban", "Nilai Awal", "Sudah Dibebankan")
 		if _, okT := tanggalOpsional(b, i, &errs, "tgl", "Tgl Bayar / Dokumen"); !okS || !okT || sisa == 0 {
 			continue
 		}
-		out = append(out, SaldoAkun{Kode: kode, Nama: gabungIsi(" — ", cmp.Or(b.get(i, "uraian"), b.get(i, "jenis")), b.get(i, "pihak")),
-			Kategori: KatAsetLain, Nominal: sisa, Keterangan: b.get(i, "ket")})
+		uraian := gabungIsi(" — ", cmp.Or(b.get(i, "uraian"), b.get(i, "jenis")), b.get(i, "pihak"))
+		r := SaldoAkun{Kode: kode, Nama: uraian, Kategori: KatAsetLain, Nominal: sisa, Keterangan: b.get(i, "ket")}
+		if kode == "" { // jenis diketik sendiri: akun tersendiri bernama jenisnya
+			r.Nama, r.Keterangan = b.get(i, "jenis"), gabungIsi("; ", uraian, r.Keterangan)
+		}
+		out = append(out, r)
 	}
 	return out, errs
 }
@@ -1232,9 +1250,10 @@ func rinciUtang(rows [][]string) ([]SaldoAkun, []ImportError) {
 			kode, kat = "2105", KatKewajibanLain
 		case strings.Contains(j, "lain"):
 			kode, kat = "2105", KatKewajibanLain
-		default:
-			errs.add(i, "Jenis Utang %q tidak dikenal; pilih %s", b.get(i, "jenis"), strings.Join(jenisUtangList, " / "))
-			continue
+		case strings.Contains(j, "kredit") || strings.Contains(j, "koperasi") || strings.Contains(j, "cicilan"):
+			kat = KatPinjaman // akun pinjaman; jenisnya jadi nama baris
+		default: // jenis diketik sendiri: akun tersendiri bernama jenisnya
+			kat = KatKewajibanLain
 		}
 		sisa, okS := sisaRinci(b, i, &errs, "nilai", "bayar", "Nilai Awal", "Sudah Dibayar")
 		_, okT := tanggalOpsional(b, i, &errs, "tgl", "Tgl Dokumen")
@@ -1246,8 +1265,12 @@ func rinciUtang(rows [][]string) ([]SaldoAkun, []ImportError) {
 		if jt != "" {
 			ket = "jatuh tempo " + jt
 		}
-		out = append(out, SaldoAkun{Kode: kode, Nama: gabungIsi(" — ", cmp.Or(b.get(i, "uraian"), b.get(i, "jenis")), b.get(i, "pihak")),
-			Kategori: kat, Nominal: sisa, Keterangan: gabungIsi("; ", b.get(i, "nomor"), ket, b.get(i, "ket"))})
+		uraian := gabungIsi(" — ", cmp.Or(b.get(i, "uraian"), b.get(i, "jenis")), b.get(i, "pihak"))
+		r := SaldoAkun{Kode: kode, Nama: uraian, Kategori: kat, Nominal: sisa, Keterangan: gabungIsi("; ", b.get(i, "nomor"), ket, b.get(i, "ket"))}
+		if kode == "" {
+			r.Nama, r.Keterangan = b.get(i, "jenis"), gabungIsi("; ", uraian, r.Keterangan)
+		}
+		out = append(out, r)
 	}
 	return out, errs
 }
@@ -1295,9 +1318,8 @@ func rinciModal(rows [][]string) ([]SaldoAkun, []ImportError) {
 			s.Kode, s.Kategori = "3201", KatLabaDitahan // boleh minus (rugi)
 		case strings.Contains(j, "modal"):
 			s.Kode, s.Kategori = "3101", KatModal
-		default:
-			errs.add(i, "Jenis Ekuitas %q tidak dikenal; pilih %s", jenis, strings.Join(jenisEkuitasList, " / "))
-			continue
+		default: // jenis diketik sendiri (agio saham, …): bagian modal
+			s.Kategori = KatModal
 		}
 		if n < 0 && s.Kategori == KatModal {
 			errs.add(i, "Nilai %s tidak boleh minus; prive / dividen diisi positif dengan Jenis Prive / Dividen", jenis)

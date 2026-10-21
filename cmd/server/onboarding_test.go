@@ -78,6 +78,38 @@ func TestOnboardingTemplateEndpoint(t *testing.T) {
 	}
 }
 
+// Kode akun di Neraca Saldo Awal mengikuti CoA usaha (manufaktur: Kas Besar 1102, bank 1111);
+// baris tanpa satu akun yang pasti dikosongkan, bukan diberi kode yang salah.
+func TestOnboardingTemplate_KodeIkutCoAUsaha(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	neraca := func() map[string]string {
+		sheets, err := xlsx.ReadAll(do(srv, owner, http.MethodGet, "/api/v1/onboarding/template", "").Body.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]string{}
+		for _, sh := range sheets {
+			if sh.Name == "Neraca Saldo Awal" {
+				for _, row := range sh.Rows {
+					if len(row) > 1 {
+						out[row[1]] = row[0]
+					}
+				}
+			}
+		}
+		return out
+	}
+	do(srv, owner, http.MethodPut, "/api/v1/business", strings.Replace(profileBody, "manufaktur", "perdagangan", 1))
+	if k := neraca(); k["Kas"] != "1101" || k["Pajak Dibayar di Muka (PPh)"] != "1403" || k["Piutang Lain-lain"] != "" || k["Utang Pajak"] != "" {
+		t.Errorf("kode dagang: %v", k)
+	}
+	do(srv, owner, http.MethodPut, "/api/v1/business", profileBody)
+	if k := neraca(); k["Kas"] != "1102" || k["Bank"] != "1111" {
+		t.Errorf("kode manufaktur: Kas %q, Bank %q", k["Kas"], k["Bank"])
+	}
+}
+
 // Pratinjau tidak boleh menyimpan apa pun; commit mengganti register aset & karyawan
 // dan menambahkan transaksi.
 func TestOnboardingImport_PratinjauLaluCommit(t *testing.T) {

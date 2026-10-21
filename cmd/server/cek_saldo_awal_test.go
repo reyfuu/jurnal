@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"pajak/internal/coa"
 	"pajak/internal/finance"
 )
 
@@ -107,4 +108,61 @@ func sumLain(bs []finance.SaldoAkun) (n int64) {
 		n += b.Nominal
 	}
 	return n
+}
+
+// Akun yang ditambahkan sendiri di Saldo Awal (rekening bank lain, uang jaminan) menjadi akun
+// tersendiri di Daftar Akun dan Buku Besar, saldo kas Kas berkurang sebesar itu (total tetap),
+// neraca saldo tetap seimbang, dan akun itu tidak bisa dihapus selama dipakai transaksi.
+func TestSaldoAwal_AkunSendiriDiDaftarAkunDanBukuBesar(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", strings.Replace(profileBody, "manufaktur", "perdagangan", 1)); rec.Code != http.StatusOK {
+		t.Fatalf("profil: %d %s", rec.Code, rec.Body)
+	}
+	saldo := `{"tanggal":"2026-01-01","rincian":[
+		{"nama":"Kas","kategori":"kas","nominal":5000000},
+		{"nama":"Bank BCA","kategori":"kas","nominal":10000000},
+		{"nama":"Uang Jaminan","kategori":"aset_lain","nominal":2000000},
+		{"nama":"Modal Pemilik","kategori":"modal","nominal":17000000}]}`
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", saldo); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	op := getJSON[openingResp](t, srv, owner, "/api/v1/opening")
+	kode := map[string]string{}
+	for _, r := range op.Opening.Rincian {
+		kode[r.Nama] = r.Kode
+	}
+	if kode["Kas"] != "1101" || kode["Bank BCA"] != "1105" || kode["Uang Jaminan"] != "1408" {
+		t.Fatalf("kode akun saldo awal: %v", kode)
+	}
+	daftar := getJSON[struct {
+		Accounts []coa.Account `json:"accounts"`
+	}](t, srv, owner, "/api/v1/coa")
+	for _, k := range []string{"1105", "1408"} {
+		if a, ok := coa.Find(daftar.Accounts, k); !ok || a.Catatan != coa.CatatanSaldoAwal {
+			t.Errorf("Daftar Akun harus memuat %s: %+v", k, a)
+		}
+	}
+	bb := getJSON[bukuBesarResp](t, srv, owner, "/api/v1/reports/buku-besar?dari=2026-01-01&sampai=2026-01-31")
+	awal := map[string]int64{}
+	for _, a := range bb.Akun {
+		awal[a.Kode] = a.SaldoAwal
+	}
+	if awal["1105"] != 10_000_000 || awal["1101"] != 5_000_000 || awal["1408"] != 2_000_000 || !bb.Seimbang {
+		t.Fatalf("saldo awal Buku Besar: 1101 %d, 1105 %d, 1408 %d, seimbang %v", awal["1101"], awal["1105"], awal["1408"], bb.Seimbang)
+	}
+	for _, p := range []string{"2026-01", "2026-08"} {
+		var d, k int64
+		for _, b := range getJSON[coaReport](t, srv, owner, "/api/v1/reports/coa?period="+p).TrialBalance {
+			d, k = d+b.Debit, k+b.Kredit
+		}
+		if d != k {
+			t.Errorf("%s: neraca saldo tidak seimbang %d vs %d", p, d, k)
+		}
+	}
+	srv.tenants[1].txs[0].Akun = "1105" // transaksi dikoreksi ke rekening itu
+	tanpaBCA := strings.Replace(saldo, `{"nama":"Bank BCA","kategori":"kas","nominal":10000000},`, `{"nama":"Bank","kategori":"kas","nominal":10000000},`, 1)
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", tanpaBCA); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "Bank BCA") {
+		t.Fatalf("akun yang dipakai transaksi tidak boleh hilang: %d %s", rec.Code, rec.Body)
+	}
 }

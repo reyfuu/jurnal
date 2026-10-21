@@ -132,13 +132,21 @@ func (s *tenant) coaTemplate(p finance.BusinessProfile) (katalog.Template, bool)
 	return st.TemplateAktif(p.JenisUsaha)
 }
 
-// coaAkun: semua akun template (urutan neraca saldo) dan akun yang aktif untuk profil.
+// coaAkun: semua akun template (urutan neraca saldo) ditambah akun yang dibuat sendiri di Saldo
+// Awal, dan akun yang aktif untuk profil. Jangan dipanggil dengan s.mu terkunci.
 func (s *tenant) coaAkun() (all, active []coa.Account, p finance.BusinessProfile) {
 	p = s.currentProfile()
-	if t, ok := s.coaTemplate(p); ok {
-		return t.Akun, coa.ActiveFrom(t.Akun, p), p
+	t, ok := s.coaTemplate(p)
+	if !ok {
+		return nil, nil, p
 	}
-	return nil, nil, p
+	all = t.Akun
+	s.mu.RLock()
+	if s.opening != nil {
+		all = coa.AkunSaldoAwal(s.opening.Rincian, all, coa.PetaDari(all))
+	}
+	s.mu.RUnlock()
+	return all, coa.ActiveFrom(all, p), p
 }
 
 type coaPembaruan struct {

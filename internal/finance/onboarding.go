@@ -29,6 +29,8 @@ type FormatTabel struct {
 	Lebar                                     []float64
 	Angka, Bilangan, Tanggal                  []int
 	Pilihan                                   map[int][]string
+	Bebas                                     []int    // kolom Pilihan yang hanya saran (ketikan bebas diterima)
+	Status                                    []string // sel status SEIMBANG / BELUM SEIMBANG (diwarnai)
 	Rumus                                     map[int]string
 	Gaya                                      map[string]string
 	Referensi, Kunci                          bool
