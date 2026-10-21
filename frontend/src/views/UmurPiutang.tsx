@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getUmurSaldo, lunasiTransaksi, pelunasanSaldoAwal, type UmurSaldo } from '@/lib/api'
+import { getInvoices, getUmurSaldo, lunasiTransaksi, pelunasanSaldoAwal, type InvoiceRow, type UmurSaldo, type View } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { PiutangUtang } from '@/views/PiutangStok'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -16,11 +16,17 @@ import { formatRp, formatTanggal } from '@/lib/format'
 const hariIni = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
 const WARNA = ['var(--accent-green)', 'var(--text-warn)', 'var(--accent-amber)', 'var(--text-danger)']
 
-export function UmurPiutang({ bisaUbah, onChanged }: { bisaUbah: boolean; onChanged: () => void }) {
+export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boolean; onChanged: () => void; navigate?: (v: View) => void }) {
   const [tab, setTab] = useState<'piutang' | 'utang' | 'manual'>('piutang')
   const jenis = tab === 'utang' ? 'utang' : 'piutang'
   const [per, setPer] = useState(hariIni)
   const [muatUlang, setMuatUlang] = useState(0)
+  // Invoice yang belum jadi piutang (draft / belum dibukukan): dijelaskan supaya angka di sini
+  // tidak terlihat "tidak sinkron" dengan menu Invoice. Tanpa akses Invoice, catatan disembunyikan.
+  const [invoiceLuar, setInvoiceLuar] = useState<InvoiceRow[]>([])
+  useEffect(() => {
+    getInvoices().then((i) => setInvoiceLuar((i.summary.invoices ?? []).filter((r) => r.status === 'draft' || (!r.dibukukan && r.status !== 'lunas'))), () => {})
+  }, [muatUlang])
   const [hasil, setHasil] = useState<{ kunci: string; d?: UmurSaldo; error?: string } | null>(null)
   const [lunasi, setLunasi] = useState<UmurSaldo['baris'][number] | null>(null)
   const kunci = `${jenis}|${per}|${muatUlang}`
@@ -37,6 +43,13 @@ export function UmurPiutang({ bisaUbah, onChanged }: { bisaUbah: boolean; onChan
       {tab !== 'manual' && <PageHeader title="Piutang & Utang"
         subtitle={jenis === 'piutang' ? 'Tagihan ke pelanggan yang belum dibayar (dari transaksi belum lunas), dikelompokkan menurut lamanya. Tagih yang paling lama dulu.'
           : 'Kewajiban ke supplier yang belum dibayar (dari transaksi belum lunas), dikelompokkan menurut lamanya.'} />}
+      {tab === 'piutang' && invoiceLuar.length > 0 && (
+        <div className="note-box warn" style={{ marginTop: 0, marginBottom: 12 }}>
+          Belum termasuk di sini: {invoiceLuar.map((r) => `${r.nomor} (${r.status === 'draft' ? 'masih draft' : 'belum dibukukan'})`).join(', ')}.
+          Piutang dihitung dari invoice yang sudah <strong>Terkirim</strong> dan dibukukan.{' '}
+          {navigate && <button type="button" className="underline underline-offset-4" onClick={() => navigate('invoice')}>Buka Invoice</button>}
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3" style={{ marginBottom: 12 }}>
         <div className="tabbar" role="tablist" aria-label="Jenis">
           <button role="tab" className="tab-btn" aria-selected={tab === 'piutang'} onClick={() => setTab('piutang')}>Piutang (pelanggan)</button>

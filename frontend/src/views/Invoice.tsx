@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
-  createInvoice, deleteInvoice, getInvoices, invoicePdfUrl, updateInvoice,
+  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, invoicePdfUrl, updateInvoice,
   type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow,
 } from '@/lib/api'
 import { ekspor } from '@/lib/garansi'
@@ -97,6 +97,24 @@ export function InvoiceView() {
     }
   }
 
+  // Invoice terbit yang dibuat sebelum invoice tersambung ke pembukuan: belum jadi omzet/piutang.
+  const belumBuku = rows.filter((r) => !r.dibukukan && r.status !== 'draft')
+  const draft = rows.filter((r) => r.status === 'draft')
+
+  async function bukukanSemua() {
+    if (!confirm(`Bukukan ${belumBuku.length} invoice sekarang? Penjualannya akan tercatat di Transaksi (dan jadi piutang bila belum lunas). Kalau penjualan ini sudah Anda catat manual, batalkan dan hapus transaksi manualnya dulu supaya tidak dobel.`)) return
+    setBusy(true)
+    try {
+      const h = await bukukanInvoice()
+      if (h.gagal.length) setError('Sebagian gagal dibukukan: ' + h.gagal.join('; '))
+      await muat()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const t = form ? hitung(form) : null
   const ubahBaris = (i: number, patch: Partial<InvoiceItem>) =>
     setForm((f) => f && { ...f, items: f.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) })
@@ -117,6 +135,22 @@ export function InvoiceView() {
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
             Belum diisi: {info.profil_lengkap.join(', ')}. Faktur tetap bisa dicetak, tapi bagian itu akan kosong di PDF.
           </div>
+        </div>
+      )}
+
+      {belumBuku.length > 0 && (
+        <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ flex: 1, minWidth: 260 }}>
+            <strong>{belumBuku.length} invoice belum masuk pembukuan</strong> ({belumBuku.map((r) => r.nomor).join(', ')}), jadi belum muncul sebagai penjualan,
+            piutang, atau kas di laporan. Invoice ini dibuat sebelum invoice tersambung otomatis ke pembukuan.
+          </span>
+          <button className="btn-cta" style={{ padding: '8px 16px', fontSize: 13 }} disabled={busy} onClick={() => void bukukanSemua()}>Bukukan sekarang</button>
+        </div>
+      )}
+      {draft.length > 0 && (
+        <div className="note-box" style={{ marginTop: 0, marginBottom: 14 }}>
+          {draft.length} invoice masih <strong>Draft</strong> ({draft.map((r) => r.nomor).join(', ')}): belum dihitung sebagai tagihan maupun piutang.
+          Klik <strong>Ubah</strong> lalu ganti status ke <strong>Terkirim</strong> saat invoice dikirim ke pelanggan — otomatis tercatat di Piutang &amp; Utang.
         </div>
       )}
 
@@ -240,7 +274,7 @@ export function InvoiceView() {
             </div>
           </div>
 
-          {editId !== null && form.dibukukan === false ? (
+          {editId !== null && form.dibukukan === false && rows.find((r) => r.id === editId)?.status !== 'draft' ? (
             <label className="note-box warn" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12 }}>
               <input type="checkbox" checked={false} onChange={() => setForm({ ...form, dibukukan: true })} />
               <span><strong>Bukukan invoice ini ke pembukuan.</strong> Invoice ini dibuat sebelum invoice tersambung ke pembukuan, jadi belum tercatat.
@@ -300,6 +334,7 @@ export function InvoiceView() {
                     <span className={'pill-status ' + (r.status === 'lunas' ? 'pill-green' : r.hari_terlambat > 0 ? 'pill-red' : 'pill-amber')}>
                       {r.hari_terlambat > 0 && r.status !== 'lunas' ? 'Lewat Tempo' : STATUS_LABEL[r.status] ?? r.status}
                     </span>
+                    {r.status === 'draft' && <div style={{ fontSize: 11, marginTop: 3, color: 'var(--text-muted)' }}>belum jadi piutang</div>}
                     {r.status !== 'draft' && (
                       <div style={{ fontSize: 11, marginTop: 3, color: r.dibukukan ? 'var(--text-muted)' : AMBER }}>
                         {r.dibukukan ? `tercatat · trx #${r.transaksi_id}${r.transaksi_ppn_id ? ` & #${r.transaksi_ppn_id}` : ''}` : 'belum dibukukan'}

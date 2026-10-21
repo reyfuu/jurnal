@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net/http"
 	"slices"
 
 	"pajak/internal/finance"
@@ -91,4 +92,34 @@ func (s *tenant) lunasiInvoiceLocked(invoiceID int, tanggal string) error {
 	}
 	s.invoices[i] = inv
 	return nil
+}
+
+// handleBukukanInvoice: semua invoice yang belum dibukukan (dibuat sebelum invoice tersambung
+// ke pembukuan) dibukukan sekaligus. Draft ikut ditandai supaya langsung tercatat begitu
+// dikirim. Invoice yang gagal (mis. bulannya sudah tutup buku) dilewati dan dilaporkan.
+func (s *tenant) handleBukukanInvoice(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := struct {
+		Dibukukan int      `json:"dibukukan"`
+		Gagal     []string `json:"gagal"`
+	}{Gagal: []string{}}
+	for i := range s.invoices {
+		if s.invoices[i].Dibukukan {
+			continue
+		}
+		inv := s.invoices[i]
+		inv.Dibukukan = true
+		txs, nextID := slices.Clone(s.txs), s.nextTxID
+		if err := s.sinkronInvoiceLocked(&inv); err != nil {
+			s.txs, s.nextTxID = txs, nextID // invoice ini tidak diubah sama sekali
+			out.Gagal = append(out.Gagal, inv.Nomor+": "+err.Error())
+			continue
+		}
+		s.invoices[i] = inv
+		if inv.Status != finance.StatusDraft {
+			out.Dibukukan++
+		}
+	}
+	writeJSON(w, out)
 }

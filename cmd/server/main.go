@@ -414,6 +414,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/invoice", s.guard("invoice", s.on((*tenant).handleListInvoice)))
 	s.mux.HandleFunc("POST /api/v1/invoice", s.persisting(s.guard("invoice", s.on((*tenant).handleCreateInvoice))))
+	s.mux.HandleFunc("POST /api/v1/invoice/bukukan", s.persisting(s.guard("invoice", s.on((*tenant).handleBukukanInvoice))))
 	s.mux.HandleFunc("PUT /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdateInvoice))))
 	s.mux.HandleFunc("DELETE /api/v1/invoice/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeleteInvoice))))
 	s.mux.HandleFunc("GET /api/v1/invoice/{id}/pdf", s.guard("invoice", s.exporting(s.on((*tenant).handleInvoicePDF))))

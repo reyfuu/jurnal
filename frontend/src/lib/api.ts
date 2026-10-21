@@ -1433,6 +1433,8 @@ export interface InvoiceInfo {
 }
 
 export const getInvoices = () => api<InvoiceInfo>('/invoice')
+/** Bukukan semua invoice lama sekaligus (dibuat sebelum invoice tersambung ke pembukuan). */
+export const bukukanInvoice = () => api<{ dibukukan: number; gagal: string[] }>('/invoice/bukukan', { method: 'POST' })
 export const createInvoice = (inv: InvoiceInput) => api<Invoice>('/invoice', { method: 'POST', body: inv })
 export const updateInvoice = (id: number, inv: InvoiceInput) => api<Invoice>(`/invoice/${id}`, { method: 'PUT', body: inv })
 export const deleteInvoice = (id: number) => api<void>(`/invoice/${id}`, { method: 'DELETE' })

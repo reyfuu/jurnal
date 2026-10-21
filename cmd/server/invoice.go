@@ -122,7 +122,8 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		inv.Nomor = lama.Nomor
 	}
 	// Tautan pembukuan diatur server; "bukukan" dari klien hanya bisa menyalakan, bukan mematikan.
-	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan
+	// Draft belum pernah terbit, jadi belum mungkin dicatat manual: begitu dikirim langsung dibukukan.
+	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan || lama.Status == finance.StatusDraft
 	inv.TransaksiID, inv.TransaksiPPNID = lama.TransaksiID, lama.TransaksiPPNID
 	if err := s.sinkronInvoiceLocked(&inv); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)

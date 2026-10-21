@@ -118,3 +118,55 @@ func TestInvoice_LamaDibukukanSetelahDiminta(t *testing.T) {
 		t.Fatalf("bukukan: %+v %+v", inv, tx)
 	}
 }
+
+// "Bukukan sekarang": invoice lama terkirim/lunas langsung jadi transaksi (piutang bila belum
+// lunas), draft hanya ditandai dan tercatat begitu dikirim.
+func TestInvoice_BukukanSemuaInvoiceLama(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	tn := srv.tenants[1]
+	item := []finance.InvoiceItem{{Deskripsi: "X", Qty: 1, HargaSatuan: 100_000}}
+	tn.mu.Lock()
+	tn.invoices = append(tn.invoices,
+		finance.Invoice{ID: 901, Nomor: "INV-L1", Status: finance.StatusTerkirim, Tanggal: "2026-10-21", JatuhTempo: "2026-11-20", PelangganNama: "Bayu", Items: item},
+		finance.Invoice{ID: 902, Nomor: "INV-L2", Status: finance.StatusDraft, Tanggal: "2026-10-21", JatuhTempo: "2026-11-20", PelangganNama: "Agung", Items: item})
+	tn.mu.Unlock()
+	var hasil struct {
+		Dibukukan int
+		Gagal     []string
+	}
+	if err := json.NewDecoder(do(srv, owner, http.MethodPost, "/api/v1/invoice/bukukan", "").Body).Decode(&hasil); err != nil || hasil.Dibukukan < 1 || len(hasil.Gagal) != 0 {
+		t.Fatalf("bukukan: %+v %v", hasil, err)
+	}
+	tn.mu.RLock()
+	l1, l2 := tn.invoices[len(tn.invoices)-2], tn.invoices[len(tn.invoices)-1]
+	tn.mu.RUnlock()
+	if tx, ok := txByID(srv, l1.TransaksiID); !l1.Dibukukan || !ok || tx.Lunas || tx.Pihak != "Bayu" {
+		t.Fatalf("invoice terkirim harus jadi piutang: %+v %+v", l1, tx)
+	}
+	if !l2.Dibukukan || l2.TransaksiID != 0 {
+		t.Fatalf("draft hanya ditandai: %+v", l2)
+	}
+	body := `{"nomor":"INV-L2","status":"terkirim","tanggal":"2026-10-21","jatuh_tempo":"2026-11-20","pelanggan_nama":"Agung","items":[{"deskripsi":"X","qty":1,"harga_satuan":100000}]}`
+	var inv finance.Invoice
+	_ = json.NewDecoder(do(srv, owner, http.MethodPut, "/api/v1/invoice/902", body).Body).Decode(&inv)
+	if inv.TransaksiID == 0 {
+		t.Fatalf("draft yang dikirim harus langsung tercatat: %+v", inv)
+	}
+}
+
+func TestInvoice_DraftLamaDibukukanSaatDikirim(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	tn := srv.tenants[1]
+	tn.mu.Lock()
+	tn.invoices = append(tn.invoices, finance.Invoice{ID: 903, Nomor: "INV-D", Status: finance.StatusDraft, Tanggal: "2026-10-21", JatuhTempo: "2026-11-20",
+		PelangganNama: "Agung", Items: []finance.InvoiceItem{{Deskripsi: "X", Qty: 1, HargaSatuan: 100_100}}})
+	tn.mu.Unlock()
+	body := `{"nomor":"INV-D","status":"terkirim","tanggal":"2026-10-21","jatuh_tempo":"2026-11-20","pelanggan_nama":"Agung","items":[{"deskripsi":"X","qty":1,"harga_satuan":100100}]}`
+	var inv finance.Invoice
+	_ = json.NewDecoder(do(srv, owner, http.MethodPut, "/api/v1/invoice/903", body).Body).Decode(&inv)
+	if tx, ok := txByID(srv, inv.TransaksiID); !inv.Dibukukan || !ok || tx.Lunas || tx.Nominal != 100_100 {
+		t.Fatalf("draft lama yang dikirim harus jadi piutang: %+v %+v", inv, tx)
+	}
+}
