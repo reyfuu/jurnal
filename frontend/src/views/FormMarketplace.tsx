@@ -67,7 +67,8 @@ export function FormMarketplace({ m, profile, onLangganan }: { m: KalkulatorMast
             <Pilih label="Cara bayar pajak penghasilan" v={skema} set={(v) => setSkema(v as 'final' | 'umum')}
               opsi={[['final', 'PPh final 0,5% dari omzet (UMKM)'], ['umum', 'Pembukuan, pajak dari laba (tarif umum)']]} />
             {bentuk === 'op' && <Pilih label="Status PTKP" v={ptkp} set={setPtkp} opsi={m.ptkp_codes.map((c) => [c, `${c} — ${formatRp(m.ptkp[c])}`])} />}
-            <TombolHitung busy={busy} error={error} />
+            <TombolHitung busy={busy} error={error}
+              salah={Math.abs(laba) > total ? `Laba bersih (${formatRp(laba)}) lebih besar dari total omzet (${formatRp(total)}). Laba tidak mungkin melebihi omzet; periksa lagi isian laba atau omzet.` : undefined} />
           </form>
         }
         kanan={r && (

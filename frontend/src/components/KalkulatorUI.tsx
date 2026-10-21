@@ -88,10 +88,12 @@ export function Centang({ v, set, children }: { v: boolean; set: (b: boolean) =>
   )
 }
 
-export function TombolHitung({ busy, error }: { busy: boolean; error: string }) {
+/** salah: kesalahan isian yang terlihat sebelum dihitung (mis. laba > omzet); tombol dimatikan. */
+export function TombolHitung({ busy, error, salah }: { busy: boolean; error: string; salah?: string }) {
   return (
     <>
-      <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy}>{busy ? 'Menghitung…' : 'Hitung'}</button>
+      {salah && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10, whiteSpace: 'normal' }}>{salah}</p>}
+      <button className="btn-cta" style={{ padding: '9px 22px', fontSize: 13 }} disabled={busy || !!salah}>{busy ? 'Menghitung…' : 'Hitung'}</button>
       {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 12, whiteSpace: 'normal' }}>{error}</p>}
     </>
   )

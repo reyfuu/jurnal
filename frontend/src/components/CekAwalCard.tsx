@@ -48,12 +48,14 @@ function SaranCard({ s }: { s: SaranBentuk }) {
       </div>
       {!sama && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border border-border p-3">
+          <div className="relative rounded-md border border-border p-3">
+            <span className="absolute right-2 top-2"><InfoTip label="penghematan pajak"><span>Selisih pajak setahun antara skema <strong>Anda sekarang</strong> dan skema <strong>yang disarankan</strong>, dalam persen dari pajak sekarang.</span></InfoTip></span>
             <div className="text-xs text-muted-foreground">Penghematan pajak</div>
             <div className="mt-1 text-2xl font-bold tabular" style={{ color: 'var(--accent-green)' }}>{formatPct(s.hemat_bps)}</div>
             <div className="text-xs text-muted-foreground">lebih kecil dari skema Anda sekarang</div>
           </div>
-          <div className="rounded-md border border-border p-3">
+          <div className="relative rounded-md border border-border p-3">
+            <span className="absolute right-2 top-2"><InfoTip label="hemat per tahun"><span>Perkiraan pajak yang <strong>tidak perlu dibayar</strong> setahun bila memakai skema yang disarankan. Dihitung dari omzet & laba yang Anda isi; angka sebenarnya mengikuti pembukuan.</span></InfoTip></span>
             <div className="text-xs text-muted-foreground">Hemat per tahun</div>
             <div className="mt-1 text-2xl font-bold tabular" style={{ color: 'var(--accent-green)' }}>{formatRp(s.hemat)}</div>
             <div className="text-xs text-muted-foreground">{formatRp(s.hemat ? Math.round(s.hemat / 12) : 0)} per bulan</div>
@@ -72,7 +74,7 @@ function SaranCard({ s }: { s: SaranBentuk }) {
             return urut.map((k) => {
               const warnaBar = k.id === s.termurah ? 'var(--accent-green)' : k.id === s.sekarang ? 'var(--accent-amber-bright)' : 'var(--border-strong)'
               return (
-                <li key={k.id} className="grid gap-1 text-sm">
+                <li key={k.id} className="grid gap-1 rounded-md text-sm" style={k.id === s.termurah ? { background: 'color-mix(in srgb, var(--accent-green) 14%, transparent)', padding: '6px 8px', margin: '0 -8px' } : undefined}>
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <span>
                       {k.nama}
@@ -128,13 +130,15 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
       </div>
       {c.status !== 'kurang_data' && c.klu && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border border-border p-3">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">NPM <InfoTip label="NPM"><PenjelasanNPM /></InfoTip></div>
+          <div className="relative rounded-md border border-border p-3">
+            <span className="absolute right-2 top-2"><InfoTip label="NPM"><PenjelasanNPM /></InfoTip></span>
+            <div className="text-xs text-muted-foreground">NPM</div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.npm_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.npm_bps)}</span></div>
             <div className="mt-1 text-xs font-semibold" style={{ color: st.color }}>{st.label}</div>
           </div>
-          <div className="rounded-md border border-border p-3">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">CTTOR <InfoTip label="CTTOR"><PenjelasanCTTOR /></InfoTip></div>
+          <div className="relative rounded-md border border-border p-3">
+            <span className="absolute right-2 top-2"><InfoTip label="CTTOR"><PenjelasanCTTOR /></InfoTip></span>
+            <div className="text-xs text-muted-foreground">CTTOR</div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.cttor_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.cttor_bps)}</span></div>
           </div>
         </div>

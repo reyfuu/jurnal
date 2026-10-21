@@ -101,10 +101,11 @@ export function PerencanaanPajak({ profile, ptkpCodes }: { profile: BusinessProf
               </thead>
               <tbody>
                 {bu.skema.map((s) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} style={s.id === bu.termurah ? { background: 'color-mix(in srgb, var(--accent-green) 14%, transparent)', fontWeight: 600 } : undefined}
+                    aria-label={s.id === bu.termurah ? `${s.nama}, rekomendasi termurah` : undefined}>
                     <td>
                       {s.nama}
-                      {s.id === bu.termurah && <span className="pill-status pill-green" style={{ marginLeft: 8 }}>Termurah</span>}
+                      {s.id === bu.termurah && <span className="pill-status pill-green" style={{ marginLeft: 8 }}>Rekomendasi · termurah</span>}
                       {mine.includes(s.id) && <span className="pill-status pill-brand" style={{ marginLeft: 8 }}>Bentuk usaha Anda</span>}
                     </td>
                     <td style={{ color: 'var(--text-muted)' }}>{s.keterangan}</td>
