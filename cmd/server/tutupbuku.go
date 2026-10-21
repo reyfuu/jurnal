@@ -261,13 +261,19 @@ func (s *tenant) handleLangkahMulai(w http.ResponseWriter, _ *http.Request) {
 	out := []langkahMulai{
 		{Kode: "profil", Judul: "Lengkapi profil usaha", Penjelasan: "Nama, bentuk usaha, bidang usaha (KLU), dan status PKP — menentukan pajak yang berlaku.",
 			Selesai: s.profile != nil && s.profile.KLU != "", View: "profil-usaha"},
-		{Kode: "saldo", Judul: "Isi saldo awal", Penjelasan: "Kas, piutang, utang, persediaan, dan pinjaman pada hari pertama memakai aplikasi.",
-			Selesai: s.opening != nil, View: "saldo-awal"},
+		// Aset tetap & barang diisi sebelum saldo awal: nilai buku aset dan nilai persediaannya
+		// yang mengisi baris saldo awal, bukan diketik dua kali.
+		{Kode: "aset", Judul: "Daftarkan aset tetap", Penjelasan: "Kendaraan, mesin, peralatan, bangunan yang sudah dimiliki — nilai bukunya otomatis masuk saldo awal. Lewati bila tidak punya.",
+			Selesai: len(s.assets) > 0 || s.opening != nil, View: "saldo-awal"},
 	}
 	if dagang {
+		out = append(out, langkahMulai{Kode: "barang", Judul: "Daftarkan barang & bahan", Penjelasan: "Isi daftar barang di Stok & Gudang (bisa impor Excel); nilainya jadi persediaan di saldo awal.",
+			Selesai: len(s.stok) > 0, View: "stok-gudang"})
+	}
+	out = append(out, langkahMulai{Kode: "saldo", Judul: "Isi saldo awal", Penjelasan: "Kas, piutang, utang, dan pinjaman pada hari pertama memakai aplikasi.",
+		Selesai: s.opening != nil, View: "saldo-awal"})
+	if dagang {
 		out = append(out,
-			langkahMulai{Kode: "barang", Judul: "Daftarkan barang & bahan", Penjelasan: "Isi daftar barang di Stok & Gudang (bisa impor Excel).",
-				Selesai: len(s.stok) > 0, View: "stok-gudang"},
 			langkahMulai{Kode: "kartu", Judul: "Mulai kartu stok", Penjelasan: "Hitung fisik pertama supaya stok & HPP dihitung otomatis.",
 				Selesai: s.kartuLocked().Mulai != "", View: "stok-gudang", Aksi: "mulai"},
 		)
@@ -299,4 +305,5 @@ func (s *Server) alurKerjaRoutes() {
 	m.HandleFunc("POST /api/v1/opening/pelunasan", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handlePelunasanAwal))))
 	m.HandleFunc("GET /api/v1/mulai", s.guard("", s.on((*tenant).handleLangkahMulai)))
 	m.HandleFunc("GET /api/v1/saldo-awal/cek", s.guard("", s.on((*tenant).handleCekSaldoAwal)))
+	m.HandleFunc("POST /api/v1/saldo-awal/saran", s.guard("saldo-awal", s.handleSaranSaldo))
 }
