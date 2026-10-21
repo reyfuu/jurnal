@@ -59,6 +59,11 @@ func TestCariKLU_TanpaJenisDitebakDariKataKerja(t *testing.T) {
 	for teks, want := range map[string]string{
 		"saya bikin kue kering dan bolu sendiri lalu jual di toko dan online": "manufaktur",
 		"bikin kopi susu sendiri, dijual di kafe":                             "jasa",
+		"saya ternak ayam dan jual ayam":                                      "manufaktur",
+		"tanam sayur hidroponik":                                              "manufaktur",
+		"budidaya ikan lele":                                                  "manufaktur",
+		"beli ayam dari peternak lalu jual lagi":                              "perdagangan",
+		"jual ayam potong di pasar":                                           "perdagangan",
 		"jasa servis AC dan kulkas panggilan":                                 "jasa",
 	} {
 		k := CariKLU(teks, "", 3)

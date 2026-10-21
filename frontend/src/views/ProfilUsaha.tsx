@@ -213,6 +213,23 @@ const SEKTOR: Record<JenisUsaha, { nama: string; arti: string }> = {
   manufaktur: { nama: 'Manufaktur (produksi)', arti: 'Anda mengolah bahan baku menjadi barang baru, lalu menjualnya.' },
 }
 
+// sektorSaran: nama & arti sektor dari KLU yang disarankan. Pertanian/peternakan/perikanan
+// (golongan 01–03) dan pertambangan (05–09) tidak punya pilihan sendiri; pembukuannya memakai
+// cara usaha produksi, jadi itu dijelaskan terang supaya peternak tidak bingung disebut manufaktur.
+function sektorSaran(s: SaranKLU): { nama: string; arti: string } {
+  const gol = Number(s.kode.slice(0, 2))
+  if (gol >= 1 && gol <= 3) {
+    return {
+      nama: 'Pertanian, peternakan, atau perikanan',
+      arti: 'Anda menanam, beternak, atau membudidayakan sendiri lalu menjual hasilnya. Pembukuannya memakai cara usaha produksi (pilihan ketiga di atas): biaya bibit, pakan, pupuk, dan perawatan menjadi modal barang yang dijual. Bila Anda hanya membeli lalu menjual lagi tanpa memelihara, pilih perdagangan.',
+    }
+  }
+  if (gol >= 5 && gol <= 9) {
+    return { nama: 'Pertambangan / penggalian', arti: 'Anda menggali atau menambang sendiri lalu menjual hasilnya. Pembukuannya memakai cara usaha produksi (pilihan ketiga di atas).' }
+  }
+  return SEKTOR[s.jenis]
+}
+
 // BantuJenis: pemilik menceritakan usahanya, lalu sektor (perdagangan / jasa / manufaktur)
 // direkomendasikan dari bidang usaha (KLU) yang paling cocok. Memakai saran yang sama dengan
 // langkah KLU, jadi bidangnya ikut terisi bila rekomendasi dipakai.
@@ -236,7 +253,7 @@ function BantuJenis({ value, onPakai }: { value: string; onPakai: (jenis: JenisU
   }
 
   const s = hasil?.saran[0]
-  const sektor = s && SEKTOR[s.jenis]
+  const sektor = s && sektorSaran(s)
   return (
     <div className="grid gap-2 rounded-lg border border-border p-3">
       <label htmlFor="jenis-cerita" className="text-sm font-semibold">Belum yakin? Ceritakan usaha Anda, kami bantu pilihkan</label>
@@ -255,7 +272,10 @@ function BantuJenis({ value, onPakai }: { value: string; onPakai: (jenis: JenisU
         : (
           <div className="grid gap-1.5 rounded-md border p-3" style={{ borderColor: value === s.jenis ? 'var(--text-brand)' : 'var(--border-subtle)' }} aria-live="polite">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="text-sm">Rekomendasi: <strong>{sektor.nama}</strong></div>
+              <div className="text-sm">
+                Rekomendasi: <strong>{sektor.nama}</strong>
+                {sektor !== SEKTOR[s.jenis] && <span className="block text-xs text-muted-foreground">Dicatat sebagai: {SEKTOR[s.jenis].nama}</span>}
+              </div>
               <Button type="button" size="sm" variant={value === s.jenis ? 'default' : 'outline'} className="rounded-full" onClick={() => onPakai(s.jenis, s.kode)}>
                 {value === s.jenis ? 'Dipakai' : 'Pakai rekomendasi ini'}
               </Button>
