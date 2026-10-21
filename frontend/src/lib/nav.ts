@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
+  ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
   Landmark, ListFilter, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
