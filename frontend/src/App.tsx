@@ -41,6 +41,7 @@ import { PanelMaster } from '@/views/master/PanelMaster'
 import { UsulanKoreksi } from '@/views/UsulanKoreksi'
 import { Pustaka } from '@/views/Pustaka'
 import { PrimbonPajak } from '@/views/primbon/PrimbonPajak'
+import { bacaRute, tulisRute } from '@/lib/rute'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -100,12 +101,17 @@ export default function App() {
   const signIn = useCallback((m: Me) => {
     setSession({ status: 'in', me: m })
     if (m.views.includes('panel-master')) return // akun tim Master Pajak: tanpa data usaha (kecuali lihat-sebagai)
-    setView(m.langganan.status === 'habis' ? 'laporan-ai' : m.views[0]) // belum berlangganan: menu pertama yang terbuka
+    // Halaman di URL (muat ulang / login ulang) dipakai bila boleh dibuka; selain itu menu pertama,
+    // atau Laporan AI bila belum berlangganan.
+    const rute = bacaRute(window.location.hash)
+    const habis = m.langganan.status === 'habis'
+    const boleh = habis ? ['laporan-ai', 'alat-gratis'].includes(rute.view) : m.views.includes(rute.view as View) || rute.view === 'catatan'
+    setView(boleh ? (rute.view as View) : habis ? 'laporan-ai' : m.views[0])
     getBusiness().then(setBusiness, fail)
     // Butuh sesi: jangan dipanggil sebelum login.
     getPeriods().then((list) => {
       setPeriods(list)
-      const b = list.find((x) => x.bawaan)?.id ?? list[0]?.id
+      const b = list.find((x) => x.id === rute.periode)?.id ?? list.find((x) => x.bawaan)?.id ?? list[0]?.id
       if (!periodeAwal.current && b) {
         periodeAwal.current = true
         setPeriod(b)
@@ -117,6 +123,22 @@ export default function App() {
   useEffect(() => {
     getMe().then(signIn, () => setSession({ status: 'anon' }))
   }, [signIn])
+
+  // Halaman & periode aktif selalu tercermin di URL; tombol Back / Forward berpindah halaman.
+  const masukUsaha = !!business && !!me && !me.views.includes('panel-master')
+  useEffect(() => {
+    if (!masukUsaha) return
+    const h = tulisRute(view, period)
+    if (window.location.hash !== h) history.replaceState(null, '', h)
+  }, [masukUsaha, view, period])
+  useEffect(() => {
+    const kembali = () => {
+      const r = bacaRute(window.location.hash)
+      if (r.view) setView(r.view as View)
+    }
+    window.addEventListener('popstate', kembali)
+    return () => window.removeEventListener('popstate', kembali)
+  }, [])
 
   if (session.status === 'checking') return null
   if (!me) {
@@ -133,6 +155,7 @@ export default function App() {
     setAuth(null)
     periodeAwal.current = false
     ingatMasuk(false)
+    history.replaceState(null, '', window.location.pathname) // pengguna berikutnya mulai dari menu awalnya
   }
 
   // Masuk/keluar lihat-sebagai: muat ulang me; data usaha dibuang supaya tidak tertukar.
@@ -146,6 +169,7 @@ export default function App() {
     if (!canSee(v) && v !== 'catatan' && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
     if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
     setBukaTab({ tab, n: Date.now() }) // tab awal halaman tujuan, mis. dari tautan Tanya AI
+    if (v !== view) history.pushState(null, '', tulisRute(v, period))
     setView(v)
   }
 
