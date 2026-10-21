@@ -322,7 +322,7 @@ export default function App() {
         )
       case 'umur-piutang':
       case 'piutang-utang':
-        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} />
+        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} />
       case 'tutup-buku':
         return <TutupBuku periods={periods} period={period} bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onBuka={navigate} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
