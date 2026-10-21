@@ -245,9 +245,11 @@ export interface BalanceSheet {
     accum_depreciation: number
     /** Nilai buku aset tetap & tak berwujud. */
     fixed_assets: number
+    /** Aset lancar lain dari saldo awal (uang muka, dibayar di muka). */
+    other_assets?: number
     total: number
   }
-  liabilities: { payables: number; loans: number; total: number }
+  liabilities: { payables: number; loans: number; other?: number; total: number }
   equity: { opening_capital: number; added_capital: number; retained_earnings: number; current_profit: number; total: number }
   is_balanced: boolean
 }
@@ -890,9 +892,18 @@ export interface OpeningBalance {
   persediaan: number
   utang: number
   pinjaman: number
-  /** Opsional, hanya untuk dicocokkan dengan modal hasil hitung. */
+  /** Modal disetor pemilik; untuk saldo awal per akun wajib membuat Harta = Kewajiban + Modal. */
   modal_disetor: number
+  laba_ditahan?: number
+  aset_lain?: number
+  kewajiban_lain?: number
+  aset_tetap?: number
+  /** Saldo awal per akun; bila ada, pos-pos di atas diturunkan dari sini oleh server. */
+  rincian?: SaldoAkun[]
 }
+
+export interface SaldoAkun { kode?: string; nama: string; kategori: string; nominal: number; keterangan?: string }
+export interface KategoriSaldo { id: string; label: string; sisi: 'harta' | 'kewajiban' | 'modal' }
 
 export interface OpeningInfo {
   opening: OpeningBalance | null
@@ -903,6 +914,10 @@ export interface OpeningInfo {
   aktif: boolean
   /** Tanggal transaksi paling awal; tanggal saldo awal tidak boleh sesudahnya. */
   transaksi_pertama?: string
+  /** Nilai buku register aset per tanggal saldo awal (atau ?tanggal=). */
+  nilai_buku_aset: number
+  kategori: KategoriSaldo[]
+  akun_template: SaldoAkun[]
 }
 
 export interface SheetError {
@@ -925,6 +940,10 @@ export interface OnboardingResult {
   imported: boolean
   replaced_assets: number
   replaced_karyawan: number
+  /** Nilai buku aset tetap per tanggal mulai, pembanding baris Aset Tetap. */
+  nilai_buku_aset?: number
+  /** false: saldo awal belum seimbang / ada transaksi sebelum tanggal mulai. */
+  bisa_disimpan?: boolean
 }
 
 export interface Karyawan {
@@ -959,7 +978,8 @@ export async function importOnboarding(file: File, commit: boolean): Promise<Onb
   return res.json()
 }
 
-export const getOpening = () => api<OpeningInfo>('/opening')
+/** tanggal: tanggal pembanding nilai buku aset (saat tanggal mulai di form diganti). */
+export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (tanggal ? `?tanggal=${encodeURIComponent(tanggal)}` : ''))
 export const saveOpening = (o: OpeningBalance) => api<OpeningInfo>('/opening', { method: 'PUT', body: o })
 
 export const getKaryawan = () => api<KaryawanSummary>('/karyawan')

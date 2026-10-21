@@ -7,7 +7,6 @@ import {
 import { formatJt, formatRp } from '@/lib/format'
 
 const RED = 'var(--text-danger)'
-const BLUE = 'var(--accent-blue)'
 
 export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
   const [info, setInfo] = useState<OpeningInfo | null>(null)
@@ -54,7 +53,7 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
   }
 
   const errors = preview?.errors ?? []
-  const bisaCommit = preview !== null && !preview.imported && (preview.opening !== null ||
+  const bisaCommit = preview !== null && !preview.imported && preview.bisa_disimpan !== false && (preview.opening !== null ||
     (preview.assets?.length ?? 0) > 0 || (preview.karyawan?.length ?? 0) > 0 || preview.transaksi_count > 0)
 
   return (
@@ -135,32 +134,38 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
             </div>
           </div>
 
-          {preview.opening && (
-            <div className="list-rows tabular">
-              <div className="section-head">Modal awal hasil hitung</div>
-              <div className="list-row">
-                <span>Aktiva awal − kewajiban awal</span>
-                <strong style={{ color: BLUE }}>{formatRp(preview.modal_awal)}</strong>
-              </div>
-              {preview.selisih_modal !== 0 && (
-                <div className="list-row" style={{ border: '1px solid color-mix(in srgb, var(--text-danger) 40%, transparent)' }}>
-                  <span>Selisih dengan Modal Disetor yang kamu isi</span>
-                  <strong style={{ color: RED }}>{formatRp(preview.selisih_modal)}</strong>
+          {preview.opening && (() => {
+            const o = preview.opening!
+            const nbv = preview.nilai_buku_aset ?? 0
+            const harta = o.kas + o.piutang + o.persediaan + (o.aset_lain ?? 0) + nbv
+            const kewajiban = o.utang + o.pinjaman + (o.kewajiban_lain ?? 0)
+            const modal = o.modal_disetor + (o.laba_ditahan ?? 0)
+            const perAkun = (o.rincian?.length ?? 0) > 0
+            const seimbang = !perAkun || harta - kewajiban - modal === 0
+            return (
+              <div className="list-rows tabular">
+                <div className="section-head">Pembanding saldo awal: Harta = Kewajiban + Modal</div>
+                <div className="list-row"><span>Total Harta (termasuk aset tetap {formatRp(nbv)})</span><span>{formatRp(harta)}</span></div>
+                <div className="list-row"><span>Total Kewajiban</span><span>{formatRp(kewajiban)}</span></div>
+                <div className="list-row"><span>Total Modal</span><span>{perAkun ? formatRp(modal) : `${formatRp(preview.modal_awal)} (dihitung, format lama)`}</span></div>
+                <div className="list-row" style={{ border: `1px solid ${seimbang ? 'var(--accent-green)' : RED}` }}>
+                  <strong>Selisih</strong>
+                  <strong style={{ color: seimbang ? 'var(--accent-green)' : RED }}>{seimbang ? 'Seimbang' : formatRp(harta - kewajiban - modal)}</strong>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )
+          })()}
 
-          {preview.selisih_modal !== 0 && (
+          {preview.bisa_disimpan === false && (
             <div className="note-box warn">
-              Modal disetor yang kamu isi tidak sama dengan hasil hitung. Laporan tetap memakai angka hasil
-              hitung supaya neraca seimbang — periksa lagi isian kas, piutang, persediaan, utang, dan pinjaman.
+              <strong>Belum bisa disimpan.</strong> Perbaiki masalah bertanda <em>Saldo Awal</em> di tabel di bawah (saldo awal harus seimbang dan
+              aset tetapnya sama dengan nilai buku sheet Aset), lalu unggah ulang berkasnya.
             </div>
           )}
 
           {errors.length > 0 && (
             <>
-              <div className="section-head" style={{ marginTop: 16 }}>Baris yang dilewati ({errors.length})</div>
+              <div className="section-head" style={{ marginTop: 16 }}>Masalah &amp; baris yang dilewati ({errors.length})</div>
               <div className="table-scroll">
                 <table className="data-table">
                   <thead>

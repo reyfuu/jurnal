@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"pajak/internal/finance"
 	"pajak/internal/xlsx"
@@ -15,13 +16,24 @@ import (
 // dan Transaksi. Tanpa ?commit=1 hanya pratinjau — tidak ada yang disimpan.
 
 func (s *tenant) handleOnboardingTemplate(w http.ResponseWriter, r *http.Request) {
-	sheets := make([]xlsx.Sheet, 0, 5)
-	for _, sh := range finance.OnboardingTemplate() {
-		sheets = append(sheets, xlsx.Sheet{Name: sh.Nama, Rows: sh.Rows})
+	s.mu.RLock()
+	metode := s.metodeUsaha()
+	s.mu.RUnlock()
+	sheets := make([]xlsx.Sheet, 0, 7)
+	for _, sh := range finance.OnboardingTemplate(metode) {
+		sheets = append(sheets, xlsx.Sheet{Name: sh.Nama, Rows: sh.Rows, Tabel: tabelXLSX(sh.Format)})
 	}
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.Header().Set("Content-Disposition", `attachment; filename="template-data-awal.xlsx"`)
 	_ = xlsx.Write(w, sheets)
+}
+
+// tabelXLSX: format tabel template (paket finance) → xlsx.
+func tabelXLSX(f *finance.FormatTabel) *xlsx.Tabel {
+	if f == nil {
+		return nil
+	}
+	return &xlsx.Tabel{Header: f.Header, Kolom: f.Kolom, Lebar: f.Lebar, Angka: f.Angka, BarisKosong: f.BarisKosong, Pilihan: f.Pilihan, Kunci: f.Kunci}
 }
 
 // onboardingResp: ringkasan per sheet + contoh baris, supaya user bisa memeriksa sebelum commit.
@@ -43,6 +55,10 @@ type onboardingResp struct {
 	ReplacedKaryawan int `json:"replaced_karyawan"`
 	ReplacedTagihan  int `json:"replaced_tagihan"`
 	ReplacedStok     int `json:"replaced_stok"`
+	// NilaiBukuAset: nilai buku aset tetap per tanggal mulai (pembanding baris Aset Tetap).
+	NilaiBukuAset int64 `json:"nilai_buku_aset"`
+	// BisaDisimpan: false bila saldo awal belum seimbang / ada transaksi sebelum tanggal mulai.
+	BisaDisimpan bool `json:"bisa_disimpan"`
 }
 
 func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) {
@@ -78,14 +94,46 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		TransaksiCount: len(d.Transaksi), TransaksiCeki: d.Transaksi[:min(5, len(d.Transaksi))],
 		Errors: d.Errors, Terbaca: d.Terbaca,
 	}
-	// Nilai buku aset awal dipakai untuk mencocokkan modal disetor yang diisi user.
+	// Nilai buku aset awal: dari sheet Aset bila diisi (menggantikan register), selain itu
+	// register yang sudah ada. Saldo awal per akun wajib seimbang dan aset tetapnya sama
+	// dengan nilai buku itu; transaksi sebelum tanggal mulai tidak boleh ikut (dobel hitung).
+	var tolak []string
 	if d.Opening != nil {
-		nbv := finance.AssetsForPeriod(d.Assets, d.Transaksi, d.Opening.Period()).NilaiBukuAwal
+		as := d.Assets
+		if len(as) == 0 {
+			s.mu.RLock()
+			as = slices.Clone(s.assets)
+			s.mu.RUnlock()
+		}
+		nbv := finance.AssetsForPeriod(as, d.Transaksi, d.Opening.Period()).NilaiBukuAwal
 		resp.ModalAwal = d.Opening.ModalAwal(nbv)
 		resp.SelisihModal = d.Opening.SelisihModal(nbv)
+		resp.NilaiBukuAset = nbv
+		if len(d.Opening.Rincian) > 0 {
+			if err := d.Opening.CekSeimbang(nbv); err != nil {
+				tolak = append(tolak, err.Error())
+			}
+		}
+		n := 0
+		for _, t := range d.Transaksi {
+			if t.Tanggal < d.Opening.Tanggal {
+				n++
+			}
+		}
+		if n > 0 {
+			tolak = append(tolak, strconv.Itoa(n)+" transaksi bertanggal sebelum tanggal mulai "+d.Opening.Tanggal+"; posisinya sudah tercakup di saldo awal. Hapus barisnya atau mundurkan tanggal mulai")
+		}
+		for _, p := range tolak {
+			resp.Errors = append(resp.Errors, finance.SheetError{Sheet: "Saldo Awal", Pesan: p})
+		}
 	}
+	resp.BisaDisimpan = len(tolak) == 0
 	if r.URL.Query().Get("commit") != "1" {
 		writeJSON(w, resp)
+		return
+	}
+	if len(tolak) > 0 {
+		http.Error(w, "data awal belum bisa disimpan: "+strings.Join(tolak, "; "), http.StatusBadRequest)
 		return
 	}
 
@@ -164,18 +212,28 @@ type openingResp struct {
 	Aktif bool `json:"aktif"`
 	// TransaksiPertama: tanggal transaksi paling awal; tanggal saldo awal tidak boleh sesudahnya.
 	TransaksiPertama string `json:"transaksi_pertama,omitempty"`
+	// NilaiBukuAset: nilai buku register aset per tanggal saldo awal (atau ?tanggal=), untuk
+	// baris Aset Tetap yang tidak bisa diketik bebas.
+	NilaiBukuAset int64 `json:"nilai_buku_aset"`
+	// Kategori & AkunTemplate: pilihan kategori dan baris akun bawaan layar Saldo Awal.
+	Kategori     []finance.KategoriSaldo `json:"kategori"`
+	AkunTemplate []finance.SaldoAkun     `json:"akun_template"`
 }
 
-func (s *tenant) openingSummary() openingResp {
+// openingSummary: tanggal = tanggal pembanding nilai buku aset ("" = tanggal saldo awal).
+func (s *tenant) openingSummary(tanggal string) openingResp {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	pertama := s.transaksiPertamaLocked()
-	if s.opening == nil {
-		return openingResp{TransaksiPertama: pertama}
+	out := openingResp{TransaksiPertama: s.transaksiPertamaLocked(), Kategori: finance.KategoriSaldoList, AkunTemplate: finance.TemplateAkunSaldo()}
+	if s.opening != nil {
+		o := *s.opening
+		nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal
+		out.Opening, out.ModalAwal, out.SelisihModal, out.Aktif, out.NilaiBukuAset = &o, o.ModalAwal(nbv), o.SelisihModal(nbv), true, nbv
 	}
-	o := *s.opening
-	nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal
-	return openingResp{Opening: &o, ModalAwal: o.ModalAwal(nbv), SelisihModal: o.SelisihModal(nbv), Aktif: true, TransaksiPertama: pertama}
+	if len(tanggal) >= 7 {
+		out.NilaiBukuAset = finance.AssetsForPeriod(s.assets, s.txs, tanggal[:7]).NilaiBukuAwal
+	}
+	return out
 }
 
 // transaksiPertamaLocked: tanggal transaksi paling awal ("" bila belum ada). s.mu dipegang.
@@ -190,7 +248,7 @@ func (s *tenant) transaksiPertamaLocked() string {
 }
 
 func (s *tenant) handleGetOpening(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, s.openingSummary())
+	writeJSON(w, s.openingSummary(r.URL.Query().Get("tanggal")))
 }
 
 func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
@@ -199,11 +257,24 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "data neraca awal tidak valid", http.StatusBadRequest)
 		return
 	}
+	if err := o.TerapkanRincian(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err := finance.ValidateOpeningBalance(&o); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s.mu.Lock()
+	// Saldo awal per akun wajib seimbang: Harta (termasuk nilai buku register aset) =
+	// Kewajiban + Modal. Selisih yang lolos akan diam-diam menjadi modal di semua laporan.
+	if len(o.Rincian) > 0 {
+		if err := o.CekSeimbang(finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal); err != nil {
+			s.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	if s.tutupBuku != "" {
 		s.mu.Unlock()
 		http.Error(w, "saldo awal tidak bisa diubah setelah ada bulan yang ditutup bukunya", http.StatusConflict)
@@ -221,7 +292,7 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 	}
 	s.opening = &o
 	s.mu.Unlock()
-	writeJSON(w, s.openingSummary())
+	writeJSON(w, s.openingSummary(""))
 }
 
 // --- Karyawan ---

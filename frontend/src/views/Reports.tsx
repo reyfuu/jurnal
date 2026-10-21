@@ -183,6 +183,7 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
           <AmountRow label="Saldo Kas & Bank" value={formatRp(a.cash)} color={BLUE} />
           <AmountRow label="Piutang Belum Tertagih" value={formatRp(a.receivables)} color={RED} />
           <AmountRow label="Nilai Persediaan Stok" value={formatRp(a.inventory)} />
+          {!!a.other_assets && <AmountRow label="Aset Lancar Lain (uang muka, dibayar di muka)" value={formatRp(a.other_assets)} />}
           <AmountRow label="Aset Tetap & Tak Berwujud (nilai buku)" value={formatRp(a.fixed_assets)} />
           <div className="list-row sub">
             <span>Harga perolehan</span>
@@ -197,6 +198,7 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
           <AmountRow label="TOTAL KEWAJIBAN" value={formatRp(bs.liabilities.total)} color={RED} bold />
           <AmountRow label="Utang Usaha / Operasional" value={formatRp(bs.liabilities.payables)} color={RED} />
           {bs.liabilities.loans !== 0 && <AmountRow label="Pinjaman" value={formatRp(bs.liabilities.loans)} color={RED} />}
+          {!!bs.liabilities.other && <AmountRow label="Kewajiban Lain (utang pajak, beban terutang)" value={formatRp(bs.liabilities.other)} color={RED} />}
 
           <div className="section-head">Modal (Ekuitas)</div>
           <AmountRow label="TOTAL MODAL" value={formatRp(bs.equity.total)} color={GREEN} bold />
@@ -204,7 +206,7 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
           {bs.equity.added_capital !== 0 && (
             <AmountRow label="Tambahan Modal (setoran − ambil pribadi + aset & stok tanpa kas)" value={formatRp(bs.equity.added_capital)} />
           )}
-          <AmountRow label="Laba Ditahan (laba bulan-bulan sebelumnya)" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : GREEN} />
+          <AmountRow label="Laba Ditahan (saldo awal + laba bulan-bulan sebelumnya)" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : GREEN} />
           <AmountRow label="Laba Bersih Periode Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : GREEN} />
 
           <AmountRow

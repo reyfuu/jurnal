@@ -140,11 +140,16 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 }
 
 // OpeningBerjalan: saldo awal akun pada awal periode dari posisi buku berjalan. Modal (3101)
-// adalah selisih aset − kewajiban − laba ditahan (3201).
-func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal map[string]int64) map[string]int64 {
+// adalah selisih aset − kewajiban − laba ditahan (3201). lain: saldo awal akun lain per kode
+// (posisi debit positif, kewajiban negatif) — aset lancar lain & kewajiban lain saldo awal.
+func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal, lain map[string]int64) map[string]int64 {
 	out := map[string]int64{"1101": kas, "1201": piutang, "1301": persediaan, "2101": -utang, "2102": -pinjaman, "3201": -labaDitahan}
 	bersih := kas + piutang + persediaan - utang - pinjaman
 	for kode, v := range assetAwal {
+		out[kode] += v
+		bersih += v
+	}
+	for kode, v := range lain {
 		out[kode] += v
 		bersih += v
 	}
@@ -271,6 +276,38 @@ func TrialBalanceFrom(template, active []Account, opening map[string]int64, line
 			b.Saldo = -n
 		}
 		out = append(out, b)
+	}
+	return out
+}
+
+// SaldoAwalLain: akun aset lancar lain & kewajiban lain dari saldo awal (posisi debit positif).
+// Kode dari rincian dipakai bila ada di daftar akun; selain itu 1401 Biaya Dibayar Dimuka dan
+// 2105 Hutang Lain-lain menampung totalnya.
+func SaldoAwalLain(ob finance.OpeningBalance, akun []Account) map[string]int64 {
+	out := map[string]int64{}
+	if len(ob.Rincian) == 0 {
+		if ob.AsetLain != 0 {
+			out["1401"] = ob.AsetLain
+		}
+		if ob.KewajibanLain != 0 {
+			out["2105"] = -ob.KewajibanLain
+		}
+		return out
+	}
+	for _, r := range ob.Rincian {
+		kode, tanda := "", int64(1)
+		switch r.Kategori {
+		case finance.KatAsetLain:
+			kode = "1401"
+		case finance.KatKewajibanLain:
+			kode, tanda = "2105", -1
+		default:
+			continue
+		}
+		if _, ok := Find(akun, r.Kode); ok && r.Kode != "" {
+			kode = r.Kode
+		}
+		out[kode] += tanda * r.Nominal
 	}
 	return out
 }

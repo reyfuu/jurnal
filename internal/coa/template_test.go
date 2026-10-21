@@ -72,3 +72,16 @@ func TestTrialBalanceFrom_AkunTemplate(t *testing.T) {
 		t.Fatalf("akun template tidak muncul: %+v", tb)
 	}
 }
+
+// Akun di template Saldo Awal harus akun CoA Master dengan nama yang sama.
+func TestTemplateSaldoAwal_SesuaiCoA(t *testing.T) {
+	for _, a := range finance.TemplateAkunSaldo() {
+		if a.Kode == "" {
+			continue // baris aset tetap (nilai buku dari sheet Aset)
+		}
+		acc, ok := Find(Master, a.Kode)
+		if !ok || acc.Nama != a.Nama {
+			t.Errorf("akun %s %q tidak sama dengan CoA Master (%q, ada=%v)", a.Kode, a.Nama, acc.Nama, ok)
+		}
+	}
+}

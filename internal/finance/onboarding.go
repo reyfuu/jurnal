@@ -17,6 +17,18 @@ import (
 type ImportSheet struct {
 	Nama string
 	Rows [][]string
+	// Format: bentuk tabel di Excel (garis, header, kolom angka, dropdown, kunci kolom).
+	// Hanya untuk template yang diunduh; diabaikan saat membaca berkas unggahan.
+	Format *FormatTabel
+}
+
+// FormatTabel dicerminkan server ke xlsx.Tabel (paket finance tidak mengenal xlsx).
+type FormatTabel struct {
+	Header, Kolom, BarisKosong int
+	Lebar                      []float64
+	Angka                      []int
+	Pilihan                    map[int][]string
+	Kunci                      bool
 }
 
 // SheetError menunjuk sheet dan baris Excel (1-based) yang gagal; Baris 0 = masalah header.
@@ -67,33 +79,15 @@ var asetHeaders = []string{"Nama Aset", "Jenis Harta", "Kelompok PMK", "Metode",
 var karyawanHeaders = []string{"Nama", "Jabatan", "Tanggal Masuk", "Gaji Pokok", "Tunjangan", "Status PTKP", "NPWP", "Status"}
 
 // OnboardingTemplate: workbook contoh yang isinya lolos ParseOnboarding apa adanya.
-func OnboardingTemplate() []ImportSheet {
-	saldo := [][]string{{"Keterangan", "Nilai", "Penjelasan"}}
-	for _, l := range saldoAwalLabels {
-		contoh := ""
-		switch l.Label {
-		case "Tanggal Mulai Pembukuan":
-			contoh = "2026-01-01"
-		case "Kas & Bank":
-			contoh = "45000000"
-		case "Piutang Usaha":
-			contoh = "8500000"
-		case "Persediaan":
-			contoh = "8250000"
-		case "Utang Usaha":
-			contoh = "5200000"
-		case "Pinjaman":
-			contoh = "0"
-		}
-		saldo = append(saldo, []string{l.Label, contoh, l.Hint})
-	}
-
+func OnboardingTemplate(metode string) []ImportSheet {
+	// Contoh aset dibeli sebelum tanggal mulai, jadi nilai bukunya masuk saldo awal.
 	aset := [][]string{asetHeaders,
-		{"Mesin Espresso 2 Group", "Mesin pengolah makanan & minuman", "", "Saldo Menurun", "2026-02-01", "90000000"},
-		{"Kulkas & Chiller Display", "Peralatan usaha restoran / rumah makan", "", "Garis Lurus", "2026-03-01", "18000000"},
-		{"Renovasi Ruko Sewa", "Bangunan tidak permanen (renovasi ruko sewa)", "", "Garis Lurus", "2026-02-01", "36000000"},
-		{"Software Kasir & Lisensi", "Harta tak berwujud — software & lisensi", "", "Garis Lurus", "2026-02-01", "18000000"},
+		{"Mesin Espresso 2 Group", "Mesin pengolah makanan & minuman", "", "Garis Lurus", "2025-02-01", "90000000"},
+		{"Kulkas & Chiller Display", "Peralatan usaha restoran / rumah makan", "", "Garis Lurus", "2025-03-01", "18000000"},
+		{"Renovasi Ruko Sewa", "Bangunan tidak permanen (renovasi ruko sewa)", "", "Garis Lurus", "2025-02-01", "36000000"},
+		{"Software Kasir & Lisensi", "Harta tak berwujud — software & lisensi", "", "Garis Lurus", "2025-02-01", "18000000"},
 	}
+	saldo := saldoAwalTemplateRows(aset, metode)
 
 	karyawan := [][]string{karyawanHeaders,
 		{"Dewi Lestari", "Kepala Barista", "2026-01-05", "5500000", "750000", "K/1", "", "Aktif"},
@@ -133,15 +127,122 @@ func OnboardingTemplate() []ImportSheet {
 		panduan = append(panduan, []string{j.Nama, j.Arah, ""})
 	}
 
-	return []ImportSheet{
-		{sheetSaldoAwal, saldo},
-		{sheetAset, aset},
-		{sheetKaryawan, karyawan},
-		{sheetTagihan, tagihan},
-		{sheetStok, stok},
-		{sheetTransaksi, TemplateRows()},
-		{sheetPanduan, panduan},
+	jenisTx := make([]string, 0, len(JenisList))
+	for _, j := range JenisList {
+		jenisTx = append(jenisTx, j.Nama)
 	}
+	tabel := func(kolom int, lebar []float64, angka []int, pilihan map[int][]string) *FormatTabel {
+		return &FormatTabel{Kolom: kolom, Lebar: lebar, Angka: angka, Pilihan: pilihan, BarisKosong: 50, Kunci: true}
+	}
+	kategori := make([]string, 0, len(KategoriSaldoList))
+	for _, k := range KategoriSaldoList {
+		kategori = append(kategori, k.Label)
+	}
+	return []ImportSheet{
+		{sheetSaldoAwal, saldo, &FormatTabel{Header: saldoHeaderRow, Kolom: 5, Lebar: []float64{12, 40, 32, 20, 48}, Angka: []int{3},
+			Pilihan: map[int][]string{2: kategori}, BarisKosong: 30, Kunci: true}},
+		{sheetAset, aset, tabel(6, []float64{32, 46, 16, 16, 18, 18}, []int{5}, map[int][]string{3: {"Garis Lurus", "Saldo Menurun"}})},
+		{sheetKaryawan, karyawan, tabel(8, []float64{26, 20, 16, 16, 14, 13, 22, 12}, []int{3, 4}, map[int][]string{7: {"Aktif", "Nonaktif"}})},
+		{sheetTagihan, tagihan, tabel(7, []float64{12, 18, 34, 16, 18, 14, 34}, []int{4}, map[int][]string{0: {"Piutang", "Utang"}, 5: {"Belum Lunas", "Lunas"}})},
+		{sheetStok, stok, tabel(8, []float64{12, 36, 16, 12, 10, 14, 16, 16}, []int{3, 5, 6, 7}, nil)},
+		{sheetTransaksi, TemplateRows(), tabel(10, []float64{14, 24, 16, 28, 22, 10, 14, 24, 14, 14}, []int{2, 5}, map[int][]string{1: jenisTx, 8: {"Lunas", "Belum Lunas"}})},
+		{sheetPanduan, panduan, &FormatTabel{Kolom: 5, Lebar: []float64{44, 30, 18, 40, 18}}},
+	}
+}
+
+// saldoHeaderRow: baris judul kolom di sheet Saldo Awal; di atasnya tanggal mulai & ringkasan.
+const saldoHeaderRow = 7
+
+// templateAkunSaldo: akun neraca CoA di sheet Saldo Awal (nama sama dengan CoA Master; dijaga
+// tes di paket coa). Aset tetap per jenis tidak dirinci di sini: nilai bukunya satu baris yang
+// harus sama dengan sheet Aset.
+var templateAkunSaldo = []SaldoAkun{
+	{Kode: "1101", Nama: "Kas", Kategori: KatKas, Keterangan: "uang tunai di laci / kasir"},
+	{Kode: "1102", Nama: "Bank", Kategori: KatKas, Keterangan: "saldo semua rekening bank usaha; tambah baris per rekening bila perlu"},
+	{Kode: "1103", Nama: "E-Wallet (QRIS/OVO/GoPay/Dana)", Kategori: KatKas},
+	{Kode: "1104", Nama: "Saldo Marketplace", Kategori: KatKas, Keterangan: "saldo penjual yang belum ditarik"},
+	{Kode: "1201", Nama: "Piutang Usaha", Kategori: KatPiutang, Keterangan: "penjualan yang belum dibayar pelanggan"},
+	{Kode: "1202", Nama: "Piutang Pihak Berelasi", Kategori: KatAsetLain},
+	{Kode: "1301", Nama: "Persediaan Barang Dagang", Kategori: KatPersediaan, Keterangan: "stok dihitung dengan harga beli"},
+	{Kode: "1302", Nama: "Perlengkapan", Kategori: KatAsetLain},
+	{Kode: "1401", Nama: "Biaya Dibayar Dimuka", Kategori: KatAsetLain, Keterangan: "mis. sewa tempat setahun yang sudah dibayar"},
+	{Kode: "1402", Nama: "PPN Masukan", Kategori: KatAsetLain},
+	{Kode: "1403", Nama: "Pajak Dibayar Dimuka (PPh)", Kategori: KatAsetLain},
+	{Kode: "1404", Nama: "Uang Muka Pembelian", Kategori: KatAsetLain},
+	{Kode: "1405", Nama: "Uang Muka Karyawan", Kategori: KatAsetLain},
+	{Kode: "1407", Nama: "Piutang Karyawan", Kategori: KatAsetLain},
+	{Kode: "", Nama: "Aset tetap (nilai buku, sesuai sheet Aset)", Kategori: KatAsetTetap, Keterangan: "harus sama dengan total nilai buku daftar aset per tanggal mulai"},
+	{Kode: "2101", Nama: "Hutang Usaha", Kategori: KatUtang, Keterangan: "tagihan supplier yang belum dibayar"},
+	{Kode: "2102", Nama: "Hutang Bank", Kategori: KatPinjaman, Keterangan: "sisa pokok pinjaman bank / koperasi / leasing"},
+	{Kode: "2104", Nama: "Beban Yang Masih Harus Dibayar", Kategori: KatKewajibanLain},
+	{Kode: "2105", Nama: "Hutang Lain-lain", Kategori: KatKewajibanLain},
+	{Kode: "2107", Nama: "Utang PPh 21", Kategori: KatKewajibanLain},
+	{Kode: "2110", Nama: "Utang PPh Final", Kategori: KatKewajibanLain},
+	{Kode: "2111", Nama: "PPN Kurang Bayar", Kategori: KatKewajibanLain},
+	{Kode: "2112", Nama: "Utang BPJS", Kategori: KatKewajibanLain},
+	{Kode: "2114", Nama: "Utang Pihak Berelasi", Kategori: KatKewajibanLain},
+	{Kode: "3101", Nama: "Modal Pemilik", Kategori: KatModal, Keterangan: "modal yang disetor pemilik sampai tanggal mulai"},
+	{Kode: "3201", Nama: "Laba Ditahan", Kategori: KatLabaDitahan, Keterangan: "laba tahun-tahun lalu yang belum diambil; minus bila rugi"},
+}
+
+// TemplateAkunSaldo: salinan daftar akun template (dipakai layar Saldo Awal & tes CoA).
+func TemplateAkunSaldo() []SaldoAkun { return append([]SaldoAkun(nil), templateAkunSaldo...) }
+
+// labelKategori: label tampilan kategori saldo.
+func labelKategori(id string) string {
+	for _, k := range KategoriSaldoList {
+		if k.ID == id {
+			return k.Label
+		}
+	}
+	return id
+}
+
+// saldoAwalTemplateRows: sheet Saldo Awal contoh yang SEIMBANG — nilai buku aset dihitung dari
+// contoh sheet Aset (dengan metode usaha), modal disetor menjadi penyeimbangnya.
+func saldoAwalTemplateRows(asetRows [][]string, metode string) [][]string {
+	const mulai = "2026-01-01"
+	as, _ := parseAsetRows(asetRows)
+	TerapkanMetode(as, metode)
+	nbv := AssetsForPeriod(as, nil, mulai[:7]).NilaiBukuAwal
+	contoh := map[string]int64{"1101": 5_000_000, "1102": 40_000_000, "1201": 8_500_000, "1301": 8_250_000, "1401": 6_000_000,
+		"2101": 5_200_000, "2102": 20_000_000, "2110": 450_000, "3201": 10_000_000}
+	o := OpeningBalance{Tanggal: mulai}
+	for _, a := range templateAkunSaldo {
+		a.Nominal = contoh[a.Kode]
+		if a.Kategori == KatAsetTetap {
+			a.Nominal = nbv
+		}
+		o.Rincian = append(o.Rincian, a)
+	}
+	_ = o.TerapkanRincian()
+	modal := o.Harta(nbv) - o.Kewajiban() - o.LabaDitahan
+
+	rows := [][]string{
+		{"Saldo Awal (Neraca Pembukaan)"},
+		{"Tanggal mulai pembukuan", mulai, "Format TAHUN-BULAN-TANGGAL. Isi posisi usaha di pagi hari tanggal ini."},
+		{"Total Harta", `=SUMIF(C:C,"Harta*",D:D)`},
+		{"Total Kewajiban", `=SUMIF(C:C,"Kewajiban*",D:D)`},
+		{"Total Modal", `=SUMIF(C:C,"Modal*",D:D)`},
+		{"Selisih (harus 0)", "=B3-B4-B5", "Harta harus sama dengan Kewajiban + Modal. Bila belum 0, saldo awal ditolak saat impor."},
+		{"", "", "Tambah baris untuk akun yang belum ada (mis. rekening bank kedua); pilih Kategori Akun dari daftar."},
+		{"Kode Akun", "Nama Akun", "Kategori Akun", "Nominal (Rp)", "Keterangan"},
+	}
+	for _, a := range templateAkunSaldo {
+		n := contoh[a.Kode]
+		switch a.Kategori {
+		case KatAsetTetap:
+			n = nbv
+		case KatModal:
+			n = modal
+		}
+		nominal := ""
+		if n != 0 {
+			nominal = fmt.Sprint(n)
+		}
+		rows = append(rows, []string{a.Kode, a.Nama, labelKategori(a.Kategori), nominal, a.Keterangan})
+	}
+	return rows
 }
 
 // kindOfSheet mengenali sheet dari namanya; nama bebas selama mengandung kata kuncinya.
@@ -238,7 +339,102 @@ func saldoField(label string) string {
 	return ""
 }
 
+// parseSaldoAwal: format per akun (kolom Kategori Akun & Nominal) bila ada, selain itu format
+// lama dua kolom (label, nilai).
 func parseSaldoAwal(rows [][]string) (*OpeningBalance, []ImportError) {
+	if o, errs, ok := parseSaldoAwalAkun(rows); ok {
+		return o, errs
+	}
+	return parseSaldoAwalLama(rows)
+}
+
+// parseSaldoAwalAkun membaca sheet Saldo Awal per akun. ok=false bila sheet bukan format ini.
+func parseSaldoAwalAkun(rows [][]string) (*OpeningBalance, []ImportError, bool) {
+	header, cols := -1, map[string]int{}
+	for i, row := range rows {
+		m := map[string]int{}
+		for c, h := range row {
+			n := norm(h)
+			switch {
+			case strings.Contains(n, "kategori"):
+				m["kategori"] = c
+			case strings.Contains(n, "nominal") || strings.Contains(n, "saldo") || strings.Contains(n, "jumlah") || n == "nilai" || strings.Contains(n, "nilai rp"):
+				m["nominal"] = c
+			case strings.Contains(n, "kode"):
+				m["kode"] = c
+			case strings.Contains(n, "nama") || n == "akun":
+				m["nama"] = c
+			case strings.Contains(n, "keterangan") || strings.Contains(n, "catatan"):
+				m["ket"] = c
+			}
+		}
+		_, k := m["kategori"]
+		_, n := m["nominal"]
+		if k && n {
+			header, cols = i, m
+			break
+		}
+	}
+	if header < 0 {
+		return nil, nil, false
+	}
+	get := func(row []string, k string) string {
+		c, ok := cols[k]
+		if !ok || c >= len(row) {
+			return ""
+		}
+		return strings.TrimSpace(row[c])
+	}
+	var o OpeningBalance
+	var errs []ImportError
+	for i, row := range rows[:header] {
+		if len(row) >= 2 && strings.Contains(norm(row[0]), "tanggal") {
+			if t, ok := parseTanggal(strings.TrimSpace(row[1])); ok {
+				o.Tanggal = t
+			} else {
+				errs = append(errs, ImportError{i + 1, fmt.Sprintf("tanggal mulai %q tidak dikenali (pakai YYYY-MM-DD)", row[1])})
+			}
+		}
+	}
+	for i := header + 1; i < len(rows); i++ {
+		row := rows[i]
+		nama, kat, raw := get(row, "nama"), get(row, "kategori"), get(row, "nominal")
+		if nama == "" && kat == "" && raw == "" {
+			continue
+		}
+		var n int64
+		if raw != "" {
+			neg := strings.HasPrefix(raw, "-") || (strings.HasPrefix(raw, "(") && strings.HasSuffix(raw, ")"))
+			v, ok := parseRupiah(strings.Trim(raw, "-() "))
+			if !ok {
+				errs = append(errs, ImportError{i + 1, fmt.Sprintf("nominal %q bukan angka", raw)})
+				continue
+			}
+			if neg {
+				v = -v
+			}
+			n = v
+		}
+		if n == 0 && raw == "" && kat != "" && nama != "" {
+			// Akun template yang tidak diisi: lewati tanpa dianggap salah.
+			continue
+		}
+		o.Rincian = append(o.Rincian, SaldoAkun{Kode: get(row, "kode"), Nama: nama, Kategori: kat, Nominal: n, Keterangan: get(row, "ket")})
+	}
+	if o.Tanggal == "" {
+		errs = append(errs, ImportError{0, "tanggal mulai pembukuan belum diisi (baris \"Tanggal mulai pembukuan\" di atas tabel)"})
+		return nil, errs, true
+	}
+	if err := o.TerapkanRincian(); err != nil {
+		return nil, append(errs, ImportError{0, err.Error()}), true
+	}
+	if err := ValidateOpeningBalance(&o); err != nil {
+		return nil, append(errs, ImportError{0, err.Error()}), true
+	}
+	return &o, errs, true
+}
+
+func parseSaldoAwalLama(rows [][]string) (*OpeningBalance, []ImportError) {
 	var o OpeningBalance
 	var errs []ImportError
 	found := false

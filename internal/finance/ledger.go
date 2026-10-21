@@ -143,13 +143,17 @@ type BalanceSheetAssets struct {
 	FixedAssetsCost   int64 `json:"fixed_assets_cost"`
 	AccumDepreciation int64 `json:"accum_depreciation"`
 	FixedAssets       int64 `json:"fixed_assets"`
-	Total             int64 `json:"total"`
+	// OtherAssets: aset lancar lain dari saldo awal (uang muka, biaya dibayar di muka, dll.).
+	OtherAssets int64 `json:"other_assets,omitempty"`
+	Total       int64 `json:"total"`
 }
 
 type BalanceSheetLiabilities struct {
 	Payables int64 `json:"payables"`
 	Loans    int64 `json:"loans"`
-	Total    int64 `json:"total"`
+	// Other: kewajiban lain dari saldo awal (utang pajak, beban yang masih harus dibayar, dll.).
+	Other int64 `json:"other,omitempty"`
+	Total int64 `json:"total"`
 }
 
 type BalanceSheetEquity struct {
