@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -901,6 +901,8 @@ export interface OpeningInfo {
   selisih_modal: number
   /** false = laporan masih memakai saldo awal data contoh. */
   aktif: boolean
+  /** Tanggal transaksi paling awal; tanggal saldo awal tidak boleh sesudahnya. */
+  transaksi_pertama?: string
 }
 
 export interface SheetError {

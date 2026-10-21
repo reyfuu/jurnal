@@ -190,6 +190,12 @@ func MutasiDariTeks(baris []string) [][]string {
 	out := [][]string{{"Tanggal", "Keterangan", "Debet", "Kredit", "Mutasi", "DB/CR", "Saldo"}}
 	prev := saldoAwal
 	for _, t := range txs {
+		if len(t.uang) == 0 {
+			// Baris bertanggal tanpa angka uang sama sekali: jam cetak di kaki halaman
+			// ("07/18/2025 08:58:23") atau kop, bukan transaksi. Ikut dibaca justru berbahaya:
+			// tanggal bulan/hari seperti itu membuat semua tanggal lain dibaca terbalik.
+			continue
+		}
 		debet, kredit, saldo := "", "", ""
 		var mut *uangPDF
 		var sal *int64

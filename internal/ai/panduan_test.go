@@ -36,7 +36,7 @@ func TestCariPanduan_IsiLaporanKeuangan(t *testing.T) {
 func TestCariPanduan_TopikLain(t *testing.T) {
 	cek := map[string]string{
 		"cara impor mutasi bank BCA":         "transaksi#",
-		"dimana saya isi saldo awal":         "impor-data#",
+		"dimana saya isi saldo awal":         "saldo-awal#",
 		"mau download laporan keuangan pdf":  "laporan-keuangan#",
 		"bandingkan laporan beberapa bulan":  "laporan-keuangan#banding",
 		"di mana catat piutang pelanggan":    "piutang-utang#",
@@ -118,7 +118,7 @@ func TestCariPanduan_TahanSalahKetik(t *testing.T) {
 		"kalau mau input trasaksi dmn ya ?": "transaksi#",
 		"dimana bikin invoce":               "invoice#",
 		"cara impor mutsai bank":            "transaksi#",
-		"dmn isi saldo awla":                "impor-data#",
+		"dmn isi saldo awla":                "saldo-awal#",
 	}
 	for q, mau := range cek {
 		p, ok := CariPanduan(q, semuaBoleh)

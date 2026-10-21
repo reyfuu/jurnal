@@ -45,8 +45,8 @@ var financeViews = []string{
 
 // Roles adalah satu-satunya sumber kebenaran hak akses; frontend menerima Views lewat /auth/me.
 var Roles = map[Role]RoleInfo{
-	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "pengguna", "profil-usaha", "langganan", "usulan-koreksi")},
-	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data")},
+	Owner: {"Owner", "Akses penuh, termasuk kelola pengguna & akses.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "saldo-awal", "pengguna", "profil-usaha", "langganan", "usulan-koreksi")},
+	Admin: {"Admin Keuangan", "Semua laporan & operasional, tanpa kelola pengguna.", append(slices.Clone(financeViews), "transaksi-kelola", "impor-data", "saldo-awal")},
 	Kasir: {"Kasir", "Dashboard dan catat transaksi (tanpa ubah/hapus).", []string{"dashboard", "transaksi", "lapor-bug"}},
 	MP:    {"Tim Master Pajak", "Panel Master sesuai role tim.", []string{"panel-master"}},
 	Lihat: {"Lihat sebagai (tim Master Pajak)", "Membaca data usaha tanpa bisa mengubah.", []string{

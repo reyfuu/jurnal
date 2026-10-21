@@ -367,7 +367,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/onboarding/template", s.guard("impor-data", s.on((*tenant).handleOnboardingTemplate)))
 	s.mux.HandleFunc("POST /api/v1/onboarding/import", s.persisting(s.guard("impor-data", s.on((*tenant).handleOnboardingImport))))
 	s.mux.HandleFunc("GET /api/v1/opening", s.guard("laporan-keuangan", s.on((*tenant).handleGetOpening)))
-	s.mux.HandleFunc("PUT /api/v1/opening", s.persisting(s.guard("impor-data", s.on((*tenant).handlePutOpening))))
+	s.mux.HandleFunc("PUT /api/v1/opening", s.persisting(s.guard("saldo-awal", s.on((*tenant).handlePutOpening))))
 
 	s.mux.HandleFunc("GET /api/v1/karyawan", s.guard("karyawan", s.on((*tenant).handleListKaryawan)))
 	s.mux.HandleFunc("POST /api/v1/karyawan", s.persisting(s.guard("karyawan", s.on((*tenant).handleCreateKaryawan))))
@@ -1017,7 +1017,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.mu.Lock()
-	if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+	if err := s.cekTxLocked(t); err != nil {
 		s.mu.Unlock()
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1049,7 +1049,11 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	if err := s.cekTerbukaLocked(append(tanggalTx(s.txs[i]), tanggalTx(t)...)...); err != nil {
+	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if err := s.cekTxLocked(t); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
@@ -1120,7 +1124,7 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 	if r.URL.Query().Get("commit") == "1" {
 		s.mu.Lock()
 		for _, t := range txs {
-			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+			if err := s.cekTxLocked(t); err != nil {
 				s.mu.Unlock()
 				http.Error(w, err.Error(), http.StatusConflict)
 				return

@@ -2,11 +2,12 @@ package finance
 
 import (
 	"slices"
+	"strconv"
 	"time"
 )
 
-// Daftar periode laporan diturunkan dari data usaha: dari bulan transaksi paling awal sampai
-// bulan berjalan. Sebelumnya dipatok Januari–Agustus 2026 (periode data contoh), sehingga
+// Daftar periode laporan diturunkan dari data usaha: dari bulan transaksi paling awal (paling
+// lambat Januari tahun lalu) sampai bulan berjalan. Sebelumnya dipatok Januari–Agustus 2026 (periode data contoh), sehingga
 // transaksi bulan lain tidak bisa dilaporkan.
 
 const maksPeriode = 36
@@ -44,6 +45,13 @@ func DaftarPeriode(txs []Transaction, ekstra []string, sekarang string) []Piliha
 	for _, b := range ekstra {
 		if PeriodeSah(b) {
 			awal, akhir = min(awal, b), max(akhir, b)
+		}
+	}
+	// Usaha baru belum punya transaksi, tapi tetap perlu periode lampau untuk mengimpor mutasi
+	// atau mencatat bulan-bulan sebelumnya: minimal sejak Januari tahun lalu (tahun SPT terakhir).
+	if len(sekarang) >= 4 {
+		if th, err := strconv.Atoi(sekarang[:4]); err == nil {
+			awal = min(awal, strconv.Itoa(th-1)+"-01")
 		}
 	}
 	awal = max(awal, geserBulan(akhir, -(maksPeriode-1)))

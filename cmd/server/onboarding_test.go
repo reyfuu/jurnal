@@ -242,3 +242,22 @@ func TestOnboarding_RoleAccess(t *testing.T) {
 		}
 	}
 }
+
+// Tanggal saldo awal tidak boleh setelah transaksi yang sudah dicatat: transaksi itu sudah
+// tercermin di saldo awal, jadi akan terhitung dua kali.
+func TestSaldoAwal_TidakBolehSetelahTransaksiPertama(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	info := getJSON[openingResp](t, srv, owner, "/api/v1/opening")
+	if info.TransaksiPertama == "" {
+		t.Fatal("demo punya transaksi; tanggal pertama harus terisi")
+	}
+	telat := `{"tanggal":"2099-01-01","kas":1000}`
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", telat); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), info.TransaksiPertama) {
+		t.Fatalf("tanggal sesudah transaksi pertama: %d %s", rec.Code, rec.Body)
+	}
+	pas := `{"tanggal":"` + info.TransaksiPertama + `","kas":1000}`
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/opening", pas); rec.Code != http.StatusOK {
+		t.Fatalf("tanggal = transaksi pertama: %d %s", rec.Code, rec.Body)
+	}
+}
