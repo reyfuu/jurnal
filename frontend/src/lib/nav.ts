@@ -49,6 +49,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
       { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: SquarePercent },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Target },
       { view: 'pustaka', label: 'Pustaka Pajak', icon: Library },
+      { view: 'primbon-pajak', label: 'Primbon Pajak', icon: LibraryBig },
     ],
   },
   {

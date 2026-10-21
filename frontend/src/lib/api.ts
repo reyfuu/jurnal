@@ -10,6 +10,7 @@ export type View =
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
   | 'usulan-koreksi' // pemilik usaha meninjau usulan koreksi tim Master Pajak
   | 'pustaka' // artikel pajak dari tim Master Pajak
+  | 'primbon-pajak' // katalog peraturan resmi (khusus pelanggan)
   | 'laporan-ai' | 'alat-gratis' // menu mode terkunci (belum berlangganan), hanya di frontend
   | 'catatan' // catatan konsultan untuk klien, hanya di frontend
 
@@ -1655,6 +1656,82 @@ export const listArtikel = () => api<Artikel[]>('/master/artikel')
 export const simpanArtikel = (id: number | null, a: ArtikelInput, terbit: boolean) =>
   api<Artikel>(id ? `/master/artikel/${id}` : '/master/artikel', { method: id ? 'PUT' : 'POST', body: { ...a, terbit } })
 export const listPustaka = () => api<Artikel[]>('/pustaka')
+
+// --- Primbon Pajak: katalog peraturan resmi (internal/primbon, cmd/server/primbon.go) ---
+
+export interface CatatanPrimbon { isi: string; diubah: string }
+
+export interface Peraturan {
+  uuid: string
+  kode: string
+  judul: string
+  jenis: string // UU | PP | PERPRES | PMK | KMK | PERDIRJEN | SE_DJP | SEMA | LAIN
+  jenis_label: string
+  kategori: string[]
+  kategori_label: string[]
+  status?: string
+  tahun?: number
+  ditetapkan?: string
+  diundangkan?: string
+  berlaku?: string
+  sumber_ln?: string
+  halaman?: number
+  /** Naskah di server; kosong = belum tersedia. */
+  format?: 'pdf' | 'htm'
+  lampiran?: boolean
+  abstrak?: boolean
+  sumber_url?: string
+  bookmark: boolean
+  ada_catatan: boolean
+  waktu?: string
+  catatan?: CatatanPrimbon
+}
+
+export interface OpsiPrimbon { kode: string; label: string; jumlah: number }
+
+export interface HasilPrimbon {
+  items: Peraturan[]
+  total: number
+  halaman: number
+  total_halaman: number
+  facet: { kategori: OpsiPrimbon[]; jenis: OpsiPrimbon[]; status: OpsiPrimbon[]; tahun_min: number; tahun_max: number }
+}
+
+export interface FilterPrimbon {
+  q: string
+  kategori: string[]
+  jenis: string[]
+  status: string[]
+  dari: string
+  sampai: string
+  urut: 'terbaru' | 'terlama' | 'abjad'
+  hal: number
+}
+
+export const FILTER_PRIMBON_AWAL: FilterPrimbon = { q: '', kategori: [], jenis: [], status: [], dari: '', sampai: '', urut: 'terbaru', hal: 1 }
+
+export function cariPrimbon(f: FilterPrimbon) {
+  const p = new URLSearchParams()
+  if (f.q.trim()) p.set('q', f.q.trim())
+  for (const k of ['kategori', 'jenis', 'status'] as const) f[k].forEach((v) => p.append(k, v))
+  if (f.dari) p.set('dari', f.dari)
+  if (f.sampai) p.set('sampai', f.sampai)
+  if (f.urut !== 'terbaru') p.set('urut', f.urut)
+  if (f.hal > 1) p.set('hal', String(f.hal))
+  return api<HasilPrimbon>('/primbon/peraturan?' + p)
+}
+const uuidPath = (uuid: string) => encodeURIComponent(uuid)
+export const getPeraturan = (uuid: string) => api<Peraturan>(`/primbon/peraturan/${uuidPath(uuid)}`)
+export const berkasPrimbonUrl = (uuid: string, opsi: { unduh?: boolean; lampiran?: boolean } = {}) =>
+  `/api/v1/primbon/peraturan/${uuidPath(uuid)}/berkas` + (opsi.unduh || opsi.lampiran
+    ? '?' + new URLSearchParams([...(opsi.lampiran ? [['lampiran', '1']] : []), ...(opsi.unduh ? [['unduh', '1']] : [])])
+    : '')
+export const setBookmarkPrimbon = (uuid: string, aktif: boolean) =>
+  api<void>(`/primbon/bookmark/${uuidPath(uuid)}`, { method: aktif ? 'PUT' : 'DELETE' })
+export const listBookmarkPrimbon = () => api<Peraturan[]>('/primbon/bookmark')
+export const listCatatanPrimbon = () => api<Peraturan[]>('/primbon/catatan')
+export const simpanCatatanPrimbon = (uuid: string, isi: string) =>
+  api<CatatanPrimbon | null>(`/primbon/catatan/${uuidPath(uuid)}`, { method: 'PUT', body: { isi } })
 export const listPengetahuan = () => api<{ sumber: SumberPengetahuan[]; artikel_terbit: number; potongan_dipakai: number }>('/master/pengetahuan')
 /** Kategori isi pengetahuan AI: bukan hanya aturan — pengalaman lapangan & pengetahuan umum juga. */
 export type KategoriSumber = 'peraturan' | 'artikel' | 'praktik' | 'umum' | 'lainnya'
