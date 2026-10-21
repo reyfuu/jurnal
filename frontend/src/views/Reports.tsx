@@ -7,7 +7,7 @@ import { LaporanAI } from '@/views/LaporanAI'
 import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
 import { laporanPdfUrl, type AssetSummary, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
-import { formatJt, formatPct, formatRp, formatSignedJt } from '@/lib/format'
+import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -147,17 +147,17 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
         <div className="chart-title">Jembatan ke Tab Lain</div>
         <div className="chart-subtitle">Angka kunci yang dipakai Neraca, Arus Kas &amp; Aset</div>
         <div className="list-rows tabular">
-          <AmountRow label="Laba bersih → Modal di Neraca" value={formatJt(r.net_profit)} color={GREEN} bold />
-          <AmountRow label="Kenaikan kas riil → tab Arus Kas" value={formatSignedJt(cf.net_cash)} color={BLUE} bold />
-          <AmountRow label="Selisih laba vs kas" value={formatSignedJt(-selisih)} color={selisih === 0 ? GREEN : RED} />
+          <AmountRow label="Laba bersih → Modal di Neraca" value={formatRp(r.net_profit)} color={GREEN} bold />
+          <AmountRow label="Kenaikan kas riil → tab Arus Kas" value={formatSignedRp(cf.net_cash)} color={BLUE} bold />
+          <AmountRow label="Selisih laba vs kas" value={formatSignedRp(-selisih)} color={selisih === 0 ? GREEN : RED} />
         </div>
         {selisih !== 0 && (
           <div className="note-box">
-            <strong>Kenapa laba {formatJt(r.net_profit)} tapi kas bergerak {formatSignedJt(cf.net_cash)}?</strong>{' '}
-            {cf.new_receivables > 0 && <>{formatJt(cf.new_receivables)} masih tertahan di piutang. </>}
-            {cf.new_payables > 0 && <>{formatJt(cf.new_payables)} biaya sudah dicatat tapi belum dibayar. </>}
-            {nonKas > 0 && <>{formatJt(nonKas)} penyusutan &amp; amortisasi tidak mengeluarkan uang sama sekali. </>}
-            {!!cf.kenaikan_persediaan && cf.kenaikan_persediaan > 0 && <>{formatJt(cf.kenaikan_persediaan)} jadi stok yang belum terjual. </>}
+            <strong>Kenapa laba {formatRp(r.net_profit)} tapi kas bergerak {formatSignedRp(cf.net_cash)}?</strong>{' '}
+            {cf.new_receivables > 0 && <>{formatRp(cf.new_receivables)} masih tertahan di piutang. </>}
+            {cf.new_payables > 0 && <>{formatRp(cf.new_payables)} biaya sudah dicatat tapi belum dibayar. </>}
+            {nonKas > 0 && <>{formatRp(nonKas)} penyusutan &amp; amortisasi tidak mengeluarkan uang sama sekali. </>}
+            {!!cf.kenaikan_persediaan && cf.kenaikan_persediaan > 0 && <>{formatRp(cf.kenaikan_persediaan)} jadi stok yang belum terjual. </>}
             Rinciannya di tab <strong>Arus Kas</strong>.
           </div>
         )}
@@ -234,10 +234,10 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
         </div>
         <div className="note-box">
           <strong>Hubungan antar tab:</strong><br />
-          · Kas {formatJt(a.cash)} = saldo akhir di tab Arus Kas.<br />
+          · Kas {formatRp(a.cash)} = saldo akhir di tab Arus Kas.<br />
           · Piutang &amp; utang = penyesuaian modal kerja di Arus Kas metode tidak langsung.<br />
-          · Nilai buku aset {formatJt(a.fixed_assets)} = total tab Aset &amp; Penyusutan.<br />
-          · Laba {formatJt(bs.equity.current_profit)} = baris Laba Bersih di tab Laba Rugi.
+          · Nilai buku aset {formatRp(a.fixed_assets)} = total tab Aset &amp; Penyusutan.<br />
+          · Laba {formatRp(bs.equity.current_profit)} = baris Laba Bersih di tab Laba Rugi.
         </div>
         {!kartuAktif && (
           <div className="note-box warn">
@@ -258,7 +258,7 @@ function Section({ title, section, total }: { title: string; section: CashFlowSe
         <div key={i}>
           <AmountRow
             label={l.label}
-            value={l.non_kas ? 'Rp0' : formatSignedJt(l.amount)}
+            value={l.non_kas ? 'Rp0' : formatSignedRp(l.amount)}
             color={l.non_kas ? 'var(--text-muted)' : l.amount < 0 ? RED : l.amount > 0 ? GREEN : 'var(--text-muted)'}
           />
           {(l.detail ?? []).map((d, j) => (
@@ -269,7 +269,7 @@ function Section({ title, section, total }: { title: string; section: CashFlowSe
           ))}
         </div>
       ))}
-      <AmountRow label={total} value={formatSignedJt(section.net)} color={section.net < 0 ? RED : GREEN} bold />
+      <AmountRow label={total} value={formatSignedRp(section.net)} color={section.net < 0 ? RED : GREEN} bold />
     </>
   )
 }
@@ -283,18 +283,18 @@ function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlo
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         <div className="card">
           <div className="kpi-label">Saldo Kas Awal Periode</div>
-          <div className="kpi-value tabular">{formatJt(cf.opening_balance)}</div>
+          <div className="kpi-value tabular">{formatRp(cf.opening_balance)}</div>
         </div>
         <div className="card">
           <div className="kpi-label">Arus Kas Bersih Periode Ini</div>
-          <div className="kpi-value tabular" style={{ color: cf.net_cash < 0 ? RED : GREEN }}>{formatSignedJt(cf.net_cash)}</div>
+          <div className="kpi-value tabular" style={{ color: cf.net_cash < 0 ? RED : GREEN }}>{formatSignedRp(cf.net_cash)}</div>
           <div className="kpi-meta-row">
             <span>Masuk {formatRp(cf.cash_in)} · Keluar {formatRp(cf.cash_out)}</span>
           </div>
         </div>
         <div className="card">
           <div className="kpi-label">Saldo Kas Akhir Periode</div>
-          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatJt(cf.closing_balance)}</div>
+          <div className="kpi-value tabular" style={{ color: BLUE }}>{formatRp(cf.closing_balance)}</div>
         </div>
       </div>
 
@@ -329,7 +329,7 @@ function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlo
             <Section title="B. Aktivitas Investasi" section={cf.investasi} total="Kas Bersih dari Aktivitas Investasi" />
             <Section title="C. Aktivitas Pendanaan" section={cf.pendanaan} total="Kas Bersih dari Aktivitas Pendanaan" />
             <div style={{ height: 8 }} />
-            <AmountRow label="Kenaikan Kas Bersih (A + B + C)" value={formatSignedJt(cf.net_cash)} color={cf.net_cash < 0 ? RED : GREEN} bold />
+            <AmountRow label="Kenaikan Kas Bersih (A + B + C)" value={formatSignedRp(cf.net_cash)} color={cf.net_cash < 0 ? RED : GREEN} bold />
             <AmountRow label="Saldo Kas Awal Periode" value={formatRp(cf.opening_balance)} />
             <AmountRow
               label="SALDO KAS AKHIR PERIODE"
@@ -354,19 +354,19 @@ function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlo
             </div>
           ) : (
             <div className="note-box">
-              Metode ini menjawab <strong>kenapa laba {formatJt(netProfit)} tapi kas bergerak {formatSignedJt(cf.net_cash)}</strong>.
+              Metode ini menjawab <strong>kenapa laba {formatRp(netProfit)} tapi kas bergerak {formatSignedRp(cf.net_cash)}</strong>.
               Beban non-kas dibalik lagi, lalu piutang dan utang disesuaikan. Ini format standar yang diminta bank dan PSAK.
             </div>
           )}
           <div className="list-rows tabular" style={{ marginTop: 16 }}>
             <div className="section-head">Jembatan laba → kas</div>
             <AmountRow label="Laba bersih" value={formatRp(netProfit)} color={GREEN} />
-            <AmountRow label="Beban non-kas (penyusutan + amortisasi)" value={formatSignedJt(cf.depreciation + cf.amortization)} color={GREEN} />
-            <AmountRow label="Tertahan di piutang" value={formatSignedJt(-cf.new_receivables)} color={RED} />
-            <AmountRow label="Tertunda di utang" value={formatSignedJt(cf.new_payables)} color={GREEN} />
+            <AmountRow label="Beban non-kas (penyusutan + amortisasi)" value={formatSignedRp(cf.depreciation + cf.amortization)} color={GREEN} />
+            <AmountRow label="Tertahan di piutang" value={formatSignedRp(-cf.new_receivables)} color={RED} />
+            <AmountRow label="Tertunda di utang" value={formatSignedRp(cf.new_payables)} color={GREEN} />
             {kartuAktif && !!cf.kenaikan_persediaan && (
               <AmountRow label={cf.kenaikan_persediaan > 0 ? 'Tertahan di persediaan stok' : 'Persediaan stok berkurang'}
-                value={formatSignedJt(-cf.kenaikan_persediaan)} color={cf.kenaikan_persediaan > 0 ? RED : GREEN} />
+                value={formatSignedRp(-cf.kenaikan_persediaan)} color={cf.kenaikan_persediaan > 0 ? RED : GREEN} />
             )}
             <AmountRow label="Kas bersih dari operasi" value={formatRp(cf.operasi_tidak_langsung.net)} color={BLUE} bold />
           </div>

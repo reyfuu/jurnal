@@ -334,3 +334,36 @@ func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[str
 	}
 	return out
 }
+
+// SaldoBawaan: saldo akun yang dibawa utuh dari bulan ke bulan di saldo awal per akun, selain
+// pos ringkas (kas, piutang, utang, …): kas di akun selain Kas (bank, saldo marketplace) dan
+// prive kumulatif. Tanpa ini saldo awal bulanan menggabungkan semua kas ke akun Kas dan prive
+// ke Modal, sehingga riwayat Buku Besar per akun terputus di setiap awal bulan (totalnya sama).
+// sebelum: tanggal awal periode (YYYY-MM-DD); posisi debit positif.
+func SaldoBawaan(txs []finance.Transaction, sebelum string, p finance.BusinessProfile, peta Peta) map[string]int64 {
+	out := map[string]int64{}
+	kas, prive := peta.Kode(PeranKas), peta.Kode(PeranPrive)
+	for _, t := range txs {
+		j, ok := finance.LookupJenis(t.Jenis)
+		if !ok {
+			continue
+		}
+		tanda := int64(1)
+		if j.Arah != "masuk" {
+			tanda = -1
+		}
+		bayar := t.TanggalLunas
+		if bayar == "" {
+			bayar = t.Tanggal
+		}
+		if t.Lunas && bayar < sebelum {
+			if k := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta); k != kas {
+				out[k] += tanda * t.Nominal
+			}
+		}
+		if t.Tanggal < sebelum && !isPT(p) && AccountFor(t, p, peta) == prive {
+			out[prive] += t.Nominal
+		}
+	}
+	return out
+}
