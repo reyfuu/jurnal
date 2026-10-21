@@ -111,7 +111,7 @@ export function MenuImportDialog({
           {preview && (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="pill-status pill-green">{preview.valid} baris siap diimpor</span>
+                <span className="pill-status pill-green">{preview.valid} {satuan} siap diimpor</span>
                 {errors.length > 0 && <span className="pill-status pill-red">{errors.length} baris dilewati</span>}
                 {preview.sheet && <span className="text-sm text-muted-foreground">dari sheet "{preview.sheet}"</span>}
               </div>

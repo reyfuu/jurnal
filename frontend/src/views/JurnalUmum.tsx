@@ -88,7 +88,7 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
               <table className="data-table tabular" style={{ minWidth: 900 }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 100 }}>Tanggal</th><th style={{ width: 120 }}>No. bukti</th><th>Keterangan / akun</th>
+                    <th style={{ width: 110 }}>Tanggal</th><th style={{ width: 130 }}>No. bukti</th><th>Keterangan / akun</th>
                     <th style={{ width: 70 }}>Kode</th><th style={{ textAlign: 'right', width: 150 }}>Debit</th><th style={{ textAlign: 'right', width: 150 }}>Kredit</th>
                   </tr>
                 </thead>
@@ -107,8 +107,8 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
                   {tampil.map((e) => (
                     <Fragment key={e.bukti + e.tanggal + e.keterangan}>
                       <tr style={{ background: 'var(--bg-raised)' }}>
-                        <td>{formatTanggal(e.tanggal)}</td>
-                        <td style={{ fontWeight: 600 }}>{e.bukti}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{formatTanggal(e.tanggal)}</td>
+                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{e.bukti}</td>
                         <td colSpan={4} style={{ whiteSpace: 'normal' }}>{e.keterangan}</td>
                       </tr>
                       {e.baris.map((b, i) => (
