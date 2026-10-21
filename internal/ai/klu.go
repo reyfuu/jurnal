@@ -27,7 +27,8 @@ const promptKLU = `Kamu membantu pemilik UMKM Indonesia memilih kategori bidang 
 ATURAN:
 1. Pilih 1-3 kode HANYA dari daftar, paling cocok dulu. Jangan mengarang kode.
 2. Untuk tiap pilihan tulis "alasan": 1-2 kalimat bahasa awam, jelaskan kategori itu mencakup usaha apa dan kenapa cocok dengan cerita pemilik. Bila ada beda penting antar pilihan (mis. jual di toko vs online, eceran vs grosir), sebutkan.
-3. Jangan menyebut lembaga atau sumber data.
+3. Perhatikan kegiatannya, bukan hanya nama barangnya: membeli barang jadi lalu menjual lagi = perdagangan (KLU 45-47) walaupun nama barangnya mirip industri (mis. jual beli metal detector = perdagangan eceran, bukan industri logam); membuat/mengolah/membudidayakan sendiri = industri/pertanian; menjual tenaga atau keahlian = jasa.
+4. Jangan menyebut lembaga atau sumber data.
 
 Balas HANYA JSON: {"saran":[{"kode":"563","alasan":"..."}]}`
 

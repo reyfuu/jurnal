@@ -3,11 +3,16 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
+
+	pdfapi "github.com/pdfcpu/pdfcpu/pkg/api"
+	pdfmodel "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 
 	"pajak/internal/finance"
 	"pajak/internal/pdf"
@@ -132,7 +137,7 @@ func TestBarisPDF_FontType0KolomRapat(t *testing.T) {
 		{0, []sel{{40, "Tanggal"}, {120, "Keterangan"}, {300, "Debet"}, {360, "Kredit"}, {430, "Saldo"}}},
 		{0, []sel{{40, "02/09/2026"}, {100, "SETORAN TUNAI"}, {175, "0.00"}, {205, "1,500,000.00"}, {275, "2,500,000.00"}}},
 	})
-	baris, err := barisPDF(data)
+	baris, err := barisPDF(data, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,5 +148,58 @@ func TestBarisPDF_FontType0KolomRapat(t *testing.T) {
 	h := finance.ParseMutasi(finance.MutasiDariTeks(baris), 2026, nil)
 	if len(h.Rows) != 1 || h.Rows[0].Arah != "masuk" || h.Rows[0].Nominal != 1_500_000 {
 		t.Fatalf("hasil: %+v %v", h.Rows, h.Errors)
+	}
+}
+
+func kunciPDF(t *testing.T, data []byte, conf *pdfmodel.Configuration) []byte {
+	t.Helper()
+	var out bytes.Buffer
+	if err := pdfapi.Encrypt(bytes.NewReader(data), &out, conf); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+// E-statement bank biasanya dikunci kata sandi; AES-256 tidak dikenal pustaka pembaca teks.
+func TestBarisPDF_BerkataSandi(t *testing.T) {
+	polos := rekeningKoranPDF(t)
+	for nama, conf := range map[string]*pdfmodel.Configuration{
+		"AES-256": pdfmodel.NewAESConfiguration("010190", "pemilik-bank", 256),
+		"AES-128": pdfmodel.NewAESConfiguration("010190", "pemilik-bank", 128),
+		"RC4-128": pdfmodel.NewRC4Configuration("010190", "pemilik-bank", 128),
+	} {
+		data := kunciPDF(t, polos, conf)
+		if _, err := barisPDF(data, ""); !errors.Is(err, errPDFPerluSandi) {
+			t.Errorf("%s tanpa sandi: %v", nama, err)
+		}
+		if _, err := barisPDF(data, "salah"); !errors.Is(err, errPDFSandiSalah) {
+			t.Errorf("%s sandi salah: %v", nama, err)
+		}
+		baris, err := barisPDF(data, "010190")
+		if err != nil || !slices.Contains(baris, "02/09 TRSF E-BANKING CR BUDI 1,500,000.00 11,500,000.00") {
+			t.Errorf("%s sandi benar: %v %q", nama, err, baris)
+		}
+	}
+}
+
+func TestMutasi_PDFBerkataSandiLewatAPI(t *testing.T) {
+	srv := NewServer()
+	c := login(t, srv, "owner@kedaikopisenja.id")
+	data := kunciPDF(t, rekeningKoranPDF(t), pdfmodel.NewAESConfiguration("010190", "pemilik", 256))
+	if code, raw, _ := unggahBerkasMutasi(srv, c, "estatement.pdf", data); code != http.StatusBadRequest || !strings.Contains(raw, "kata sandi") {
+		t.Fatalf("tanpa sandi: %d %s", code, raw)
+	}
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("file", "estatement.pdf")
+	_, _ = fw.Write(data)
+	_ = mw.WriteField("tahun", "2026")
+	_ = mw.WriteField("sandi", "010190")
+	_ = mw.Close()
+	rec := upload(srv, c, "/api/v1/transactions/mutasi", &body, mw.FormDataContentType())
+	var h finance.MutasiHasil
+	_ = json.NewDecoder(rec.Body).Decode(&h)
+	if rec.Code != http.StatusOK || len(h.Rows) != 2 {
+		t.Fatalf("dengan sandi: %d %+v", rec.Code, h)
 	}
 }

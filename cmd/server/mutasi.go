@@ -26,9 +26,9 @@ import (
 // seluruh gunanya langkah pratinjau justru supaya tebakan itu bisa diperbaiki.
 
 // bacaTabel membaca .xlsx, .csv, maupun PDF e-statement jadi baris-baris sel.
-func bacaTabel(nama string, data []byte) ([][]string, error) {
+func bacaTabel(nama string, data []byte, sandi string) ([][]string, error) {
 	if bytes.HasPrefix(data, []byte("%PDF")) {
-		baris, err := barisPDF(data)
+		baris, err := barisPDF(data, sandi)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +135,7 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
-	rows, err := bacaTabel(fh.Filename, data)
+	rows, err := bacaTabel(fh.Filename, data, r.FormValue("sandi"))
 	if err != nil && bytes.HasPrefix(data, []byte("%PDF")) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return finance.MutasiHasil{}, false

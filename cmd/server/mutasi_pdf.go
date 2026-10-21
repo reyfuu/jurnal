@@ -8,13 +8,21 @@ import (
 	"strings"
 
 	"github.com/ledongthuc/pdf"
+	pdfapi "github.com/pdfcpu/pdfcpu/pkg/api"
+	pdfmodel "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 
 	ukurpdf "pajak/internal/pdf"
 )
 
+// pdfcpu menulis berkas konfigurasi di folder home, dan menghentikan program (os.Exit) bila
+// gagal; image scratch tidak punya folder home. Dimatikan sebelum dipakai.
+func init() { pdfapi.DisableConfigDir() }
+
 var (
-	errPDFTerkunci = errors.New("PDF tidak bisa dibuka. Bila PDF-nya dikunci kata sandi, buka dulu lalu simpan ulang tanpa sandi (Cetak → Simpan sebagai PDF)")
-	errPDFGambar   = errors.New("PDF ini tidak berisi teks (hasil scan / foto), jadi belum bisa dibaca. Unduh e-statement asli dari internet banking, atau pakai mutasi .xlsx / .csv")
+	errPDFTerkunci   = errors.New("PDF tidak bisa dibuka; berkasnya rusak atau bukan PDF biasa")
+	errPDFPerluSandi = errors.New("PDF ini dikunci kata sandi. Isi kata sandi PDF (biasanya yang diberikan bank, mis. tanggal lahir), lalu pilih berkasnya lagi")
+	errPDFSandiSalah = errors.New("kata sandi PDF salah. Periksa lagi kata sandi dari bank Anda")
+	errPDFGambar     = errors.New("PDF ini tidak berisi teks (hasil scan / foto), jadi belum bisa dibaca. Unduh e-statement asli dari internet banking, atau pakai mutasi .xlsx / .csv")
 )
 
 // maxHalamanPDF membatasi rekening koran yang sangat tebal (dan PDF yang sengaja dibuat berat).
@@ -22,13 +30,23 @@ const maxHalamanPDF = 60
 
 // barisPDF mengambil teks PDF per baris visual, dengan kolom di satu baris tetap di satu baris
 // dan dipisah spasi.
-func barisPDF(data []byte) (out []string, err error) {
+//
+// sandi: kata sandi PDF e-statement (boleh kosong). Hanya dipakai membuka berkas di memori
+// selama permintaan ini; tidak disimpan dan tidak dicatat di log.
+func barisPDF(data []byte, sandi string) (out []string, err error) {
 	defer func() { // pustaka PDF bisa panik pada berkas rusak
 		if r := recover(); r != nil {
 			out, err = nil, errPDFTerkunci
 		}
 	}()
 	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil && bytes.Contains(data, []byte("/Encrypt")) {
+		var polos []byte
+		if polos, err = bukaSandiPDF(data, sandi); err != nil {
+			return nil, err
+		}
+		r, err = pdf.NewReader(bytes.NewReader(polos), int64(len(polos)))
+	}
 	if err != nil {
 		return nil, errPDFTerkunci
 	}
@@ -43,6 +61,30 @@ func barisPDF(data []byte) (out []string, err error) {
 		return nil, errPDFGambar
 	}
 	return out, nil
+}
+
+// bukaSandiPDF membuka enkripsi PDF (RC4, AES-128, maupun AES-256 yang dipakai e-statement
+// bank) dengan pdfcpu; pustaka pembaca teks hanya mengenal enkripsi lama.
+func bukaSandiPDF(data []byte, sandi string) (polos []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			polos, err = nil, errPDFTerkunci
+		}
+	}()
+	conf := pdfmodel.NewDefaultConfiguration()
+	conf.UserPW, conf.OwnerPW = sandi, sandi
+	conf.ValidationMode = pdfmodel.ValidationRelaxed
+	var out bytes.Buffer
+	if err := pdfapi.Decrypt(bytes.NewReader(data), &out, conf); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "password") {
+			if sandi == "" {
+				return nil, errPDFPerluSandi
+			}
+			return nil, errPDFSandiSalah
+		}
+		return nil, errPDFTerkunci
+	}
+	return out.Bytes(), nil
 }
 
 // --- Pembacaan huruf beserta posisinya ---

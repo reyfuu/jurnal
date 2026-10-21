@@ -1155,10 +1155,12 @@ export interface MutasiCommitResult {
 }
 
 /** Langkah 1: baca berkas & tebak jenisnya. Tidak menyimpan apa pun. */
-export async function previewMutasi(file: File, tahun?: number): Promise<MutasiHasil> {
+/** sandi: kata sandi PDF e-statement; hanya dipakai server membuka berkas ini, tidak disimpan. */
+export async function previewMutasi(file: File, tahun?: number, sandi?: string): Promise<MutasiHasil> {
   const form = new FormData()
   form.append('file', file)
   if (tahun) form.append('tahun', String(tahun))
+  if (sandi) form.append('sandi', sandi)
   const res = await fetch('/api/v1/transactions/mutasi', { method: 'POST', body: form })
   if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
   return res.json()

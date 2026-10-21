@@ -51,6 +51,7 @@ export function FormMarketplace({ m, profile, onLangganan }: { m: KalkulatorMast
           <form onSubmit={hitung}>
             <div className="chart-title">PPh 22 Marketplace</div>
             <div className="chart-subtitle">Marketplace memungut PPh 22 dari omzet penjual. Cek apakah pungutan itu melebihi pajak Anda.</div>
+            {omzetProfil > 0 && <p className="kpi-meta-row" style={{ marginBottom: 8 }}>Omzet dan margin laba awal dari profil usaha Anda; ubah untuk mencoba angka lain.</p>}
             <Uang label="Omzet lewat marketplace setahun" v={omzet} set={setOmzet} hint="Shopee, Tokopedia, TikTok Shop, dll." />
             <Uang label="Omzet di luar marketplace setahun" v={lain} set={setLain} hint="Toko, reseller, transfer langsung" />
             <div className="grid gap-x-3 sm:grid-cols-2">
