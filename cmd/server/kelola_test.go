@@ -81,6 +81,11 @@ func TestKelolaPengguna_UbahNonaktifResetHapus(t *testing.T) {
 	}
 
 	list := getJSON[[]penggunaRow](t, srv, m, "/api/v1/master/pengguna")
+	for _, r := range list {
+		if r.KlienID == 0 || r.Langganan.Status == "" {
+			t.Errorf("pengguna %s tanpa klien/langganan: %+v", r.Email, r)
+		}
+	}
 	var dapat bool
 	for _, p := range list {
 		if p.Role == auth.MP {

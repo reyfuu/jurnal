@@ -671,7 +671,10 @@ export interface KlienRow {
   arsip?: string; arsip_alasan?: string
 }
 export interface IdentitasUsaha { nama_usaha: string; alamat?: string; kecamatan?: string; kota?: string; provinsi?: string; npwp?: string; telepon?: string; email?: string }
-export interface PenggunaKlien extends User { role_label: string; usaha: string; kota?: string; alamat?: string; telepon?: string; arsip: boolean; wa?: string; last_seen?: string }
+export interface PenggunaKlien extends User {
+  role_label: string; usaha: string; kota?: string; alamat?: string; telepon?: string; arsip: boolean; wa?: string; last_seen?: string
+  klien_id: number; langganan: { status: 'trial' | 'aktif' | 'habis'; sampai?: string }; demo?: boolean
+}
 export const ubahKlien = (id: number, b: IdentitasUsaha) => api<BusinessProfile>(`/master/klien/${id}`, { method: 'PUT', body: b })
 export const arsipKlien = (id: number, alasan: string) => api<void>(`/master/klien/${id}/arsip`, { method: 'POST', body: { alasan } })
 export const pulihkanKlien = (id: number) => api<void>(`/master/klien/${id}/arsip`, { method: 'DELETE' })

@@ -216,6 +216,11 @@ type penggunaRow struct {
 	Alamat    string `json:"alamat,omitempty"`
 	Telepon   string `json:"telepon,omitempty"` // telepon usaha (profil)
 	Arsip     bool   `json:"arsip"`
+	// KlienID & Langganan: usaha pengguna ini dan status langganannya, supaya Master bisa
+	// mengatur paket langsung dari daftar pengguna.
+	KlienID   int             `json:"klien_id"`
+	Langganan langgananStatus `json:"langganan"`
+	Demo      bool            `json:"demo,omitempty"`
 }
 
 func (s *Server) handleMasterPengguna(w http.ResponseWriter, r *http.Request) {
@@ -232,8 +237,10 @@ func (s *Server) handleMasterPengguna(w http.ResponseWriter, r *http.Request) {
 				row.Usaha, row.Kota, row.Alamat, row.Telepon = p.NamaUsaha, p.Kota, p.Alamat, p.Telepon
 			}
 			row.Arsip = !t.arsip.IsZero()
+			row.KlienID, row.Demo = t.id, t.id == 1
 			t.mu.RUnlock()
 			row.Usaha = namaKlien(t, row.Usaha)
+			row.Langganan = t.langgananStatus(time.Now())
 		}
 		out = append(out, row)
 	}

@@ -97,13 +97,15 @@ export function Ringkasan({ onBuka }: { onBuka: (id: number) => void }) {
 type Filter = 'semua' | 'aktif' | 'trial' | 'habis' | 'perhatian' | 'arsip'
 const FILTER: [Filter, string][] = [['semua', 'Semua'], ['aktif', 'Aktif'], ['trial', 'Masa coba'], ['habis', 'Habis'], ['perhatian', 'Perlu perhatian'], ['arsip', 'Diarsipkan']]
 
-export function KlienList({ onBuka, bisaLihat, onLihat }: { onBuka: (id: number) => void; bisaLihat: boolean; onLihat: () => void }) {
+export function KlienList({ onBuka, bisaLihat, bisaLangganan = false, onLihat }: { onBuka: (id: number) => void; bisaLihat: boolean; bisaLangganan?: boolean; onLihat: () => void }) {
   const [lihat, setLihat] = useState<KlienRow | null>(null)
+  const [langganan, setLangganan] = useState<KlienRow | null>(null)
   const [rows, setRows] = useState<KlienRow[] | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<Filter>('semua')
   const [q, setQ] = useState('')
-  useEffect(() => { listKlien().then(setRows, (e: Error) => setError(e.message)) }, [])
+  const muat = () => listKlien().then(setRows, (e: Error) => setError(e.message))
+  useEffect(() => { void muat() }, [])
   const tampil = useMemo(() => (rows ?? []).filter((k) =>
     (filter === 'arsip' ? !!k.arsip : !k.arsip) &&
     (filter === 'semua' || filter === 'arsip' || (filter === 'perhatian' ? k.perlu_perhatian : k.status === filter)) &&
@@ -127,7 +129,7 @@ export function KlienList({ onBuka, bisaLihat, onLihat }: { onBuka: (id: number)
               <tr>
                 <th>Usaha</th><th>Paket</th><th>Status</th><th>Berlaku s/d</th><th>Terakhir aktif</th>
                 <th style={{ textAlign: 'right' }}>Transaksi bulan ini</th><th>Profil</th><th>Ditangani</th>
-                {bisaLihat && <th style={{ textAlign: 'right' }}>Aksi</th>}
+                {(bisaLihat || bisaLangganan) && <th style={{ textAlign: 'right' }}>Aksi</th>}
               </tr>
             </thead>
             <tbody>
@@ -148,9 +150,14 @@ export function KlienList({ onBuka, bisaLihat, onLihat }: { onBuka: (id: number)
                   <td className="tabular" style={{ textAlign: 'right' }}>{k.transaksi_bulan_ini.toLocaleString('id-ID')}</td>
                   <td>{k.onboarding ? <span className="pill-status pill-green">Lengkap</span> : <span className="pill-status pill-status-muted">Belum</span>}</td>
                   <td>{k.penangan.length ? k.penangan.map((p) => p.nama.split(' ')[0]).join(', ') : <span className="pill-status pill-amber">Belum ada</span>}</td>
-                  {bisaLihat && (
-                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                      {!k.arsip && (
+                  {(bisaLihat || bisaLangganan) && (
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                      {bisaLangganan && !k.demo && !k.arsip && (
+                        <Button size="sm" variant="outline" className="rounded-full" style={{ marginRight: 6 }} onClick={() => setLangganan(k)}>
+                          Atur langganan
+                        </Button>
+                      )}
+                      {bisaLihat && !k.arsip && (
                         <Button size="sm" variant="outline" className="rounded-full" onClick={() => setLihat(k)} aria-label={`Lihat sebagai ${k.nama}`}>
                           <Eye /> Lihat sebagai
                         </Button>
@@ -167,6 +174,7 @@ export function KlienList({ onBuka, bisaLihat, onLihat }: { onBuka: (id: number)
         </div>
       </div>
       {lihat && <LihatDialog open onClose={() => setLihat(null)} klien={lihat} tiket={[]} onMulai={onLihat} />}
+      {langganan && <LanggananDialog open onClose={() => setLangganan(null)} klien={langganan} onSaved={() => { setLangganan(null); void muat() }} />}
     </>
   )
 }
@@ -290,11 +298,13 @@ export function KlienDetailView({ id, bisaLangganan, bisaLihat, bisaUbah, bisaHa
   )
 }
 
-function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onClose: () => void; klien: KlienRow; onSaved: () => void }) {
-  const [aksi, setAksi] = useState<'trial' | 'aktifkan'>('aktifkan')
+/** Atur langganan klien: coba semua fitur (masa coba), aktifkan paket manual, atau perpanjang
+ *  masa coba. Semua paket & masa coba membuka seluruh fitur; alasan masuk audit log. */
+export function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onClose: () => void; klien: { id: number; nama: string }; onSaved: () => void }) {
+  const [aksi, setAksi] = useState<'coba' | 'trial' | 'aktifkan'>('coba')
   const [paket, setPaket] = useState('bulanan')
-  const [hari, setHari] = useState('7')
-  const [alasan, setAlasan] = useState('')
+  const [hari, setHari] = useState('14')
+  const [alasan, setAlasan] = useState('Uji coba semua fitur')
   const [plans, setPlans] = useState<Paket[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -304,7 +314,7 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
     setBusy(true)
     setError('')
     try {
-      await aturLangganan(klien.id, aksi === 'trial' ? { aksi, hari: Number(hari), alasan } : { aksi, paket, alasan })
+      await aturLangganan(klien.id, aksi === 'aktifkan' ? { aksi, paket, alasan } : { aksi: 'trial', hari: Number(hari), alasan })
       setAlasan('')
       onSaved()
     } catch (err) {
@@ -319,14 +329,22 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
         <form onSubmit={simpan} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Atur langganan · {klien.nama}</DialogTitle>
-            <DialogDescription>Untuk pembayaran transfer, promo, atau kompensasi. Alasan masuk audit log.</DialogDescription>
+            <DialogDescription>
+              Semua fitur terbuka selama masa coba atau paket aktif. Pakai <strong>Coba semua fitur</strong> untuk uji coba tanpa pembayaran;
+              <strong> Aktifkan paket</strong> untuk pembayaran transfer, promo, atau kompensasi. Alasan masuk audit log.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-1.5">
             <Label htmlFor="lg-aksi">Aksi</Label>
-            <Select value={aksi} onValueChange={(v) => setAksi(v as 'trial' | 'aktifkan')}>
+            <Select value={aksi} onValueChange={(v) => {
+              const a = v as 'coba' | 'trial' | 'aktifkan'
+              setAksi(a)
+              if (a === 'coba') { setHari('14'); setAlasan('Uji coba semua fitur') } else if (alasan === 'Uji coba semua fitur') setAlasan('')
+            }}>
               <SelectTrigger id="lg-aksi" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="aktifkan">Aktifkan paket manual</SelectItem>
+                <SelectItem value="coba">Coba semua fitur (masa coba gratis)</SelectItem>
+                <SelectItem value="aktifkan">Aktifkan paket berbayar (manual)</SelectItem>
                 <SelectItem value="trial">Perpanjang masa coba</SelectItem>
               </SelectContent>
             </Select>
@@ -344,8 +362,9 @@ function LanggananDialog({ open, onClose, klien, onSaved }: { open: boolean; onC
             </div>
           ) : (
             <div className="grid gap-1.5">
-              <Label htmlFor="lg-hari">Tambah berapa hari</Label>
+              <Label htmlFor="lg-hari">{aksi === 'coba' ? 'Lama masa coba (hari)' : 'Tambah berapa hari'}</Label>
               <Input id="lg-hari" type="number" min={1} max={90} required value={hari} onChange={(e) => setHari(e.target.value)} />
+              {aksi === 'coba' && <p className="text-xs text-muted-foreground">Klien langsung bisa memakai semua menu. Setelah masa coba habis, menu kembali terkunci sampai berlangganan.</p>}
             </div>
           )}
           <div className="grid gap-1.5">

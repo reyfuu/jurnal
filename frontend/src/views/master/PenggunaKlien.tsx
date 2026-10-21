@@ -7,15 +7,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { getPenggunaKlien, hapusPenggunaKlien, resetPasswordKlien, ubahPenggunaKlien, type PenggunaKlien } from '@/lib/api'
-import { formatRelatif } from '@/lib/format'
+import { formatRelatif, formatTanggal } from '@/lib/format'
 import { HapusPermanenDialog, KonfirmasiDialog } from './KelolaDialog'
+import { LanggananDialog } from './Klien'
 
 // Pengguna klien: semua akun usaha (bukan tim) yang boleh dilihat anggota — kontak, usaha, status.
 // Nonaktif = soft delete (bisa diaktifkan lagi); hapus permanen hanya untuk akun nonaktif.
 
 type Saring = 'semua' | 'aktif' | 'nonaktif'
 
-export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKelola: boolean; bisaReset: boolean; bisaHapus: boolean }) {
+const STATUS_LG: Record<PenggunaKlien['langganan']['status'], [string, string]> = { aktif: ['pill-green', 'Aktif'], trial: ['pill-amber', 'Masa coba'], habis: ['pill-red', 'Habis'] }
+
+export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus, bisaLangganan = false }: { bisaKelola: boolean; bisaReset: boolean; bisaHapus: boolean; bisaLangganan?: boolean }) {
+  const [langganan, setLangganan] = useState<PenggunaKlien | null>(null)
   const [rows, setRows] = useState<PenggunaKlien[] | null>(null)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
@@ -57,8 +61,8 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
           <Input aria-label="Cari pengguna" placeholder="Cari nama, email, no HP, usaha" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280, marginLeft: 'auto' }} />
         </div>
         <div className="table-scroll">
-          <table className="data-table" style={{ minWidth: 1180 }}>
-            <thead><tr><th>Nama</th><th>No HP</th><th>Usaha</th><th>Alamat usaha</th><th>Role</th><th>Status</th><th>Terakhir aktif</th><th style={{ textAlign: 'right' }}>Aksi</th></tr></thead>
+          <table className="data-table" style={{ minWidth: 1300 }}>
+            <thead><tr><th>Nama</th><th>No HP</th><th>Usaha</th><th>Alamat usaha</th><th>Role</th><th>Langganan</th><th>Status</th><th>Terakhir aktif</th><th style={{ textAlign: 'right' }}>Aksi</th></tr></thead>
             <tbody>
               {tampil.map((u) => (
                 <tr key={u.id}>
@@ -67,6 +71,15 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
                   <td>{u.usaha}{u.arsip && <span className="pill-status pill-red" style={{ marginLeft: 6, fontSize: 10 }}>diarsipkan</span>}</td>
                   <td className="text-sm" style={{ whiteSpace: 'normal', maxWidth: 240 }}>{[u.alamat, u.kota].filter(Boolean).join(', ') || <span className="text-muted-foreground">—</span>}</td>
                   <td>{u.role_label}</td>
+                  <td>
+                    <span className={'pill-status ' + STATUS_LG[u.langganan.status][0]}>{STATUS_LG[u.langganan.status][1]}</span>
+                    {u.langganan.sampai && <div className="text-xs text-muted-foreground">s/d {formatTanggal(u.langganan.sampai)}</div>}
+                    {bisaLangganan && !u.demo && !u.arsip && (
+                      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setLangganan(u)}>
+                        {u.langganan.status === 'habis' ? 'Buka semua fitur' : 'Atur langganan'}
+                      </Button>
+                    )}
+                  </td>
                   <td>{u.active ? <span className="pill-status pill-green">Aktif</span> : <span className="pill-status pill-status-muted">Nonaktif</span>}</td>
                   <td>{formatRelatif(u.last_seen)}</td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -79,13 +92,17 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus }: { bisaKe
                   </td>
                 </tr>
               ))}
-              {rows && tampil.length === 0 && <tr><td colSpan={8} className="text-center text-muted-foreground" style={{ padding: 24 }}>Tidak ada pengguna yang cocok.</td></tr>}
+              {rows && tampil.length === 0 && <tr><td colSpan={9} className="text-center text-muted-foreground" style={{ padding: 24 }}>Tidak ada pengguna yang cocok.</td></tr>}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">Nonaktifkan (soft delete) = pengguna tidak bisa masuk, data tetap, bisa diaktifkan lagi. Hapus (hard delete) = akun dihapus permanen; akun aktif dinonaktifkan dulu otomatis. Semua tindakan tercatat di audit log.</p>
       </div>
 
+      {langganan && (
+        <LanggananDialog open klien={{ id: langganan.klien_id, nama: langganan.usaha }} onClose={() => setLangganan(null)}
+          onSaved={() => { setLangganan(null); void muat() }} />
+      )}
       {edit && <EditPengguna u={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); void muat() }} />}
 
       <Dialog open={!!reset} onOpenChange={(o) => !o && setReset(null)}>

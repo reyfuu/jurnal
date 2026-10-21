@@ -119,13 +119,13 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
         <section className="workspace">
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
-            ? <KlienList onBuka={buka} bisaLihat={bisa('lihat_sebagai')} onLihat={onLihat} />
+            ? <KlienList onBuka={buka} bisaLihat={bisa('lihat_sebagai')} bisaLangganan={bisa('langganan')} onLihat={onLihat} />
             : <KlienDetailView id={klienId} bisaLangganan={bisa('langganan')} bisaLihat={bisa('lihat_sebagai')} bisaUbah={bisa('klien_ubah')}
               bisaHapus={bisa('hapus_permanen')} onLihat={onLihat} onKembali={() => setKlienId(null)} />)}
           {page === 'koreksi' && <KoreksiMaster />}
           {page === 'catatan' && <CatatanMaster />}
           {page === 'pengingat' && <PengingatMaster bisaAtur={bisa('pengaturan')} />}
-          {page === 'pengguna' && <PenggunaKlienView bisaKelola={bisa('pengguna_kelola')} bisaReset={bisa('pengguna_reset')} bisaHapus={bisa('hapus_permanen')} />}
+          {page === 'pengguna' && <PenggunaKlienView bisaKelola={bisa('pengguna_kelola')} bisaReset={bisa('pengguna_reset')} bisaHapus={bisa('hapus_permanen')} bisaLangganan={bisa('langganan')} />}
           {page === 'pengetahuan' && <BasisPengetahuan />}
           {page === 'artikel' && <ArtikelView bolehTerbit={bisa('artikel_terbit')} />}
           {page === 'coa' && <TemplateCOAView />}
