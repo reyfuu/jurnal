@@ -16,8 +16,8 @@ func TagihanDariBuku(piutang, utang UmurSaldoResult) []Tagihan {
 			jenis = TagihanPiutang
 		}
 		for _, b := range u.Baris {
-			jt := b.Tanggal
-			if t, err := time.Parse(time.DateOnly, b.Tanggal); err == nil {
+			jt := b.JatuhTempo // invoice: jatuh tempo sebenarnya
+			if t, err := time.Parse(time.DateOnly, b.Tanggal); err == nil && jt == "" {
 				jt = t.AddDate(0, 0, 30).Format(time.DateOnly)
 			}
 			nomor := "Saldo awal"

@@ -15,6 +15,7 @@ var peranJenis = map[string]string{
 	"Sewa Tempat": PeranSewa, "Listrik, Air, Internet": PeranListrik, "Iklan & Promosi": PeranIklan,
 	"Perawatan & Perlengkapan": PeranPerawatan, "Pajak & Izin": PeranBebanPajak, "Biaya Lain": PeranBiayaLain,
 	"Beli Alat / Aset": PeranPeralatan, "Bayar Cicilan": PeranPinjaman,
+	"PPN Keluaran": PeranPPNKeluaran, "Setor PPN": PeranPPNKeluaran,
 }
 
 // modalKode: akun modal; template boleh memisahkan modal PT (modal disetor) dari modal pemilik

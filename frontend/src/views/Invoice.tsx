@@ -25,9 +25,11 @@ function kosong(nomor: string, ppnBps: number): InvoiceInput {
   return {
     nomor, no_po: '', status: 'draft', tanggal: hariIni, jatuh_tempo: tempo,
     pelanggan_nama: '', pelanggan_alamat: '', pelanggan_npwp: '',
-    items: [{ ...BARIS_KOSONG }], diskon_rp: 0, ppn_bps: ppnBps, catatan: '',
+    items: [{ ...BARIS_KOSONG }], diskon_rp: 0, ppn_bps: ppnBps, catatan: '', tanggal_lunas: '',
   }
 }
+
+const hariIniWIB = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
 
 function toInput(r: InvoiceRow): InvoiceInput {
   return {
@@ -35,7 +37,7 @@ function toInput(r: InvoiceRow): InvoiceInput {
     jatuh_tempo: r.jatuh_tempo, pelanggan_nama: r.pelanggan_nama,
     pelanggan_alamat: r.pelanggan_alamat ?? '', pelanggan_npwp: r.pelanggan_npwp ?? '',
     items: r.items.map((i) => ({ ...i })), diskon_rp: r.diskon_rp,
-    ppn_bps: r.ppn_bps, catatan: r.catatan ?? '',
+    ppn_bps: r.ppn_bps, catatan: r.catatan ?? '', tanggal_lunas: r.tanggal_lunas ?? '', dibukukan: r.dibukukan,
   }
 }
 
@@ -101,7 +103,7 @@ export function InvoiceView() {
 
   return (
     <>
-      <PageHeader title="Invoice" subtitle="Terbitkan faktur penjualan dan unduh PDF siap kirim ke pelanggan.">
+      <PageHeader title="Invoice" subtitle="Terbitkan faktur penjualan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan & piutang.">
         <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => buka()}>
           + Buat Invoice
         </button>
@@ -149,10 +151,16 @@ export function InvoiceView() {
                 onChange={(e) => setForm({ ...form, no_po: e.target.value })} />
             </Field>
             <Field label="Status">
-              <select className="input-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <select className="input-field" value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value, tanggal_lunas: e.target.value === 'lunas' ? (form.tanggal_lunas || hariIniWIB()) : '' })}>
                 {info.status.map((v) => <option key={v} value={v}>{STATUS_LABEL[v] ?? v}</option>)}
               </select>
             </Field>
+            {form.status === 'lunas' && (
+              <Field label="Tanggal dibayar">
+                <input className="input-field" type="date" required min={form.tanggal} value={form.tanggal_lunas ?? ''} onChange={(e) => setForm({ ...form, tanggal_lunas: e.target.value })} />
+              </Field>
+            )}
             <Field label="Tanggal terbit">
               <input className="input-field" type="date" value={form.tanggal} onChange={(e) => setForm({ ...form, tanggal: e.target.value })} />
             </Field>
@@ -232,6 +240,20 @@ export function InvoiceView() {
             </div>
           </div>
 
+          {editId !== null && form.dibukukan === false ? (
+            <label className="note-box warn" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12 }}>
+              <input type="checkbox" checked={false} onChange={() => setForm({ ...form, dibukukan: true })} />
+              <span><strong>Bukukan invoice ini ke pembukuan.</strong> Invoice ini dibuat sebelum invoice tersambung ke pembukuan, jadi belum tercatat.
+                Centang hanya bila penjualannya <strong>belum</strong> Anda catat manual di Transaksi, supaya tidak dobel.</span>
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground" style={{ marginTop: 12 }}>
+              {form.status === 'draft'
+                ? 'Draft belum dicatat ke pembukuan. Ubah status ke Terkirim saat invoice dikirim ke pelanggan.'
+                : `Tercatat otomatis: Penjualan ${formatRp(t!.dpp)}${t!.ppn > 0 ? ` + PPN Keluaran ${formatRp(t!.ppn)} (utang PPN, bukan omzet)` : ''}, sebagai ${form.status === 'lunas' ? 'kas masuk' : 'piutang di menu Piutang & Utang'}.`}
+            </p>
+          )}
+
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} disabled={busy}>
               {busy ? 'Menyimpan…' : editId === null ? 'Simpan Invoice' : 'Simpan Perubahan'}
@@ -278,6 +300,11 @@ export function InvoiceView() {
                     <span className={'pill-status ' + (r.status === 'lunas' ? 'pill-green' : r.hari_terlambat > 0 ? 'pill-red' : 'pill-amber')}>
                       {r.hari_terlambat > 0 && r.status !== 'lunas' ? 'Lewat Tempo' : STATUS_LABEL[r.status] ?? r.status}
                     </span>
+                    {r.status !== 'draft' && (
+                      <div style={{ fontSize: 11, marginTop: 3, color: r.dibukukan ? 'var(--text-muted)' : AMBER }}>
+                        {r.dibukukan ? `tercatat · trx #${r.transaksi_id}${r.transaksi_ppn_id ? ` & #${r.transaksi_ppn_id}` : ''}` : 'belum dibukukan'}
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'right', color: r.status === 'lunas' ? GREEN : undefined }}>{formatRp(r.totals.total)}</td>
                   <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

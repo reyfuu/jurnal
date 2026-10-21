@@ -33,6 +33,15 @@ type Invoice struct {
 	// yang benar untuk usaha non-PKP — mereka memang tidak boleh memungut PPN.
 	PPNBps  int    `json:"ppn_bps"`
 	Catatan string `json:"catatan,omitempty"`
+
+	// TanggalLunas: tanggal pelanggan membayar (status lunas).
+	TanggalLunas string `json:"tanggal_lunas,omitempty"`
+	// Dibukukan: invoice ini tercatat di pembukuan — status terkirim/lunas otomatis membuat
+	// transaksi Penjualan (DPP) dan PPN Keluaran. Invoice lama (sebelum fitur ini) false sampai
+	// pengguna memilih "Bukukan", supaya tidak dobel dengan penjualan yang dicatat manual.
+	Dibukukan      bool `json:"dibukukan,omitempty"`
+	TransaksiID    int  `json:"transaksi_id,omitempty"`
+	TransaksiPPNID int  `json:"transaksi_ppn_id,omitempty"`
 }
 
 type InvoiceItem struct {
@@ -111,6 +120,14 @@ func ValidateInvoice(inv *Invoice) error {
 	}
 	if len(inv.Items) == 0 {
 		return errors.New("faktur harus punya minimal satu baris rincian")
+	}
+	inv.TanggalLunas = strings.TrimSpace(inv.TanggalLunas)
+	if inv.Status != StatusLunas {
+		inv.TanggalLunas = ""
+	} else if lunas, err := time.Parse(time.DateOnly, inv.TanggalLunas); err != nil {
+		return errors.New("isi tanggal pelanggan membayar untuk faktur lunas (format YYYY-MM-DD)")
+	} else if lunas.Before(terbit) {
+		return errors.New("tanggal bayar tidak boleh sebelum tanggal terbit faktur")
 	}
 	for i := range inv.Items {
 		it := &inv.Items[i]

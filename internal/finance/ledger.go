@@ -18,6 +18,9 @@ const (
 	CatAsset       = "ASSET"        // beli alat/aset (bukan biaya langsung)
 	CatLoanPayment = "LOAN_PAYMENT" // bayar cicilan (mengurangi utang)
 	CatPrive       = "PRIVE"        // ambil uang pribadi (mengurangi modal)
+	// CatPPN: PPN keluaran yang dipungut dari pembeli (masuk) atau disetor ke negara (keluar).
+	// Titipan untuk negara: menggerakkan kas operasi & utang pajak, bukan laba rugi.
+	CatPPN = "PPN"
 	// expense category lain dihitung sebagai Opex
 )
 
@@ -128,6 +131,8 @@ type CashFlow struct {
 	Prive      int64 `json:"prive"`
 	// KenaikanPersediaan: nilai persediaan akhir − awal dari kartu stok (0 sebelum titik nol).
 	KenaikanPersediaan int64 `json:"kenaikan_persediaan"`
+	// KenaikanUtangPPN: PPN keluaran dipungut − disetor (akrual) periode ini.
+	KenaikanUtangPPN int64 `json:"kenaikan_utang_ppn,omitempty"`
 
 	OperasiLangsung      CashFlowSection `json:"operasi_langsung"`
 	OperasiTidakLangsung CashFlowSection `json:"operasi_tidak_langsung"`
@@ -177,8 +182,8 @@ func BuildIncomeStatement(entries []LedgerEntry, depreciation, amortization int6
 	is := IncomeStatement{Depreciation: depreciation, Amortization: amortization}
 	opexIdx := map[string]int{}
 	for _, e := range entries {
-		if aktivitasOf(e) != AktivitasOperasi {
-			continue // modal, pinjaman, aset, cicilan, prive bukan laba rugi
+		if aktivitasOf(e) != AktivitasOperasi || e.Category == CatPPN {
+			continue // modal, pinjaman, aset, cicilan, prive, PPN titipan bukan laba rugi
 		}
 		switch {
 		case e.Kind == KindIncome && e.Category == CatSales:
@@ -226,7 +231,7 @@ const catatanPersediaan = "Perubahan persediaan stok — belum dihitung (mulai k
 func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) CashFlow {
 	cf := CashFlow{OpeningBalance: opening, Depreciation: is.Depreciation, Amortization: is.Amortization}
 
-	var pelanggan, lainnya, potongan, hpp, opex, beliAset, modal, pinjaman, cicilan, prive int64
+	var pelanggan, lainnya, potongan, hpp, opex, beliAset, modal, pinjaman, cicilan, prive, ppnMasuk, ppnSetor int64
 	channel := newTally()
 	opexDetail := newTally()
 
@@ -234,6 +239,13 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 		kas := e.Gross
 		if e.Kind == KindIncome {
 			kas = e.Gross - e.Fee
+		}
+		if e.Category == CatPPN { // utang PPN berubah saat dipungut / disetor (akrual)
+			if e.Kind == KindIncome {
+				cf.KenaikanUtangPPN += e.Gross
+			} else {
+				cf.KenaikanUtangPPN -= e.Gross
+			}
 		}
 		if !e.Settled {
 			// Belum menyentuh kas. Hanya akrual operasional yang jadi penyesuaian modal kerja;
@@ -257,6 +269,10 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 			cf.CashOut += kas
 		}
 		switch {
+		case e.Category == CatPPN && e.Kind == KindIncome:
+			ppnMasuk += kas
+		case e.Category == CatPPN:
+			ppnSetor += kas
 		case e.Category == CatSales:
 			pelanggan += kas
 			channel.add(cmp.Or(e.Channel, "Lainnya"), kas)
@@ -290,6 +306,10 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 	cf.OperasiLangsung.add("Pembayaran potongan channel / aplikasi", -potongan)
 	cf.OperasiLangsung.add("Pembayaran ke supplier bahan baku (HPP)", -hpp)
 	cf.OperasiLangsung.add("Pembayaran beban operasional", -opex, opexDetail.lines()...)
+	if ppnMasuk != 0 || ppnSetor != 0 {
+		cf.OperasiLangsung.add("PPN dipungut dari pembeli (titipan negara)", ppnMasuk)
+		cf.OperasiLangsung.add("PPN disetor ke negara", -ppnSetor)
+	}
 	cf.OperasiLangsung.note("Penjualan tempo & biaya belum dibayar — belum menyentuh kas")
 	cf.OperasiLangsung.note("Penyusutan & amortisasi — tidak mengeluarkan kas")
 
@@ -312,6 +332,9 @@ func (cf *CashFlow) susunTidakLangsung(is IncomeStatement) {
 	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
 	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)
 	cf.OperasiTidakLangsung.add("Kenaikan utang usaha", cf.NewPayables)
+	if cf.KenaikanUtangPPN != 0 {
+		cf.OperasiTidakLangsung.add("Kenaikan utang PPN (dipungut − disetor)", cf.KenaikanUtangPPN)
+	}
 	cf.OperasiTidakLangsung.note(catatanPersediaan)
 }
 
@@ -340,13 +363,17 @@ func (t *tally) lines() []Line { return t.items }
 // Persediaan = saldo awal + kenaikan dari kartu stok; sebelum titik nol kenaikannya 0, jadi
 // persediaan tetap angka saldo awal.
 func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, as AssetSummary, opening ReportOpening) BalanceSheet {
-	var loans int64
+	var loans, utangPPN int64
 	for _, e := range entries {
-		switch e.Category {
-		case CatLoan:
+		switch {
+		case e.Category == CatLoan:
 			loans += e.Gross
-		case CatLoanPayment:
+		case e.Category == CatLoanPayment:
 			loans -= e.Gross
+		case e.Category == CatPPN && e.Kind == KindIncome:
+			utangPPN += e.Gross
+		case e.Category == CatPPN:
+			utangPPN -= e.Gross
 		}
 	}
 	a := BalanceSheetAssets{
@@ -359,8 +386,9 @@ func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, a
 	l := BalanceSheetLiabilities{
 		Payables: opening.Payables + cf.NewPayables + cf.NewPayablesOther,
 		Loans:    opening.Loans + loans,
+		Other:    utangPPN,
 	}
-	l.Total = l.Payables + l.Loans
+	l.Total = l.Payables + l.Loans + l.Other
 	q := BalanceSheetEquity{
 		OpeningCapital: opening.Cash + opening.Receivables + opening.Inventory + as.NilaiBukuAwal - opening.Payables - opening.Loans,
 		AddedCapital:   cf.SetorModal - cf.Prive + as.TambahanTanpaKas,

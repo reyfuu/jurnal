@@ -24,7 +24,7 @@ var peranManufaktur = map[string]string{
 	"5101": PeranHPP, "5102": PeranPembelian, "5104": PeranKemasan, "6113": PeranBebanPenyusutan,
 	"6124": PeranBebanAmortisasi, "7204": PeranPendapatanLain, "6120": PeranBebanPajak, "6108": PeranPotonganAplikasi,
 	"6106": PeranOngkir, "6101": PeranGaji, "6104": PeranSewa, "6105": PeranListrik, "6102": PeranIklan,
-	"6112": PeranPerawatan, "6190": PeranBiayaLain,
+	"6112": PeranPerawatan, "6190": PeranBiayaLain, "2108": PeranPPNKeluaran,
 }
 
 // kondisiManufaktur: akun yang hanya muncul untuk bentuk usaha tertentu, atau opsional (JikaAda).

@@ -88,6 +88,10 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   }
   function openEdit(t: Tx) {
     if (!bisaBuka) return
+    if (t.invoice_id) {
+      setError('Transaksi ini dibuat otomatis dari invoice. Ubah lewat menu Invoice, atau tandai lunas dari menu Piutang & Utang, supaya invoice dan pembukuan tetap sama.')
+      return
+    }
     setError('')
     setAlasan('')
     const { id, ...input } = t
@@ -245,7 +249,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                       <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-brand)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
                     )}
                     <td>
-                      <div style={{ fontWeight: 500 }}>{t.keterangan || '-'}</div>
+                      <div style={{ fontWeight: 500 }}>{t.keterangan || '-'}{!!t.invoice_id && <span className="pill-status pill-brand" style={{ marginLeft: 6, fontSize: 10 }}>dari invoice</span>}</div>
                       {sub && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{sub}</div>}
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{t.pihak}</td>
@@ -259,9 +263,9 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                     </td>
                     {bisaBuka && (
                       <td style={{ textAlign: 'right' }}>
-                        <Button variant="ghost" size="icon-sm" aria-label={`${usulMode ? 'Usulkan koreksi' : 'Ubah'} ${t.keterangan || t.jenis}`} onClick={(e) => { e.stopPropagation(); openEdit(t) }}>
+                        {!t.invoice_id && <Button variant="ghost" size="icon-sm" aria-label={`${usulMode ? 'Usulkan koreksi' : 'Ubah'} ${t.keterangan || t.jenis}`} onClick={(e) => { e.stopPropagation(); openEdit(t) }}>
                           <Pencil />
-                        </Button>
+                        </Button>}
                       </td>
                     )}
                   </tr>

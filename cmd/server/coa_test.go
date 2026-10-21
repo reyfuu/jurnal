@@ -32,7 +32,7 @@ func TestCoAEndpoints(t *testing.T) {
 
 	do(srv, owner, http.MethodPut, "/api/v1/business", dagangCV)
 	_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/coa", "").Body).Decode(&c)
-	if !c.Supported || len(c.Accounts) < 60 || len(c.Mapping) != 18 {
+	if !c.Supported || len(c.Accounts) < 60 || len(c.Mapping) != len(finance.JenisList) {
 		t.Fatalf("CoA perdagangan: supported=%v akun=%d mapping=%d", c.Supported, len(c.Accounts), len(c.Mapping))
 	}
 

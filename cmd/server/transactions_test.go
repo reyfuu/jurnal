@@ -33,7 +33,7 @@ func TestTransactionsCRUD_UpdatesReportsAndDashboard(t *testing.T) {
 
 	var list txList
 	_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/transactions", "").Body).Decode(&list)
-	if len(list.Transactions) == 0 || len(list.Jenis) != 18 || !list.CanEdit {
+	if len(list.Transactions) == 0 || len(list.Jenis) != len(finance.JenisList) || !list.CanEdit {
 		t.Fatalf("list: %d txs, %d jenis, can_edit=%v", len(list.Transactions), len(list.Jenis), list.CanEdit)
 	}
 	base := omzetAug(t, srv, owner)

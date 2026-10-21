@@ -1,0 +1,94 @@
+package main
+
+import (
+	"errors"
+	"slices"
+
+	"pajak/internal/finance"
+)
+
+// Invoice ↔ pembukuan. Invoice yang dibukukan (Dibukukan) dan sudah terkirim/lunas dijaga
+// punya dua transaksi: Penjualan sebesar DPP dan PPN Keluaran sebesar PPN (bila ada), atas nama
+// pelanggan dengan jatuh tempo invoice. Draft tidak dibukukan. Dengan begitu invoice yang
+// dikirim langsung menjadi omzet & piutang, dan pelunasannya menambah kas — tidak dicatat dua
+// kali lewat menu Transaksi.
+
+var errTxInvoice = errors.New("transaksi ini dibuat otomatis dari invoice; ubah atau hapus lewat menu Invoice supaya invoice dan pembukuan tetap sama")
+
+// sinkronInvoiceLocked menyesuaikan transaksi milik inv (lama = keadaan sebelumnya, nil saat
+// dibuat / dihapus = inv dengan status draft). Dipanggil dengan s.mu terkunci; inv.ID sudah ada.
+func (s *tenant) sinkronInvoiceLocked(inv *finance.Invoice) error {
+	if !inv.Dibukukan {
+		return nil
+	}
+	tot := inv.Totals()
+	aktif := inv.Status != finance.StatusDraft
+	lunas := inv.Status == finance.StatusLunas
+	if err := s.jagaTxInvoiceLocked(&inv.TransaksiID, aktif && tot.DPP > 0, finance.Transaction{
+		Tanggal: inv.Tanggal, Jenis: "Penjualan", Nominal: tot.DPP, Keterangan: "Invoice " + inv.Nomor,
+		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
+	}); err != nil {
+		return err
+	}
+	return s.jagaTxInvoiceLocked(&inv.TransaksiPPNID, aktif && tot.PPN > 0, finance.Transaction{
+		Tanggal: inv.Tanggal, Jenis: "PPN Keluaran", Nominal: tot.PPN, Keterangan: "PPN invoice " + inv.Nomor,
+		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
+	})
+}
+
+// jagaTxInvoiceLocked membuat, memperbarui, atau menghapus satu transaksi milik invoice.
+// Channel & akun koreksi pengguna dipertahankan; bulan yang sudah tutup buku ditolak.
+func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) error {
+	i := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return *id != 0 && x.ID == *id })
+	if !ada {
+		if i >= 0 {
+			if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
+				return err
+			}
+			s.txs = slices.Delete(s.txs, i, i+1)
+		}
+		*id = 0
+		return nil
+	}
+	if t.TanggalLunas == t.Tanggal {
+		t.TanggalLunas = ""
+	}
+	if i >= 0 {
+		t.Channel, t.Akun = s.txs[i].Channel, s.txs[i].Akun
+		if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
+			return err
+		}
+	}
+	if err := finance.Validate(&t); err != nil {
+		return err
+	}
+	if err := s.cekTxLocked(t); err != nil {
+		return err
+	}
+	if i >= 0 {
+		t.ID = s.txs[i].ID
+		s.txs[i] = t
+	} else {
+		t.ID = s.nextTxID
+		s.nextTxID++
+		s.txs = append(s.txs, t)
+	}
+	*id = t.ID
+	return nil
+}
+
+// lunasiInvoiceLocked: transaksi invoice dilunasi dari Piutang & Utang → invoice lunas pada
+// tanggal itu dan transaksi pasangannya (DPP / PPN) ikut lunas.
+func (s *tenant) lunasiInvoiceLocked(invoiceID int, tanggal string) error {
+	i := slices.IndexFunc(s.invoices, func(x finance.Invoice) bool { return x.ID == invoiceID })
+	if i < 0 {
+		return nil
+	}
+	inv := s.invoices[i]
+	inv.Status, inv.TanggalLunas = finance.StatusLunas, tanggal
+	if err := s.sinkronInvoiceLocked(&inv); err != nil {
+		return err
+	}
+	s.invoices[i] = inv
+	return nil
+}
