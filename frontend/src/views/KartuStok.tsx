@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
+  createTransaction, getGerakStok, getMetodeStok, pilihMetodeStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
   stokAwal, stokOpname, stokProduksi,
-  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
+  type BarisKartu, type GerakStok, type MetodeNilaiStok, type MetodeStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
 } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -27,6 +27,15 @@ const LABEL_KARTU: Record<JenisKartu, string> = {
   awal: 'Stok awal', beli: 'Beli', produksi_masuk: 'Hasil produksi', produksi_pakai: 'Dipakai produksi', jual: 'Terjual', opname: 'Stok opname',
 }
 
+const NAMA_METODE: Record<MetodeNilaiStok, string> = { fifo: 'FIFO (yang dibeli duluan keluar duluan)', rata_rata: 'rata-rata bergerak' }
+
+/** Metode nilai stok usaha (null selama dimuat); dipakai teks penjelasan & dialog mulai kartu. */
+function useMetodeStok() {
+  const [m, setM] = useState<MetodeStok | null>(null)
+  useEffect(() => { getMetodeStok().then(setM, () => setM(null)) }, [])
+  return m
+}
+
 function Galat({ teks }: { teks: string }) {
   return teks ? <p className="text-sm text-destructive" role="alert">{teks}</p> : null
 }
@@ -37,6 +46,8 @@ export function MulaiKartuDialog({ items, onClose, onDone }: { items: StokRow[];
   const [isi, setIsi] = useState(() => items.map((it) => ({ id: it.id, fisik: qtyKeTeks(it.jumlah_mili), harga: it.harga_pokok })))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const metode = useMetodeStok()
+  const [pilih, setPilih] = useState<MetodeNilaiStok | ''>('')
   const set = (i: number, p: Partial<(typeof isi)[number]>) => setIsi((x) => x.map((r, j) => (j === i ? { ...r, ...p } : r)))
   const total = isi.reduce((n, r) => n + Math.round((parseQty(r.fisik) * r.harga) / 1000), 0)
 
@@ -45,6 +56,12 @@ export function MulaiKartuDialog({ items, onClose, onDone }: { items: StokRow[];
     setBusy(true)
     setError('')
     try {
+      // Metode dikunci saat kartu stok dimulai; FIFO (bawaan) dikunci otomatis oleh server.
+      if (metode && !metode.terkunci && pilih && pilih !== metode.metode) {
+        await pilihMetodeStok(pilih).catch((err: Error) => {
+          throw new Error(/akses|forbidden|izin/i.test(err.message) ? 'Hanya Owner yang bisa memilih metode rata-rata; biarkan FIFO atau minta Owner memilihnya di Profil Usaha.' : err.message)
+        })
+      }
       await stokAwal({ tanggal, baris: isi.map((r) => ({ stok_id: r.id, fisik: parseQty(r.fisik), harga_unit: r.harga })) })
       onDone()
     } catch (err) {
@@ -63,6 +80,19 @@ export function MulaiKartuDialog({ items, onClose, onDone }: { items: StokRow[];
               dari transaksi beli & jual, produksi, dan stok opname. Laporan sebelum tanggal ini tidak berubah.
             </DialogDescription>
           </DialogHeader>
+          {metode && (metode.terkunci ? (
+            <p className="text-sm">Nilai stok &amp; modal barang terjual dihitung dengan <strong>{NAMA_METODE[metode.metode]}</strong> (sudah dikunci).</p>
+          ) : (
+            <div className="note-box warn" style={{ margin: 0 }}>
+              <Label htmlFor="ks-metode"><strong>Cara menghitung nilai stok &amp; modal barang terjual</strong></Label>
+              <select id="ks-metode" className="input-field" style={{ marginTop: 6, maxWidth: 420 }} value={pilih || metode.metode} onChange={(e) => setPilih(e.target.value as MetodeNilaiStok)}>
+                {metode.pilihan.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <p className="text-xs" style={{ marginTop: 6 }}>
+                {metode.pilihan.find((o) => o.value === (pilih || metode.metode))?.hint} Berlaku untuk semua barang dan <strong>dikunci begitu kartu stok dimulai</strong>; perubahan metode memerlukan persetujuan DJP.
+              </p>
+            </div>
+          ))}
           <div className="grid gap-1.5" style={{ maxWidth: 200 }}>
             <Label htmlFor="ks-tgl">Tanggal hitung fisik</Label>
             <Input id="ks-tgl" type="date" required value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
@@ -177,7 +207,7 @@ export function OpnameDialog({ items, mulai, onClose, onDone }: { items: StokRow
   )
 }
 
-/** Beli bahan/barang: transaksi "Beli Bahan / Stok" yang memilih barang → stok & HPP rata-rata bergerak. */
+/** Beli bahan/barang: transaksi "Beli Bahan / Stok" yang memilih barang → stok & HPP (FIFO / rata-rata). */
 export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; onClose: () => void; onDone: () => void }) {
   const [tanggal, setTanggal] = useState(hariIni)
   const [stokId, setStokId] = useState(items[0]?.id ?? 0)
@@ -212,7 +242,7 @@ export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; 
         <form onSubmit={kirim} className="grid gap-3">
           <DialogHeader>
             <DialogTitle>Beli bahan / barang</DialogTitle>
-            <DialogDescription>Menambah stok dan memperbarui harga pokok rata-rata. Tercatat juga sebagai transaksi pengeluaran (atau utang bila belum lunas).</DialogDescription>
+            <DialogDescription>Menambah stok dan memperbarui nilai stok. Tercatat juga sebagai transaksi pengeluaran (atau utang bila belum lunas).</DialogDescription>
           </DialogHeader>
           <div className="grid gap-1.5"><Label htmlFor="bb-barang">Barang</Label>
             <select id="bb-barang" className="input-field" value={stokId} onChange={(e) => setStokId(Number(e.target.value))}>
@@ -248,6 +278,7 @@ export function KartuBarangDialog({ item, onClose }: { item: StokRow; onClose: (
   const [dari, setDari] = useState(awalBulan)
   const [sampai, setSampai] = useState(hariIni)
   const [data, setData] = useState<{ kunci: string; k?: KartuBarang; error?: string } | null>(null)
+  const metode = useMetodeStok()
   const kunci = `${dari}|${sampai}`
   useEffect(() => {
     let batal = false
@@ -260,7 +291,7 @@ export function KartuBarangDialog({ item, onClose }: { item: StokRow; onClose: (
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Kartu stok — {item.nama}</DialogTitle>
-          <DialogDescription>Setiap barang masuk & keluar beserta saldonya. Nilai memakai harga pokok rata-rata bergerak.</DialogDescription>
+          <DialogDescription>Setiap barang masuk & keluar beserta saldonya. Nilai memakai metode {metode ? NAMA_METODE[metode.metode] : 'nilai stok usaha'}.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5"><Label htmlFor="kb-dari">Dari</Label><Input id="kb-dari" type="date" value={dari} onChange={(e) => setDari(e.target.value)} /></div>
@@ -299,6 +330,7 @@ export function KartuBarangDialog({ item, onClose }: { item: StokRow; onClose: (
 export function MutasiStokPanel({ mulai, bisaEkspor }: { mulai: string; bisaEkspor: boolean }) {
   const [mode, setMode] = useState<'harian' | 'bulanan'>('bulanan')
   const [tgl, setTgl] = useState(hariIni)
+  const metode = useMetodeStok()
   const { dari, sampai } = useMemo(() => {
     if (mode === 'harian') return { dari: tgl, sampai: tgl }
     const [y, m] = tgl.split('-').map(Number)
@@ -394,7 +426,7 @@ export function MutasiStokPanel({ mulai, bisaEkspor }: { mulai: string; bisaEksp
       </div>
       <p className="text-xs text-muted-foreground">
         Rumus: Akhir = Awal + Beli + Hasil produksi − Terjual − Dipakai produksi ± Opname. Terjual berasal dari transaksi Penjualan yang memilih barang;
-        nilai memakai harga pokok rata-rata bergerak. Jumlah antarbarang tidak dijumlahkan karena satuannya berbeda.
+        nilai memakai metode {metode ? NAMA_METODE[metode.metode] : 'nilai stok usaha'}. Jumlah antarbarang tidak dijumlahkan karena satuannya berbeda.
       </p>
     </>
   )

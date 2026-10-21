@@ -5,14 +5,14 @@ import { cekLabaOmzet } from './kalkulator'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'kelamin' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'kelamin' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut' | 'hpp'
 // lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
 export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
 export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
 export type Answers = Partial<Record<Field, string>>
 
 // jawaban aman bila pengguna ragu
-export const DEFAULT_ANSWERS: Answers = { stok: 'periodik', gabung: 'tidak', pkp: 'tidak', susut: 'garis_lurus' }
+export const DEFAULT_ANSWERS: Answers = { stok: 'periodik', gabung: 'tidak', pkp: 'tidak', susut: 'garis_lurus', hpp: 'fifo' }
 
 export interface Question { judul: string; alasan: string; options?: Option[] }
 
@@ -114,6 +114,14 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
       { value: 'ya', label: 'Ya, usaha saya sudah PKP' },
     ],
   },
+  hpp: {
+    judul: 'Bagaimana modal barang yang terjual dihitung?',
+    alasan: 'Harga beli barang bisa berubah-ubah. Saat barang terjual, kami perlu tahu **modal barang itu berapa** supaya laba dan pajak Anda tepat. Contoh: stok 10 kg dibeli Rp10.000/kg, lalu beli lagi 10 kg Rp12.000/kg, kemudian terjual 15 kg. **Satu cara berlaku untuk semua barang dan tidak bisa diganti lagi tanpa persetujuan kantor pajak.**',
+    options: [
+      { value: 'fifo', label: 'Yang dibeli duluan dianggap terjual duluan (FIFO)', hint: 'Contoh di atas: modal Rp160.000. Paling umum; pilih ini kalau ragu.' },
+      { value: 'rata_rata', label: 'Dirata-rata dengan harga beli sebelumnya (rata-rata)', hint: 'Contoh di atas: modal Rp165.000 (rata-rata Rp11.000/kg).' },
+    ],
+  },
   susut: {
     judul: 'Bagaimana perhitungan pengurangan nilai aset usaha Anda setiap tahunnya?',
     alasan: 'Mesin, kendaraan, dan peralatan yang Anda pakai untuk usaha nilainya makin lama makin berkurang. Pengurangan nilai itu kami catat sebagai **biaya usaha setiap tahunnya** (disebut penyusutan), jadi laba dan pajak Anda lebih tepat. **Satu cara berlaku untuk semua aset dan tidak bisa diganti lagi tanpa persetujuan kantor pajak.** Bangunan selalu memakai cara sama rata.',
@@ -136,7 +144,7 @@ export function steps(a: Answers): StepId[] {
     'lokasi',
     'jenis',
     'klu',
-    ...(jualBarang(a) ? ['stok' as const] : []),
+    ...(jualBarang(a) ? ['stok' as const, 'hpp' as const] : []),
     'omzet',
     'laba',
     'bentuk',
@@ -176,6 +184,7 @@ export function toProfile(a: Answers): BusinessProfile {
     klu: a.klu ?? '',
     metode_persediaan: jenis === 'jasa' ? '' : ((a.stok as BusinessProfile['metode_persediaan']) || 'periodik'),
     metode_penyusutan: (a.susut as BusinessProfile['metode_penyusutan']) || 'garis_lurus',
+    metode_nilai_stok: jenis === 'jasa' ? '' : ((a.hpp as BusinessProfile['metode_nilai_stok']) || 'fifo'),
     omzet_tahunan: parseRp(a.omzet) || 0,
     laba_sebelum_pajak: parseRp(a.laba) || 0,
   }
@@ -208,6 +217,12 @@ export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
           isi: p.metode_persediaan === 'perpetual'
             ? 'Perpetual: modal barang tercatat setiap kali barang terjual.'
             : 'Periodik: modal barang dihitung dari pembelian dan hitung stok di akhir periode.',
+        }]
+      : []),
+    ...(p.metode_nilai_stok
+      ? [{
+          judul: 'Modal barang terjual',
+          isi: (p.metode_nilai_stok === 'rata_rata' ? 'Rata-rata bergerak' : 'FIFO (yang dibeli duluan terjual duluan)') + ' untuk semua barang. Pilihan ini dikunci setelah disimpan.',
         }]
       : []),
     { judul: 'Pajak penghasilan', isi: PAJAK[p.bentuk_usaha] + (p.ptkp ? ` Status PTKP Anda: ${p.ptkp}.` : '') + ' Perbandingan skema lengkap ada di menu Perencanaan Pajak.' },

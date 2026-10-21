@@ -64,6 +64,7 @@ func (s *tenant) handleGetBusiness(w http.ResponseWriter, r *http.Request) {
 			"ptkp":              tax.PTKPCodes,
 			"metode_persediaan": finance.MetodePersediaanOptions,
 			"metode_penyusutan": finance.MetodePenyusutanOptions,
+			"metode_nilai_stok": finance.MetodeNilaiStokOptions,
 			"provinsi":          finance.ProvinsiOptions,
 			"klu":               kluOptions,
 		},
@@ -101,6 +102,16 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 	case lama != "" && prof.MetodePenyusutan != lama:
 		http.Error(w, errMetodeTerkunci, http.StatusConflict)
 		return
+	}
+	// Metode nilai stok juga terkunci setelah dipilih / kartu stok dimulai.
+	if lama, kunci := s.metodeStokLocked(); kunci {
+		switch {
+		case prof.MetodeNilaiStok == "":
+			prof.MetodeNilaiStok = lama
+		case prof.MetodeNilaiStok != lama:
+			http.Error(w, errMetodeStokTerkunci, http.StatusConflict)
+			return
+		}
 	}
 	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan profil usaha", http.StatusInternalServerError)

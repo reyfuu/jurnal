@@ -342,6 +342,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/business/cek-awal", s.guard("", s.on((*tenant).handleCekAwal)))
 	s.mux.HandleFunc("POST /api/v1/business/klu-saran", s.guard("", s.handleSaranKLU))
 	s.mux.HandleFunc("PUT /api/v1/business", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePutBusiness))))
+	s.mux.HandleFunc("GET /api/v1/stok/metode", s.guard("", s.on((*tenant).handleGetMetodeStok)))
+	s.mux.HandleFunc("POST /api/v1/stok/metode", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePilihMetodeStok))))
 	s.mux.HandleFunc("POST /api/v1/business/metode-penyusutan", s.guard("profil-usaha", s.persisting(s.on((*tenant).handlePilihMetode))))
 	s.mux.HandleFunc("POST /api/v1/tax/planning", s.guard("perencanaan-pajak", s.on((*tenant).handleTaxPlanning)))
 	s.mux.HandleFunc("GET /api/v1/coa", s.guard("", s.on((*tenant).handleCoA)))

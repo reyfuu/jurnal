@@ -479,7 +479,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
                     <td>
                       {stokMulai ? (
                         p.ada_di_stok
-                          ? <span style={{ fontSize: 12 }} title="Dari kartu stok (rata-rata bergerak)">Stok {formatRp(p.hpp_stok)}</span>
+                          ? <span style={{ fontSize: 12 }} title="Dari kartu stok">Stok {formatRp(p.hpp_stok)}</span>
                           : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>dibuat saat produksi pertama</span>
                       ) : !p.ada_di_stok ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>SKU tidak ada di stok</span>

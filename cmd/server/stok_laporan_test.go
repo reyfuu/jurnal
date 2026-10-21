@@ -21,13 +21,19 @@ type coaRingkas struct {
 }
 
 func TestKartuStok_MasukLaporanKeuangan(t *testing.T) {
-	for _, metode := range []string{"periodik", "perpetual"} {
-		t.Run(metode, func(t *testing.T) {
+	// HPP stok 2,5 kg: rata-rata @225rb = 562.500; FIFO dari lapis stok awal @200rb = 500.000.
+	type harap struct{ hppStok, persediaan int64 }
+	nilai := map[string]harap{finance.MetodeRataRata: {562_500, 3_937_500}, finance.MetodeFIFO: {500_000, 4_000_000}}
+	for _, kasus := range []struct{ metode, stok string }{
+		{"periodik", finance.MetodeRataRata}, {"perpetual", finance.MetodeRataRata}, {"periodik", finance.MetodeFIFO}, {"perpetual", finance.MetodeFIFO},
+	} {
+		metode, h := kasus.metode, nilai[kasus.stok]
+		t.Run(metode+"/"+kasus.stok, func(t *testing.T) {
 			t.Setenv("DATA_DIR", t.TempDir())
 			srv := NewServer()
 			qa := register(t, srv, registerBody)
 			aktifkan(t, srv, qa)
-			if rec := do(srv, qa, http.MethodPut, "/api/v1/business", strings.Replace(dagangCV, "periodik", metode, 1)); rec.Code != http.StatusOK {
+			if rec := do(srv, qa, http.MethodPut, "/api/v1/business", strings.Replace(strings.Replace(dagangCV, "periodik", metode, 1), "{", `{"metode_nilai_stok":"`+kasus.stok+`",`, 1)); rec.Code != http.StatusOK {
 				t.Fatalf("profil: %d %s", rec.Code, rec.Body)
 			}
 			kopi := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kopi","kategori":"Barang","satuan":"kg","harga_pokok":200000}`)
@@ -42,23 +48,23 @@ func TestKartuStok_MasukLaporanKeuangan(t *testing.T) {
 			}
 
 			is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
-			// HPP = modal 2,5 kg @225rb (562.500) + belanja tanpa barang 300rb; pembelian 2,5 jt masuk persediaan.
-			if is.COGS != 862_500 || is.HPPStok == nil || is.NetProfit != 3_000_000-862_500 {
+			// HPP = modal 2,5 kg + belanja tanpa barang 300rb; pembelian 2,5 jt masuk persediaan.
+			if is.COGS != h.hppStok+300_000 || is.HPPStok == nil || is.NetProfit != 3_000_000-h.hppStok-300_000 {
 				t.Fatalf("laba rugi: hpp %d laba %d rincian %+v", is.COGS, is.NetProfit, is.HPPStok)
 			}
 			bs := getJSON[finance.BalanceSheet](t, srv, qa, "/api/v1/reports/balance-sheet?period=2026-01")
-			if bs.Assets.Inventory != 3_937_500 || !bs.IsBalanced {
+			if bs.Assets.Inventory != h.persediaan || !bs.IsBalanced {
 				t.Errorf("neraca %+v", bs)
 			}
 			cf := getJSON[finance.CashFlow](t, srv, qa, "/api/v1/reports/cashflow?period=2026-01")
-			if cf.OperasiLangsung.Net != cf.OperasiTidakLangsung.Net || cf.KenaikanPersediaan != 1_937_500 {
+			if cf.OperasiLangsung.Net != cf.OperasiTidakLangsung.Net || cf.KenaikanPersediaan != h.persediaan-2_000_000 {
 				t.Errorf("arus kas langsung %d tidak langsung %d", cf.OperasiLangsung.Net, cf.OperasiTidakLangsung.Net)
 			}
 			c := getJSON[coaRingkas](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
 			if c.IncomeStatement.LabaBersih != is.NetProfit || c.IncomeStatement.HPP != is.COGS || !c.BalanceSheet.Seimbang {
 				t.Errorf("laporan CoA %s: %+v (laba sederhana %d)", metode, c, is.NetProfit)
 			}
-			if metode == "periodik" && c.IncomeStatement.PersediaanAkhir != 3_937_500 {
+			if metode == "periodik" && c.IncomeStatement.PersediaanAkhir != h.persediaan {
 				t.Errorf("persediaan akhir CoA %d", c.IncomeStatement.PersediaanAkhir)
 			}
 		})

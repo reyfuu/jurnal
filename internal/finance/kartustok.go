@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-// Kartu stok: riwayat pergerakan tiap barang dan nilainya dengan metode rata-rata bergerak.
+// Kartu stok: riwayat pergerakan tiap barang dan nilainya dengan metode FIFO atau rata-rata
+// bergerak (pilihan usaha).
 //
 // Sumbernya dua: transaksi yang memilih barang (Beli Bahan / Stok menambah, Penjualan
 // mengurangi) dan dokumen stok (stok awal = titik nol, stok opname, produksi). Kartu tidak
@@ -79,7 +80,8 @@ type PosisiStok struct {
 }
 
 type KartuStok struct {
-	Mulai  string             `json:"mulai"` // tanggal titik nol; kosong = kartu stok belum dimulai
+	Mulai  string             `json:"mulai"`  // tanggal titik nol; kosong = kartu stok belum dimulai
+	Metode string             `json:"metode"` // fifo | rata_rata
 	Baris  []BarisKartu       `json:"baris"`
 	Posisi map[int]PosisiStok `json:"-"`
 }
@@ -91,16 +93,235 @@ type kejadian struct {
 	jalan   func()
 }
 
+// Metode penilaian persediaan (Pasal 10 ayat 6 UU PPh): FIFO atau rata-rata. Dipilih sekali
+// per usaha (BusinessProfile.MetodeNilaiStok); pergantian butuh persetujuan DJP.
+const (
+	MetodeFIFO     = "fifo"
+	MetodeRataRata = "rata_rata"
+)
+
+// penilai menyimpan saldo tiap barang dan menilai barang masuk/keluar menurut metodenya.
+type penilai interface {
+	// awal menimpa saldo barang dengan hasil hitung fisik pertama.
+	awal(id int, qty, nilai int64)
+	// masuk menambah stok; mengembalikan koreksi nilai bila stok sebelumnya minus.
+	masuk(id int, q, biaya int64) int64
+	// keluar mengurangi stok; mengembalikan nilai yang keluar (positif).
+	keluar(id int, q int64) int64
+	// hargaTambah: nilai q unit lebih (opname) — harga pokok terakhir yang diketahui.
+	hargaTambah(id int, q int64) int64
+	posisi(id int) (qty, nilai int64)
+	ids() []int
+}
+
+// NamaMetodeStok: label metode untuk laporan & ekspor.
+func NamaMetodeStok(m string) string {
+	if m == MetodeFIFO {
+		return "FIFO"
+	}
+	return "rata-rata bergerak"
+}
+
+func penilaiUntuk(metode string, harga map[int]int64) penilai {
+	if metode == MetodeFIFO {
+		return &penilaiFIFO{harga: harga, st: map[int]*itemFIFO{}}
+	}
+	return &penilaiRata{harga: harga, st: map[int]*nilaiItem{}}
+}
+
+// --- Rata-rata bergerak ---
+
 type nilaiItem struct {
 	qty, nilai int64
 	// rata-rata terakhir saat stok masih positif, untuk menilai barang keluar saat stok habis
 	akhirQty, akhirNilai int64
 }
 
-// HitungKartu menghitung kartu stok dari stok awal (titik nol), transaksi bertanda barang,
-// stok opname, dan produksi.
+type penilaiRata struct {
+	harga map[int]int64
+	st    map[int]*nilaiItem
+}
+
+func (p *penilaiRata) item(id int) *nilaiItem {
+	if p.st[id] == nil {
+		p.st[id] = &nilaiItem{}
+	}
+	return p.st[id]
+}
+
+func (p *penilaiRata) ingat(v *nilaiItem) {
+	if v.qty > 0 {
+		v.akhirQty, v.akhirNilai = v.qty, v.nilai
+	}
+}
+
+func (p *penilaiRata) awal(id int, qty, nilai int64) {
+	v := p.item(id)
+	v.qty, v.nilai = qty, nilai
+	p.ingat(v)
+}
+
+func (p *penilaiRata) hargaTambah(id int, q int64) int64 {
+	v := p.item(id)
+	switch {
+	case v.qty > 0:
+		return mulDiv(v.nilai, q, v.qty)
+	case v.akhirQty > 0:
+		return mulDiv(v.akhirNilai, q, v.akhirQty)
+	}
+	return mulDiv(p.harga[id], q, TakaranSkala)
+}
+
+func (p *penilaiRata) keluar(id int, q int64) int64 {
+	v := p.item(id)
+	biaya := p.hargaTambah(id, q)
+	v.qty -= q
+	v.nilai -= biaya
+	p.ingat(v)
+	return biaya
+}
+
+func (p *penilaiRata) masuk(id int, q, biaya int64) int64 {
+	v := p.item(id)
+	sebelum := v.qty
+	v.qty += q
+	v.nilai += biaya
+	var koreksi int64
+	if sebelum < 0 && v.qty > 0 {
+		benar := mulDiv(biaya, v.qty, q)
+		koreksi = benar - v.nilai
+		v.nilai = benar
+	}
+	p.ingat(v)
+	return koreksi
+}
+
+func (p *penilaiRata) posisi(id int) (int64, int64) { v := p.item(id); return v.qty, v.nilai }
+
+func (p *penilaiRata) ids() []int {
+	out := make([]int, 0, len(p.st))
+	for id := range p.st {
+		out = append(out, id)
+	}
+	return out
+}
+
+// --- FIFO: barang yang masuk lebih dulu keluar lebih dulu ---
+
+type lapisFIFO struct{ qty, nilai int64 }
+
+type itemFIFO struct {
+	lapis []lapisFIFO
+	// kurangQty/kurangNilai: stok minus (keluar melebihi saldo) dan nilai yang sudah dibebankan
+	// untuknya; dibereskan oleh barang masuk berikutnya (selisihnya jadi koreksi).
+	kurangQty, kurangNilai int64
+	// harga pokok per unit terakhir (qty, nilai) untuk menilai stok minus & lebih opname
+	akhirQty, akhirNilai int64
+}
+
+type penilaiFIFO struct {
+	harga map[int]int64
+	st    map[int]*itemFIFO
+}
+
+func (p *penilaiFIFO) item(id int) *itemFIFO {
+	if p.st[id] == nil {
+		p.st[id] = &itemFIFO{}
+	}
+	return p.st[id]
+}
+
+func (p *penilaiFIFO) awal(id int, qty, nilai int64) {
+	v := p.item(id)
+	*v = itemFIFO{}
+	if qty > 0 {
+		v.lapis = []lapisFIFO{{qty, nilai}}
+		v.akhirQty, v.akhirNilai = qty, nilai
+	}
+}
+
+func (p *penilaiFIFO) hargaTambah(id int, q int64) int64 {
+	if v := p.item(id); v.akhirQty > 0 {
+		return mulDiv(v.akhirNilai, q, v.akhirQty)
+	}
+	return mulDiv(p.harga[id], q, TakaranSkala)
+}
+
+func (p *penilaiFIFO) keluar(id int, q int64) int64 {
+	v := p.item(id)
+	var biaya int64
+	for q > 0 && len(v.lapis) > 0 {
+		l := &v.lapis[0]
+		if l.qty <= q {
+			biaya += l.nilai
+			q -= l.qty
+			v.lapis = v.lapis[1:]
+			continue
+		}
+		n := mulDiv(l.nilai, q, l.qty)
+		l.qty -= q
+		l.nilai -= n
+		biaya += n
+		q = 0
+	}
+	if q > 0 { // stok habis: sisanya dinilai harga pokok terakhir sampai barang masuk lagi
+		n := p.hargaTambah(id, q)
+		v.kurangQty += q
+		v.kurangNilai += n
+		biaya += n
+	}
+	return biaya
+}
+
+func (p *penilaiFIFO) masuk(id int, q, biaya int64) int64 {
+	v := p.item(id)
+	v.akhirQty, v.akhirNilai = q, biaya
+	var koreksi int64
+	if v.kurangQty > 0 {
+		tutup := min(q, v.kurangQty)
+		sebenarnya := mulDiv(biaya, tutup, q)
+		dibebankan := mulDiv(v.kurangNilai, tutup, v.kurangQty)
+		koreksi = dibebankan - sebenarnya
+		v.kurangQty -= tutup
+		v.kurangNilai -= dibebankan
+		q -= tutup
+		biaya -= sebenarnya
+	}
+	if q > 0 {
+		v.lapis = append(v.lapis, lapisFIFO{q, biaya})
+	}
+	return koreksi
+}
+
+func (p *penilaiFIFO) posisi(id int) (qty, nilai int64) {
+	v := p.item(id)
+	for _, l := range v.lapis {
+		qty += l.qty
+		nilai += l.nilai
+	}
+	return qty - v.kurangQty, nilai - v.kurangNilai
+}
+
+func (p *penilaiFIFO) ids() []int {
+	out := make([]int, 0, len(p.st))
+	for id := range p.st {
+		out = append(out, id)
+	}
+	return out
+}
+
+// HitungKartu menghitung kartu stok dengan rata-rata bergerak (lihat HitungKartuMetode).
 func HitungKartu(stok []StokItem, txs []Transaction, gerak []GerakStok) KartuStok {
-	k := KartuStok{Posisi: map[int]PosisiStok{}}
+	return HitungKartuMetode(MetodeRataRata, stok, txs, gerak)
+}
+
+// HitungKartuMetode menghitung kartu stok dari stok awal (titik nol), transaksi bertanda barang,
+// stok opname, dan produksi, dengan metode penilaian FIFO atau rata-rata bergerak.
+func HitungKartuMetode(metode string, stok []StokItem, txs []Transaction, gerak []GerakStok) KartuStok {
+	k := KartuStok{Posisi: map[int]PosisiStok{}, Metode: metode}
+	if metode != MetodeFIFO {
+		k.Metode = MetodeRataRata
+	}
 	awal := -1
 	for i, g := range gerak {
 		if g.Jenis == GerakAwal && (awal < 0 || g.Tanggal < gerak[awal].Tanggal) {
@@ -116,61 +337,13 @@ func HitungKartu(stok []StokItem, txs []Transaction, gerak []GerakStok) KartuSto
 	for _, s := range stok {
 		harga[s.ID] = s.HargaPokok
 	}
-	st := map[int]*nilaiItem{}
-	item := func(id int) *nilaiItem {
-		if st[id] == nil {
-			st[id] = &nilaiItem{}
-		}
-		return st[id]
-	}
+	nilai := penilaiUntuk(k.Metode, harga)
 	catat := func(b BarisKartu) {
-		v := item(b.StokID)
-		b.SaldoQty, b.SaldoNilai, b.Minus = v.qty, v.nilai, v.qty < 0
-		if v.qty > 0 {
-			v.akhirQty, v.akhirNilai = v.qty, v.nilai
-		}
+		b.SaldoQty, b.SaldoNilai = nilai.posisi(b.StokID)
+		b.Minus = b.SaldoQty < 0
 		k.Baris = append(k.Baris, b)
 	}
-	// keluar mengurangi stok dengan nilai rata-rata; mengembalikan nilai yang keluar (positif).
-	keluar := func(id int, q int64) int64 {
-		v := item(id)
-		var biaya int64
-		switch {
-		case v.qty > 0:
-			biaya = mulDiv(v.nilai, q, v.qty)
-		case v.akhirQty > 0:
-			biaya = mulDiv(v.akhirNilai, q, v.akhirQty)
-		default:
-			biaya = mulDiv(harga[id], q, TakaranSkala)
-		}
-		v.qty -= q
-		v.nilai -= biaya
-		return biaya
-	}
-	// masuk menambah stok; mengembalikan koreksi nilai bila stok sebelumnya minus.
-	masuk := func(id int, q, biaya int64) int64 {
-		v := item(id)
-		sebelum := v.qty
-		v.qty += q
-		v.nilai += biaya
-		if sebelum < 0 && v.qty > 0 {
-			benar := mulDiv(biaya, v.qty, q)
-			koreksi := benar - v.nilai
-			v.nilai = benar
-			return koreksi
-		}
-		return 0
-	}
-	rata := func(id int, q int64) int64 { // nilai q unit pada rata-rata saat ini
-		v := item(id)
-		switch {
-		case v.qty > 0:
-			return mulDiv(v.nilai, q, v.qty)
-		case v.akhirQty > 0:
-			return mulDiv(v.akhirNilai, q, v.akhirQty)
-		}
-		return mulDiv(harga[id], q, TakaranSkala)
-	}
+	keluar, masuk, rata := nilai.keluar, nilai.masuk, nilai.hargaTambah
 
 	var ev []kejadian
 	for _, g := range gerak {
@@ -182,9 +355,9 @@ func HitungKartu(stok []StokItem, txs []Transaction, gerak []GerakStok) KartuSto
 		case GerakAwal:
 			ev = append(ev, kejadian{g.Tanggal, 0, g.ID, func() {
 				for _, b := range g.Baris {
-					v := item(b.StokID)
-					v.qty, v.nilai = b.Fisik, mulDiv(b.Fisik, b.HargaUnit, TakaranSkala)
-					catat(BarisKartu{Tanggal: g.Tanggal, StokID: b.StokID, Jenis: KartuAwal, GerakID: g.ID, Keterangan: "Stok awal (titik nol)", Qty: b.Fisik, Nilai: v.nilai})
+					n := mulDiv(b.Fisik, b.HargaUnit, TakaranSkala)
+					nilai.awal(b.StokID, b.Fisik, n)
+					catat(BarisKartu{Tanggal: g.Tanggal, StokID: b.StokID, Jenis: KartuAwal, GerakID: g.ID, Keterangan: "Stok awal (titik nol)", Qty: b.Fisik, Nilai: n})
 				}
 			}})
 		case GerakProduksi:
@@ -217,8 +390,8 @@ func HitungKartu(stok []StokItem, txs []Transaction, gerak []GerakStok) KartuSto
 		case GerakOpname:
 			ev = append(ev, kejadian{g.Tanggal, 4, g.ID, func() {
 				for _, b := range g.Baris {
-					v := item(b.StokID)
-					selisih := b.Fisik - v.qty
+					qty, _ := nilai.posisi(b.StokID)
+					selisih := b.Fisik - qty
 					var nilai, kor int64
 					switch {
 					case selisih < 0:
@@ -256,8 +429,9 @@ func HitungKartu(stok []StokItem, txs []Transaction, gerak []GerakStok) KartuSto
 	for _, e := range ev {
 		e.jalan()
 	}
-	for id, v := range st {
-		k.Posisi[id] = PosisiStok{Qty: v.qty, Nilai: v.nilai}
+	for _, id := range nilai.ids() {
+		q, n := nilai.posisi(id)
+		k.Posisi[id] = PosisiStok{Qty: q, Nilai: n}
 	}
 	return k
 }

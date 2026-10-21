@@ -492,8 +492,8 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
                 className="input-field tabular" placeholder="0" {...angka(form.stok_min, (n) => setForm({ ...form, stok_min: n }))}
               />
             </label>
-            <label title={editDilacak ? 'Harga pokok rata-rata dihitung dari pembelian & produksi' : undefined}>
-              <span className="kpi-label">Harga Pokok / Satuan{editDilacak ? ' (rata-rata)' : ''}</span>
+            <label title={editDilacak ? 'Harga pokok dihitung dari kartu stok (pembelian & produksi)' : undefined}>
+              <span className="kpi-label">Harga Pokok / Satuan{editDilacak ? ' (dari kartu stok)' : ''}</span>
               <input
                 className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
               />

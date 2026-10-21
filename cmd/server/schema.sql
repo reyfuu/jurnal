@@ -388,6 +388,7 @@ $$;
 
 -- Metode penyusutan usaha (Okt 2026): dipilih sekali untuk semua aset, lalu terkunci.
 ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS metode_penyusutan TEXT;
+ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS metode_nilai_stok TEXT;
 
 -- Kelola data Panel Master (Okt 2026): usaha diarsipkan (soft delete) — user-nya tidak bisa masuk.
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS arsip TIMESTAMPTZ;
