@@ -131,7 +131,7 @@ type Asset struct {
 	// "Beli Alat / Aset" dibuat & dijaga otomatis), SumberModal (barang setoran pemilik).
 	// Kosong = belum dipilih (data lama / impor), sementara dicatat sebagai tambahan modal.
 	SumberDana string `json:"sumber_dana,omitempty"`
-	Keterangan       string `json:"keterangan,omitempty"`
+	Keterangan string `json:"keterangan,omitempty"`
 }
 
 func KelompokOf(id string) (KelompokAset, bool) {
