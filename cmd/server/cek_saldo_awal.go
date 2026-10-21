@@ -26,6 +26,15 @@ type cekKecocokan struct {
 	Langkah      string `json:"langkah"` // kode Langkah memulai yang terkait
 }
 
+// pembandingPersediaanLocked: nilai persediaan yang seharusnya ada di saldo awal — hitung fisik
+// pertama kartu stok bila sudah dimulai, selain itu nilai daftar barang. s.mu dipegang.
+func (s *tenant) pembandingPersediaanLocked() (int64, string) {
+	if k := s.kartuLocked(); k.Mulai != "" {
+		return k.Periode(k.Mulai[:7]).PersediaanAwal, "Nilai hitung fisik pertama " + finance.FormatTanggalID(k.Mulai)
+	}
+	return finance.SummarizeStok(s.stok).NilaiPersediaan, "Nilai daftar barang (jumlah × harga pokok)"
+}
+
 // cekSaldoAwalLocked: pemanggil memegang s.mu. Kosong bila saldo awal belum diisi.
 func (s *tenant) cekSaldoAwalLocked() []cekKecocokan {
 	if s.opening == nil {
@@ -39,7 +48,7 @@ func (s *tenant) cekSaldoAwalLocked() []cekKecocokan {
 	// lama tanpa baris aset tetap memakai nilai buku daftar aset langsung.
 	nbv := finance.AssetsForPeriod(s.assets, s.txs, ob.Period()).NilaiBukuAwal
 	c := cekKecocokan{Kode: "aset", Judul: "Aset tetap = daftar aset", SaldoAwal: ob.AsetTetap, Pembanding: nbv,
-		LabelBanding: "Nilai buku daftar aset per " + finance.FormatTanggalID(ob.Tanggal), View: "laporan-keuangan", Langkah: "saldo"}
+		LabelBanding: "Nilai buku daftar aset per " + finance.FormatTanggalID(ob.Tanggal), View: "saldo-awal", Langkah: "aset"}
 	switch {
 	case len(ob.Rincian) == 0 && ob.AsetTetap == 0:
 		c.Status, c.SaldoAwal = "info", nbv
@@ -56,15 +65,10 @@ func (s *tenant) cekSaldoAwalLocked() []cekKecocokan {
 	// Persediaan: dengan kartu stok dibandingkan dengan hitung fisik pertama (titik nol),
 	// tanpa kartu stok dengan nilai daftar barang di Stok & Gudang.
 	k := s.kartuLocked()
-	c = cekKecocokan{Kode: "persediaan", Judul: "Persediaan = daftar barang", SaldoAwal: ob.Persediaan, View: "stok-gudang"}
+	c = cekKecocokan{Kode: "persediaan", Judul: "Persediaan = daftar barang", SaldoAwal: ob.Persediaan, View: "stok-gudang", Langkah: "barang"}
+	c.Pembanding, c.LabelBanding = s.pembandingPersediaanLocked()
 	if k.Mulai != "" {
 		c.Judul, c.Langkah = "Persediaan = hitung fisik pertama (kartu stok)", "kartu"
-		c.Pembanding = k.Periode(k.Mulai[:7]).PersediaanAwal
-		c.LabelBanding = "Nilai hitung fisik pertama " + finance.FormatTanggalID(k.Mulai)
-	} else {
-		c.Langkah = "barang"
-		c.Pembanding = finance.SummarizeStok(s.stok).NilaiPersediaan
-		c.LabelBanding = "Nilai daftar barang (jumlah × harga pokok)"
 	}
 	switch {
 	case ob.Persediaan == 0 && c.Pembanding == 0:

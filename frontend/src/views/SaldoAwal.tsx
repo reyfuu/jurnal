@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Info, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Info, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
-import { getCekSaldoAwal, getOpening, saveOpening, type CekKecocokan, type KategoriSaldo, type OpeningBalance, type OpeningInfo, type SaldoAkun, type View } from '@/lib/api'
+import { Aset } from '@/views/Aset'
+import {
+  getAssets, getCekSaldoAwal, getOpening, saranSaldo, saveOpening,
+  type AssetSummary, type CekKecocokan, type KategoriSaldo, type OpeningBalance, type OpeningInfo, type SaldoAkun, type SaranSaldo, type View,
+} from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
+const AMBER = 'var(--accent-amber)'
+
+// Baris layar: _k kunci baris; _baru = ditambah pengguna (dapat saran kategori & kode);
+// _katManual / _kodeAuto menjaga pilihan pengguna tidak tertimpa saran.
+type Baris = SaldoAkun & { _k: number; _baru?: boolean; _katManual?: boolean; _kodeAuto?: boolean; _saran?: SaranSaldo }
+let urut = 0
+const jadiBaris = (b: SaldoAkun, extra: Partial<Baris> = {}): Baris => ({ ...b, ...extra, _k: ++urut })
+const bersih = (b: SaldoAkun): SaldoAkun => ({ kode: b.kode, nama: b.nama, kategori: b.kategori, nominal: b.nominal, keterangan: b.keterangan })
 
 // Saldo awal lama (tanpa rincian): pos-posnya dijadikan baris supaya bisa diedit per akun.
+// Aset tetap tidak termasuk: barisnya selalu datang dari daftar aset.
 function dariPos(o: OpeningBalance, nbv: number): SaldoAkun[] {
   const baris: SaldoAkun[] = [
     { kode: '1101', nama: 'Kas & Bank', kategori: 'kas', nominal: o.kas },
     { kode: '1201', nama: 'Piutang Usaha', kategori: 'piutang', nominal: o.piutang },
     { kode: '1301', nama: 'Persediaan', kategori: 'persediaan', nominal: o.persediaan },
-    { kode: '', nama: 'Aset tetap (nilai buku, dari daftar aset)', kategori: 'aset_tetap', nominal: nbv },
     { kode: '2101', nama: 'Hutang Usaha', kategori: 'utang', nominal: o.utang },
     { kode: '2102', nama: 'Hutang Bank', kategori: 'pinjaman', nominal: o.pinjaman },
   ]
@@ -22,60 +34,122 @@ function dariPos(o: OpeningBalance, nbv: number): SaldoAkun[] {
   return [...baris, { kode: '3101', nama: 'Modal Pemilik', kategori: 'modal', nominal: modal }]
 }
 
-/** Menu Saldo Awal: neraca pembukaan per akun; hanya bisa disimpan bila Harta = Kewajiban + Modal. */
+const bulanIni = () => new Date().toISOString().slice(0, 7)
+
+/**
+ * Menu Saldo Awal, berurutan: 1. aset tetap (daftar aset), 2. barang & persediaan, 3. neraca
+ * pembukaan per akun — hanya bisa disimpan bila Harta = Kewajiban + Modal.
+ */
 export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => void; navigate: (v: View, tab?: string) => void; bisaUbah: boolean }) {
   const [info, setInfo] = useState<OpeningInfo | null>(null)
   const [tanggal, setTanggal] = useState('')
-  const [baris, setBaris] = useState<SaldoAkun[] | null>(null)
-  const [nbv, setNbv] = useState(0)
+  const [baris, setBaris] = useState<Baris[] | null>(null)
+  const [asetEdit, setAsetEdit] = useState<SaldoAkun[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-
   const [cek, setCek] = useState<CekKecocokan[]>([])
+  const [bukaAset, setBukaAset] = useState(false)
+  const [asetData, setAsetData] = useState<AssetSummary | null>(null)
+  const [versiAset, setVersiAset] = useState(0)
+  const kartuAset = useRef<HTMLDivElement>(null)
+  const timer = useRef<Record<number, number>>({})
 
   useEffect(() => {
     getOpening().then(setInfo, (e: Error) => setError(e.message))
-  }, [])
-  // Diperiksa ulang tiap saldo awal tersimpan, supaya selisih yang baru terlihat langsung.
+  }, [versiAset])
+  // Diperiksa ulang tiap saldo awal / daftar aset berubah, supaya selisih baru langsung terlihat.
   useEffect(() => { getCekSaldoAwal().then(setCek, () => setCek([])) }, [info])
 
+  const editing = baris !== null
   // Nilai buku aset mengikuti tanggal mulai yang dipilih (aset dibeli sebelum tanggal itu).
   useEffect(() => {
-    if (!baris || tanggal.length !== 10) return
+    if (!editing || tanggal.length !== 10) return
     let hidup = true
-    getOpening(tanggal).then((i) => { if (hidup) setNbv(i.nilai_buku_aset) }, () => {})
+    getOpening(tanggal).then((i) => { if (hidup) setAsetEdit(i.aset_tetap ?? []) }, () => {})
     return () => { hidup = false }
-  }, [tanggal, baris === null]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tanggal, editing, versiAset])
+
+  const o = info?.opening
+  const periodAset = (tanggal || o?.tanggal || '').slice(0, 7) || bulanIni()
+  useEffect(() => {
+    if (!bukaAset) return
+    let hidup = true
+    getAssets(periodAset).then((d) => { if (hidup) setAsetData(d) }, (e: Error) => setError(e.message))
+    return () => { hidup = false }
+  }, [bukaAset, periodAset, versiAset])
 
   const kategori: KategoriSaldo[] = info?.kategori ?? []
   const sisi = (id: string) => kategori.find((k) => k.id === id)?.sisi
-  // Baris aset tetap selalu = nilai buku daftar aset; tidak diketik bebas.
-  const isi = (baris ?? []).map((b) => (b.kategori === 'aset_tetap' ? { ...b, nominal: nbv } : b))
-  const jumlah = (s: string) => isi.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
+  const asetRows: SaldoAkun[] = ((editing ? asetEdit : info?.aset_tetap) ?? [])
+  const nbv = asetRows.reduce((t, r) => t + r.nominal, 0)
+  // Baris aset tetap disisipkan sesudah harta lain, sebelum kewajiban.
+  const biasa = baris ?? []
+  const pos = biasa.findIndex((b) => b.kategori && sisi(b.kategori) !== 'harta')
+  const tampil: (Baris | (SaldoAkun & { _k: -1 }))[] = [
+    ...biasa.slice(0, pos < 0 ? biasa.length : pos),
+    ...asetRows.map((r) => ({ ...r, _k: -1 as const })),
+    ...(pos < 0 ? [] : biasa.slice(pos)),
+  ]
+  const jumlah = (s: string) => tampil.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
   const harta = jumlah('harta'), kewajiban = jumlah('kewajiban'), modal = jumlah('modal')
   const selisih = harta - kewajiban - modal
-  const adaAsetTetap = isi.some((b) => b.kategori === 'aset_tetap')
+  const tanpaKategori = biasa.filter((b) => (b.nama.trim() || b.nominal) && !b.kategori)
+  const totalPersediaan = biasa.filter((b) => b.kategori === 'persediaan').reduce((t, b) => t + (b.nominal || 0), 0)
+  const nilaiBarang = info?.persediaan ?? 0
 
   function mulaiUbah() {
     if (!info) return
-    const o = info.opening
     setTanggal(o?.tanggal ?? info.transaksi_pertama ?? '')
-    setNbv(info.nilai_buku_aset)
-    setBaris(o?.rincian?.length ? o.rincian.map((r) => ({ ...r }))
-      : o ? dariPos(o, info.nilai_buku_aset)
-      : info.akun_template.map((a) => ({ ...a, nominal: 0 })))
+    setAsetEdit(info.aset_tetap ?? [])
+    const awal = o?.rincian?.length ? o.rincian : o ? dariPos(o, info.nilai_buku_aset) : info.akun_template.map((a) => ({ ...a, nominal: 0 }))
+    const rows = awal.filter((r) => r.kategori !== 'aset_tetap').map((r) => jadiBaris({ ...r }))
+    // Saldo awal baru: persediaan langsung diisi dari daftar barang, bukan diketik ulang.
+    const p = rows.find((r) => r.kategori === 'persediaan')
+    if (!o && p && nilaiBarang > 0) {
+      p.nominal = nilaiBarang
+      p.keterangan = info.label_persediaan
+    }
+    setBaris(rows)
     setError('')
   }
 
-  const ubah = (i: number, patch: Partial<SaldoAkun>) => setBaris((bs) => bs!.map((b, j) => (j === i ? { ...b, ...patch } : b)))
+  const ubah = (k: number, patch: Partial<Baris>) => setBaris((bs) => bs && bs.map((b) => (b._k === k ? { ...b, ...patch } : b)))
+
+  // Saran kategori & kode dari server (akun CoA yang cocok → AI → kata kunci). Ketikan dijeda
+  // sebentar supaya tidak meminta saran tiap huruf.
+  function mintaSaran(b: Baris, nama: string, pilihKategori?: string) {
+    window.clearTimeout(timer.current[b._k])
+    const dipakai = biasa.filter((x) => x._k !== b._k && x.kode).map((x) => x.kode!)
+    timer.current[b._k] = window.setTimeout(() => {
+      saranSaldo({ nama, kategori: pilihKategori, dipakai }).then((s) => {
+        setBaris((bs) => bs && bs.map((x) => {
+          if (x._k !== b._k || x.nama !== nama) return x // ketikan sudah berubah
+          const p: Partial<Baris> = { _saran: s }
+          if (s.kategori && s.kategori !== 'aset_tetap' && !x._katManual) p.kategori = s.kategori
+          if (s.kode && (!x.kode || x._kodeAuto)) { p.kode = s.kode; p._kodeAuto = true }
+          return { ...x, ...p }
+        }))
+      }, () => { /* saran gagal: kategori dipilih sendiri */ })
+    }, pilihKategori ? 0 : 600)
+  }
+
+  function lihatAset() {
+    setBukaAset(true)
+    kartuAset.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function asetBerubah() {
+    setVersiAset((v) => v + 1)
+    onChanged()
+  }
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
-    if (!baris || selisih !== 0) return
+    if (!baris || selisih !== 0 || tanpaKategori.length) return
     setBusy(true)
     setError('')
     try {
-      const rincian = isi.filter((b) => b.nama.trim() || b.nominal)
+      const rincian = tampil.filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
       const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian })
       setInfo(res)
       setBaris(null)
@@ -88,26 +162,62 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   }
 
   const pertama = info?.transaksi_pertama
-  const o = info?.opening
+  const tampilSimpan = o ? (o.rincian?.length ? o.rincian : [...dariPos(o, info!.nilai_buku_aset), ...(info?.aset_tetap ?? [])]) : []
 
   return (
     <>
       <PageHeader title="Saldo Awal" subtitle="Neraca pembukaan: posisi usaha di hari pertama memakai aplikasi. Diisi sekali; bulan berikutnya terbentuk sendiri dari transaksi." />
 
       <div className="note-box" style={{ marginTop: 0, marginBottom: 14 }}>
-        Isi per akun: <strong>apa yang dimiliki (Harta)</strong>, <strong>yang masih harus dibayar (Kewajiban)</strong>, dan <strong>modal pemilik</strong>.
-        Saldo awal baru bisa disimpan bila <strong>Harta = Kewajiban + Modal</strong>, supaya selisihnya tidak terbawa ke semua laporan.
-        Akun yang belum ada bisa ditambah sebagai baris baru. Aset tetap diambil dari{' '}
-        <button type="button" className="underline underline-offset-4" onClick={() => navigate('laporan-keuangan', 'aset')}>daftar aset</button> (nilai buku per tanggal mulai).
-        Banyak akun sekaligus bisa diisi lewat template Excel di <strong>Impor Data Awal</strong>.
+        Urutannya: <strong>1. daftarkan aset tetap</strong>, <strong>2. daftarkan barang</strong>, lalu <strong>3. isi neraca pembukaan</strong>.
+        Nilai buku aset dan nilai persediaan barang otomatis masuk ke saldo awal, jadi tidak diketik dua kali.
+        Saldo awal baru bisa disimpan bila <strong>Harta = Kewajiban + Modal</strong>. Banyak akun sekaligus bisa diisi lewat template Excel di <strong>Impor Data Awal</strong>.
       </div>
 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12, whiteSpace: 'normal' }}>{error}</div>}
 
+      <div ref={kartuAset} className="card" style={{ padding: 20, marginBottom: 14, scrollMarginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div className="chart-title">1. Aset tetap</div>
+            <div className="chart-subtitle">
+              Kendaraan, mesin, peralatan, bangunan yang sudah dimiliki. Nilai bukunya menjadi baris aset tetap di saldo awal, per akun CoA. Tidak punya aset tetap? Lewati langkah ini.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className={'pill-status ' + (info?.jumlah_aset ? 'pill-green' : 'pill-amber')}>
+              {info?.jumlah_aset ? `${info.jumlah_aset} aset · nilai buku ${formatRp(nbv)}` : 'Belum ada aset'}
+            </span>
+            {bisaUbah && (
+              <button type="button" className={bukaAset ? 'nav-item' : 'btn-cta'} style={{ width: 'auto', padding: '8px 16px', fontSize: 13 }} onClick={() => setBukaAset((b) => !b)}>
+                {bukaAset ? 'Tutup daftar aset' : info?.jumlah_aset ? 'Kelola daftar aset' : 'Tambah aset tetap'}
+              </button>
+            )}
+          </div>
+        </div>
+        {bukaAset && (
+          <div style={{ marginTop: 14 }}>
+            {asetData ? <Aset data={asetData} onChanged={asetBerubah} tanggalSaldoAwal={tanggal || o?.tanggal} /> : <p className="text-sm text-muted-foreground">Memuat daftar aset…</p>}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 20, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div className="chart-title">2. Barang &amp; persediaan</div>
+            <div className="chart-subtitle">
+              {info?.label_persediaan ?? 'Nilai daftar barang'}: <strong>{formatRp(nilaiBarang)}</strong>. Angka ini yang dipakai sebagai persediaan di saldo awal.
+            </div>
+          </div>
+          <button type="button" className="nav-item" style={{ width: 'auto', padding: '8px 16px', fontSize: 13 }} onClick={() => navigate('stok-gudang')}>Buka Stok &amp; Gudang</button>
+        </div>
+      </div>
+
       <div className="card" style={{ padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
           <div>
-            <div className="chart-title">Neraca pembukaan</div>
+            <div className="chart-title">3. Neraca pembukaan</div>
             <div className="chart-subtitle">
               {info?.aktif && o ? `Mulai ${formatTanggal(o.tanggal)}.` : 'Belum diisi. Laporan dimulai dari nol di bulan transaksi pertama.'}
             </div>
@@ -127,7 +237,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
             <table className="data-table tabular">
               <thead><tr><th>Akun</th><th>Kategori</th><th style={{ textAlign: 'right' }}>Nominal</th></tr></thead>
               <tbody>
-                {(o.rincian?.length ? o.rincian : dariPos(o, info.nilai_buku_aset)).filter((r) => r.nominal).map((r, i) => (
+                {tampilSimpan.filter((r) => r.nominal).map((r, i) => (
                   <tr key={i}>
                     <td>{r.kode && <span className="text-muted-foreground">{r.kode} </span>}{r.nama}</td>
                     <td>{kategori.find((k) => k.id === r.kategori)?.label ?? r.kategori}</td>
@@ -160,25 +270,66 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                   <tr><th style={{ width: 90 }}>Kode</th><th>Nama akun</th><th style={{ width: 230 }}>Kategori akun</th><th style={{ width: 170, textAlign: 'right' }}>Nominal (Rp)</th><th>Keterangan</th><th style={{ width: 40 }} /></tr>
                 </thead>
                 <tbody>
-                  {isi.map((b, i) => {
-                    const tetap = b.kategori === 'aset_tetap'
+                  {tampil.map((b, i) => {
+                    if (b._k === -1) {
+                      return (
+                        <tr key={`aset-${i}`}>
+                          <td><div className="input-field tabular" style={{ borderStyle: 'dashed' }}>{b.kode}</div></td>
+                          <td><div className="input-field" style={{ borderStyle: 'dashed' }}>{b.nama}</div></td>
+                          <td><div className="input-field" style={{ borderStyle: 'dashed' }}>{kategori.find((k) => k.id === 'aset_tetap')?.label}</div></td>
+                          <td><div className="input-field tabular" style={{ textAlign: 'right', borderStyle: 'dashed' }} title="Dari daftar aset">{formatRp(b.nominal)}</div></td>
+                          <td>
+                            <button type="button" className="text-xs underline underline-offset-4" onClick={lihatAset}>
+                              {b.nominal ? `${b.keterangan ?? 'dari daftar aset'} · ubah di langkah 1` : 'Tambah aset di langkah 1'}
+                            </button>
+                          </td>
+                          <td />
+                        </tr>
+                      )
+                    }
+                    const r = b as Baris
+                    const s = r._saran
                     return (
-                      <tr key={i}>
-                        <td><input className="input-field" aria-label="Kode akun" value={b.kode ?? ''} onChange={(e) => ubah(i, { kode: e.target.value })} /></td>
-                        <td><input className="input-field" aria-label="Nama akun" value={b.nama} onChange={(e) => ubah(i, { nama: e.target.value })} /></td>
+                      <tr key={r._k}>
+                        <td><input className="input-field" aria-label="Kode akun" value={r.kode ?? ''} placeholder="otomatis" onChange={(e) => ubah(r._k, { kode: e.target.value, _kodeAuto: false })} /></td>
                         <td>
-                          <select className="input-field" aria-label="Kategori akun" value={b.kategori} onChange={(e) => ubah(i, { kategori: e.target.value })}>
-                            {kategori.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+                          <input className="input-field" aria-label="Nama akun" value={r.nama} placeholder="mis. Bank BCA, Pinjaman koperasi"
+                            onChange={(e) => {
+                              const nama = e.target.value
+                              ubah(r._k, { nama })
+                              if (r._baru && nama.trim().length >= 3) mintaSaran(r, nama)
+                            }} />
+                          {r._baru && s && (
+                            s.kategori === 'aset_tetap' ? (
+                              <div className="text-xs" style={{ color: AMBER, marginTop: 4 }}>
+                                Ini aset tetap: daftarkan di <button type="button" className="underline underline-offset-4" onClick={lihatAset}>langkah 1 (daftar aset)</button> supaya nilai buku &amp; penyusutannya dihitung, lalu hapus baris ini.
+                              </div>
+                            ) : s.kategori && (
+                              <div className="text-xs text-muted-foreground" style={{ marginTop: 4, display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+                                {s.sumber === 'ai' && <Sparkles size={12} style={{ flexShrink: 0, marginTop: 2, color: 'var(--accent-blue)' }} aria-hidden />}
+                                <span>
+                                  {s.sumber === 'ai' ? `Saran AI${s.alasan ? `: ${s.alasan}` : ''}` : s.sumber === 'coa' ? `Sesuai akun CoA "${s.akun}"` : s.sumber === 'aturan' ? 'Ditebak dari nama akun' : 'Kategori dipilih sendiri'}
+                                  {s.baru && s.kode && ` · kode baru ${s.kode}`}
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </td>
+                        <td>
+                          <select className="input-field" aria-label="Kategori akun" value={r.kategori}
+                            onChange={(e) => {
+                              const kat = e.target.value
+                              ubah(r._k, { kategori: kat, _katManual: true })
+                              if (kat && (!r.kode || r._kodeAuto)) mintaSaran(r, r.nama, kat)
+                            }}>
+                            {!r.kategori && <option value="">Pilih kategori…</option>}
+                            {kategori.filter((k) => k.id !== 'aset_tetap').map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
                           </select>
                         </td>
+                        <td><input className="input-field tabular" style={{ textAlign: 'right' }} aria-label="Nominal" {...angka(r.nominal, (n) => ubah(r._k, { nominal: n }))} /></td>
+                        <td><input className="input-field" aria-label="Keterangan" value={r.keterangan ?? ''} onChange={(e) => ubah(r._k, { keterangan: e.target.value })} /></td>
                         <td>
-                          {tetap
-                            ? <div className="input-field tabular" style={{ textAlign: 'right', borderStyle: 'dashed' }} title="Dari daftar aset">{formatRp(nbv)}</div>
-                            : <input className="input-field tabular" style={{ textAlign: 'right' }} aria-label="Nominal" {...angka(b.nominal, (n) => ubah(i, { nominal: n }))} />}
-                        </td>
-                        <td><input className="input-field" aria-label="Keterangan" value={b.keterangan ?? ''} onChange={(e) => ubah(i, { keterangan: e.target.value })} /></td>
-                        <td>
-                          <button type="button" className="nav-item" style={{ width: 'auto', padding: 6 }} aria-label={`Hapus baris ${b.nama}`} onClick={() => setBaris((bs) => bs!.filter((_, j) => j !== i))}>
+                          <button type="button" className="nav-item" style={{ width: 'auto', padding: 6 }} aria-label={`Hapus baris ${r.nama}`} onClick={() => setBaris((bs) => bs && bs.filter((x) => x._k !== r._k))}>
                             <Trash2 size={14} aria-hidden="true" />
                           </button>
                         </td>
@@ -189,14 +340,10 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
               </table>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="nav-item" style={{ width: 'auto', padding: '7px 12px' }} onClick={() => setBaris((bs) => [...bs!, { kode: '', nama: '', kategori: 'kas', nominal: 0 }])}>
+              <button type="button" className="nav-item" style={{ width: 'auto', padding: '7px 12px' }} onClick={() => setBaris((bs) => [...(bs ?? []), jadiBaris({ kode: '', nama: '', kategori: '', nominal: 0 }, { _baru: true })])}>
                 <Plus size={14} aria-hidden="true" /> Tambah akun
               </button>
-              {!adaAsetTetap && nbv > 0 && (
-                <button type="button" className="nav-item" style={{ width: 'auto', padding: '7px 12px' }} onClick={() => setBaris((bs) => [...bs!, { kode: '', nama: 'Aset tetap (nilai buku, dari daftar aset)', kategori: 'aset_tetap', nominal: nbv }])}>
-                  <Plus size={14} aria-hidden="true" /> Tambah baris aset tetap ({formatRp(nbv)})
-                </button>
-              )}
+              <span className="text-xs text-muted-foreground" style={{ alignSelf: 'center' }}>Ketik nama akunnya; kategori &amp; kode terisi otomatis.</span>
             </div>
 
             <div className="list-rows tabular" style={{ marginTop: 16 }} aria-live="polite">
@@ -212,13 +359,24 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                   {selisih > 0 ? 'Harta lebih besar' : 'Kewajiban + Modal lebih besar'} {formatRp(Math.abs(selisih))}. Periksa kembali angka per akun, atau sesuaikan Modal Pemilik / Laba Ditahan.
                 </p>
               )}
-              {!adaAsetTetap && nbv > 0 && (
-                <p className="text-sm" style={{ color: RED }}>Daftar aset punya nilai buku {formatRp(nbv)} per tanggal ini; tambahkan baris aset tetap supaya ikut dihitung.</p>
+              {totalPersediaan !== nilaiBarang && (
+                <p className="text-sm" style={{ color: AMBER }}>
+                  Persediaan di sini {formatRp(totalPersediaan)}, sedangkan {(info?.label_persediaan ?? 'nilai daftar barang').toLowerCase()} {formatRp(nilaiBarang)}.{' '}
+                  {biasa.some((b) => b.kategori === 'persediaan') && nilaiBarang - totalPersediaan + (biasa.find((b) => b.kategori === 'persediaan')!.nominal || 0) >= 0 && (
+                    <button type="button" className="underline underline-offset-4" onClick={() => {
+                      const p = biasa.find((b) => b.kategori === 'persediaan')!
+                      ubah(p._k, { nominal: (p.nominal || 0) + nilaiBarang - totalPersediaan })
+                    }}>Samakan dengan daftar barang</button>
+                  )}
+                </p>
+              )}
+              {tanpaKategori.length > 0 && (
+                <p className="text-sm" style={{ color: RED }}>Pilih kategori untuk: {tanpaKategori.map((b) => b.nama || 'baris tanpa nama').join(', ')}.</p>
               )}
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy || selisih !== 0 || (!adaAsetTetap && nbv > 0)}>
+              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy || selisih !== 0 || tanpaKategori.length > 0}>
                 {busy ? 'Menyimpan…' : 'Simpan saldo awal'}
               </button>
               <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setBaris(null)}>Batal</button>

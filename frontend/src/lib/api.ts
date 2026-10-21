@@ -923,7 +923,21 @@ export interface OpeningInfo {
   nilai_buku_aset: number
   kategori: KategoriSaldo[]
   akun_template: SaldoAkun[]
+  /** Baris aset tetap per akun CoA dari daftar aset (nilai buku); tidak diketik bebas. */
+  aset_tetap: SaldoAkun[]
+  jumlah_aset: number
+  /** Nilai persediaan yang seharusnya di saldo awal (daftar barang / hitung fisik pertama). */
+  persediaan: number
+  label_persediaan: string
 }
+
+/** Saran kategori & kode untuk nama akun yang diketik di Saldo Awal. */
+export interface SaranSaldo {
+  kategori: string; kode: string; akun?: string; baru: boolean
+  sumber: 'coa' | 'ai' | 'aturan' | 'pilihan' | ''; alasan?: string
+}
+export const saranSaldo = (body: { nama: string; kategori?: string; dipakai: string[] }) =>
+  api<SaranSaldo>('/saldo-awal/saran', { method: 'POST', body })
 
 export interface SheetError {
   sheet: string
