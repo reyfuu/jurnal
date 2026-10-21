@@ -232,6 +232,9 @@ func seedJenis(e LedgerEntry) string {
 
 var bulanSingkat = [...]string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
 
+// FormatTanggalID: "2026-08-05" → "05 Agu 2026".
+func FormatTanggalID(d string) string { return formatTanggal(d) }
+
 func formatTanggal(d string) string {
 	t, err := time.Parse(time.DateOnly, d)
 	if err != nil {

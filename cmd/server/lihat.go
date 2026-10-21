@@ -111,7 +111,7 @@ var namaHalaman = map[string]string{
 	"produksi-supplier": "Produksi & Supplier", "invoice": "Invoice", "simulasi-harga": "Simulasi & Harga",
 	"pajak-umkm": "Pajak UMKM", "kalkulator-pajak": "Kalkulator Pajak", "perencanaan-pajak": "Perencanaan Pajak",
 	"karyawan": "Karyawan", "master-data": "Daftar Akun", "profil-usaha": "Profil Usaha", "pengguna": "Pengguna & Akses",
-	"langganan": "Langganan", "impor-data": "Impor Data Awal", "saldo-awal": "Saldo Awal", "buku-besar": "Buku Besar", "pustaka": "Pustaka Pajak",
+	"langganan": "Langganan", "impor-data": "Impor Data Awal", "saldo-awal": "Saldo Awal", "buku-besar": "Buku Besar", "laporan-transaksi": "Laporan Transaksi", "pustaka": "Pustaka Pajak",
 }
 
 // catatBukaLihat: setiap halaman data klien yang dibuka selama lihat-sebagai tercatat sekali

@@ -2,9 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
-import { bukuBesarXlsxUrl, getBukuBesar, type AkunBukuBesar, type BukuBesar as DataBukuBesar } from '@/lib/api'
+import { bukuBesarXlsxUrl, getBukuBesar, type AkunBukuBesar, type BukuBesar as DataBukuBesar, type FilterBukuBesar } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
+import { pilihanCepat, rentangBulan } from '@/lib/rentang'
 
 const RED = 'var(--text-danger)'
 
@@ -14,17 +15,27 @@ const RED = 'var(--text-danger)'
  * akun, jadi akun kredit (utang, modal, pendapatan) tampil positif seperti di neraca.
  */
 export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: boolean }) {
+  const [f, setF] = useState<FilterBukuBesar>(() => rentangBulan(period))
   const [data, setData] = useState<DataBukuBesar | null>(null)
   const [error, setError] = useState('')
   const [cari, setCari] = useState('')
   const [semua, setSemua] = useState(false)
   const [buka, setBuka] = useState<Set<string>>(new Set())
 
+  // Ganti periode laporan di atas = rentang ikut ke bulan itu (akun yang dipilih tetap).
+  useEffect(() => { setF((x) => ({ ...x, ...rentangBulan(period) })) }, [period])
   useEffect(() => {
+    if (f.dari > f.sampai) { setError('Tanggal sampai tidak boleh sebelum tanggal dari.'); return }
     let hidup = true
-    getBukuBesar(period).then((d) => { if (hidup) { setData(d); setError('') } }, (e: Error) => { if (hidup) setError(e.message) })
+    getBukuBesar(f).then((d) => {
+      if (!hidup) return
+      setData(d)
+      setError('')
+      if (f.akun) setBuka(new Set([f.akun])) // riwayat satu akun: langsung tampil rinciannya
+    }, (e: Error) => { if (hidup) setError(e.message) })
     return () => { hidup = false }
-  }, [period])
+  }, [f])
+  const ubah = (patch: Partial<FilterBukuBesar>) => setF((x) => ({ ...x, ...patch }))
 
   const tampil = useMemo(() => {
     const q = cari.trim().toLowerCase()
@@ -50,16 +61,41 @@ export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: 
     return n
   })
 
-  if (error) return <p className="pill-status pill-red" role="alert">{error}</p>
-  if (!data) return <p className="workspace-subtitle">Memuat buku besar…</p>
+  if (!data) return error ? <p className="pill-status pill-red" role="alert">{error}</p> : <p className="workspace-subtitle">Memuat buku besar…</p>
 
   return (
     <>
-      <PageHeader title="Buku Besar" subtitle={`${data.period_label} · saldo awal, mutasi, dan saldo akhir setiap akun`}>
+      <PageHeader title="Buku Besar" subtitle={`${data.period_label} · saldo awal, mutasi, dan saldo akhir ${f.akun ? 'akun terpilih' : 'setiap akun'}`}>
         {data.supported && bisaEkspor && (
-          <Button variant="outline" onClick={() => void ekspor(bukuBesarXlsxUrl(period))}><FileSpreadsheet aria-hidden="true" /> Ekspor Excel</Button>
+          <Button variant="outline" onClick={() => void ekspor(bukuBesarXlsxUrl(f))}><FileSpreadsheet aria-hidden="true" /> Ekspor Excel</Button>
         )}
       </PageHeader>
+
+      {data.supported && (
+        <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1"><span className="kpi-label">Dari tanggal</span>
+              <input className="input-field" type="date" value={f.dari} max={f.sampai} onChange={(e) => e.target.value && ubah({ dari: e.target.value })} /></label>
+            <label className="grid gap-1"><span className="kpi-label">Sampai tanggal</span>
+              <input className="input-field" type="date" value={f.sampai} min={f.dari} onChange={(e) => e.target.value && ubah({ sampai: e.target.value })} /></label>
+            <label className="grid gap-1" style={{ minWidth: 260 }}><span className="kpi-label">Akun</span>
+              <select className="input-field" value={f.akun ?? ''} onChange={(e) => ubah({ akun: e.target.value || undefined })}>
+                <option value="">Semua akun (gambaran besar)</option>
+                {data.pilihan.map((a) => <option key={a.kode} value={a.kode}>{a.kode} · {a.nama}</option>)}
+              </select></label>
+            <div className="flex flex-wrap gap-1.5">
+              {pilihanCepat(period).map((p) => (
+                <button key={p.label} type="button" className="pill-status" style={{ cursor: 'pointer', outline: f.dari === p.dari && f.sampai === p.sampai ? '1px solid var(--text-brand)' : undefined }}
+                  onClick={() => ubah({ dari: p.dari, sampai: p.sampai })}>{p.label}</button>
+              ))}
+            </div>
+          </div>
+          {error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 10 }}>{error}</p>}
+          <p className="text-xs text-muted-foreground" style={{ marginTop: 8 }}>
+            Rentang lintas bulan: saldo berjalan menyambung, akun pendapatan & beban menjumlah seluruh rentang, dan laba bulan-bulan sebelum tanggal dari sudah masuk Laba Ditahan.
+          </p>
+        </div>
+      )}
 
       {!data.supported ? (
         <div className="card" style={{ padding: 22 }}>
@@ -143,7 +179,7 @@ export function BukuBesar({ period, bisaEkspor }: { period: string; bisaEkspor: 
                     </Fragment>
                   ))}
                   <tr style={{ fontWeight: 700 }}>
-                    <td /><td>Total mutasi bulan ini</td><td />
+                    <td /><td>Total mutasi {f.akun ? 'akun ini' : 'dalam rentang'}</td><td />
                     <td style={{ textAlign: 'right' }}>{formatRp(data.total_debit)}</td>
                     <td style={{ textAlign: 'right' }}>{formatRp(data.total_kredit)}</td><td />
                   </tr>

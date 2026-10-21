@@ -119,6 +119,14 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	}
 	opening := s.openingFor(period)
 	saldoLain := coa.SaldoAwalLain(s.bukuAwalLocked(), all, peta)
+	// Kas di bank / saldo marketplace & prive dibawa per akun; kas sisanya di akun Kas.
+	kasAwal := opening.Cash
+	for kode, v := range coa.SaldoBawaan(s.txs, period+"-01", p, peta) {
+		saldoLain[kode] += v
+		if kode != peta.Kode(coa.PeranPrive) {
+			kasAwal -= v
+		}
+	}
 	sp := s.kartuLocked().Periode(period)
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
@@ -135,7 +143,7 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		j.entri = append(j.entri, entriJurnal{susut[i], ket}, entriJurnal{susut[i+1], ket})
 	}
-	j.saldoAwal = coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
 		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
 	j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.

@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'laporan-transaksi'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -984,9 +984,27 @@ export interface AkunBukuBesar {
   kode: string; nama: string; kelompok: string; normal: 'debit' | 'kredit'
   saldo_awal: number; debit: number; kredit: number; saldo_akhir: number; baris: BarisBukuBesar[]
 }
-export interface BukuBesar { supported: boolean; period: string; period_label: string; akun: AkunBukuBesar[]; total_debit: number; total_kredit: number; seimbang: boolean }
-export const getBukuBesar = (period: string) => api<BukuBesar>(`/reports/buku-besar?period=${encodeURIComponent(period)}`)
-export const bukuBesarXlsxUrl = (period: string) => `/api/v1/reports/buku-besar.xlsx?period=${encodeURIComponent(period)}`
+export interface BukuBesar {
+  supported: boolean; period: string; period_label: string; dari: string; sampai: string
+  akun: AkunBukuBesar[]; total_debit: number; total_kredit: number; seimbang: boolean
+  pilihan: { kode: string; nama: string }[]
+}
+/** Rentang tanggal (YYYY-MM-DD) dan opsional satu akun (riwayat). */
+export interface FilterBukuBesar { dari: string; sampai: string; akun?: string }
+const qBukuBesar = (f: FilterBukuBesar) => new URLSearchParams({ dari: f.dari, sampai: f.sampai, ...(f.akun ? { akun: f.akun } : {}) }).toString()
+export const getBukuBesar = (f: FilterBukuBesar) => api<BukuBesar>(`/reports/buku-besar?${qBukuBesar(f)}`)
+export const bukuBesarXlsxUrl = (f: FilterBukuBesar) => `/api/v1/reports/buku-besar.xlsx?${qBukuBesar(f)}`
+
+export interface FilterTransaksi { dari: string; sampai: string; jenis?: string; arah?: string; status?: string; channel?: string; cari?: string }
+export interface LaporanTransaksi {
+  dari: string; sampai: string; transaksi: Tx[]; jumlah: number
+  total_masuk: number; total_keluar: number; belum_lunas: number
+  per_jenis: { jenis: string; arah: string; jumlah: number; total: number }[]
+  channel: string[] | null; jenis_pilihan: { nama: string; arah: string }[]
+}
+const qTransaksi = (f: FilterTransaksi) => new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString()
+export const getLaporanTransaksi = (f: FilterTransaksi) => api<LaporanTransaksi>(`/reports/transaksi?${qTransaksi(f)}`)
+export const laporanTransaksiXlsxUrl = (f: FilterTransaksi) => `/api/v1/reports/transaksi.xlsx?${qTransaksi(f)}`
 
 /** tanggal: tanggal pembanding nilai buku aset (saat tanggal mulai di form diganti). */
 export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (tanggal ? `?tanggal=${encodeURIComponent(tanggal)}` : ''))
