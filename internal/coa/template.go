@@ -5,39 +5,22 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-
-	"pajak/internal/finance"
 )
 
 // Template COA yang dikelola tim Master Pajak (per jenis usaha, berversi) harus tetap bisa dipakai
-// jurnal otomatis: semua kode yang ditulis langsung di jurnal & laporan wajib ada.
+// jurnal otomatis: semua peran akun (peran.go) wajib dipegang akun di template.
 
 var ErrTemplate = errors.New("template COA tidak valid")
 
-// kodeSistem: kode yang dipakai langsung di jurnal & laporan (selain pemetaan jenis transaksi);
-// TestKodeWajib_MencakupKodeDiKode menjaga daftar ini tetap lengkap.
-var kodeSistem = []string{
-	"1101", "1102", "1104", "1201", "1301", "1401", "1501", "1502", "1503", "1504", "1505", "1506", "1507", "1508",
-	"2101", "2102", "2105", "3101", "3102", "3201", "4101", "5101", "5102", "5104", "6113", "6118", "8101", "9103",
-}
+// Jurnal otomatis tidak lagi memakai kode tetap: tiap peran (peran.go) harus dipegang satu akun
+// di template, lewat kolom Peran atau — untuk template lama — kode bawaan CoA dagang.
 
-// KodeWajib: kode akun yang harus ada di setiap template terbit, urut.
-func KodeWajib() []string {
-	out := slices.Clone(kodeSistem)
-	for _, j := range finance.JenisList {
-		for _, p := range []finance.BusinessProfile{
-			{BentukUsaha: "op", MetodePersediaan: "periodik"}, {BentukUsaha: "pt", MetodePersediaan: "perpetual"},
-		} {
-			out = append(out, AutoAccount(j.Nama, p))
-		}
-	}
-	slices.Sort(out)
-	return slices.Compact(out)
-}
+// PeranWajib: peran yang harus terisi di setiap template terbit, beserta kode bawaannya.
+func PeranWajib() []PeranInfo { return slices.Clone(DaftarPeran) }
 
 var kondisiValid = []Kondisi{Selalu, JikaAda, JikaPT, JikaNonPT, JikaPerpetual, JikaPeriodik}
 
-// ValidateTemplate: kode 4 digit unik, isian lengkap & dikenal, dan semua KodeWajib ada.
+// ValidateTemplate: kode 4 digit unik, isian lengkap & dikenal, dan semua peran wajib terisi.
 func ValidateTemplate(accs []Account) error {
 	ada := map[string]bool{}
 	for i, a := range accs {
@@ -58,14 +41,21 @@ func ValidateTemplate(accs []Account) error {
 		}
 		ada[a.Kode] = true
 	}
-	var hilang []string
-	for _, k := range KodeWajib() {
-		if !ada[k] {
-			hilang = append(hilang, k)
+	peranDipakai := map[string]string{}
+	for _, a := range accs {
+		if a.Peran == "" {
+			continue
 		}
+		if !slices.ContainsFunc(DaftarPeran, func(r PeranInfo) bool { return r.ID == a.Peran }) && a.Peran != "modal_pt" {
+			return fmt.Errorf("%w: akun %s: peran %q tidak dikenal", ErrTemplate, a.Kode, a.Peran)
+		}
+		if lain, dobel := peranDipakai[a.Peran]; dobel {
+			return fmt.Errorf("%w: peran %q dipegang dua akun (%s dan %s)", ErrTemplate, a.Peran, lain, a.Kode)
+		}
+		peranDipakai[a.Peran] = a.Kode
 	}
-	if len(hilang) > 0 {
-		return fmt.Errorf("%w: akun wajib untuk jurnal otomatis tidak ada: %s", ErrTemplate, strings.Join(hilang, ", "))
+	if kurang := PeranKurang(accs); len(kurang) > 0 {
+		return fmt.Errorf("%w: peran untuk jurnal otomatis belum dipegang akun mana pun: %s", ErrTemplate, strings.Join(kurang, ", "))
 	}
 	return nil
 }

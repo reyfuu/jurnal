@@ -31,7 +31,7 @@ func (s *tenant) handleCoA(w http.ResponseWriter, r *http.Request) {
 	var mapping []mappingRow
 	if active != nil {
 		for _, j := range finance.JenisList {
-			kode := coa.AutoAccount(j.Nama, p)
+			kode := coa.AutoAccount(j.Nama, p, coa.PetaDari(active))
 			acc, _ := coa.Find(active, kode)
 			mapping = append(mapping, mappingRow{j.Nama, kode, acc.Nama})
 		}
@@ -60,45 +60,47 @@ func (s *tenant) buildCoAReport(r *http.Request) coaReport {
 	// Buku berjalan: saldo awal akun = posisi akhir bulan lalu; transaksi bulan ini dan
 	// pelunasan transaksi bulan lalu dijurnal di bulan ini.
 	s.mu.RLock()
-	lines := coa.JournalBerjalan(s.txs, period, p)
-	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr 1201, atau Dr 2101 / Cr Kas.
+	peta := coa.PetaDari(all)
+	lines := coa.JournalBerjalan(s.txs, period, p, peta)
+	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr Piutang, atau Dr Utang / Cr Kas.
+	kas, piutang, utang := peta.Kode(coa.PeranKas), peta.Kode(coa.PeranPiutang), peta.Kode(coa.PeranUtangUsaha)
 	for _, pa := range s.bukuAwalLocked().Pelunasan {
 		if len(pa.Tanggal) < 7 || pa.Tanggal[:7] != period {
 			continue
 		}
 		if pa.Jenis == "piutang" {
-			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: "1101", Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: "1201", Kredit: pa.Nominal})
+			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: kas, Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: piutang, Kredit: pa.Nominal})
 		} else {
-			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: "2101", Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: "1101", Kredit: pa.Nominal})
+			lines = append(lines, coa.Line{Tanggal: pa.Tanggal, Kode: utang, Debit: pa.Nominal}, coa.Line{Tanggal: pa.Tanggal, Kode: kas, Kredit: pa.Nominal})
 		}
 	}
 	opening := s.openingFor(period)
-	saldoLain := coa.SaldoAwalLain(s.bukuAwalLocked(), all)
+	saldoLain := coa.SaldoAwalLain(s.bukuAwalLocked(), all, peta)
 	sp := s.kartuLocked().Periode(period)
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
 	// dengan tab Laba Rugi / Neraca, yang memang satu menu.
 	as := rep.Assets
-	lines = append(lines, coa.DepreciationJournal(as, period)...)
+	lines = append(lines, coa.DepreciationJournal(as, period, peta, p)...)
 	saldoAwal := coa.OpeningBerjalan(opening.Cash, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
-		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period), saldoLain)
+		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
 	tb := coa.TrialBalanceFrom(all, active, saldoAwal, lines)
-	// Kartu stok: sesuaikan 1301 ke nilai persediaan akhir; selisihnya masuk HPP.
+	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.
 	var penyesuaian int64
 	if sp.Aktif {
-		var saldo1301 int64
+		var saldoPersediaan int64
 		for _, b := range tb {
-			if b.Kode == "1301" {
-				saldo1301 = b.Saldo
+			if b.Kode == peta.Kode(coa.PeranPersediaan) {
+				saldoPersediaan = b.Saldo
 			}
 		}
-		if penyesuaian = sp.PersediaanAkhir - saldo1301; penyesuaian != 0 {
-			lines = append(lines, coa.PenyesuaianPersediaan(period+"-28", penyesuaian, p)...)
+		if penyesuaian = sp.PersediaanAkhir - saldoPersediaan; penyesuaian != 0 {
+			lines = append(lines, coa.PenyesuaianPersediaan(period+"-28", penyesuaian, p, peta)...)
 			tb = coa.TrialBalanceFrom(all, active, saldoAwal, lines)
 		}
 	}
-	is := coa.IncomeStatementKartu(tb, p, sp.Aktif, penyesuaian)
+	is := coa.IncomeStatementKartu(tb, p, sp.Aktif, penyesuaian, peta)
 	bs := coa.BalanceSheet(tb, is.LabaBersih)
 	return coaReport{true, tb, &is, &bs}
 }
@@ -116,6 +118,8 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rep := s.buildCoAReport(r)
+	all, _, _ := s.coaAkun()
+	kodePersediaan := coa.PetaDari(all).Kode(coa.PeranPersediaan)
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)
 		return
@@ -131,11 +135,11 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	add("Pendapatan Usaha", is.Pendapatan)
 	lr = append(lr, []string{"", "Penjualan Bersih", rp(is.PenjualanBersih)})
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{"1301", "Persediaan Awal", rp(is.PersediaanAwal)})
+		lr = append(lr, []string{kodePersediaan, "Persediaan Awal", rp(is.PersediaanAwal)})
 	}
 	add("Harga Pokok Penjualan", is.HPPLines)
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{"1301", "Persediaan Akhir", rp(-is.PersediaanAkhir)})
+		lr = append(lr, []string{kodePersediaan, "Persediaan Akhir", rp(-is.PersediaanAkhir)})
 	}
 	lr = append(lr, []string{"", "Harga Pokok Penjualan", rp(is.HPP)}, []string{"", "Laba Kotor", rp(is.LabaKotor)})
 	add("Beban Operasional", is.BebanOperasional)

@@ -54,13 +54,14 @@ type IncomeStatementResult struct {
 }
 
 // IncomeStatement: laba rugi format perdagangan dari neraca saldo.
-func IncomeStatement(tb []Balance, p finance.BusinessProfile) IncomeStatementResult {
-	return IncomeStatementKartu(tb, p, false, 0)
+func IncomeStatement(tb []Balance, p finance.BusinessProfile, peta Peta) IncomeStatementResult {
+	return IncomeStatementKartu(tb, p, false, 0, peta)
 }
 
 // IncomeStatementKartu: seperti IncomeStatement; bila kartu aktif, neraca saldo sudah memuat
 // jurnal PenyesuaianPersediaan sebesar penyesuaian (1301 = persediaan akhir kartu stok).
-func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, penyesuaian int64) IncomeStatementResult {
+func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, penyesuaian int64, peta Peta) IncomeStatementResult {
+	persediaan, pembelian := peta.Kode(PeranPersediaan), peta.Kode(PeranPembelian)
 	r := IncomeStatementResult{Metode: "periodik"}
 	r.Pendapatan, r.PenjualanBersih = linesOf(tb, PendapatanUsaha)
 	var hppLines int64
@@ -70,21 +71,21 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 		r.Metode = "perpetual"
 		r.HPP = hppLines
 		if kartu {
-			r.Catatan = append(r.Catatan, "Metode perpetual: HPP (5101) = modal barang terjual + selisih stok opname dari kartu stok (rata-rata bergerak).")
+			r.Catatan = append(r.Catatan, "Metode perpetual: HPP ("+peta.Kode(PeranHPP)+") = modal barang terjual + selisih stok opname dari kartu stok (rata-rata bergerak).")
 		} else {
-			r.Catatan = append(r.Catatan, "Metode perpetual: pembelian tercatat ke Persediaan (1301). HPP per penjualan terisi setelah kartu stok dimulai di Stok & Gudang.")
+			r.Catatan = append(r.Catatan, "Metode perpetual: pembelian tercatat ke Persediaan ("+persediaan+"). HPP per penjualan terisi setelah kartu stok dimulai di Stok & Gudang.")
 		}
 	case kartu:
 		// Penyesuaian dicatat ke 5102; ditampilkan kembali sebagai persediaan awal/akhir supaya
 		// baris Pembelian tetap menunjukkan pembelian sebenarnya.
 		for _, b := range tb {
-			if b.Kode == "1301" {
+			if b.Kode == persediaan {
 				r.PersediaanAkhir = b.Saldo
 			}
 		}
 		r.PersediaanAwal = r.PersediaanAkhir - penyesuaian
 		for i := range r.HPPLines {
-			if r.HPPLines[i].Kode == "5102" {
+			if r.HPPLines[i].Kode == pembelian {
 				r.HPPLines[i].Jumlah += penyesuaian
 			}
 		}
@@ -94,7 +95,7 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 	default:
 		// ponytail: persediaan akhir = awal sampai stok opname/kartu stok dicatat di aplikasi.
 		for _, b := range tb {
-			if b.Kode == "1301" {
+			if b.Kode == persediaan {
 				r.PersediaanAwal, r.PersediaanAkhir = b.Saldo, b.Saldo
 			}
 		}
@@ -104,10 +105,10 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 	r.LabaKotor = r.PenjualanBersih - r.HPP
 	r.BebanOperasional, r.TotalBebanOps = linesOf(tb, BebanOperasional)
 	r.LabaUsaha = r.LabaKotor - r.TotalBebanOps
-	// EBITDA: laba usaha sebelum penyusutan (6113) & amortisasi (6118) yang dijurnal saat penutupan bulan.
+	// EBITDA: laba usaha sebelum penyusutan & amortisasi yang dijurnal saat penutupan bulan.
 	r.EBITDA = r.LabaUsaha
 	for _, l := range r.BebanOperasional {
-		if l.Kode == "6113" || l.Kode == "6118" {
+		if l.Kode == peta.Kode(PeranBebanPenyusutan) || l.Kode == peta.Kode(PeranBebanAmortisasi) {
 			r.EBITDA += l.Jumlah
 		}
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"pajak/internal/coa"
 	"strings"
 	"testing"
 
@@ -69,5 +70,37 @@ func TestTransactionAkunOverride(t *testing.T) {
 	bad := strings.Replace(ok, `"6114"`, `"2115"`, 1) // Utang Dividen tidak aktif untuk CV
 	if rec := do(srv, owner, http.MethodPost, "/api/v1/transactions", bad); rec.Code != http.StatusBadRequest {
 		t.Fatalf("akun tidak aktif harus 400, got %d", rec.Code)
+	}
+}
+
+// Usaha manufaktur otomatis memakai CoA manufaktur (penomoran sendiri) lewat peran akun:
+// kas di 1102 Kas Besar, bukan 1101 seperti CoA dagang, dan neraca saldonya tetap seimbang.
+func TestCoA_ManufakturMemakaiTemplateSendiri(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/business", profileBody); rec.Code != http.StatusOK {
+		t.Fatalf("profil manufaktur: %d %s", rec.Code, rec.Body)
+	}
+	rep := getJSON[coaReport](t, srv, owner, "/api/v1/reports/coa?period=2026-08")
+	if !rep.Supported {
+		t.Fatal("usaha manufaktur harus punya CoA")
+	}
+	var d, k int64
+	saldo := map[string]int64{}
+	for _, b := range rep.TrialBalance {
+		d, k = d+b.Debit, k+b.Kredit
+		saldo[b.Kode] = b.Saldo
+	}
+	if d != k {
+		t.Fatalf("neraca saldo tidak seimbang: debit %d kredit %d", d, k)
+	}
+	if saldo["1102"] == 0 || rep.BalanceSheet == nil {
+		t.Fatalf("kas manufaktur harus di 1102 Kas Besar: %+v", saldo)
+	}
+	if acc, ok := coa.Find(coa.Manufaktur, "1102"); !ok || acc.Nama != "Kas Besar" {
+		t.Fatalf("akun 1102: %+v", acc)
+	}
+	if bs := rep.BalanceSheet; bs.TotalAset != bs.TotalLiabilitas+bs.TotalEkuitas {
+		t.Fatalf("neraca per akun tidak seimbang: %+v", bs)
 	}
 }

@@ -62,13 +62,24 @@ type State struct {
 // nasional di internal/tax — sebagai versi 1.
 func NewState() State {
 	return State{
-		Template:        []Template{{ID: 1, Jenis: "perdagangan", Versi: 1, Status: Terbit, Akun: slices.Clone(coa.Master), Catatan: "Daftar COA.xlsx, review akuntan Master Pajak"}},
+		Template: []Template{
+			{ID: 1, Jenis: "perdagangan", Versi: 1, Status: Terbit, Akun: slices.Clone(coa.Master), Catatan: "Daftar COA.xlsx, review akuntan Master Pajak"},
+			TemplateManufakturBawaan(2),
+		},
 		Benchmark:       []Benchmark{{ID: 1, Nama: "Benchmark nasional · data 2020", Sumber: tax.SumberBenchmark, Status: Aktif, Baris: slices.Clone(tax.KLUBenchmarks)}},
 		Parameter:       []ParameterVersi{{ID: 1, Nama: "Bawaan aplikasi", Dasar: tax.SumberParameterBawaan, Status: Aktif, Isi: tax.ParameterBawaan()}},
-		NextTemplateID:  2,
+		NextTemplateID:  3,
 		NextBenchmarkID: 2,
 		NextParameterID: 2,
 	}
+}
+
+// CatatanManufakturBawaan menandai template manufaktur bawaan aplikasi (versi yang mengikuti kode).
+const CatatanManufakturBawaan = "Daftar COA Manufaktur.xlsx, tim Master Pajak (bawaan aplikasi)"
+
+// TemplateManufakturBawaan: CoA manufaktur bawaan sebagai versi 1 terbit.
+func TemplateManufakturBawaan(id int) Template {
+	return Template{ID: id, Jenis: "manufaktur", Versi: 1, Status: Terbit, Akun: slices.Clone(coa.Manufaktur), Catatan: CatatanManufakturBawaan}
 }
 
 // Clone: salinan untuk diubah lalu disimpan (gagal simpan = state lama tetap).
@@ -321,12 +332,12 @@ func ParseBenchmark(rows [][]string) ([]tax.KLUBenchmark, error) {
 	return out, validasiBenchmark(out)
 }
 
-var kepalaTemplate = []string{"Kode", "Nama", "Subtype", "Saldo normal", "Kelompok", "Kondisi", "Catatan"}
+var kepalaTemplate = []string{"Kode", "Nama", "Subtype", "Saldo normal", "Kelompok", "Kondisi", "Catatan", "Peran"}
 
 func BarisTemplate(akun []coa.Account) [][]string {
 	out := [][]string{kepalaTemplate}
 	for _, a := range akun {
-		out = append(out, []string{a.Kode, a.Nama, a.Subtype, string(a.Normal), string(a.Kelompok), string(a.Kondisi), a.Catatan})
+		out = append(out, []string{a.Kode, a.Nama, a.Subtype, string(a.Normal), string(a.Kelompok), string(a.Kondisi), a.Catatan, a.Peran})
 	}
 	return out
 }
@@ -339,7 +350,7 @@ func ParseTemplate(rows [][]string) ([]coa.Account, error) {
 			continue
 		}
 		a := coa.Account{Kode: kolom(r, 0), Nama: kolom(r, 1), Subtype: kolom(r, 2), Normal: coa.Normal(strings.ToLower(kolom(r, 3))),
-			Kelompok: coa.Kelompok(kolom(r, 4)), Kondisi: coa.Kondisi(strings.ToLower(cmp.Or(kolom(r, 5), "selalu"))), Catatan: kolom(r, 6)}
+			Kelompok: coa.Kelompok(kolom(r, 4)), Kondisi: coa.Kondisi(strings.ToLower(cmp.Or(kolom(r, 5), "selalu"))), Catatan: kolom(r, 6), Peran: strings.ToLower(kolom(r, 7))}
 		if a.Normal != coa.Debit && a.Normal != coa.Kredit {
 			return nil, fmt.Errorf("%w: baris %d: saldo normal harus debit atau kredit", ErrTidakValid, i+1)
 		}

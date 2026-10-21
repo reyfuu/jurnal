@@ -48,11 +48,11 @@ func BenchmarkJournalTrialBalance(b *testing.B) {
 			p := benchProfile()
 			txs := benchTxs(n)
 			active := Active(p)
-			opening := Opening(50_000_000, 10_000_000, nil)
+			opening := Opening(50_000_000, 10_000_000, nil, PetaMaster)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				lines := Journal(txs, p)
+				lines := Journal(txs, p, PetaMaster)
 				tb := TrialBalance(active, opening, lines)
 				if len(tb) == 0 {
 					b.Fatal("neraca saldo kosong")
@@ -65,8 +65,8 @@ func BenchmarkJournalTrialBalance(b *testing.B) {
 func BenchmarkTrialBalanceOnly(b *testing.B) {
 	p := benchProfile()
 	active := Active(p)
-	opening := Opening(50_000_000, 10_000_000, nil)
-	lines := Journal(benchTxs(10_000), p)
+	opening := Opening(50_000_000, 10_000_000, nil, PetaMaster)
+	lines := Journal(benchTxs(10_000), p, PetaMaster)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

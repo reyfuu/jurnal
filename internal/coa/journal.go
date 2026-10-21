@@ -2,61 +2,73 @@ package coa
 
 import (
 	"slices"
+	"strings"
 
 	"pajak/internal/finance"
 )
 
-// autoMap: akun bawaan per jenis transaksi (perdagangan). Akun yang bergantung profil
-// ditangani di AutoAccount.
-var autoMap = map[string]string{
-	"Penjualan": "4101", "Pendapatan Lain": "8101", "Setor Modal": "3101", "Terima Pinjaman": "2102",
-	"Kemasan": "5104", "Potongan Aplikasi": "6108", "Ongkir & Transport": "6106", "Gaji & Upah": "6101",
-	"Sewa Tempat": "6104", "Listrik, Air, Internet": "6105", "Iklan & Promosi": "6102",
-	"Perawatan & Perlengkapan": "6112", "Pajak & Izin": "9103", "Biaya Lain": "6190",
-	"Beli Alat / Aset": "1501", "Bayar Cicilan": "2102",
+// peranJenis: peran akun per jenis transaksi. Jenis yang bergantung profil ditangani di
+// AutoAccount.
+var peranJenis = map[string]string{
+	"Penjualan": PeranPenjualan, "Pendapatan Lain": PeranPendapatanLain, "Setor Modal": PeranModal, "Terima Pinjaman": PeranPinjaman,
+	"Kemasan": PeranKemasan, "Potongan Aplikasi": PeranPotonganAplikasi, "Ongkir & Transport": PeranOngkir, "Gaji & Upah": PeranGaji,
+	"Sewa Tempat": PeranSewa, "Listrik, Air, Internet": PeranListrik, "Iklan & Promosi": PeranIklan,
+	"Perawatan & Perlengkapan": PeranPerawatan, "Pajak & Izin": PeranBebanPajak, "Biaya Lain": PeranBiayaLain,
+	"Beli Alat / Aset": PeranPeralatan, "Bayar Cicilan": PeranPinjaman,
 }
 
-// AutoAccount: "CoA otomatis" — akun untuk jenis transaksi sesuai profil usaha.
-func AutoAccount(jenis string, p finance.BusinessProfile) string {
+// modalKode: akun modal; template boleh memisahkan modal PT (modal disetor) dari modal pemilik
+// usaha perorangan/CV lewat peran opsional "modal_pt".
+func modalKode(peta Peta, p finance.BusinessProfile) string {
+	if isPT(p) && peta["modal_pt"] != "" {
+		return peta["modal_pt"]
+	}
+	return peta.Kode(PeranModal)
+}
+
+// AutoAccount: "CoA otomatis" — akun untuk jenis transaksi sesuai profil usaha dan template.
+func AutoAccount(jenis string, p finance.BusinessProfile, peta Peta) string {
 	switch jenis {
 	case "Beli Bahan / Stok":
 		if perpetual(p) {
-			return "1301" // perpetual: pembelian langsung menambah persediaan
+			return peta.Kode(PeranPersediaan) // perpetual: pembelian langsung menambah persediaan
 		}
-		return "5102"
+		return peta.Kode(PeranPembelian)
 	case "Ambil Uang Pribadi":
 		if isPT(p) {
-			return "3201" // PT: pengambilan pemilik = pembagian laba (mengurangi laba ditahan)
+			return peta.Kode(PeranLabaDitahan) // PT: pengambilan pemilik = pembagian laba
 		}
-		return "3102"
+		return peta.Kode(PeranPrive)
+	case "Setor Modal":
+		return modalKode(peta, p)
 	}
-	return autoMap[jenis]
+	return peta.Kode(peranJenis[jenis])
 }
 
 // AccountFor: akun koreksi user bila ada, selain itu otomatis.
-func AccountFor(t finance.Transaction, p finance.BusinessProfile) string {
+func AccountFor(t finance.Transaction, p finance.BusinessProfile, peta Peta) string {
 	if t.Akun != "" {
 		return t.Akun
 	}
-	return AutoAccount(t.Jenis, p)
+	return AutoAccount(t.Jenis, p, peta)
 }
 
 var marketplace = []string{"GoFood", "GrabFood", "ShopeeFood"}
 
 // CounterAccount: sisi kas/bank/piutang/utang dari transaksi.
-func CounterAccount(t finance.Transaction) string {
+func CounterAccount(t finance.Transaction, peta Peta) string {
 	j, _ := finance.LookupJenis(t.Jenis)
 	switch {
 	case !t.Lunas && j.Arah == "masuk":
-		return "1201"
+		return peta.Kode(PeranPiutang)
 	case !t.Lunas:
-		return "2101"
+		return peta.Kode(PeranUtangUsaha)
 	case slices.Contains(marketplace, t.Channel):
-		return "1104"
+		return peta.Kode(PeranMarketplace)
 	case t.Channel == "BCA Bisnis" || t.Channel == "B2B Tempo":
-		return "1102"
+		return peta.Kode(PeranBank)
 	}
-	return "1101"
+	return peta.Kode(PeranKas)
 }
 
 type Line struct {
@@ -69,23 +81,23 @@ type Line struct {
 
 // PenyesuaianPersediaan: jurnal akhir periode supaya 1301 Persediaan = nilai kartu stok.
 // Lawannya akun HPP: 5102 (periodik) atau 5101 (perpetual).
-func PenyesuaianPersediaan(tanggal string, selisih int64, p finance.BusinessProfile) []Line {
-	hpp := "5102"
+func PenyesuaianPersediaan(tanggal string, selisih int64, p finance.BusinessProfile, peta Peta) []Line {
+	hpp, persediaan := peta.Kode(PeranPembelian), peta.Kode(PeranPersediaan)
 	if perpetual(p) {
-		hpp = "5101"
+		hpp = peta.Kode(PeranHPP)
 	}
 	if selisih >= 0 {
-		return []Line{{Tanggal: tanggal, Kode: "1301", Debit: selisih}, {Tanggal: tanggal, Kode: hpp, Kredit: selisih}}
+		return []Line{{Tanggal: tanggal, Kode: persediaan, Debit: selisih}, {Tanggal: tanggal, Kode: hpp, Kredit: selisih}}
 	}
-	return []Line{{Tanggal: tanggal, Kode: hpp, Debit: -selisih}, {Tanggal: tanggal, Kode: "1301", Kredit: -selisih}}
+	return []Line{{Tanggal: tanggal, Kode: hpp, Debit: -selisih}, {Tanggal: tanggal, Kode: persediaan, Kredit: -selisih}}
 }
 
 // Journal: jurnal berpasangan (double entry) dari transaksi; 2 baris per transaksi.
-func Journal(txs []finance.Transaction, p finance.BusinessProfile) []Line {
+func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []Line {
 	out := make([]Line, 0, 2*len(txs))
 	for _, t := range txs {
 		j, _ := finance.LookupJenis(t.Jenis)
-		akun, lawan := AccountFor(t, p), CounterAccount(t)
+		akun, lawan := AccountFor(t, p, peta), CounterAccount(t, peta)
 		if j.Arah == "masuk" {
 			out = append(out, Line{t.ID, t.Tanggal, lawan, t.Nominal, 0}, Line{t.ID, t.Tanggal, akun, 0, t.Nominal})
 		} else {
@@ -99,7 +111,8 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile) []Line {
 // kas bila sudah lunas sampai akhir bulan, selain itu ke piutang (1201) / utang (2101);
 // transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
 // atau Dr Utang / Cr Kas) di tanggal bayar.
-func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile) []Line {
+func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta) []Line {
+	piutang, utang := peta.Kode(PeranPiutang), peta.Kode(PeranUtangUsaha)
 	akhir := period + "-31"
 	var out []Line
 	for _, t := range txs {
@@ -112,17 +125,17 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 		if bayar == "" {
 			bayar = t.Tanggal
 		}
-		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel})
+		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta)
 		switch {
 		case t.Tanggal[:7] == period:
 			lawan := kas
 			if !t.Lunas || bayar > akhir {
-				lawan = "2101"
+				lawan = utang
 				if masuk {
-					lawan = "1201"
+					lawan = piutang
 				}
 			}
-			akun := AccountFor(t, p)
+			akun := AccountFor(t, p, peta)
 			if masuk {
 				out = append(out, Line{t.ID, t.Tanggal, lawan, t.Nominal, 0}, Line{t.ID, t.Tanggal, akun, 0, t.Nominal})
 			} else {
@@ -130,9 +143,9 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 			}
 		case t.Tanggal[:7] < period && t.Lunas && len(bayar) >= 7 && bayar[:7] == period:
 			if masuk {
-				out = append(out, Line{t.ID, bayar, kas, t.Nominal, 0}, Line{t.ID, bayar, "1201", 0, t.Nominal})
+				out = append(out, Line{t.ID, bayar, kas, t.Nominal, 0}, Line{t.ID, bayar, piutang, 0, t.Nominal})
 			} else {
-				out = append(out, Line{t.ID, bayar, "2101", t.Nominal, 0}, Line{t.ID, bayar, kas, 0, t.Nominal})
+				out = append(out, Line{t.ID, bayar, utang, t.Nominal, 0}, Line{t.ID, bayar, kas, 0, t.Nominal})
 			}
 		}
 	}
@@ -142,8 +155,12 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 // OpeningBerjalan: saldo awal akun pada awal periode dari posisi buku berjalan. Modal (3101)
 // adalah selisih aset − kewajiban − laba ditahan (3201). lain: saldo awal akun lain per kode
 // (posisi debit positif, kewajiban negatif) — aset lancar lain & kewajiban lain saldo awal.
-func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal, lain map[string]int64) map[string]int64 {
-	out := map[string]int64{"1101": kas, "1201": piutang, "1301": persediaan, "2101": -utang, "2102": -pinjaman, "3201": -labaDitahan}
+func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal, lain map[string]int64, peta Peta, p finance.BusinessProfile) map[string]int64 {
+	out := map[string]int64{}
+	for kode, v := range map[string]int64{peta.Kode(PeranKas): kas, peta.Kode(PeranPiutang): piutang, peta.Kode(PeranPersediaan): persediaan,
+		peta.Kode(PeranUtangUsaha): -utang, peta.Kode(PeranPinjaman): -pinjaman, peta.Kode(PeranLabaDitahan): -labaDitahan} {
+		out[kode] += v
+	}
 	bersih := kas + piutang + persediaan - utang - pinjaman
 	for kode, v := range assetAwal {
 		out[kode] += v
@@ -153,23 +170,24 @@ func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int6
 		out[kode] += v
 		bersih += v
 	}
-	out["3101"] = -(bersih - labaDitahan)
+	out[modalKode(peta, p)] += -(bersih - labaDitahan)
 	return out
 }
 
 // akunAset: akun harta, akumulasi, dan beban untuk satu aset. Dipilih dari jenis hartanya
 // supaya peralatan, gedung, kendaraan, dan harta tak berwujud tidak menumpuk di satu akun.
-func akunAset(a finance.Asset) (harta, akumulasi, beban string) {
+func akunAset(a finance.Asset, peta Peta) (harta, akumulasi, beban string) {
+	susut := peta.Kode(PeranBebanPenyusutan)
 	switch a.JenisHarta {
 	case "kendaraan", "sepeda_motor":
-		return "1505", "1506", "6113"
+		return peta.Kode(PeranKendaraan), peta.Kode(PeranAkumKendaraan), susut
 	case "bangunan_permanen", "bangunan_tidak_permanen":
-		return "1503", "1504", "6113"
+		return peta.Kode(PeranGedung), peta.Kode(PeranAkumGedung), susut
 	}
 	if a.TakBerwujud {
-		return "1507", "1508", "6118"
+		return peta.Kode(PeranTakBerwujud), peta.Kode(PeranAkumAmortisasi), peta.Kode(PeranBebanAmortisasi)
 	}
-	return "1501", "1502", "6113"
+	return peta.Kode(PeranPeralatan), peta.Kode(PeranAkumPeralatan), susut
 }
 
 // diperolehPadaPeriode: aset baru masuk periode ini, jadi belum punya nilai buku awal.
@@ -182,11 +200,11 @@ func diperolehPadaPeriode(r finance.AssetReport, period string) bool {
 //
 // Tanpa jurnal ini laporan per akun tidak mengenal penyusutan sama sekali, sehingga laba
 // bersihnya berbeda dengan tab Laba Rugi untuk periode yang sama.
-func DepreciationJournal(as finance.AssetSummary, period string) []Line {
+func DepreciationJournal(as finance.AssetSummary, period string, peta Peta, p finance.BusinessProfile) []Line {
 	tanggal := period + "-01"
 	out := make([]Line, 0, 2*len(as.Assets))
 	for _, r := range as.Assets {
-		harta, akumulasi, beban := akunAset(r.Asset)
+		harta, akumulasi, beban := akunAset(r.Asset, peta)
 		if r.BebanBulanIni != 0 {
 			out = append(out,
 				Line{0, tanggal, beban, r.BebanBulanIni, 0},
@@ -198,7 +216,7 @@ func DepreciationJournal(as finance.AssetSummary, period string) []Line {
 		if r.TransaksiID == 0 && !r.Draft && diperolehPadaPeriode(r, period) {
 			out = append(out,
 				Line{0, tanggal, harta, r.HargaPerolehan, 0},
-				Line{0, tanggal, "3101", 0, r.HargaPerolehan},
+				Line{0, tanggal, modalKode(peta, p), 0, r.HargaPerolehan},
 			)
 		}
 	}
@@ -209,13 +227,13 @@ func DepreciationJournal(as finance.AssetSummary, period string) []Line {
 // periode sebelumnya di akun akumulasi (negatif karena peta ini berposisi debit). Dipisah,
 // bukan diringkas jadi nilai buku, supaya neraca per akun menyajikan kontra seperti biasa.
 // Tanpa ini aset yang sudah dimiliki sebelum periode hilang dari neraca per akun.
-func OpeningAssets(as finance.AssetSummary, period string) map[string]int64 {
+func OpeningAssets(as finance.AssetSummary, period string, peta Peta) map[string]int64 {
 	out := map[string]int64{}
 	for _, r := range as.Assets {
 		if diperolehPadaPeriode(r, period) {
 			continue // perolehan periode ini masuk lewat jurnal, bukan saldo awal
 		}
-		harta, akumulasi, _ := akunAset(r.Asset)
+		harta, akumulasi, _ := akunAset(r.Asset, peta)
 		out[harta] += r.HargaPerolehan
 		out[akumulasi] -= r.HargaPerolehan - r.NilaiBukuAwal
 	}
@@ -224,14 +242,15 @@ func OpeningAssets(as finance.AssetSummary, period string) map[string]int64 {
 
 // Opening: saldo awal periode (posisi debit positif). Modal awal = kas + persediaan + nilai
 // buku aset awal, sama dengan neraca ringkas. assetAwal dari OpeningAssets; nil bila tanpa aset.
-func Opening(cash, inventory int64, assetAwal map[string]int64) map[string]int64 {
-	out := map[string]int64{"1101": cash, "1301": inventory}
+func Opening(cash, inventory int64, assetAwal map[string]int64, peta Peta) map[string]int64 {
+	out := map[string]int64{peta.Kode(PeranKas): cash}
+	out[peta.Kode(PeranPersediaan)] += inventory
 	total := cash + inventory
 	for kode, v := range assetAwal {
 		out[kode] += v
 		total += v
 	}
-	out["3101"] = -total
+	out[peta.Kode(PeranModal)] += -total
 	return out
 }
 
@@ -283,14 +302,15 @@ func TrialBalanceFrom(template, active []Account, opening map[string]int64, line
 // SaldoAwalLain: akun aset lancar lain & kewajiban lain dari saldo awal (posisi debit positif).
 // Kode dari rincian dipakai bila ada di daftar akun; selain itu 1401 Biaya Dibayar Dimuka dan
 // 2105 Hutang Lain-lain menampung totalnya.
-func SaldoAwalLain(ob finance.OpeningBalance, akun []Account) map[string]int64 {
+func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[string]int64 {
 	out := map[string]int64{}
+	asetLain, kewLain := peta.Kode(PeranDibayarDimuka), peta.Kode(PeranUtangLain)
 	if len(ob.Rincian) == 0 {
 		if ob.AsetLain != 0 {
-			out["1401"] = ob.AsetLain
+			out[asetLain] = ob.AsetLain
 		}
 		if ob.KewajibanLain != 0 {
-			out["2105"] = -ob.KewajibanLain
+			out[kewLain] = -ob.KewajibanLain
 		}
 		return out
 	}
@@ -298,13 +318,16 @@ func SaldoAwalLain(ob finance.OpeningBalance, akun []Account) map[string]int64 {
 		kode, tanda := "", int64(1)
 		switch r.Kategori {
 		case finance.KatAsetLain:
-			kode = "1401"
+			kode = asetLain
 		case finance.KatKewajibanLain:
-			kode, tanda = "2105", -1
+			kode, tanda = kewLain, -1
 		default:
 			continue
 		}
-		if _, ok := Find(akun, r.Kode); ok && r.Kode != "" {
+		// Kode rincian dipakai hanya bila akun itu memang akun yang sama di CoA usaha ini (nama
+		// sama): kode template saldo awal mengikuti CoA dagang, dan di CoA lain kode yang sama
+		// bisa berarti akun lain (manufaktur: 1401 = Uang Muka Pembelian).
+		if acc, ok := Find(akun, r.Kode); ok && r.Kode != "" && strings.EqualFold(strings.TrimSpace(acc.Nama), strings.TrimSpace(r.Nama)) {
 			kode = r.Kode
 		}
 		out[kode] += tanda * r.Nominal

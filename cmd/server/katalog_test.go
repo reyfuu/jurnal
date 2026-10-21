@@ -72,7 +72,7 @@ func TestKatalog_TemplateBaruTidakMengubahKlienLama(t *testing.T) {
 	}
 	var d katalog.Template
 	_ = json.NewDecoder(rec.Body).Decode(&d)
-	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/"+itoa(d.ID)+"/terbitkan", ""); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "1101") {
+	if rec := do(srv, m, http.MethodPost, "/api/v1/master/coa/"+itoa(d.ID)+"/terbitkan", ""); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "kas") {
 		t.Fatalf("terbit tanpa kas: %d %s", rec.Code, rec.Body)
 	}
 

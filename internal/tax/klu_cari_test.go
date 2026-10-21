@@ -127,6 +127,10 @@ func TestCariKLU_BerbagaiIndustri(t *testing.T) {
 		{"saya ternak ayam dan jual ayam", "manufaktur", []string{"014"}},
 		{"tanam sayur hidroponik", "manufaktur", []string{"011"}},
 		{"budidaya ikan lele", "manufaktur", []string{"032"}},
+		{"ternak ikan lele", "manufaktur", []string{"032"}},
+		{"ternak kerang mutiara", "manufaktur", []string{"032"}},
+		{"budidaya kerang mutiara", "manufaktur", []string{"032"}},
+		{"ternak sapi perah", "manufaktur", []string{"014"}},
 		{"tambak udang", "manufaktur", []string{"032"}},
 		{"kebun sawit", "manufaktur", []string{"012"}},
 		// jasa
