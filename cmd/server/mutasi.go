@@ -5,10 +5,12 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -147,8 +149,15 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
 	s.mu.RLock()
 	existing := append([]finance.Transaction(nil), s.txs...)
+	awal := ""
+	if s.opening != nil {
+		awal = s.opening.Tanggal
+	}
 	s.mu.RUnlock()
 	h := finance.ParseMutasi(rows, tahun, existing)
+	if n := len(slices.DeleteFunc(slices.Clone(h.Rows), func(x finance.MutasiRow) bool { return x.Tanggal >= awal })); awal != "" && n > 0 {
+		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris bertanggal sebelum tanggal saldo awal (%s) dan tidak bisa dibukukan. Mundurkan tanggal saldo awal di menu Saldo Awal bila mutasi lama ini memang mau dicatat.", n, awal))
+	}
 	if bytes.HasPrefix(data, []byte("%PDF")) {
 		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks.
 		h.Peringatan = append(h.Peringatan, "Dibaca dari PDF: cocokkan jumlah baris serta total uang masuk dan keluar di atas dengan rekening koran Anda sebelum menyimpan.")
@@ -180,7 +189,7 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	for _, t := range txs {
-		if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+		if err := s.cekTxLocked(t); err != nil {
 			s.mu.Unlock()
 			http.Error(w, err.Error(), http.StatusConflict)
 			return

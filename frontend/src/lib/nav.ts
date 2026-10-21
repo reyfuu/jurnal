@@ -1,6 +1,6 @@
 import {
   ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, Package,
-  Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
+  Landmark, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
 
@@ -57,6 +57,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
     group: 'Pengaturan',
     items: [
       { view: 'profil-usaha', label: 'Profil Usaha', icon: Building2 },
+      { view: 'saldo-awal', label: 'Saldo Awal', icon: Landmark },
       { view: 'impor-data', label: 'Impor Data Awal', icon: Upload },
       { view: 'karyawan', label: 'Karyawan', icon: Users },
       { view: 'pengguna', label: 'Pengguna & Akses', icon: UserCog },

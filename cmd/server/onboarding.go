@@ -162,17 +162,31 @@ type openingResp struct {
 	SelisihModal int64                   `json:"selisih_modal"`
 	// Aktif false = laporan masih memakai saldo awal data demo.
 	Aktif bool `json:"aktif"`
+	// TransaksiPertama: tanggal transaksi paling awal; tanggal saldo awal tidak boleh sesudahnya.
+	TransaksiPertama string `json:"transaksi_pertama,omitempty"`
 }
 
 func (s *tenant) openingSummary() openingResp {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	pertama := s.transaksiPertamaLocked()
 	if s.opening == nil {
-		return openingResp{}
+		return openingResp{TransaksiPertama: pertama}
 	}
 	o := *s.opening
 	nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal
-	return openingResp{Opening: &o, ModalAwal: o.ModalAwal(nbv), SelisihModal: o.SelisihModal(nbv), Aktif: true}
+	return openingResp{Opening: &o, ModalAwal: o.ModalAwal(nbv), SelisihModal: o.SelisihModal(nbv), Aktif: true, TransaksiPertama: pertama}
+}
+
+// transaksiPertamaLocked: tanggal transaksi paling awal ("" bila belum ada). s.mu dipegang.
+func (s *tenant) transaksiPertamaLocked() string {
+	pertama := ""
+	for _, t := range s.txs {
+		if pertama == "" || t.Tanggal < pertama {
+			pertama = t.Tanggal
+		}
+	}
+	return pertama
 }
 
 func (s *tenant) handleGetOpening(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +207,13 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 	if s.tutupBuku != "" {
 		s.mu.Unlock()
 		http.Error(w, "saldo awal tidak bisa diubah setelah ada bulan yang ditutup bukunya", http.StatusConflict)
+		return
+	}
+	// Saldo awal = posisi di pagi hari tanggal mulai. Transaksi sebelum tanggal itu sudah
+	// tercermin di saldo awal, jadi kalau tetap dihitung, uangnya terhitung dua kali.
+	if p := s.transaksiPertamaLocked(); p != "" && p < o.Tanggal {
+		s.mu.Unlock()
+		http.Error(w, "sudah ada transaksi tanggal "+p+", sebelum tanggal mulai "+o.Tanggal+". Pilih tanggal mulai paling lambat "+p+" (posisi saldo di pagi hari itu), atau hapus transaksi sebelum tanggal mulai", http.StatusConflict)
 		return
 	}
 	if s.opening != nil {

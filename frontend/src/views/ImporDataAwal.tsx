@@ -1,31 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
-  getOpening, importOnboarding, saveOpening, ONBOARDING_TEMPLATE_URL,
-  type OnboardingResult, type OpeningBalance, type OpeningInfo,
+  getOpening, importOnboarding, ONBOARDING_TEMPLATE_URL,
+  type OnboardingResult, type OpeningInfo,
 } from '@/lib/api'
 import { formatJt, formatRp } from '@/lib/format'
-import { angka } from '@/lib/angka'
 
 const RED = 'var(--text-danger)'
 const BLUE = 'var(--accent-blue)'
 
-const KOSONG: OpeningBalance = {
-  tanggal: '', kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0,
-}
-
-const FIELDS: { key: keyof OpeningBalance; label: string; hint: string }[] = [
-  { key: 'kas', label: 'Kas & Bank', hint: 'saldo tunai + seluruh rekening usaha' },
-  { key: 'piutang', label: 'Piutang Usaha', hint: 'tagihan pelanggan yang belum dibayar' },
-  { key: 'persediaan', label: 'Persediaan', hint: 'nilai stok bahan baku & barang dagang' },
-  { key: 'utang', label: 'Utang Usaha', hint: 'tagihan supplier & biaya belum dibayar' },
-  { key: 'pinjaman', label: 'Pinjaman', hint: 'sisa pokok pinjaman bank / koperasi' },
-  { key: 'modal_disetor', label: 'Modal Disetor', hint: 'opsional, hanya untuk dicocokkan' },
-]
-
 export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
   const [info, setInfo] = useState<OpeningInfo | null>(null)
-  const [form, setForm] = useState<OpeningBalance | null>(null)
   const [preview, setPreview] = useState<OnboardingResult | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState('')
@@ -63,21 +48,6 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
       onChanged()
     } catch (e) {
       setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function simpanNeracaAwal(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form) return
-    setBusy(true)
-    try {
-      setInfo(await saveOpening(form))
-      setForm(null)
-      onChanged()
-    } catch (err) {
-      setError((err as Error).message)
     } finally {
       setBusy(false)
     }
@@ -234,89 +204,9 @@ export function ImporDataAwal({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {/* --- Neraca awal: status & isi manual --- */}
-      <div className="card" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-          <div>
-            <div className="chart-title">Neraca Awal</div>
-            <div className="chart-subtitle">
-              {info?.aktif
-                ? `Berlaku sejak ${info.opening?.tanggal}. Laporan memakai angka ini sebagai posisi awal.`
-                : 'Belum diisi — laporan masih memakai saldo awal data contoh.'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className={'pill-status ' + (info?.aktif ? 'pill-green' : 'pill-amber')}>
-              {info?.aktif ? 'Aktif' : 'Belum diisi'}
-            </span>
-            <button
-              className="nav-item"
-              style={{ width: 'auto', padding: '8px 14px' }}
-              onClick={() => setForm(info?.opening ? { ...info.opening } : { ...KOSONG })}
-            >
-              {info?.aktif ? 'Ubah' : 'Isi Manual'}
-            </button>
-          </div>
-        </div>
-
-        {info?.aktif && info.opening && !form && (
-          <div className="list-rows tabular">
-            {FIELDS.filter((f) => f.key !== 'modal_disetor').map((f) => (
-              <div className="list-row" key={f.key}>
-                <span>{f.label}</span>
-                <span className="tabular">{formatRp(info.opening![f.key] as number)}</span>
-              </div>
-            ))}
-            <div className="list-row" style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }}>
-              <span><strong>Modal Awal (hasil hitung)</strong></span>
-              <strong style={{ color: BLUE }}>{formatRp(info.modal_awal)}</strong>
-            </div>
-            {info.selisih_modal !== 0 && (
-              <div className="list-row">
-                <span>Selisih dengan Modal Disetor</span>
-                <strong style={{ color: RED }}>{formatRp(info.selisih_modal)}</strong>
-              </div>
-            )}
-          </div>
-        )}
-
-        {form && (
-          <form onSubmit={simpanNeracaAwal}>
-            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-              <label>
-                <span className="kpi-label">Tanggal Mulai Pembukuan</span>
-                <input
-                  className="input-field" type="date" required value={form.tanggal}
-                  onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
-                />
-              </label>
-              {FIELDS.map((f) => (
-                <label key={f.key}>
-                  <span className="kpi-label">{f.label}</span>
-                  <input
-                    className="input-field tabular" {...angka(form[f.key] as number, (n) => setForm({ ...form, [f.key]: n }))}
-                  />
-                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{f.hint}</span>
-                </label>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy}>
-                {busy ? 'Menyimpan…' : 'Simpan Neraca Awal'}
-              </button>
-              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>
-                Batal
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div className="note-box warn">
-          Piutang, utang, dan pinjaman awal hanya dipakai di periode onboarding; pelunasannya lintas periode
-          belum ditelusuri. Saldo kas tetap berjalan ke periode berikutnya.
-          <br />
-          Menyimpan neraca awal mengubah angka seluruh laporan — lakukan sekali di awal, bukan tiap bulan.
-        </div>
+      <div className="note-box" style={{ marginBottom: 0 }}>
+        Mau mengisi saldo awal tanpa Excel? Pakai menu <strong>Pengaturan → Saldo Awal</strong>.
+        {info?.aktif && info.opening && <> Saldo awal sekarang mulai {info.opening.tanggal}.</>}
       </div>
 
       <div className="note-box" style={{ marginBottom: 0 }}>

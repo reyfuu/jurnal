@@ -452,6 +452,16 @@ func parseTanggalMutasi(s string, tahunDari func(time.Month) int, bulanDulu bool
 	if t, ok := parseTanggal(s); ok {
 		return t, true
 	}
+	// Tahun dua angka ("01/01/25", cetakan BRI): hari/bulan/tahun, kecuali berkasnya bulan dulu.
+	tahun2 := []string{"02/01/06", "2/1/06", "02-01-06", "2-1-06"}
+	if bulanDulu {
+		tahun2 = []string{"01/02/06", "1/2/06", "01-02-06", "1-2-06"}
+	}
+	for _, layout := range tahun2 {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format(time.DateOnly), true
+		}
+	}
 	for _, layout := range []string{"02 Jan 2006", "02 January 2006", "2 Jan 2006", "02-Jan-2006", "02 Jan 06"} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t.Format(time.DateOnly), true

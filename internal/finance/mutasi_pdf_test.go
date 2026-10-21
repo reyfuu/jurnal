@@ -81,3 +81,35 @@ func TestMutasiDariTeks_TanpaTransaksi(t *testing.T) {
 		t.Fatal("teks tanpa baris bertanggal harus nil")
 	}
 }
+
+// Cetakan e-Statement BRImo: tanggal dd/mm/yy + jam, kolom Teller, Debet/Kredit/Saldo, dan jam
+// cetak di kaki halaman berformat bulan/tanggal ("07/18/2025 08:58:23") yang bukan transaksi.
+func TestMutasiDariTeks_GayaBRImo(t *testing.T) {
+	baris := []string{
+		"Halaman 1 dari 2",
+		"Periode Transaksi : 01/01/25 - 31/01/25",
+		"Tanggal Transaksi Uraian Transaksi Teller Debet Kredit Saldo",
+		"01/01/25 12:40:51 Transfer Dari Budi via BRImo 8888110 0.00 999,000.00 17,237,544.00",
+		"07/18/2025 08:58:23",
+		"Halaman 2 dari 2",
+		"15/01/25 23:59:59 Pajak 496.00 0.00 17,237,048.00",
+		"29/01/25 14:40:20 Transfer BI-Fast dari BANK MANDIRI (PERSERO), PT 8888698 0.00 999,999.00 18,237,047.00",
+		"- SITI",
+		"Saldo Awal Total Transaksi Debet Total Transaksi Kredit Saldo Akhir",
+		"16,238,544.00 496.00 1,998,999.00 18,237,047.00",
+		"07/18/2025 08:58:23",
+	}
+	h := ParseMutasi(MutasiDariTeks(baris), 2026, nil)
+	if len(h.Errors) != 0 || len(h.Rows) != 3 || len(h.Peringatan) != 0 {
+		t.Fatalf("errors=%v peringatan=%v rows=%+v", h.Errors, h.Peringatan, h.Rows)
+	}
+	if h.Rows[0].Tanggal != "2025-01-01" || h.Rows[1].Tanggal != "2025-01-15" || h.Rows[2].Tanggal != "2025-01-29" {
+		t.Errorf("tanggal: %s %s %s", h.Rows[0].Tanggal, h.Rows[1].Tanggal, h.Rows[2].Tanggal)
+	}
+	if h.TotalMasuk != 1_998_999 || h.TotalKeluar != 496 {
+		t.Errorf("total masuk %d keluar %d", h.TotalMasuk, h.TotalKeluar)
+	}
+	if h.Rows[2].Keterangan != "Transfer BI-Fast dari BANK MANDIRI (PERSERO), PT 8888698 - SITI" {
+		t.Errorf("keterangan lanjutan: %q", h.Rows[2].Keterangan)
+	}
+}

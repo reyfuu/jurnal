@@ -42,7 +42,7 @@ type topik struct {
 var (
 	keTransaksi = Tautan{View: "transaksi", Label: "Buka Transaksi"}
 	keLaporan   = Tautan{View: "laporan-keuangan", Label: "Buka Laporan Keuangan"}
-	keImporAwal = Tautan{View: "impor-data", Label: "Isi saldo awal"}
+	keImporAwal = Tautan{View: "saldo-awal", Label: "Isi saldo awal"}
 )
 
 var daftarTopik = []topik{
@@ -50,7 +50,7 @@ var daftarTopik = []topik{
 		kata: []string{"laporan keuangan", "lapkeu", "laba rugi", "neraca", "arus kas", "pembukuan", "pembukuan usaha"},
 		jawaban: "Laporan keuangan (Laba Rugi, Neraca, Arus Kas) **tersusun otomatis** dari transaksi yang Anda catat — tidak perlu diisi manual.\n" +
 			"- **Catat transaksi** setiap ada uang masuk/keluar di menu Transaksi (bisa juga impor mutasi bank).\n" +
-			"- **Isi saldo awal** sekali saja (kas, piutang, utang, stok, aset) di Impor Data Awal.\n" +
+			"- **Isi saldo awal** sekali saja (kas, piutang, utang, stok, pinjaman) di menu Saldo Awal.\n" +
 			"- **Lihat hasilnya** di Laporan Keuangan; pilih bulannya di Ganti Periode.",
 		tautan: []Tautan{{View: "transaksi", Label: "Catat transaksi"}, keImporAwal, {View: "laporan-keuangan", Label: "Lihat laporan keuangan"}}},
 	{kode: "unduh-laporan", ringkas: "mengunduh / mencetak laporan keuangan ke PDF",
@@ -71,8 +71,8 @@ var daftarTopik = []topik{
 		tautan:  []Tautan{{View: "transaksi", Label: "Impor mutasi bank"}}},
 	{kode: "saldo-awal", ringkas: "mengisi saldo awal / data awal / modal awal / impor Excel data lama",
 		kata:    []string{"saldo awal", "data awal", "neraca awal", "modal awal", "impor data", "import data", "data lama", "template excel"},
-		jawaban: "Saldo awal (kas, piutang, utang, stok, aset, modal) diisi sekali di **Impor Data Awal** — isi formulir atau unduh template Excel lalu unggah kembali.",
-		tautan:  []Tautan{keImporAwal}},
+		jawaban: "Saldo awal (kas & bank, piutang, utang, stok, pinjaman) diisi sekali di menu **Saldo Awal**; modal awal dihitung otomatis. Aset yang sudah dimiliki didaftarkan di Laporan Keuangan → Aset. Data lama yang banyak bisa diunggah sekaligus lewat template Excel di **Impor Data Awal**.",
+		tautan:  []Tautan{keImporAwal, {View: "impor-data", Label: "Impor Data Awal (Excel)"}}},
 	{kode: "piutang", ringkas: "piutang pelanggan, utang ke supplier, tagihan belum dibayar",
 		kata:    []string{"piutang", "utang", "hutang", "ngutang", "tagihan", "belum dibayar", "belum lunas", "jatuh tempo", "tempo", "kasbon"},
 		jawaban: "Daftar piutang (pelanggan belum bayar) dan utang (Anda belum bayar) ada di **Piutang & Utang**. Transaksi yang dicatat *belum lunas* otomatis masuk ke sana.",

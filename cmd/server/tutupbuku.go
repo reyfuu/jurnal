@@ -29,6 +29,16 @@ func (s *tenant) cekTerbukaLocked(tanggal ...string) error {
 	return nil
 }
 
+// cekTxLocked: transaksi baru / diubah harus di bulan yang belum ditutup dan tidak sebelum
+// tanggal saldo awal yang diisi pengguna (posisinya sudah tercakup saldo awal; dicatat lagi =
+// terhitung dua kali). Tanpa saldo awal isian, tanggal mulai ikut transaksi paling awal.
+func (s *tenant) cekTxLocked(t finance.Transaction) error {
+	if s.opening != nil && t.Tanggal < s.opening.Tanggal {
+		return fmt.Errorf("tanggal %s sebelum tanggal saldo awal (%s); posisi sebelum tanggal itu sudah tercakup di saldo awal. Bila memang mau mencatat transaksi lama, mundurkan tanggal saldo awal dulu di menu Saldo Awal", t.Tanggal, s.opening.Tanggal)
+	}
+	return s.cekTerbukaLocked(tanggalTx(t)...)
+}
+
 func tanggalTx(t finance.Transaction) []string {
 	out := []string{t.Tanggal}
 	if t.Lunas && t.TanggalLunas != "" {
@@ -244,7 +254,7 @@ func (s *tenant) handleLangkahMulai(w http.ResponseWriter, _ *http.Request) {
 		{Kode: "profil", Judul: "Lengkapi profil usaha", Penjelasan: "Nama, bentuk usaha, bidang usaha (KLU), dan status PKP — menentukan pajak yang berlaku.",
 			Selesai: s.profile != nil && s.profile.KLU != "", View: "profil-usaha"},
 		{Kode: "saldo", Judul: "Isi saldo awal", Penjelasan: "Kas, piutang, utang, persediaan, dan pinjaman pada hari pertama memakai aplikasi.",
-			Selesai: s.opening != nil, View: "impor-data"},
+			Selesai: s.opening != nil, View: "saldo-awal"},
 	}
 	if dagang {
 		out = append(out,

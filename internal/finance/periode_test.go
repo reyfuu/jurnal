@@ -15,23 +15,24 @@ func idsDari(p []PilihanPeriode) string {
 }
 
 func TestDaftarPeriode(t *testing.T) {
+	// Selalu dari Januari tahun lalu sampai bulan berjalan: Okt 2026 → 22 bulan, Jan 2025 terakhir.
 	txs := []Transaction{{Tanggal: "2026-08-03"}, {Tanggal: "2026-10-02"}}
 	p := DaftarPeriode(txs, nil, "2026-10")
-	if idsDari(p) != "2026-10,2026-09,2026-08" || p[0].Label != "Oktober 2026" || !p[0].Bawaan {
+	if len(p) != 22 || !strings.HasPrefix(idsDari(p), "2026-10,2026-09,2026-08,") || p[21].ID != "2025-01" || p[0].Label != "Oktober 2026" || !p[0].Bawaan {
 		t.Fatalf("%+v", p)
 	}
 	// Bulan berjalan tanpa transaksi tetap ada; bawaan = bulan terakhir yang punya transaksi.
 	p = DaftarPeriode([]Transaction{{Tanggal: "2026-08-03"}}, nil, "2026-10")
-	if idsDari(p) != "2026-10,2026-09,2026-08" || p[0].Bawaan || !p[2].Bawaan {
+	if p[0].Bawaan || !p[2].Bawaan {
 		t.Errorf("bawaan %+v", p)
 	}
-	// Ekstra (mis. periode neraca awal / titik nol) ikut memperpanjang ke belakang.
-	if p := DaftarPeriode(nil, []string{"2026-07"}, "2026-08"); idsDari(p) != "2026-08,2026-07" || !p[0].Bawaan {
-		t.Errorf("ekstra %+v", p)
-	}
-	// Usaha baru tanpa data: bulan berjalan saja.
-	if p := DaftarPeriode(nil, nil, "2026-10"); idsDari(p) != "2026-10" || !p[0].Bawaan {
+	// Usaha baru tanpa data tetap bisa memilih bulan lampau (impor mutasi, catat bulan lalu).
+	if p := DaftarPeriode(nil, nil, "2026-10"); len(p) != 22 || !p[0].Bawaan || p[21].ID != "2025-01" {
 		t.Errorf("kosong %+v", p)
+	}
+	// Ekstra (mis. periode neraca awal / titik nol) ikut memperpanjang ke belakang.
+	if p := DaftarPeriode(nil, []string{"2024-07"}, "2026-08"); p[len(p)-1].ID != "2024-07" || !p[0].Bawaan {
+		t.Errorf("ekstra %+v", p)
 	}
 	// Maksimal 36 bulan ke belakang.
 	if p := DaftarPeriode([]Transaction{{Tanggal: "2020-01-01"}}, nil, "2026-10"); len(p) != 36 || p[35].ID != "2023-11" {

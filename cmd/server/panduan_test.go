@@ -31,7 +31,7 @@ func TestTanyaAI_PanduanMenuDenganTautan(t *testing.T) {
 	for _, l := range r.Tautan {
 		views = append(views, l.View)
 	}
-	if r.Category != "panduan" || !slices.Contains(views, "transaksi") || !slices.Contains(views, "laporan-keuangan") || !slices.Contains(views, "impor-data") {
+	if r.Category != "panduan" || !slices.Contains(views, "transaksi") || !slices.Contains(views, "laporan-keuangan") || !slices.Contains(views, "saldo-awal") {
 		t.Fatalf("owner: kategori %q tautan %v", r.Category, views)
 	}
 
