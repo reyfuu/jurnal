@@ -4,7 +4,7 @@
 export type View =
   | 'dashboard' | 'laporan-keuangan' | 'laporan-penjualan' | 'transaksi' | 'piutang-utang' | 'stok-gudang'
   | 'produksi-supplier' | 'invoice' | 'simulasi-harga' | 'pajak-umkm' | 'kalkulator-pajak' | 'perencanaan-pajak' | 'karyawan' | 'master-data'
-  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'laporan-transaksi'
+  | 'panduan' | 'pengguna' | 'profil-usaha' | 'lapor-bug' | 'langganan' | 'umur-piutang' | 'tutup-buku' | 'saldo-awal' | 'buku-besar' | 'jurnal-umum' | 'laporan-transaksi'
   | 'transaksi-kelola' // izin, bukan menu: ubah & hapus transaksi
   | 'impor-data' // menu Impor Data Awal, sekaligus izin mengubah neraca awal
   | 'panel-master' // akun tim Master Pajak: seluruh aplikasi diganti Panel Master
@@ -1025,6 +1025,19 @@ export interface FilterBukuBesar { dari: string; sampai: string; akun?: string }
 const qBukuBesar = (f: FilterBukuBesar) => new URLSearchParams({ dari: f.dari, sampai: f.sampai, ...(f.akun ? { akun: f.akun } : {}) }).toString()
 export const getBukuBesar = (f: FilterBukuBesar) => api<BukuBesar>(`/reports/buku-besar?${qBukuBesar(f)}`)
 export const bukuBesarXlsxUrl = (f: FilterBukuBesar) => `/api/v1/reports/buku-besar.xlsx?${qBukuBesar(f)}`
+
+export interface BarisJurnalUmum { kode: string; nama: string; debit: number; kredit: number }
+/** bukti: SA saldo awal, TRX-id transaksi, BYR-id pelunasan, JU-yyyymm-n entri sistem (penyusutan, penyesuaian). */
+export interface EntriJurnalUmum { bukti: string; tanggal: string; tx_id?: number; keterangan: string; baris: BarisJurnalUmum[]; debit: number; kredit: number }
+export interface JurnalUmum {
+  supported: boolean; period_label: string; dari: string; sampai: string
+  entri: EntriJurnalUmum[]; total_debit: number; total_kredit: number; seimbang: boolean
+  pilihan: { kode: string; nama: string }[]
+}
+export interface FilterJurnalUmum { dari: string; sampai: string; akun?: string; q?: string }
+const qJurnal = (f: FilterJurnalUmum) => new URLSearchParams({ dari: f.dari, sampai: f.sampai, ...(f.akun ? { akun: f.akun } : {}), ...(f.q ? { q: f.q } : {}) }).toString()
+export const getJurnalUmum = (f: FilterJurnalUmum) => api<JurnalUmum>(`/reports/jurnal?${qJurnal(f)}`)
+export const jurnalUmumXlsxUrl = (f: FilterJurnalUmum) => `/api/v1/reports/jurnal.xlsx?${qJurnal(f)}`
 
 export interface FilterTransaksi { dari: string; sampai: string; jenis?: string; arah?: string; status?: string; channel?: string; cari?: string }
 export interface LaporanTransaksi {

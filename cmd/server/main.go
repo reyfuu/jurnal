@@ -357,6 +357,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/transaksi", s.guard("laporan-transaksi", s.on((*tenant).handleLaporanTransaksi)))
 	s.mux.HandleFunc("GET /api/v1/reports/transaksi.xlsx", s.guard("laporan-transaksi", s.exporting(s.on((*tenant).handleLaporanTransaksiXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/buku-besar.xlsx", s.guard("buku-besar", s.exporting(s.on((*tenant).handleBukuBesarXlsx))))
+	s.mux.HandleFunc("GET /api/v1/reports/jurnal", s.guard("jurnal-umum", s.on((*tenant).handleJurnalUmum)))
+	s.mux.HandleFunc("GET /api/v1/reports/jurnal.xlsx", s.guard("jurnal-umum", s.exporting(s.on((*tenant).handleJurnalUmumXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("GET /api/v1/reports/pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleLaporanPDF))))
