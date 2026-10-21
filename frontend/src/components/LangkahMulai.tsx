@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Circle, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Circle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getLangkahMulai, type LangkahMulai as Langkah, type View } from '@/lib/api'
 
@@ -18,7 +18,9 @@ export function LangkahMulaiCard({ onBuka }: { onBuka: (v: View, aksi?: string) 
   useEffect(() => { getLangkahMulai().then(setLangkah, () => setLangkah([])) }, [])
   if (tutup || !langkah || langkah.length === 0) return null
   const selesai = langkah.filter((l) => l.selesai).length
-  if (selesai === langkah.length) return null
+  const adaPeringatan = langkah.some((l) => l.peringatan)
+  // Semua langkah selesai tetap ditampilkan selama masih ada selisih yang perlu dibereskan.
+  if (selesai === langkah.length && !adaPeringatan) return null
   const berikut = langkah.find((l) => !l.selesai)
   return (
     <div className="card" style={{ padding: 20, marginBottom: 18, borderColor: 'var(--accent-blue)' }}>
@@ -39,7 +41,14 @@ export function LangkahMulaiCard({ onBuka }: { onBuka: (v: View, aksi?: string) 
             <div style={{ flex: 1 }}>
               <div className="text-sm font-semibold">{i + 1}. {l.judul}</div>
               <div className="text-xs text-muted-foreground">{l.penjelasan}</div>
+              {l.peringatan && (
+                <div role="alert" className="mt-1.5 flex items-start gap-1.5 text-xs" style={{ color: 'var(--accent-amber)' }}>
+                  <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+                  <span>{l.peringatan}</span>
+                </div>
+              )}
             </div>
+            {l.peringatan && l.selesai && <Button size="sm" variant="outline" onClick={() => onBuka(l.view, l.aksi)}>Periksa</Button>}
             {!l.selesai && <Button size="sm" variant={l === berikut ? 'default' : 'outline'} onClick={() => onBuka(l.view, l.aksi)}>Kerjakan</Button>}
           </li>
         ))}

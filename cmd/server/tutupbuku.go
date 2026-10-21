@@ -145,6 +145,12 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 	}
 	out.Cek = append(out.Cek, c)
 
+	for _, k := range s.cekSaldoAwalLocked() {
+		if k.Status == "selisih" {
+			out.Cek = append(out.Cek, cekTutup{Kode: "saldo_" + k.Kode, Judul: "Saldo awal cocok: " + k.Judul, View: k.View, Status: "peringatan", Detail: k.Pesan})
+		}
+	}
+
 	c = cekTutup{Kode: "neraca", Judul: "Neraca seimbang", View: "laporan-keuangan", Status: "ok", Detail: "Aktiva = Pasiva."}
 	if !rep.BalanceSheet.IsBalanced {
 		c.Status, c.Detail = "peringatan", "Aktiva ≠ Pasiva — hubungi tim Master Pajak."
@@ -244,6 +250,8 @@ type langkahMulai struct {
 	Selesai    bool   `json:"selesai"`
 	View       string `json:"view"`
 	Aksi       string `json:"aksi,omitempty"`
+	// Peringatan: selisih saldo awal dengan rincian langkah ini (lihat cek_saldo_awal.go).
+	Peringatan string `json:"peringatan,omitempty"`
 }
 
 func (s *tenant) handleLangkahMulai(w http.ResponseWriter, _ *http.Request) {
@@ -270,6 +278,16 @@ func (s *tenant) handleLangkahMulai(w http.ResponseWriter, _ *http.Request) {
 		langkahMulai{Kode: "tutup", Judul: "Tutup buku bulan pertama", Penjelasan: "Cek akhir bulan lalu kunci bulannya supaya laporan tidak berubah.",
 			Selesai: s.tutupBuku != "", View: "tutup-buku"},
 	)
+	for _, c := range s.cekSaldoAwalLocked() {
+		if c.Status != "selisih" {
+			continue
+		}
+		for i := range out {
+			if out[i].Kode == c.Langkah {
+				out[i].Peringatan = c.Pesan
+			}
+		}
+	}
 	writeJSON(w, out)
 }
 
@@ -280,4 +298,5 @@ func (s *Server) alurKerjaRoutes() {
 	m.HandleFunc("DELETE /api/v1/tutup-buku", s.persisting(s.guard("tutup-buku", s.on((*tenant).handleBukaBulan))))
 	m.HandleFunc("POST /api/v1/opening/pelunasan", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handlePelunasanAwal))))
 	m.HandleFunc("GET /api/v1/mulai", s.guard("", s.on((*tenant).handleLangkahMulai)))
+	m.HandleFunc("GET /api/v1/saldo-awal/cek", s.guard("", s.on((*tenant).handleCekSaldoAwal)))
 }
