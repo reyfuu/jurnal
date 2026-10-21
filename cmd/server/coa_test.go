@@ -250,3 +250,21 @@ func TestLaporanTransaksi_FilterRentang(t *testing.T) {
 		t.Fatalf("ekspor: %d %s", rec.Code, rec.Body)
 	}
 }
+
+// Akun tanpa saldo & mutasi tetap dikirim (nol), supaya "Tampilkan akun tanpa saldo" berisi
+// seluruh CoA — juga untuk usaha yang belum punya transaksi sama sekali.
+func TestBukuBesar_AkunTanpaSaldoTetapAda(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	bb := getJSON[bukuBesarResp](t, srv, owner, "/api/v1/reports/buku-besar?period=2026-08")
+	_, active, _ := srv.tenants[1].coaAkun()
+	ada := map[string]bool{}
+	for _, a := range bb.Akun {
+		ada[a.Kode] = true
+	}
+	for _, a := range active {
+		if !ada[a.Kode] {
+			t.Errorf("akun aktif %s %s tidak ada di buku besar", a.Kode, a.Nama)
+		}
+	}
+}
