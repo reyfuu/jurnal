@@ -994,9 +994,10 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 	return t, true
 }
 
-// decodeTx + cek akun koreksi terhadap CoA aktif.
+// decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
+	t.InvoiceID = 0
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1058,6 +1059,10 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
 		return
 	}
+	if s.txs[i].InvoiceID != 0 {
+		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
+		return
+	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1081,6 +1086,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if s.txs[i].InvoiceID != 0 {
+		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
 		return
 	}
 	// Transaksi yang menjadi pembayaran aset terdaftar: menghapusnya membuat aset di neraca

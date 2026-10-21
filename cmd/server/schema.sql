@@ -451,3 +451,11 @@ ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS aset_lain BIGINT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS kewajiban_lain BIGINT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS aset_tetap BIGINT;
 ALTER TABLE opening_balances ADD COLUMN IF NOT EXISTS rincian JSONB;
+
+-- Invoice ↔ pembukuan (Okt 2026): transaksi Penjualan & PPN Keluaran dibuat otomatis dari invoice.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS invoice_id INT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS jatuh_tempo DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tanggal_lunas DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dibukukan BOOLEAN;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_id INT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS transaksi_ppn_id INT;

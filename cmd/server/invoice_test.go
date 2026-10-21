@@ -87,7 +87,7 @@ func TestInvoiceEndpoints_BuatUbahHapus(t *testing.T) {
 	}
 
 	// Ubah status jadi lunas.
-	ubah := `{"nomor":"INV-2026-090","status":"lunas","pelanggan_nama":"Toko Mitra Jaya",
+	ubah := `{"nomor":"INV-2026-090","status":"lunas","tanggal_lunas":"2026-09-20","pelanggan_nama":"Toko Mitra Jaya",
 	  "tanggal":"2026-09-01","jatuh_tempo":"2026-10-01","ppn_bps":1100,
 	  "items":[{"deskripsi":"Biji kopi 1kg","qty":10,"satuan":"kg","harga_satuan":250000}]}`
 	var diubah struct {

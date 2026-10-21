@@ -274,6 +274,9 @@ export interface Tx {
   lunas: boolean
   tanggal_lunas: string
   akun?: string // kode CoA koreksi; kosong = otomatis dari jenis
+  /** Dibuat otomatis dari invoice ini (Penjualan DPP / PPN Keluaran); diubah lewat menu Invoice. */
+  invoice_id?: number
+  jatuh_tempo?: string
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
@@ -1373,11 +1376,17 @@ export interface InvoiceInput {
   diskon_rp: number
   ppn_bps: number
   catatan?: string
+  /** Tanggal pelanggan membayar (wajib untuk status lunas). */
+  tanggal_lunas?: string
+  /** true = tercatat di pembukuan (Penjualan + PPN Keluaran otomatis). */
+  dibukukan?: boolean
 }
 
 export interface Invoice extends InvoiceInput {
   id: number
   nomor: string
+  transaksi_id?: number
+  transaksi_ppn_id?: number
 }
 
 export interface InvoiceRow extends Invoice {

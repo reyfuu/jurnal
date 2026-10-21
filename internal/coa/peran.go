@@ -44,6 +44,7 @@ const (
 	PeranIklan            = "beban_iklan"
 	PeranPerawatan        = "beban_perawatan"
 	PeranBiayaLain        = "beban_lain"
+	PeranPPNKeluaran      = "ppn_keluaran"
 )
 
 // PeranInfo: peran beserta kode bawaannya di CoA dagang (Master) dan penjelasannya untuk Panel Master.
@@ -92,6 +93,7 @@ var DaftarPeran = []PeranInfo{
 	{PeranIklan, "Beban iklan & promosi", "6102"},
 	{PeranPerawatan, "Beban pemeliharaan & perlengkapan", "6112"},
 	{PeranBiayaLain, "Beban operasional lain-lain", "6190"},
+	{PeranPPNKeluaran, "PPN keluaran (utang PPN)", "2106"},
 }
 
 // Peta: peran → kode akun untuk satu template.

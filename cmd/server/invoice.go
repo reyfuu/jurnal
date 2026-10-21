@@ -76,6 +76,13 @@ func (s *tenant) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inv.ID = s.nextInvoiceID
+	inv.Dibukukan = true // invoice baru selalu masuk pembukuan (lihat invoice_buku.go)
+	inv.TransaksiID, inv.TransaksiPPNID = 0, 0
+	if err := s.sinkronInvoiceLocked(&inv); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	s.nextInvoiceID++
 	s.invoices = append(s.invoices, inv)
 	s.mu.Unlock()
@@ -109,9 +116,17 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nomor faktur "+inv.Nomor+" sudah dipakai", http.StatusConflict)
 		return
 	}
-	inv.ID = s.invoices[i].ID
+	lama := s.invoices[i]
+	inv.ID = lama.ID
 	if inv.Nomor == "" {
-		inv.Nomor = s.invoices[i].Nomor
+		inv.Nomor = lama.Nomor
+	}
+	// Tautan pembukuan diatur server; "bukukan" dari klien hanya bisa menyalakan, bukan mematikan.
+	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan
+	inv.TransaksiID, inv.TransaksiPPNID = lama.TransaksiID, lama.TransaksiPPNID
+	if err := s.sinkronInvoiceLocked(&inv); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
 	}
 	s.invoices[i] = inv
 	writeJSON(w, inv)
@@ -123,6 +138,13 @@ func (s *tenant) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
 	i := s.invoiceIndex(r)
 	if i < 0 {
 		http.Error(w, "faktur tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	// Transaksi pembukuannya ikut terhapus (ditolak bila bulannya sudah tutup buku).
+	hapus := s.invoices[i]
+	hapus.Status = finance.StatusDraft
+	if err := s.sinkronInvoiceLocked(&hapus); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.invoices = slices.Delete(s.invoices, i, i+1)
