@@ -5,13 +5,17 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"pajak/internal/finance"
 )
 
 // Nomor jurnal tetap per transaksi (checklist tester No 31): JU-YYYYMM-NNNN menurut bulan
-// tanggal transaksi saat pertama diberi nomor. Diberikan di satu tempat setelah setiap perubahan
-// data (persisting) dan saat data dimuat, sehingga semua jalur pembuat transaksi (form, Catat,
-// impor, mutasi, invoice, aset) tercakup. Satu catatan (grup) atau satu invoice berbagi nomor.
-// Nomor tidak berubah saat diedit dan penghitung tidak pernah turun (nomor terhapus tidak dipakai ulang).
+// tanggal transaksi. Diberikan di satu tempat setelah setiap perubahan data (persisting) dan saat
+// data dimuat, sehingga semua jalur pembuat transaksi (form, Catat, impor, mutasi, invoice, aset)
+// tercakup. Satu catatan (grup) atau satu invoice berbagi nomor. Nomor tidak berubah saat diedit
+// di bulan yang sama; pindah ke bulan lain → nomor baru di bulan itu. Penghitung tidak pernah
+// turun, jadi nomor terhapus atau ditinggalkan tidak dipakai ulang. Invoice menyimpan nomornya
+// sehingga invoice yang kembali ke draft lalu dikirim lagi memakai nomor yang sama.
 
 func (s *tenant) beriNomorJurnal() {
 	s.mu.Lock()
@@ -25,8 +29,25 @@ func (s *tenant) beriNomorJurnalLocked() {
 		s.nomorJurnal = map[string]int{}
 	}
 	perGrup, perInvoice := map[int]string{}, map[int]string{}
+	for _, inv := range s.invoices {
+		if b, n, ok := urai(inv.NoJurnal); ok {
+			s.nomorJurnal[b] = max(s.nomorJurnal[b], n)
+			if bulanTx(inv.Tanggal) == b {
+				perInvoice[inv.ID] = inv.NoJurnal
+			}
+		}
+	}
 	var kosong []int
-	for i, t := range s.txs {
+	for i := range s.txs {
+		t := &s.txs[i]
+		b, n, ok := urai(t.NoJurnal)
+		if ok {
+			// penghitung minimal setinggi nomor yang sudah ada (data lama / penghitung hilang)
+			s.nomorJurnal[b] = max(s.nomorJurnal[b], n)
+			if b != bulanTx(t.Tanggal) {
+				t.NoJurnal = "" // dipindah ke bulan lain: nomor baru di bulan itu
+			}
+		}
 		if t.NoJurnal == "" {
 			kosong = append(kosong, i)
 			continue
@@ -37,10 +58,6 @@ func (s *tenant) beriNomorJurnalLocked() {
 		if t.InvoiceID > 0 {
 			perInvoice[t.InvoiceID] = t.NoJurnal
 		}
-		// penghitung minimal setinggi nomor yang sudah ada (data lama / penghitung hilang)
-		if b, n, ok := urai(t.NoJurnal); ok && n > s.nomorJurnal[b] {
-			s.nomorJurnal[b] = n
-		}
 	}
 	slices.SortFunc(kosong, func(a, b int) int { return s.txs[a].ID - s.txs[b].ID })
 	for _, i := range kosong {
@@ -50,8 +67,8 @@ func (s *tenant) beriNomorJurnalLocked() {
 			t.NoJurnal = perGrup[t.Grup]
 		case t.InvoiceID > 0 && perInvoice[t.InvoiceID] != "":
 			t.NoJurnal = perInvoice[t.InvoiceID]
-		case len(t.Tanggal) >= 7:
-			b := t.Tanggal[:4] + t.Tanggal[5:7]
+		case bulanTx(t.Tanggal) != "":
+			b := bulanTx(t.Tanggal)
 			s.nomorJurnal[b]++
 			t.NoJurnal = fmt.Sprintf("JU-%s-%04d", b, s.nomorJurnal[b])
 		}
@@ -62,6 +79,29 @@ func (s *tenant) beriNomorJurnalLocked() {
 			perInvoice[t.InvoiceID] = t.NoJurnal
 		}
 	}
+	for i := range s.invoices {
+		if no := perInvoice[s.invoices[i].ID]; no != "" {
+			s.invoices[i].NoJurnal = no
+		}
+	}
+}
+
+// nomorTxLocked memberi nomor yang belum ada lalu mengembalikan nomor transaksi id, supaya
+// respons simpan langsung memuat nomornya. s.mu dipegang.
+func (s *tenant) nomorTxLocked(id int) string {
+	s.beriNomorJurnalLocked()
+	if i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id }); i >= 0 {
+		return s.txs[i].NoJurnal
+	}
+	return ""
+}
+
+// bulanTx: "2026-10-05" → "202610"; "" bila tanggal tidak lengkap.
+func bulanTx(tanggal string) string {
+	if len(tanggal) < 7 {
+		return ""
+	}
+	return tanggal[:4] + tanggal[5:7]
 }
 
 // urai: "JU-202610-0012" → ("202610", 12).

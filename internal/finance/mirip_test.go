@@ -45,3 +45,17 @@ func TestParseMutasi_TagihanJadiPelunasan(t *testing.T) {
 		t.Fatalf("baris pelunasan tidak boleh jadi transaksi baru: %+v", txs)
 	}
 }
+
+// Pindah Dana: keluar dari rekening asal dan masuk ke rekening tujuan, jadi mutasi kedua sisi
+// (impor rekening asal maupun tujuan) mengenalinya sebagai sudah tercatat.
+func TestCariMirip_PindahDanaDuaArah(t *testing.T) {
+	txs := []Transaction{{ID: 1, Tanggal: "2026-10-10", Jenis: JenisPindahDana, Akun: "1102", Lawan: "1101", Nominal: 1_000_000, Lunas: true}}
+	for _, arah := range []string{"masuk", "keluar"} {
+		if m := CariMirip(txs, "2026-10-11", 1_000_000, arah, nil); len(m) != 1 || m[0].ID != 1 || m[0].BelumLunas {
+			t.Fatalf("%s: %+v", arah, m)
+		}
+	}
+	if m := CariMirip(txs, "2026-10-11", 999_000, "masuk", nil); len(m) != 0 {
+		t.Fatalf("nominal beda: %+v", m)
+	}
+}

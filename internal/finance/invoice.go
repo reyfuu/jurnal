@@ -26,6 +26,9 @@ type Invoice struct {
 	PelangganNama   string `json:"pelanggan_nama"`
 	PelangganAlamat string `json:"pelanggan_alamat,omitempty"`
 	PelangganNPWP   string `json:"pelanggan_npwp,omitempty"`
+	// NoJurnal: nomor jurnal transaksi invoice, disimpan supaya invoice yang kembali ke draft
+	// lalu dikirim lagi memakai nomor yang sama. Diatur server (cmd/server/nomor_jurnal.go).
+	NoJurnal string `json:"no_jurnal,omitempty"`
 
 	Items    []InvoiceItem `json:"items"`
 	DiskonRp int64         `json:"diskon_rp"`

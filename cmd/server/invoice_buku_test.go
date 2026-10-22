@@ -220,3 +220,36 @@ func TestImporInvoice_PratinjauLaluCommit(t *testing.T) {
 		}
 	}
 }
+
+// Invoice terkirim → kembali draft → dikirim lagi: nomor jurnalnya tetap (transaksinya dibuat
+// ulang tapi nomor disimpan di invoice), dan respons invoice memuat nomornya.
+func TestInvoice_NomorJurnalTetapSetelahDraft(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	body := func(status string) string {
+		return `{"nomor":"INV-NJ-001","status":"` + status + `","tanggal":"2026-08-10","jatuh_tempo":"2026-09-09",` +
+			`"pelanggan_nama":"PT Uji","items":[{"deskripsi":"Kopi","qty":1,"harga_satuan":500000}],"diskon_rp":0,"ppn_bps":0}`
+	}
+	kirim := func(method, url, status string) finance.Invoice {
+		rec := do(srv, owner, method, url, body(status))
+		var inv finance.Invoice
+		_ = json.NewDecoder(rec.Body).Decode(&inv)
+		if rec.Code >= 300 {
+			t.Fatalf("%s %s: %d %s", method, status, rec.Code, rec.Body)
+		}
+		return inv
+	}
+	inv := kirim(http.MethodPost, "/api/v1/invoice", "terkirim")
+	url := "/api/v1/invoice/" + strconv.Itoa(inv.ID)
+	awal := inv.NoJurnal
+	if tx, ok := txByID(srv, inv.TransaksiID); !ok || awal == "" || tx.NoJurnal != awal {
+		t.Fatalf("nomor invoice terkirim: %q %+v", awal, tx)
+	}
+	if inv = kirim(http.MethodPut, url, "draft"); inv.TransaksiID != 0 {
+		t.Fatalf("draft masih punya transaksi: %+v", inv)
+	}
+	inv = kirim(http.MethodPut, url, "terkirim")
+	if tx, _ := txByID(srv, inv.TransaksiID); inv.NoJurnal != awal || tx.NoJurnal != awal {
+		t.Fatalf("dikirim lagi: invoice %q, transaksi %q, mau %q", inv.NoJurnal, tx.NoJurnal, awal)
+	}
+}

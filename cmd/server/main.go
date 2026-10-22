@@ -1129,6 +1129,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
+	t.NoJurnal = s.nomorTxLocked(t.ID)
 	resp := s.withWarnings(t)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
@@ -1172,6 +1173,7 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
 	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal
 	s.txs[i] = t
+	t.NoJurnal = s.nomorTxLocked(t.ID) // pindah bulan → nomor baru
 	writeJSON(w, s.withWarnings(t))
 }
 

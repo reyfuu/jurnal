@@ -494,6 +494,7 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;
 -- Nomor jurnal (Okt 2026, checklist No 31): JU-YYYYMM-NNNN per transaksi / catatan, tidak
 -- dipakai ulang; penghitung terakhir per bulan di tenants.nomor_jurnal ({"202610": 12}).
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS no_jurnal TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS no_jurnal TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS nomor_jurnal JSONB;
 
 -- Daftar pelanggan (Okt 2026, checklist No 24): master pelanggan, pola sama dengan supplier.

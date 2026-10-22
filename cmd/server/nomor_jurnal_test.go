@@ -30,6 +30,9 @@ func TestNomorJurnal(t *testing.T) {
 		}
 		return out
 	}
+	if a.NoJurnal != "JU-202610-0001" || b.NoJurnal != "JU-202610-0002" {
+		t.Fatalf("respons POST harus memuat nomor jurnal: %q %q", a.NoJurnal, b.NoJurnal)
+	}
 	if n := nomor(); n[a.ID] != "JU-202610-0001" || n[b.ID] != "JU-202610-0002" {
 		t.Fatalf("nomor awal: %v", n)
 	}
@@ -44,11 +47,19 @@ func TestNomorJurnal(t *testing.T) {
 	var cat catatResp
 	_ = json.Unmarshal(rec.Body.Bytes(), &cat)
 	n := nomor()
-	if n[c.ID] != "JU-202610-0003" || n[b.ID] != "JU-202610-0002" {
-		t.Fatalf("tidak dipakai ulang / tetap saat diedit: %v", n)
+	// b pindah ke November: nomor baru di bulan itu; JU-202610-0002 tidak dipakai lagi.
+	if n[c.ID] != "JU-202610-0003" || n[b.ID] != "JU-202611-0001" {
+		t.Fatalf("tidak dipakai ulang / ikut bulan saat dipindah: %v", n)
 	}
-	if len(cat.Transaksi) != 2 || n[cat.Transaksi[0]] != "JU-202611-0001" || n[cat.Transaksi[1]] != "JU-202611-0001" {
-		t.Fatalf("satu catatan satu nomor: %v %v", cat.Transaksi, n)
+	if len(cat.Transaksi) != 2 || n[cat.Transaksi[0]] != "JU-202611-0002" || n[cat.Transaksi[1]] != "JU-202611-0002" || cat.NoJurnal != "JU-202611-0002" {
+		t.Fatalf("satu catatan satu nomor: %v %v %q", cat.Transaksi, n, cat.NoJurnal)
+	}
+	// edit di bulan yang sama: nomor tetap
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/transactions/"+strconv.Itoa(c.ID), `{"tanggal":"2026-10-20","jenis":"Penjualan","nominal":6000,"lunas":true}`); rec.Code != http.StatusOK {
+		t.Fatalf("ubah c: %d %s", rec.Code, rec.Body)
+	}
+	if d := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", `{"tanggal":"2026-10-21","jenis":"Penjualan","nominal":7000,"lunas":true}`); d.NoJurnal != "JU-202610-0004" || nomor()[c.ID] != "JU-202610-0003" {
+		t.Fatalf("edit bulan sama harus tetap; nomor baru lanjut: %q %v", d.NoJurnal, nomor())
 	}
 	// Jurnal Umum: satu catatan multi-akun = satu bukti berisi semua barisnya
 	var ju struct {
@@ -60,7 +71,7 @@ func TestNomorJurnal(t *testing.T) {
 	_ = json.Unmarshal(do(srv, qa, http.MethodGet, "/api/v1/reports/jurnal?dari=2026-11-01&sampai=2026-11-30", "").Body.Bytes(), &ju)
 	jumlah := 0
 	for _, e := range ju.Entri {
-		if e.Bukti == "JU-202611-0001" {
+		if e.Bukti == "JU-202611-0002" {
 			jumlah++
 			if len(e.Baris) != 3 {
 				t.Fatalf("baris bukti catatan: %d, mau 3: %+v", len(e.Baris), ju.Entri)
@@ -68,7 +79,7 @@ func TestNomorJurnal(t *testing.T) {
 		}
 	}
 	if jumlah != 1 {
-		t.Fatalf("bukti JU-202611-0001 muncul %d kali, mau 1", jumlah)
+		t.Fatalf("bukti JU-202611-0002 muncul %d kali, mau 1", jumlah)
 	}
 }
 
@@ -93,5 +104,23 @@ func TestNomorJurnal_MigrasiSaatMuat(t *testing.T) {
 	tn2.restore(st)
 	if fmt.Sprint(tn2.txs) != fmt.Sprint(tn.txs) || tn2.nomorJurnal["202610"] != 6 {
 		t.Fatalf("muat ulang mengubah nomor: %v %v", tn2.txs, tn2.nomorJurnal)
+	}
+}
+
+// Nomor basi (bulan nomor ≠ bulan tanggal) diganti nomor baru di bulan tanggalnya; satu grup
+// tetap satu nomor; nomor lama tidak dipakai ulang. Nomor bukan JU tidak disentuh.
+func TestNomorJurnal_PindahBulan(t *testing.T) {
+	tn := newTenant(9)
+	tn.nomorJurnal = map[string]int{"202610": 3}
+	tn.txs = []finance.Transaction{
+		{ID: 1, Tanggal: "2026-11-02", Jenis: "Penjualan", Nominal: 1, Lunas: true, Grup: 2, NoJurnal: "JU-202610-0003"},
+		{ID: 2, Tanggal: "2026-11-02", Jenis: "Biaya Lain", Nominal: 1, Lunas: true, Grup: 2, NoJurnal: "JU-202610-0003"},
+		{ID: 3, Tanggal: "2026-10-05", Jenis: "Penjualan", Nominal: 1, Lunas: true},
+		{ID: 4, Tanggal: "2026-12-01", Jenis: "Penjualan", Nominal: 1, Lunas: true, NoJurnal: "SIS-LAMA"},
+	}
+	tn.beriNomorJurnalLocked()
+	got := fmt.Sprint(tn.txs[0].NoJurnal, tn.txs[1].NoJurnal, tn.txs[2].NoJurnal, tn.txs[3].NoJurnal)
+	if want := fmt.Sprint("JU-202611-0001", "JU-202611-0001", "JU-202610-0004", "SIS-LAMA"); got != want {
+		t.Fatalf("nomor: %s, mau %s", got, want)
 	}
 }
