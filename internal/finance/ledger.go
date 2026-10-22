@@ -176,6 +176,8 @@ type BalanceSheet struct {
 	Liabilities BalanceSheetLiabilities `json:"liabilities"`
 	Equity      BalanceSheetEquity      `json:"equity"`
 	IsBalanced  bool                    `json:"is_balanced"`
+	// Tanggal: tanggal posisi neraca (YYYY-MM-DD); akhir bulan untuk laporan per periode.
+	Tanggal string `json:"tanggal,omitempty"`
 }
 
 func BuildIncomeStatement(entries []LedgerEntry, depreciation, amortization int64) IncomeStatement {

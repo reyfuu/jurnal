@@ -873,6 +873,10 @@ export interface CoAInfo {
 export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[] }
 
 export const getCoA = () => api<CoAInfo>('/coa')
+/** Akun buatan klien: jenisnya mengikuti akun induk, kode dibuat otomatis setelah induk. */
+export const tambahAkunCoA = (nama: string, induk: string) => api<{ kode: string; nama: string; induk: string }>('/coa/akun', { method: 'POST', body: { nama, induk } })
+export const hapusAkunCoA = (kode: string) => api<void>(`/coa/akun/${kode}`, { method: 'DELETE' })
+export const CATATAN_AKUN_TAMBAHAN = 'Ditambahkan sendiri di Daftar Akun'
 export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
 
 // --- Katalog Panel Master: template COA & benchmark NPM nasional ---
@@ -1873,8 +1877,10 @@ export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
 export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
 /** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
-export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }) =>
-  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}`
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
+/** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
+export const getNeracaPada = (tanggal: string) => api<BalanceSheet>(`/reports/balance-sheet?tanggal=${tanggal}`)
 
 /** Laba rugi & arus kas untuk rentang tanggal bebas. */
 export interface LaporanRentang { dari: string; sampai: string; label: string; income: IncomeStatement; cashflow: CashFlow }

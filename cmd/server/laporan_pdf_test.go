@@ -94,3 +94,24 @@ func TestBandingMultiPeriode(t *testing.T) {
 		}
 	}
 }
+
+// Neraca per tanggal bebas: API dan PDF ("Per 15 Agustus 2026").
+func TestNeracaPerTanggal(t *testing.T) {
+	t.Setenv("DATA_DIR", t.TempDir())
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+
+	var bs finance.BalanceSheet
+	rec := do(srv, owner, http.MethodGet, "/api/v1/reports/balance-sheet?tanggal=2026-08-15", "")
+	_ = json.NewDecoder(rec.Body).Decode(&bs)
+	if rec.Code != http.StatusOK || bs.Tanggal != "2026-08-15" || !bs.IsBalanced {
+		t.Fatalf("neraca 15 Agustus: %d %+v", rec.Code, bs)
+	}
+	if rec := do(srv, owner, http.MethodGet, "/api/v1/reports/balance-sheet?tanggal=15-08-2026", ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("format tanggal salah harus ditolak: %d", rec.Code)
+	}
+	rec = do(srv, owner, http.MethodGet, "/api/v1/reports/pdf?period=2026-08&bagian=neraca&tanggal=2026-08-15", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Per 15 Agustus 2026") || !strings.Contains(rec.Header().Get("Content-Disposition"), "Neraca-2026-08-15.pdf") {
+		t.Errorf("PDF neraca per tanggal: %d %q", rec.Code, rec.Header().Get("Content-Disposition"))
+	}
+}

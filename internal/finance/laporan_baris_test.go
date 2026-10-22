@@ -2,6 +2,7 @@ package finance
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -245,8 +246,12 @@ func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
 	for _, r := range b.Baris {
 		rumus[r.Kunci] = r.Rumus
 	}
-	if rumus["penjualan_bersih"] != "C = A - B" || rumus["laba_kotor"] != "E = C - D" || rumus["ebit"] != "J = G - H - I" || rumus["laba_bersih"] != "L = J + K" {
+	// amortisasi 0 tidak ditampilkan, jadi huruf sesudahnya bergeser dan rumus EBIT tanpa amortisasi
+	if rumus["penjualan_bersih"] != "C = A - B" || rumus["laba_kotor"] != "E = C - D" || rumus["ebit"] != "I = G - H" || rumus["laba_bersih"] != "K = I + J" {
 		t.Fatalf("rumus: %+v", rumus)
+	}
+	if _, ada := rumus["amortisasi"]; ada {
+		t.Error("akun bernilai 0 masih tampil")
 	}
 	var buf bytes.Buffer
 	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", "", []BagianLaporan{b}, nil); err != nil {
@@ -273,7 +278,7 @@ func TestAngkaSifat_BebanHitamTanpaMinus(t *testing.T) {
 		merah bool
 	}{
 		{-18_400, SifatPengurang, "18.400", false}, // beban & HPP: hitam, tanpa minus
-		{500, SifatPengurang, "(500)", true},       // beban yang menambah laba (koreksi)
+		{500, SifatPengurang, "(500)", false},      // beban yang menambah laba (koreksi): tetap hitam
 		{-625, SifatKontra, "(625)", true},         // penyusutan: kontra
 		{-1_000, "", "(1.000)", true},              // rugi
 		{2_000, "", "2.000", false},
@@ -303,5 +308,35 @@ func TestPDFNeraca_PerTanggal(t *testing.T) {
 	}
 	if s := buf.String(); !strings.Contains(s, "Per 31 Agustus 2026") || strings.Contains(s, "akhir Agustus") {
 		t.Error("neraca tidak ditulis per tanggal")
+	}
+}
+
+// Akun bernilai 0 tidak ditampilkan; judul kelompok yang kosong ikut hilang; saldo kas awal tetap.
+func TestRapikan_AkunNolDisembunyikan(t *testing.T) {
+	is := contohLabaRugi()
+	is.ChannelFees, is.NetSales, is.Depreciation = 0, 100_000, 0
+	is.OpexLines = append(is.OpexLines, Line{"Iklan", 0})
+	b := BagianLabaRugi(is)
+	for _, r := range b.Baris {
+		switch r.Kunci {
+		case "potongan", "beban:Iklan", "penyusutan", "amortisasi", "judul_penutupan":
+			t.Errorf("%s masih tampil", r.Kunci)
+		case "penjualan_bersih":
+			if r.Huruf != "B" || r.Rumus != "B = A" {
+				t.Errorf("penjualan bersih %q %q", r.Huruf, r.Rumus)
+			}
+		case "ebit":
+			if r.Rumus != r.Huruf+" = F" {
+				t.Errorf("ebit %q", r.Rumus)
+			}
+		}
+	}
+	ak := BagianArusKas(CashFlow{}, false)
+	if !slices.ContainsFunc(ak.Baris, func(r BarisLaporan) bool { return r.Kunci == "saldo_awal" }) {
+		t.Error("saldo kas awal harus tetap tampil")
+	}
+	nr := BagianNeraca(BalanceSheet{Assets: BalanceSheetAssets{Cash: 5}})
+	if slices.ContainsFunc(nr.Baris, func(r BarisLaporan) bool { return r.Kunci == "piutang" || r.Kunci == "pinjaman" }) {
+		t.Error("akun neraca bernilai 0 masih tampil")
 	}
 }

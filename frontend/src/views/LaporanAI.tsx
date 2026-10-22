@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { tanggalAkhirPeriode } from '@/lib/rentang'
+import { angkaSifat } from '@/lib/angkaLaporan'
 import { AlertTriangle, CheckCircle2, Lightbulb, Sparkles, TrendingUp } from 'lucide-react'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { getAIReport, type AIReport, type BusinessFacts } from '@/lib/api'
@@ -8,6 +9,8 @@ import { formatRp } from '@/lib/format'
 const AMBER = 'var(--text-warn)'
 const SOROT = 'var(--text-brand)'
 const RED = 'var(--text-danger)'
+// beban & HPP hitam tanpa minus, kontra dalam kurung (lib/angkaLaporan), dengan awalan Rp
+const rpSifat = (v: number, sifat: 'pengurang' | 'kontra') => angkaSifat(v, sifat).teks.replace(/^(\(?)/, '$1Rp')
 const GREEN = 'var(--accent-green)'
 const BLUE = 'var(--accent-blue)'
 
@@ -90,11 +93,11 @@ function RincianLaporan({ f, period }: { f: BusinessFacts; period: string }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>
         <Kartu judul="Laba Rugi">
           <Baris l="Omzet" v={lr.omzet} />
-          <Baris l="Harga pokok penjualan" v={-lr.hpp} />
+          <Baris l="Harga pokok penjualan" teks={rpSifat(-lr.hpp, 'pengurang')} />
           <Baris l="Laba (rugi) kotor" v={lr.laba_kotor} tebal />
-          <Baris l="Beban operasional" v={-lr.beban_operasional} />
-          <Baris l="Beban penyusutan" v={-lr.penyusutan} />
-          <Baris l="Beban amortisasi" v={-lr.amortisasi} />
+          <Baris l="Beban operasional" teks={rpSifat(-lr.beban_operasional, 'pengurang')} />
+          <Baris l="Beban penyusutan" teks={rpSifat(-lr.penyusutan, 'kontra')} warna={lr.penyusutan ? RED : undefined} />
+          <Baris l="Beban amortisasi" teks={rpSifat(-lr.amortisasi, 'kontra')} warna={lr.amortisasi ? RED : undefined} />
           <Baris l="Laba (rugi) bersih tahun berjalan" v={lr.laba_bersih} tebal warna={lr.laba_bersih >= 0 ? GREEN : RED} />
         </Kartu>
 

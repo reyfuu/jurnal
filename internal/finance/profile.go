@@ -34,6 +34,9 @@ type BusinessProfile struct {
 	LabaSebelumPajak int64 `json:"laba_sebelum_pajak,omitempty"`
 	// ModalAwal: modal yang ditanam pemilik; dasar ROI tahun pertama (laba / modal).
 	ModalAwal int64 `json:"modal_awal,omitempty"`
+	// AkunTambahan: akun CoA yang ditambahkan sendiri di Daftar Akun. Diatur lewat
+	// /coa/akun, bukan formulir profil (PUT /business mempertahankan isinya).
+	AkunTambahan []AkunTambahan `json:"akun_tambahan,omitempty"`
 
 	// Identitas penerbit faktur. Semuanya opsional saat onboarding supaya wizard tidak jadi
 	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
@@ -186,4 +189,12 @@ func (p BusinessProfile) CekAwal() tax.CekAwalResult {
 		BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, KLU: p.KLU, PKP: p.PKP,
 		Omzet: p.OmzetTahunan, Laba: p.LabaSebelumPajak, Modal: p.ModalAwal,
 	})
+}
+
+// AkunTambahan: akun buatan klien; jenisnya (kelompok, saldo normal, posisi di laporan) mengikuti
+// akun Induk di template.
+type AkunTambahan struct {
+	Kode  string `json:"kode"`
+	Nama  string `json:"nama"`
+	Induk string `json:"induk"`
 }

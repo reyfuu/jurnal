@@ -113,6 +113,11 @@ func (s *tenant) handlePutBusiness(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// akun tambahan diatur di Daftar Akun, bukan lewat formulir profil
+	prof.AkunTambahan = nil
+	if s.profile != nil {
+		prof.AkunTambahan = s.profile.AkunTambahan
+	}
 	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan profil usaha", http.StatusInternalServerError)
 		return

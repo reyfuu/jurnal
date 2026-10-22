@@ -149,3 +149,34 @@ func TestTagihanDariBuku(t *testing.T) {
 		t.Errorf("rekap %+v (piutang %d utang %d)", r, p.Total, u.Total)
 	}
 }
+
+// Neraca per tanggal bebas: seimbang setiap hari, transaksi sesudah tanggal belum dihitung,
+// penyusutan bulan itu belum masuk (dibukukan akhir bulan), dan akhir bulan = laporan bulanan.
+func TestNeracaPada(t *testing.T) {
+	ob, txs, assets, stok, gerak := skenarioBerjalan()
+	k := HitungKartu(stok, txs, gerak)
+	for d := 1; d <= 28; d++ {
+		tgl := "2026-02-" + string(rune('0'+d/10)) + string(rune('0'+d%10))
+		bs := BuildNeracaPada(txs, assets, tgl, ob, k)
+		if !bs.IsBalanced || bs.Tanggal != tgl {
+			t.Fatalf("%s tidak seimbang / tanggal salah: aset %d, pasiva %d, tanggal %s", tgl, bs.Assets.Total, bs.Liabilities.Total+bs.Equity.Total, bs.Tanggal)
+		}
+	}
+	// 14 Feb: pinjaman 5 Feb masuk, penjualan 15 Feb belum; akumulasi = posisi akhir Januari
+	b14 := BuildNeracaPada(txs, assets, "2026-02-14", ob, k)
+	b15 := BuildNeracaPada(txs, assets, "2026-02-15", ob, k)
+	if b15.Assets.Cash-b14.Assets.Cash != 3_000_000 {
+		t.Errorf("penjualan tunai 15 Feb: kas 14 Feb %d, 15 Feb %d", b14.Assets.Cash, b15.Assets.Cash)
+	}
+	jan := BuildLaporanBerjalan(txs, assets, "2026-01", ob, k).BalanceSheet
+	if b14.Assets.AccumDepreciation != jan.Assets.AccumDepreciation {
+		t.Errorf("akumulasi 14 Feb %d, akhir Januari %d", b14.Assets.AccumDepreciation, jan.Assets.AccumDepreciation)
+	}
+	if b14.Liabilities.Loans != 3_000_000+2_000_000 {
+		t.Errorf("pinjaman 14 Feb %d", b14.Liabilities.Loans)
+	}
+	feb := BuildLaporanBerjalan(txs, assets, "2026-02", ob, k).BalanceSheet
+	if akhir := BuildNeracaPada(txs, assets, "2026-02-28", ob, k); akhir != feb {
+		t.Errorf("akhir bulan harus sama dengan laporan bulanan:\n%+v\n%+v", akhir, feb)
+	}
+}
