@@ -1024,6 +1024,19 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
 
 /* Halaman Transaksi */
 @layer components {
+  /* Baris filter di bawah tombol aksi: kotak cari lebar + filter sama lebar, turun rapi di ponsel. */
+  .filter-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 4px;
+  }
+  .filter-bar > * { min-width: 0; width: 100%; max-width: none; }
+  @media (max-width: 860px) {
+    .filter-bar { grid-template-columns: 1fr 1fr; }
+    .filter-bar > :first-child { grid-column: 1 / -1; }
+  }
   .tx-toolbar {
     display: flex;
     flex-wrap: wrap;

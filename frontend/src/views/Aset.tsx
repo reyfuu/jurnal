@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { ThUrut } from '@/components/ThUrut'
+import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
+import { useGulirKeForm } from '@/lib/gulir'
 import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type SumberDanaAset, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -34,6 +37,11 @@ function toInput(a: Asset): AssetInput {
     sumber_dana: a.sumber_dana ?? '',
     akumulasi_awal: a.akumulasi_awal, akumulasi_per: a.akumulasi_per,
   }
+}
+
+const KOLOM_ASET: Pengurut<Asset> = {
+  nama: (a) => a.nama, kelompok: (a) => a.kelompok_nama, perolehan: (a) => a.tanggal_perolehan, harga: (a) => a.harga_perolehan,
+  metode: (a) => a.metode, tarif: (a) => a.tarif_bps, beban: (a) => a.beban_bulan_ini, akumulasi: (a) => a.akumulasi, buku: (a) => a.nilai_buku,
 }
 
 const NAMA_METODE: Record<MetodePenyusutan, string> = { garis_lurus: 'Garis lurus', saldo_menurun: 'Saldo menurun' }
@@ -86,9 +94,12 @@ function PilihMetode({ data, onChanged }: { data: AssetSummary; onChanged: () =>
 export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary; onChanged: () => void; tanggalSaldoAwal?: string }) {
   const tglAwal = tanggalSaldoAwal || data.tanggal_saldo_awal
   const [form, setForm] = useState<AssetInput | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const urut = useKolomUrut()
 
   const assets = data.assets ?? []
   // Jenis harta menentukan kelompoknya; "Lainnya" membiarkan user memilih kelompok sendiri.
@@ -199,7 +210,7 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
       )}
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Aset' : 'Ubah Aset'}</div>
           <div className="chart-subtitle">Pilih jenis harta, kelompok &amp; tarif terisi otomatis dari PMK</div>
 
@@ -345,15 +356,15 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
           <table className="data-table tabular" style={{ minWidth: 980 }}>
             <thead>
               <tr>
-                <th>Aset</th>
-                <th>Kelompok PMK</th>
-                <th>Perolehan</th>
-                <th style={{ textAlign: 'right' }}>Harga Perolehan</th>
-                <th>Metode</th>
-                <th style={{ textAlign: 'right' }}>Tarif</th>
-                <th style={{ textAlign: 'right' }}>Beban / Bln</th>
-                <th style={{ textAlign: 'right' }}>Akumulasi</th>
-                <th style={{ textAlign: 'right' }}>Nilai Buku</th>
+                <ThUrut k="nama" urut={urut}>Aset</ThUrut>
+                <ThUrut k="kelompok" urut={urut}>Kelompok PMK</ThUrut>
+                <ThUrut k="perolehan" urut={urut}>Perolehan</ThUrut>
+                <ThUrut k="harga" urut={urut} kanan>Harga Perolehan</ThUrut>
+                <ThUrut k="metode" urut={urut}>Metode</ThUrut>
+                <ThUrut k="tarif" urut={urut} kanan>Tarif</ThUrut>
+                <ThUrut k="beban" urut={urut} kanan>Beban / Bln</ThUrut>
+                <ThUrut k="akumulasi" urut={urut} kanan>Akumulasi</ThUrut>
+                <ThUrut k="buku" urut={urut} kanan>Nilai Buku</ThUrut>
                 <th />
               </tr>
             </thead>
@@ -361,7 +372,7 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
               {assets.length === 0 && (
                 <tr><td colSpan={10} style={{ color: 'var(--text-muted)' }}>Belum ada aset pada periode ini.</td></tr>
               )}
-              {assets.map((a) => (
+              {urutkan(assets, urut.kunci ? KOLOM_ASET[urut.kunci] : undefined, urut.arah).map((a) => (
                 <tr key={a.id || `draft-${a.transaksi_id}`}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{a.nama}</div>
