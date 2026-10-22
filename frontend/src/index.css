@@ -469,6 +469,16 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     border-left: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
   }
   .nav-sub.tertutup { display: none; }
+  .nav-sub-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 10px 10px 4px;
+  }
+  .nav-catat { font-size: 12.5px; padding-top: 7px; padding-bottom: 7px; }
+  .nav-catat .nav-icon { color: var(--accent-orange); opacity: 1; }
 
   .nav-icon {
     width: 15px;
@@ -923,7 +933,8 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
       display: contents;
     }
     .nav-group-label,
-    .nav-group-head {
+    .nav-group-head,
+    .nav-sub-label {
       display: none;
     }
     /* Ponsel: semua menu tetap satu baris geser, grup tidak dilipat. */

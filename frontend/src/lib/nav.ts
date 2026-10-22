@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
   Landmark, ListFilter, NotebookPen, Settings, BookOpenText, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
+  ArrowDownLeft, ArrowUpRight, ClipboardCheck, HandCoins, ShoppingCart,
 } from 'lucide-react'
 import type { View } from './api'
 
@@ -82,3 +83,14 @@ export const NAV: { group: string; icon?: LucideIcon; items: { view: View; label
 ]
 
 export const VIEW_LABEL = Object.fromEntries([...NAV, NAV_COBA, NAV_LAIN].flatMap((g) => g.items.map((i) => [i.view, i.label]))) as Record<View, string>
+
+/** Catat cepat (dulu tombol "+ Catat"): tampil di sidebar grup Catat Harian. Tiap pilihan membuka
+ *  halaman tujuan langsung dengan formulirnya (aksi). */
+export const NAV_CATAT: { label: string; ket: string; view: View; aksi: string; icon: LucideIcon }[] = [
+  { label: 'Penjualan', ket: 'Uang masuk dari pelanggan (tunai atau tempo)', view: 'transaksi', aksi: 'baru:Penjualan', icon: ArrowDownLeft },
+  { label: 'Biaya / pengeluaran', ket: 'Gaji, sewa, listrik, iklan, dll.', view: 'transaksi', aksi: 'baru:Biaya Lain', icon: ArrowUpRight },
+  { label: 'Beli bahan / barang', ket: 'Menambah stok & harga pokok', view: 'stok-gudang', aksi: 'beli', icon: ShoppingCart },
+  { label: 'Produksi', ket: 'Bahan dipakai, produk jadi bertambah', view: 'produksi-supplier', aksi: 'catat', icon: Factory },
+  { label: 'Pelunasan piutang / utang', ket: 'Pelanggan bayar atau Anda bayar supplier', view: 'piutang-utang', aksi: '', icon: HandCoins },
+  { label: 'Stok opname', ket: 'Hitung fisik barang di gudang', view: 'stok-gudang', aksi: 'opname', icon: ClipboardCheck },
+]
