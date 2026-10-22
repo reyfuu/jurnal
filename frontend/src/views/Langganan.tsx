@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { GARANSI_BELUM_BAYAR, checkout, getBilling, klaimGaransi, refreshBilling, type Billing, type GaransiStatus, type LanggananStatus } from '@/lib/api'
+import { GARANSI_BELUM_BAYAR, checkout, getBilling, kunciBaru, klaimGaransi, refreshBilling, type Billing, type GaransiStatus, type LanggananStatus } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { PaketHarga } from '@/components/PaketHarga'
 
@@ -93,6 +93,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
   const [info, setInfo] = useState('')
+  const kunciBayar = useRef<Record<string, string>>({}) // Idempotency-Key checkout per paket
   // Paket yang diklik di landing page sebelum daftar: disorot di sini.
   const [pilihan] = useState(() => { try { return sessionStorage.getItem('paket-pilihan') ?? undefined } catch { return undefined } })
 
@@ -119,10 +120,13 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
     setError('')
     setInfo('')
     try {
-      const co = await checkout(paket)
+      // Satu kunci per paket selama halaman terbuka: klik ulang / retry membuka transaksi Snap
+      // yang sama, bukan membuat tagihan kedua yang bisa terbayar dua kali.
+      const kunci = (kunciBayar.current[paket] ??= kunciBaru())
+      const co = await checkout(paket, kunci)
       await loadSnap(b.snap_js, b.client_key)
       window.snap!.pay(co.token, {
-        onSuccess: () => { setInfo('Pembayaran berhasil. Memperbarui status…'); void cekStatus() },
+        onSuccess: () => { kunciBayar.current = {}; setInfo('Pembayaran berhasil. Memperbarui status…'); void cekStatus() },
         onPending: () => setInfo('Pembayaran menunggu penyelesaian. Tekan "Cek status pembayaran" setelah Anda membayar.'),
         onError: () => setError('Pembayaran gagal. Silakan coba lagi.'),
         onClose: () => setBusy(''),

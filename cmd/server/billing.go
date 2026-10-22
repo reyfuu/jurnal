@@ -78,6 +78,11 @@ type order struct {
 	Status      string    `json:"status"` // pending | lunas | gagal
 	Waktu       time.Time `json:"waktu"`
 	DibayarPada time.Time `json:"dibayar_pada,omitzero"` // saat lunas; awal masa garansi
+	// Kunci: Idempotency-Key checkout / aktivasi manual yang membuat order ini. Token &
+	// RedirectURL: hasil Snap, dikembalikan lagi bila checkout yang sama diulang.
+	Kunci       string `json:"kunci,omitempty"`
+	Token       string `json:"token,omitempty"`
+	RedirectURL string `json:"redirect_url,omitempty"`
 }
 
 type langganan struct {
@@ -88,6 +93,9 @@ type langganan struct {
 	EksporPertama  time.Time `json:"ekspor_pertama,omitzero"` // ekspor data pertama: garansi gugur
 	GaransiDiklaim time.Time `json:"garansi_diklaim,omitzero"`
 	GaransiAlasan  string    `json:"garansi_alasan,omitempty"`
+	// kunciManual: Idempotency-Key aksi Panel Master terakhir (perpanjang trial / aktifkan).
+	// ponytail: hanya di memori — cukup untuk klik ganda & retry; restart di tengahnya jarang.
+	kunciManual string
 }
 
 // Garansi 7 hari uang kembali: berlaku untuk pembayaran PERTAMA usaha, 7×24 jam sejak lunas,
@@ -271,21 +279,55 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "pembayaran belum dikonfigurasi", http.StatusServiceUnavailable)
 		return
 	}
+	kunci, err := kunciIdempoten(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	u, t := currentUser(r), s.tenantOf(r)
-	o := order{ID: fmt.Sprintf("LB-%d-%d", t.id, time.Now().UnixNano()), Paket: p.ID, Jumlah: p.Harga, Status: "pending", Waktu: time.Now()}
+	balas := func(o order) {
+		writeJSON(w, map[string]any{"order_id": o.ID, "token": o.Token, "redirect_url": o.RedirectURL})
+	}
+	// Kunci yang sama = checkout yang sama (klik ganda, tab ganda, retry): kembalikan transaksi
+	// Snap yang sudah ada. Order dipesan dulu di bawah kunci tenant, baru Snap dipanggil.
+	t.mu.Lock()
+	if i := slices.IndexFunc(t.langganan.Orders, func(o order) bool { return kunci != "" && o.Kunci == kunci }); i >= 0 {
+		o := t.langganan.Orders[i]
+		t.mu.Unlock()
+		if o.Token == "" {
+			http.Error(w, "pembayaran ini sedang disiapkan, tunggu sebentar lalu coba lagi", http.StatusConflict)
+			return
+		}
+		balas(o)
+		return
+	}
+	o := order{ID: fmt.Sprintf("LB-%d-%d", t.id, time.Now().UnixNano()), Paket: p.ID, Jumlah: p.Harga, Status: "pending", Waktu: time.Now(), Kunci: kunci}
+	t.langganan.Orders = append(slices.Clone(t.langganan.Orders), o)
+	t.mu.Unlock()
+
 	snap, err := mt.CreateSnap(r.Context(), midtrans.SnapRequest{
 		OrderID: o.ID, Amount: p.Harga, Name: u.Name, Email: u.Email,
 		Items: []midtrans.Item{{ID: p.ID, Price: p.Harga, Quantity: 1, Name: "Master Pajak " + p.Nama}},
 	})
+	t.mu.Lock()
+	orders := slices.Clone(t.langganan.Orders)
+	i := slices.IndexFunc(orders, func(x order) bool { return x.ID == o.ID })
 	if err != nil {
+		if i >= 0 { // lepas pesanan supaya checkout yang sama bisa diulang
+			t.langganan.Orders = slices.Delete(orders, i, i+1)
+		}
+		t.mu.Unlock()
 		log.Printf("midtrans checkout %s: %v", o.ID, err)
 		http.Error(w, "gagal menghubungi Midtrans, coba lagi", http.StatusBadGateway)
 		return
 	}
-	t.mu.Lock()
-	t.langganan.Orders = append(t.langganan.Orders, o)
+	o.Token, o.RedirectURL = snap.Token, snap.RedirectURL
+	if i >= 0 {
+		orders[i] = o
+		t.langganan.Orders = orders
+	}
 	t.mu.Unlock()
-	writeJSON(w, map[string]any{"order_id": o.ID, "token": snap.Token, "redirect_url": snap.RedirectURL})
+	balas(o)
 }
 
 // handleMidtransNotify: webhook Midtrans (tanpa login). Signature diverifikasi, lalu status
@@ -383,8 +425,14 @@ func (s *Server) handleBillingRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 	t.mu.RUnlock()
 	for _, id := range pending {
-		if st, err := mt.Status(r.Context(), id); err == nil {
-			_ = s.applyPayment(st, time.Now())
+		st, err := mt.Status(r.Context(), id)
+		if err != nil {
+			continue // belum ada di Midtrans (mis. popup ditutup sebelum memilih cara bayar)
+		}
+		if err := s.applyPayment(st, time.Now()); errors.Is(err, errSimpan) {
+			// Jangan tampil "aktif" kalau belum tersimpan; klien bisa menekan cek status lagi.
+			http.Error(w, "status pembayaran belum tersimpan, coba cek status lagi", http.StatusServiceUnavailable)
+			return
 		}
 	}
 	s.handleBilling(w, r)

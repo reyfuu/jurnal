@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { KoreksiCard } from '@/components/KoreksiCard'
 import {
-  analisaKlien, arsipKlien, aturLangganan, getKlien, hapusKlien, mulaiLihat, pulihkanKlien, ubahKlien, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
+  analisaKlien, arsipKlien, aturLangganan, kunciBaru, getKlien, hapusKlien, mulaiLihat, pulihkanKlien, ubahKlien, type AnalisaKlien, getPlans, getRingkasanMaster, listKlien,
   type IdentitasUsaha, type KlienDetail, type KlienRow, type Paket, type RingkasanMaster,
 } from '@/lib/api'
 import { AlasanDialog, HapusPermanenDialog } from './KelolaDialog'
@@ -308,13 +308,15 @@ export function LanggananDialog({ open, onClose, klien, onSaved }: { open: boole
   const [plans, setPlans] = useState<Paket[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Satu Idempotency-Key per buka dialog: klik ganda / retry tidak menambah hari dua kali.
+  const kunci = useMemo(() => (open ? kunciBaru() : ''), [open])
   useEffect(() => { if (open) getPlans().then((r) => setPlans(r.paket), () => {}) }, [open])
   async function simpan(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await aturLangganan(klien.id, aksi === 'aktifkan' ? { aksi, paket, alasan } : { aksi: 'trial', hari: Number(hari), alasan })
+      await aturLangganan(klien.id, aksi === 'aktifkan' ? { aksi, paket, alasan } : { aksi: 'trial', hari: Number(hari), alasan }, kunci)
       setAlasan('')
       onSaved()
     } catch (err) {

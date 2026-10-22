@@ -469,8 +469,19 @@ func (s *Server) handleMasterLangganan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "alasan wajib diisi", http.StatusBadRequest)
 		return
 	}
+	kunci, err := kunciIdempoten(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	now := time.Now().UTC().Truncate(time.Second)
 	t.mu.Lock()
+	// Kiriman ulang aksi yang sama (klik ganda / retry): tidak menambah hari lagi.
+	if kunci != "" && (t.langganan.kunciManual == kunci || slices.ContainsFunc(t.langganan.Orders, func(o order) bool { return o.Kunci == kunci })) {
+		t.mu.Unlock()
+		writeJSON(w, t.langgananStatus(time.Now()))
+		return
+	}
 	lama := t.langganan
 	l := &t.langganan
 	var aksi string
@@ -492,13 +503,14 @@ func (s *Server) handleMasterLangganan(w http.ResponseWriter, r *http.Request) {
 		}
 		l.AktifSampai = maxTime(now, l.AktifSampai).AddDate(0, 0, p.Hari)
 		// Status "manual", bukan "lunas": tidak lewat Midtrans, jadi tidak membuka garansi 7 hari.
-		l.Orders = append(slices.Clone(l.Orders), order{ID: fmt.Sprintf("MANUAL-%d-%d", t.id, now.Unix()), Paket: p.ID, Jumlah: p.Harga, Status: "manual", Waktu: now})
+		l.Orders = append(slices.Clone(l.Orders), order{ID: fmt.Sprintf("MANUAL-%d-%d", t.id, now.Unix()), Paket: p.ID, Jumlah: p.Harga, Status: "manual", Waktu: now, Kunci: kunci})
 		aksi = "Aktifkan paket " + p.Nama + " (manual)"
 	default:
 		t.mu.Unlock()
 		http.Error(w, "aksi harus trial atau aktifkan", http.StatusBadRequest)
 		return
 	}
+	l.kunciManual = kunci
 	t.mu.Unlock()
 	if err := s.saveFor(t); err != nil {
 		t.mu.Lock()
