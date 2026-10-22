@@ -229,7 +229,11 @@ func NewServer() *Server {
 	if !loaded {
 		// DB kosong: impor berkas JSON lama (atau seed) lalu simpan. Mode JSON: seed hanya
 		// disimpan bila state.json belum ada; SEED_PASSWORD hanya dipakai saat itu.
-		if fromFiles := s.loadFiles(); s.db != nil || !fromFiles {
+		fromFiles := s.loadFiles()
+		for _, t := range s.tenants { // usaha seed / berkas lama: nomor jurnal sebelum disimpan
+			t.beriNomorJurnal()
+		}
+		if s.db != nil || !fromFiles {
 			s.saveAll()
 		}
 	}
