@@ -155,6 +155,25 @@ func (c *cetak) selesai(w io.Writer) error {
 	return c.d.Write(w)
 }
 
+// angkaBaris: beban (pengurang) ditulis hitam tanpa kurung karena barisnya sudah jelas
+// mengurangi; akun kontra merah dalam kurung; selain itu angka minus (mis. rugi) merah dalam kurung.
+func angkaBaris(r BarisLaporan) (string, bool) {
+	n := r.Nilai
+	if n < 0 {
+		n = -n
+	}
+	switch {
+	case r.Sifat == SifatPengurang:
+		return rupiah(n), false
+	case r.Sifat == SifatKontra:
+		if n == 0 {
+			return rupiah(0), false
+		}
+		return "(" + rupiah(n) + ")", true
+	}
+	return akuntansi(r.Nilai), r.Nilai < 0
+}
+
 // akuntansi: angka minus ditulis dalam kurung, kebiasaan laporan keuangan.
 func akuntansi(n int64) string {
 	if n < 0 {
@@ -178,13 +197,26 @@ func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagi
 			sub = "Posisi per akhir " + labelNeraca + " - dalam Rupiah"
 		}
 		c.halaman(b.Judul, sub)
+		berhuruf := slices.ContainsFunc(b.Baris, func(r BarisLaporan) bool { return r.Huruf != "" })
 		kolom := []kolomPDF{{judul: "KETERANGAN", lebar: isi - 140}, {judul: "JUMLAH (RP)", lebar: 140, kanan: true}}
+		if berhuruf {
+			kolom = append([]kolomPDF{{judul: "", lebar: 22}}, kolomPDF{judul: "KETERANGAN", lebar: isi - 162}, kolom[1])
+		}
 		var baris []barisPDF
 		for _, r := range b.Baris {
-			bp := barisPDF{sel: []string{r.Label}, gaya: r.Gaya}
+			label := r.Label
+			if r.Rumus != "" {
+				label += "   (" + r.Rumus + ")"
+			}
+			bp := barisPDF{sel: []string{label}, gaya: r.Gaya}
+			if berhuruf {
+				bp.sel = []string{r.Huruf, label}
+			}
 			if r.Gaya != GayaJudul {
-				bp.sel = append(bp.sel, akuntansi(r.Nilai))
-				bp.minus = []bool{false, r.Nilai < 0}
+				teks, merah := angkaBaris(r)
+				bp.sel = append(bp.sel, teks)
+				bp.minus = make([]bool, len(bp.sel))
+				bp.minus[len(bp.sel)-1] = merah
 			}
 			baris = append(baris, bp)
 		}

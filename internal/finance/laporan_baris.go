@@ -32,7 +32,18 @@ type BarisLaporan struct {
 	Nilai   int64  `json:"nilai"`
 	Gaya    string `json:"gaya"`
 	Agregat string `json:"agregat,omitempty"`
+	// Huruf & Rumus: penanda baris dan cara menghitung baris jumlah ("C = A − B") di PDF laba rugi.
+	// Sifat: SifatPengurang (beban, ditulis hitam tanpa kurung) atau SifatKontra (akun kontra,
+	// merah dalam kurung). Nilai tetap bertanda seperti di layar.
+	Huruf string `json:"huruf,omitempty"`
+	Rumus string `json:"rumus,omitempty"`
+	Sifat string `json:"sifat,omitempty"`
 }
+
+const (
+	SifatPengurang = "pengurang"
+	SifatKontra    = "kontra"
+)
 
 type BagianLaporan struct {
 	Kode  string         `json:"kode"` // laba-rugi | neraca | arus-kas
@@ -55,25 +66,40 @@ func (s *susun) tambah(gaya, kunci, label string, nilai int64) {
 
 func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	s := susun{b: BagianLaporan{Kode: "laba-rugi", Judul: "Laporan Laba Rugi"}, agregat: AgregatJumlah}
-	s.tambah(GayaBaris, "omzet", "Omzet (penjualan kotor)", is.Omzet)
-	s.tambah(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees)
-	s.tambah(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales)
-	s.tambah(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS)
-	s.tambah(GayaTotal, "laba_kotor", "Laba kotor", is.GrossProfit)
+	// Baris utama diberi huruf berurutan; baris jumlah menulis rumusnya dengan huruf itu.
+	huruf := map[string]string{}
+	berikut := 'A'
+	baris := func(gaya, kunci, label string, nilai int64, sifat, rumus string) {
+		h := string(berikut)
+		berikut++
+		huruf[kunci] = h
+		r := BarisLaporan{Kunci: kunci, Label: label, Nilai: nilai, Gaya: gaya, Agregat: s.agregat, Huruf: h, Sifat: sifat}
+		if rumus != "" {
+			r.Rumus = h + " = " + rumus
+		}
+		s.b.Baris = append(s.b.Baris, r)
+	}
+	baris(GayaBaris, "omzet", "Omzet (penjualan kotor)", is.Omzet, "", "")
+	baris(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees, SifatKontra, "")
+	baris(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales, "", huruf["omzet"]+" - "+huruf["potongan"])
+	baris(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS, SifatPengurang, "")
+	baris(GayaTotal, "laba_kotor", "Laba kotor", is.GrossProfit, "", huruf["penjualan_bersih"]+" - "+huruf["hpp"])
 	s.judul("judul_beban", "Beban operasional")
 	for _, l := range is.OpexLines {
-		s.tambah(GayaBaris, "beban:"+l.Label, l.Label, -l.Amount)
+		s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: "beban:" + l.Label, Label: l.Label, Nilai: -l.Amount, Gaya: GayaBaris, Agregat: s.agregat, Sifat: SifatPengurang})
 	}
-	s.tambah(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex)
-	s.tambah(GayaTotal, "ebitda", "EBITDA (laba sebelum penyusutan & amortisasi)", is.EBITDA)
+	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, "jumlah beban di atas")
+	baris(GayaTotal, "ebitda", "EBITDA (laba sebelum penyusutan & amortisasi)", is.EBITDA, "", huruf["laba_kotor"]+" - "+huruf["total_beban"])
 	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
-	s.tambah(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation)
-	s.tambah(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization)
-	s.tambah(GayaTotal, "ebit", "Laba usaha (EBIT)", is.EBIT)
+	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatKontra, "")
+	baris(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization, SifatKontra, "")
+	baris(GayaTotal, "ebit", "Laba usaha (EBIT)", is.EBIT, "", huruf["ebitda"]+" - "+huruf["penyusutan"]+" - "+huruf["amortisasi"])
 	if is.OtherIncome != 0 {
-		s.tambah(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome)
+		baris(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome, "", "")
+		baris(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit, "", huruf["ebit"]+" + "+huruf["pendapatan_lain"])
+	} else {
+		baris(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit, "", huruf["ebit"])
 	}
-	s.tambah(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit)
 	return s.b
 }
 
