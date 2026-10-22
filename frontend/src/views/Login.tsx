@@ -114,7 +114,7 @@ export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogi
             </form>
             <p className="mt-4 text-center text-sm text-muted-foreground">
               {daftar ? 'Sudah punya akun?' : 'Belum punya akun?'}{' '}
-              <button type="button" className="font-semibold text-foreground underline-offset-4 hover:underline" onClick={() => { setDaftar(!daftar); setError('') }}>
+              <button type="button" className="font-semibold text-foreground underline-offset-4 hover:underline" onClick={() => { setDaftar(!daftar); setError(''); history.replaceState(history.state, '', daftar ? '#/masuk' : '#/daftar') }}>
                 {daftar ? 'Masuk' : 'Daftar'}
               </button>
             </p>

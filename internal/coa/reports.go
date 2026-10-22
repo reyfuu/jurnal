@@ -28,6 +28,9 @@ func linesOf(tb []Balance, k Kelompok, skip ...string) ([]ReportLine, int64) {
 			continue
 		}
 		v := amount(b)
+		if v == 0 { // akun bersaldo 0 tidak ditampilkan di laporan
+			continue
+		}
 		out = append(out, ReportLine{b.Kode, b.Nama, v})
 		total += v
 	}
@@ -146,7 +149,7 @@ func BalanceSheet(tb []Balance, labaBerjalan int64) BalanceSheetResult {
 		Liabilitas: []BalanceSection{sec(LiabilitasPendek), sec(LiabilitasJangka)},
 		Ekuitas:    sec(Ekuitas),
 	}
-	r.Ekuitas.Lines = append(r.Ekuitas.Lines, ReportLine{"", "Laba Tahun Berjalan", labaBerjalan})
+	r.Ekuitas.Lines = append(r.Ekuitas.Lines, ReportLine{"", "Laba (Rugi) Tahun Berjalan", labaBerjalan})
 	r.Ekuitas.Total += labaBerjalan
 	for _, s := range r.Aset {
 		r.TotalAset += s.Total

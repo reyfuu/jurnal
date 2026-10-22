@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ArrowRight, Bot, Sparkles, X, Send, RefreshCw, MessageSquareQuote } from 'lucide-react'
 import { askAIChat, type AIChatResponse, type View } from '../lib/api'
 import { Monogram } from '@/components/Logo'
+import { useGeser } from '@/lib/geser'
 
 interface Message {
   id: string
@@ -21,13 +22,15 @@ const INITIAL_SUGGESTIONS = [
 
 export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?: string) => void }> = ({ period = '2026-08', onBuka }) => {
   const [isOpen, setIsOpen] = useState(false)
+  // tombol bisa digeser supaya tidak menutupi laporan; posisi diingat
+  const geser = useGeser('mp:posisi-tanya-ai')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Master Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
+      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *MasterPajak AI*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
       suggestions: INITIAL_SUGGESTIONS,
     },
   ])
@@ -115,10 +118,10 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed z-50 flex flex-col items-end" style={{ right: geser.pos.right, bottom: geser.pos.bottom }}>
       {/* Panel Chat */}
       {isOpen && (
-        <div className="mb-4 w-[430px] max-w-[94vw] h-[580px] max-h-[82vh] rounded-2xl border border-[var(--border-subtle)] bg-card shadow-[var(--shadow-3)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div style={{ maxHeight: `min(82vh, calc(100vh - ${geser.pos.bottom + 90}px))` }} className="mb-4 w-[430px] max-w-[94vw] h-[580px] rounded-2xl border border-[var(--border-subtle)] bg-card shadow-[var(--shadow-3)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
           <div className="dark px-4 py-3.5 bg-[var(--navy-700)] flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -127,7 +130,7 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
               </div>
               <div>
                 <h3 className="font-heading font-bold text-sm">AI Konsultan Pajak & Bisnis</h3>
-                <p className="text-[11px] text-muted-foreground">Master Pajak</p>
+                <p className="text-[11px] text-muted-foreground">MasterPajak AI</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -248,8 +251,11 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
 
       {/* Floating Trigger Button */}
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-[var(--navy-700)] text-white text-sm shadow-[var(--shadow-2)] hover:bg-[var(--navy-900)] active:scale-[0.98] transition border border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        {...geser.handlers}
+        onClick={() => { if (geser.diklik()) setIsOpen((prev) => !prev) }}
+        title="Klik untuk bertanya; tahan lalu geser untuk memindahkan"
+        style={{ touchAction: 'none' }}
+        className="group relative flex cursor-grab items-center gap-2.5 px-4 py-3 rounded-full active:cursor-grabbing bg-[var(--navy-700)] text-white text-sm shadow-[var(--shadow-2)] hover:bg-[var(--navy-900)] active:scale-[0.98] transition border border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <div className="relative">
           <Bot className="w-5 h-5 text-white" />

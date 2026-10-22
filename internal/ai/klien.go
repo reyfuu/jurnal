@@ -46,7 +46,7 @@ type AnalisaKlienHasil struct {
 	Poin      []PoinAnalisa `json:"poin,omitempty"`
 }
 
-const promptKlien = `Kamu konsultan pajak & pembukuan Master Pajak yang menilai satu klien UMKM untuk tim internal.
+const promptKlien = `Kamu konsultan pajak & pembukuan MasterPajak AI yang menilai satu klien UMKM untuk tim internal.
 Kamu menerima FAKTA (angka yang SUDAH dihitung sistem) dan SUMBER bernomor.
 
 ATURAN MUTLAK:

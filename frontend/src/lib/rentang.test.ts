@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pilihanCepat, rentangBulan } from './rentang'
+import { pilihanCepat, rentangBulan, tanggalAkhirPeriode } from './rentang'
 
 describe('rentang tanggal laporan', () => {
   it('bulan penuh, termasuk Februari kabisat', () => {
@@ -11,5 +11,13 @@ describe('rentang tanggal laporan', () => {
     expect(p['Bulan lalu']).toMatchObject({ dari: '2025-12-01', sampai: '2025-12-31' })
     expect(p['3 bulan terakhir']).toMatchObject({ dari: '2025-11-01', sampai: '2026-01-31' })
     expect(p['Tahun ini']).toMatchObject({ dari: '2026-01-01', sampai: '2026-01-31' })
+  })
+})
+
+describe('tanggalAkhirPeriode', () => {
+  it('neraca ditulis per tanggal, bukan "akhir bulan"', () => {
+    expect(tanggalAkhirPeriode('2026-10')).toBe('31 Oktober 2026')
+    expect(tanggalAkhirPeriode('2028-02')).toBe('29 Februari 2028')
+    expect(tanggalAkhirPeriode('2026-08', true)).toBe('31 Agu 2026')
   })
 })

@@ -13,6 +13,7 @@ type SaranBentuk struct {
 	Termurah string   `json:"termurah"`
 	Sekarang string   `json:"sekarang"` // skema bentuk usaha yang dipilih sekarang
 	Judul    string   `json:"judul"`
+	Asumsi   string   `json:"asumsi"` // dasar perhitungan: usaha di tahun pertama
 	Alasan   []string `json:"alasan"`
 	Catatan  []string `json:"catatan"`
 	Hemat    int64    `json:"hemat"`     // per tahun dibanding skema sekarang
@@ -35,7 +36,7 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 	if !pribadi || ptkpCode == "" {
 		ptkpCode = "TK/0"
 	}
-	bu, err := compareLaba(omzet, laba, ptkpCode)
+	bu, err := compareLaba(omzet, laba, ptkpCode, true)
 	if err != nil {
 		return nil
 	}
@@ -43,7 +44,7 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 	cari := func(id string) Skema {
 		return bu.Skema[slices.IndexFunc(bu.Skema, func(s Skema) bool { return s.ID == id })]
 	}
-	best, now := cari(bu.Termurah), cari(skemaSaatIni(bentuk, omzet))
+	best, now := cari(bu.Termurah), cari(skemaSaatIni(bentuk, omzet, true))
 	s := &SaranBentuk{Termurah: best.ID, Sekarang: now.ID, Hemat: now.Pajak - best.Pajak, Skema: bu.Skema, Laba: laba, PTKP: bu.PTKP, Omzet: omzet}
 	if s.Hemat <= 0 { // seri dengan skema sekarang: tetap di bentuk sekarang
 		s.Termurah, s.Hemat, best = now.ID, 0, now
@@ -54,6 +55,10 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 	umkm := persenBps(int(pr.UMKMTarifBps))
 	margin := pct(laba * 10_000 / omzet)
 
+	s.Asumsi = "Asumsi: usaha di tahun pertama, dengan omzet dan laba setahun sesuai perkiraan yang Anda isi."
+	if omzet > pr.BatasOmzetUMKM {
+		s.Asumsi += fmt.Sprintf(" Karena itu PPh final %s masih dibandingkan walau omzet di atas %s; tahun berikutnya skema ini tidak berlaku lagi.", umkm, rp(pr.BatasOmzetUMKM))
+	}
 	if s.Termurah == s.Sekarang {
 		s.Judul = "Skema pajak Anda sekarang sudah paling hemat: " + best.Nama
 	} else {
@@ -105,7 +110,10 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 
 	switch best.ID {
 	case SkemaPPOP, SkemaPPBadan:
-		s.Alasan = append(s.Alasan, fmt.Sprintf("Syaratnya omzet setahun tidak melebihi %s, dan PPh final punya batas waktu pemakaian (%s): 7 tahun untuk orang pribadi, 4 tahun untuk CV, 3 tahun untuk PT.", rp(pr.BatasOmzetUMKM), pr.DasarUMKM))
+		if omzet > pr.BatasOmzetUMKM {
+			s.Alasan = append(s.Alasan, fmt.Sprintf("Omzet di atas %s: PPh final hanya berlaku sampai akhir tahun pajak saat omzet pertama kali melewati batas (tahun pertama). Mulai tahun berikutnya wajib pembukuan dan tarif umum.", rp(pr.BatasOmzetUMKM)))
+		}
+		s.Alasan = append(s.Alasan, fmt.Sprintf("Syaratnya omzet setahun tidak melebihi %s, dan PPh final punya batas waktu pemakaian (%s).", rp(pr.BatasOmzetUMKM), pr.DasarUMKM))
 	case SkemaPasal17OP:
 		s.Alasan = append(s.Alasan, "Syaratnya menyelenggarakan pembukuan yang rapi (aplikasi ini menyiapkannya) dan memberi tahu DJP bahwa Anda tidak memakai PPh final.")
 	case SkemaPasal31E, SkemaBadan22:

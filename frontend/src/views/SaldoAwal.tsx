@@ -31,8 +31,8 @@ function dariPos(o: OpeningBalance, nbv: number): SaldoAkun[] {
     { kode: '1101', nama: 'Kas & Bank', kategori: 'kas', nominal: o.kas },
     { kode: '1201', nama: 'Piutang Usaha', kategori: 'piutang', nominal: o.piutang },
     { kode: '1301', nama: 'Persediaan', kategori: 'persediaan', nominal: o.persediaan },
-    { kode: '2101', nama: 'Hutang Usaha', kategori: 'utang', nominal: o.utang },
-    { kode: '2102', nama: 'Hutang Bank', kategori: 'pinjaman', nominal: o.pinjaman },
+    { kode: '2101', nama: 'Utang Usaha', kategori: 'utang', nominal: o.utang },
+    { kode: '2102', nama: 'Utang Bank', kategori: 'pinjaman', nominal: o.pinjaman },
   ]
   const modal = o.kas + o.piutang + o.persediaan + nbv - o.utang - o.pinjaman
   return [...baris, { kode: '3101', nama: 'Modal Pemilik', kategori: 'modal', nominal: modal }]

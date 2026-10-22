@@ -369,6 +369,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/jurnal.xlsx", s.guard("jurnal-umum", s.exporting(s.on((*tenant).handleJurnalUmumXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
+	s.mux.HandleFunc("GET /api/v1/reports/rentang", s.guard("laporan-keuangan", s.on((*tenant).handleLaporanRentang)))
 	s.mux.HandleFunc("GET /api/v1/reports/pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleLaporanPDF))))
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.xlsx", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarPDF))))
@@ -380,6 +381,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
+	s.mux.HandleFunc("GET /api/v1/transactions/mirip", s.guard("transaksi", s.on((*tenant).handleCariMirip)))
+	s.mux.HandleFunc("GET /api/v1/transactions/dobel", s.guard("transaksi", s.on((*tenant).handleDobel)))
 	s.mux.HandleFunc("POST /api/v1/transactions/foto", s.guard("transaksi", s.handleBacaNota))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
@@ -504,7 +507,7 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
 			g, ok := s.lihatUntuk(u.ID, time.Now())
 			if !ok {
-				http.Error(w, "akun tim Master Pajak hanya membuka Panel Master", http.StatusForbidden)
+				http.Error(w, "akun tim MasterPajak AI hanya membuka Panel Master", http.StatusForbidden)
 				return
 			}
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -859,8 +862,28 @@ func (s *tenant) handleCashflow(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).CashFlow)
 }
 
+// handleBalanceSheet: neraca per akhir periode, atau per tanggal bebas (?tanggal=YYYY-MM-DD).
 func (s *tenant) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
+	if tgl := r.URL.Query().Get("tanggal"); tgl != "" {
+		bs, err := s.neracaPada(tgl)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, bs)
+		return
+	}
 	writeJSON(w, s.report(periodOrDefault(r)).BalanceSheet)
+}
+
+// neracaPada: neraca per tanggal (YYYY-MM-DD) dari buku berjalan.
+func (s *tenant) neracaPada(tgl string) (finance.BalanceSheet, error) {
+	if _, err := time.Parse(time.DateOnly, tgl); err != nil {
+		return finance.BalanceSheet{}, errors.New("tanggal harus YYYY-MM-DD")
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return finance.BuildNeracaPada(s.txs, s.assets, tgl, s.bukuAwalLocked(), s.kartuLocked()), nil
 }
 
 func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -1025,7 +1048,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan = 0, 0, "" // tautan invoice & catatan jurnal hanya diatur server
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1216,7 +1239,7 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("<h1>Master Pajak API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
+	_, _ = w.Write([]byte("<h1>MasterPajak AI API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
 }
 
 func main() {
@@ -1225,7 +1248,7 @@ func main() {
 		port = "8080"
 	}
 	srv := NewServer()
-	log.Printf("Master Pajak listening on http://localhost:%s", port)
+	log.Printf("MasterPajak AI listening on http://localhost:%s", port)
 	hs := &http.Server{
 		Addr: ":" + port, Handler: srv,
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute,

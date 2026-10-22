@@ -44,7 +44,7 @@ export function KalkulatorPajak({ profile }: { profile: BusinessProfile | null }
       <div className="card" style={{ padding: '12px 18px', marginBottom: 14, borderColor: 'color-mix(in srgb, var(--text-warn) 30%, transparent)' }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
           <span style={{ color: 'var(--text-warn)', fontWeight: 600 }}>Alat bantu, bukan pengganti konsultan.</span>{' '}
-          Tarif mengikuti parameter pajak yang dikelola tim Master Pajak dan setiap objek mencantumkan rujukan aturannya.
+          Tarif mengikuti parameter pajak yang dikelola tim MasterPajak AI dan setiap objek mencantumkan rujukan aturannya.
           Minta tim pajak memverifikasi baris yang relevan sebelum dipakai untuk SPT.
         </div>
       </div>

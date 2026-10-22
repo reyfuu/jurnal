@@ -64,7 +64,7 @@ function Naskah({ p }: { p: Peraturan }) {
     return (
       <section className="card items-start" style={{ padding: 24, gap: 10, justifyContent: 'flex-start' }}>
         <FileX size={28} aria-hidden="true" style={{ color: 'var(--text-secondary)' }} />
-        <h2 className="text-base font-semibold">Naskah belum tersedia di Master Pajak</h2>
+        <h2 className="text-base font-semibold">Naskah belum tersedia di MasterPajak AI</h2>
         <p className="text-sm leading-relaxed text-muted-foreground" style={{ maxWidth: 560 }}>
           Tim kami sedang melengkapi naskah resmi peraturan ini dan akan muncul di sini begitu tersedia.
           {p.sumber_url ? ' Sementara itu, Anda bisa membacanya di sumber resmi.' : ''}

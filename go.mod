@@ -6,6 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
 	github.com/pdfcpu/pdfcpu v0.10.2
+	golang.org/x/image v0.26.0
 )
 
 require (
@@ -21,7 +22,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/image v0.26.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

@@ -162,7 +162,7 @@ func HitungMarketplace(in MarketplaceInput) (MarketplaceResult, error) {
 		add("Ajukan SKB PPh 22 supaya tidak dipungut marketplace",
 			fmt.Sprintf("PPh 22 yang dipungut marketplace setahun (%s) lebih besar dari PPh terutang (%s)%s. Kelebihan %s menjadi lebih bayar di SPT Tahunan dan baru kembali lewat restitusi yang memakan waktu dan bisa diikuti pemeriksaan. Dengan Surat Keterangan Bebas (SKB) pemungutan PPh 22, marketplace tidak memungut sehingga kas usaha tidak tertahan.",
 				rp(r.Dipungut), rp(r.Terutang), npm, rp(r.LebihBayar)), false)
-		add("Siapkan pengajuan SKB bersama Master Pajak",
+		add("Siapkan pengajuan SKB bersama MasterPajak AI",
 			"Pengajuan SKB perlu laporan keuangan dan perhitungan pajak yang rapi. Isi data usaha dan berlangganan: pembukuan, laporan laba rugi, dan perkiraan PPh tersusun otomatis dari transaksi Anda sebagai bahan pengajuan.", true)
 	case !r.Final && r.KurangBayar > 0:
 		add("PPh 22 marketplace mengurangi pajak tahunan",

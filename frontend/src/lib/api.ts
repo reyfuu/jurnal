@@ -290,6 +290,8 @@ export interface Tx {
   /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
   grup?: number
   no_bukti?: string
+  /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
+  sumber?: 'mutasi' | 'foto'
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -297,7 +299,7 @@ export type TxInput = Omit<Tx, 'id'>
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
 /** bukti: token dari bacaNota; fotonya disimpan sebagai bukti catatan baru. */
-export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; bukti?: string }
+export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string }
 /** Jejak foto nota yang menjadi bukti catatan: kapan dibaca AI, siapa yang menyimpan. */
 export interface FotoNota { dibaca_pada: string; disimpan_oleh: string; disimpan_pada: string; yakin?: string }
 export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
@@ -502,7 +504,7 @@ export const pilihMetodePenyusutan = (metode: MetodePenyusutan) =>
   api<BusinessProfile>('/business/metode-penyusutan', { method: 'POST', body: { metode } })
 
 /** Metode nilai stok usaha: bawaan FIFO; terkunci setelah dipilih atau kartu stok dimulai. */
-export interface MetodeStok { metode: MetodeNilaiStok; terkunci: boolean; pilihan: Option[] }
+export interface MetodeStok { metode: MetodeNilaiStok; terkunci: boolean; pilihan: Option[]; pencatatan: 'periodik' | 'perpetual' }
 export const getMetodeStok = () => api<MetodeStok>('/stok/metode')
 export const pilihMetodeStok = (metode: MetodeNilaiStok) => api<MetodeStok>('/stok/metode', { method: 'POST', body: { metode } })
 
@@ -560,7 +562,7 @@ export async function importTransactions(file: File, commit: boolean): Promise<I
 }
 
 /** Catatan yang mungkin sama dengan nota yang baru dibaca (grup = catatan jurnal, id = transaksi). */
-export interface DuplikatNota { grup?: number; id?: number; tanggal: string; nominal: number; pihak?: string; keterangan?: string; alasan: string }
+export interface DuplikatNota { grup: number; tanggal: string; nominal: number; pihak?: string; keterangan?: string; alasan: string }
 
 /** Hasil AI membaca foto nota/struk: pratinjau isian transaksi, belum tersimpan.
  *  bukti: token untuk menyimpan fotonya bersama catatan; duplikat: peringatan saja. */
@@ -616,6 +618,8 @@ export interface BusinessProfile {
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
   omzet_tahunan?: number
   laba_sebelum_pajak?: number
+  /** Modal yang ditanam pemilik; dasar ROI tahun pertama (laba ÷ modal). */
+  modal_awal?: number
   /** Lokasi usaha (onboarding); alamat juga dicetak di invoice. */
   alamat?: string
   kecamatan?: string
@@ -676,9 +680,13 @@ export interface CekAwal {
   risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
   /** Kesimpulan sheet "Bentuk Usaha": skema pajak paling hemat + alasan. null bila omzet kosong. */
   saran: SaranBentuk | null
+  /** ROI tahun pertama (laba ÷ modal); hanya ada bila modal diisi. */
+  modal_awal?: number
+  roi_bps?: number
+  roi_pesan?: string
 }
 export interface SaranBentuk {
-  termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]
+  termurah: string; sekarang: string; judul: string; asumsi?: string; alasan: string[]; catatan: string[]
   hemat: number; skema: TaxSkema[]; laba: number; ptkp: number
   /** hemat ÷ pajak skema sekarang, basis poin (8523 = 85,23% lebih kecil). */
   hemat_bps: number; omzet: number
@@ -874,6 +882,10 @@ export interface CoAInfo {
 export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[] }
 
 export const getCoA = () => api<CoAInfo>('/coa')
+/** Akun buatan klien: jenisnya mengikuti akun induk, kode dibuat otomatis setelah induk. */
+export const tambahAkunCoA = (nama: string, induk: string) => api<{ kode: string; nama: string; induk: string }>('/coa/akun', { method: 'POST', body: { nama, induk } })
+export const hapusAkunCoA = (kode: string) => api<void>(`/coa/akun/${kode}`, { method: 'DELETE' })
+export const CATATAN_AKUN_TAMBAHAN = 'Ditambahkan sendiri di Daftar Akun'
 export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
 
 // --- Katalog Panel Master: template COA & benchmark NPM nasional ---
@@ -1281,10 +1293,23 @@ export interface MutasiRow {
   jenis: string
   alasan: string
   keyakinan: Keyakinan
-  /** Sudah ada transaksi dengan tanggal & nominal sama — dugaan, bukan kepastian. */
+  /** Kemungkinan sudah tercatat (arah & nominal sama, tanggal berdekatan) — dugaan, bukan kepastian. */
   duplikat: boolean
+  /** Transaksi yang cocok; belum_lunas = mutasi ini bisa dicatat sebagai pelunasannya. */
+  mirip?: Mirip
+  /** Diisi ID transaksi: baris dicatat sebagai pelunasan transaksi itu, bukan transaksi baru. */
+  lunasi?: number
   pilih: boolean
 }
+
+/** Transaksi yang kemungkinan sama dengan uang masuk/keluar tertentu (cegah jurnal dobel). */
+export interface Mirip {
+  id: number; invoice_id?: number; tanggal: string; jenis: string; keterangan?: string; pihak?: string
+  nominal: number; sumber?: 'mutasi' | 'foto'; belum_lunas: boolean
+}
+export const cariMirip = (tanggal: string, nominal: number, arah: 'masuk' | 'keluar', kecualiGrup?: number) =>
+  api<Mirip[]>(`/transactions/mirip?tanggal=${tanggal}&nominal=${nominal}&arah=${arah}${kecualiGrup ? `&kecuali_grup=${kecualiGrup}` : ''}`)
+export const getDobel = (period: string) => api<[Tx, Tx][]>(`/transactions/dobel?period=${encodeURIComponent(period)}`)
 
 export interface MutasiGrup {
   jenis: string
@@ -1860,13 +1885,22 @@ export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>
 export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
 export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
-export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung') =>
-  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}`
+/** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
+/** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
+export const getNeracaPada = (tanggal: string) => api<BalanceSheet>(`/reports/balance-sheet?tanggal=${tanggal}`)
+
+/** Laba rugi & arus kas untuk rentang tanggal bebas. */
+export interface LaporanRentang { dari: string; sampai: string; label: string; income: IncomeStatement; cashflow: CashFlow }
+export const getLaporanRentang = (dari: string, sampai: string) => api<LaporanRentang>(`/reports/rentang?dari=${dari}&sampai=${sampai}`)
 export interface BarisBanding {
   kunci: string; label: string; gaya: 'judul' | 'baris' | 'sub' | 'total'
   /** Isi kolom Total: jumlah (laba rugi, arus kas), awal (saldo awal), akhir (neraca, saldo akhir). */
   agregat?: 'jumlah' | 'awal' | 'akhir'
   nilai: number[]; total: number
+  /** Laba rugi opsi B: huruf baris, rumus baris jumlah, sifat angka (lib/angkaLaporan). */
+  huruf?: string; rumus?: string; sifat?: '' | 'pengurang' | 'kontra'
 }
 export interface BagianBanding { kode: 'laba-rugi' | 'neraca' | 'arus-kas'; judul: string; baris: BarisBanding[] }
 export interface Banding { kolom: { periode: string; label: string }[]; bagian: BagianBanding[] }

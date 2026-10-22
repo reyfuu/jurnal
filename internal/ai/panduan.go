@@ -141,7 +141,7 @@ var daftarTopik = []topik{
 		kata:    []string{"daftar akun", "coa", "chart of account", "kode akun", "akun akuntansi"},
 		jawaban: "Daftar akun (CoA) usaha Anda ada di **Daftar Akun (CoA)**.",
 		tautan:  []Tautan{{View: "master-data", Label: "Buka Daftar Akun"}}},
-	{kode: "catatan", ringkas: "catatan / koreksi dari konsultan Master Pajak",
+	{kode: "catatan", ringkas: "catatan / koreksi dari konsultan MasterPajak AI",
 		kata:    []string{"catatan konsultan", "catatan dari konsultan", "usulan koreksi", "koreksi konsultan"},
 		jawaban: "Catatan dari konsultan ada di **Catatan Konsultan**; usulan koreksi pembukuan menunggu persetujuan Anda di **Usulan Koreksi**.",
 		tautan:  []Tautan{{View: "catatan", Label: "Buka Catatan Konsultan"}, {View: "usulan-koreksi", Label: "Buka Usulan Koreksi"}}},
@@ -149,9 +149,9 @@ var daftarTopik = []topik{
 		kata:    []string{"error", "bug", "lapor masalah", "tidak bisa", "gagal", "rusak", "macet"},
 		jawaban: "Laporkan kendala aplikasi lewat **Lapor Bug**; tim kami akan membalas di sana.",
 		tautan:  []Tautan{{View: "lapor-bug", Label: "Buka Lapor Bug"}}},
-	{kode: "pustaka", ringkas: "artikel & penjelasan aturan pajak dari tim Master Pajak",
+	{kode: "pustaka", ringkas: "artikel & penjelasan aturan pajak dari tim MasterPajak AI",
 		kata:    []string{"artikel", "pustaka", "artikel pajak", "penjelasan aturan"},
-		jawaban: "Artikel dan penjelasan aturan pajak dari tim Master Pajak ada di **Artikel Pajak**.",
+		jawaban: "Artikel dan penjelasan aturan pajak dari tim MasterPajak AI ada di **Artikel Pajak**.",
 		tautan:  []Tautan{{View: "pustaka", Label: "Buka Artikel Pajak"}}},
 	{kode: "primbon", ringkas: "katalog & naskah resmi peraturan pajak (UU, PP, PMK, PER DJP)",
 		kata: []string{"primbon", "peraturan", "peraturan pajak", "cari peraturan", "baca peraturan", "naskah peraturan", "naskah", "baca aturan", "dasar hukum",
@@ -293,7 +293,7 @@ func CariPanduan(q string, boleh func(view string) bool) (Panduan, bool) {
 	return p, true
 }
 
-const promptPanduan = `Kamu asisten aplikasi pembukuan & pajak UMKM "Master Pajak". Pengguna bertanya di mana atau bagaimana melakukan sesuatu di aplikasi. Pilih 1-2 topik yang paling cocok HANYA dari daftar (kode | isi topik). Jangan mengarang kode. Bila tidak ada yang cocok, kembalikan daftar kosong.
+const promptPanduan = `Kamu asisten aplikasi pembukuan & pajak UMKM "MasterPajak AI". Pengguna bertanya di mana atau bagaimana melakukan sesuatu di aplikasi. Pilih 1-2 topik yang paling cocok HANYA dari daftar (kode | isi topik). Jangan mengarang kode. Bila tidak ada yang cocok, kembalikan daftar kosong.
 
 Balas HANYA JSON: {"topik":["kode"]}`
 

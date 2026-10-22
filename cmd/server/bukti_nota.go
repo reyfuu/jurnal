@@ -58,10 +58,9 @@ func (m buktiMeta) info() *fotoNotaInfo {
 	return &fotoNotaInfo{m.DibacaPada, m.DisimpanOleh, m.DisimpanPada, m.Saran.Yakin}
 }
 
-// duplikatNota: catatan yang mungkin sama dengan nota yang baru dibaca (ID diisi bila bukan grup).
+// duplikatNota: catatan yang fotonya sama dengan nota yang baru dibaca.
 type duplikatNota struct {
-	Grup       int    `json:"grup,omitempty"`
-	ID         int    `json:"id,omitempty"`
+	Grup       int    `json:"grup"`
 	Tanggal    string `json:"tanggal"`
 	Nominal    int64  `json:"nominal"`
 	Pihak      string `json:"pihak,omitempty"`
@@ -204,44 +203,15 @@ func (s *tenant) lampirkanBuktiLocked(r *http.Request, grup int, token string) *
 	return m.info()
 }
 
-// duplikatNotaLocked: catatan yang mungkin sama dengan nota ini — fotonya sudah jadi bukti, atau
-// tanggal & nominal sama (per transaksi atau total satu grup). Hanya peringatan. s.mu dipegang.
-func (s *tenant) duplikatNotaLocked(hash string, n ai.SaranNota) []duplikatNota {
+// duplikatNotaLocked: catatan yang fotonya sama persis dengan nota ini. Tanggal & nominal sama
+// tanpa foto dicegat cek dobel saat simpan (finance.Mirip), bukan di sini. s.mu dipegang.
+func (s *tenant) duplikatNotaLocked(hash string) []duplikatNota {
 	var out []duplikatNota
-	sudah := map[int]bool{}
-	tambah := func(d duplikatNota) {
-		if len(out) < maxDuplikatNota && (d.Grup == 0 || !sudah[d.Grup]) {
-			sudah[d.Grup] = true
-			out = append(out, d)
-		}
-	}
 	for _, m := range s.semuaBuktiLocked() {
-		if m.Hash == hash {
-			tambah(duplikatNota{Grup: m.Grup, Tanggal: m.Saran.Tanggal, Nominal: m.Saran.Nominal, Pihak: m.Saran.Pihak,
+		if m.Hash == hash && len(out) < maxDuplikatNota {
+			out = append(out, duplikatNota{Grup: m.Grup, Tanggal: m.Saran.Tanggal, Nominal: m.Saran.Nominal, Pihak: m.Saran.Pihak,
 				Keterangan: m.Saran.Keterangan, Alasan: "foto yang sama sudah pernah dicatat"})
 		}
-	}
-	if n.Tanggal == "" || n.Nominal <= 0 {
-		return out
-	}
-	total := map[int]int64{}
-	for _, x := range s.txs {
-		if x.Grup > 0 && x.Tanggal == n.Tanggal {
-			total[x.Grup] += x.Nominal
-		}
-	}
-	for _, x := range s.txs {
-		if x.Tanggal != n.Tanggal || (x.Nominal != n.Nominal && (x.Grup == 0 || total[x.Grup] != n.Nominal)) {
-			continue
-		}
-		d := duplikatNota{Grup: x.Grup, Tanggal: x.Tanggal, Nominal: x.Nominal, Pihak: x.Pihak, Keterangan: x.Keterangan,
-			Alasan: "tanggal dan nominal sama"}
-		if x.Grup > 0 {
-			d.Nominal = total[x.Grup]
-		} else {
-			d.ID = x.ID
-		}
-		tambah(d)
 	}
 	return out
 }

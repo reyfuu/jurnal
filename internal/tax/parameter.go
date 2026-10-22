@@ -102,7 +102,7 @@ func ParameterBawaan() Parameter {
 		PTKP: ptkpBawaan, Pasal17: pasal17Bawaan,
 		BiayaJabatanBps: 500, BiayaJabatanMaks: 6_000_000, TanpaNPWPPPh21Bps: 12_000, DasarBukanPegawaiBps: 5000,
 		TER:          TERParam{Kategori: TERKategori, Lapisan: TERLapisan},
-		UMKMTarifBps: 50, UMKMBebasOP: 500_000_000, BatasOmzetUMKM: 4_800_000_000, DasarUMKM: "PP 55/2022",
+		UMKMTarifBps: 50, UMKMBebasOP: 500_000_000, BatasOmzetUMKM: 4_800_000_000, DasarUMKM: "PP 55/2022 jo. PP 20/2026",
 		BadanTarifBps: 2200, Fasilitas31EBps: 5000, Batas31EPenuh: 4_800_000_000, Batas31E: 50_000_000_000, DividenBps: 1000,
 		BatasPKP: 4_800_000_000, PPNTarifBps: 1200, PPNDPPPembilang: 11, PPNDPPPenyebut: 12,
 		MarketplaceTarifBps: 50, MarketplaceBebasOP: 500_000_000, DasarMarketplace: "PMK 37/2025",

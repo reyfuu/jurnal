@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { angkaSifat } from '@/lib/angkaLaporan'
+import { tanggalAkhirPeriode } from '@/lib/rentang'
 import { Check, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { bandingPdfUrl, getBanding, MAKS_BANDING, type Banding, type BagianBanding, type PeriodOption } from '@/lib/api'
@@ -88,15 +90,15 @@ function TabelBanding({ b, kolom }: { b: BagianBanding; kolom: Banding['kolom'] 
     <div className="card" style={{ padding: 20 }}>
       <div className="chart-title">{b.judul}</div>
       <div className="chart-subtitle" style={{ marginBottom: 10 }}>
-        {b.kode === 'neraca' ? 'Posisi per akhir tiap bulan; kolom terakhir = posisi bulan terakhir.' : 'Kolom Total = jumlah seluruh bulan yang dipilih.'}
+        {b.kode === 'neraca' ? 'Posisi per tanggal terakhir tiap bulan; kolom terakhir = posisi tanggal paling akhir.' : 'Kolom Total = jumlah seluruh bulan yang dipilih.'}
       </div>
       <div className="table-scroll">
         <table className="data-table tabular" style={{ minWidth: 260 + 130 * (kolom.length + (dua ? 3 : 1)) }}>
           <thead>
             <tr>
               <th style={sticky}>Akun</th>
-              {kolom.map((k) => <th key={k.periode} style={{ textAlign: 'right' }}>{k.label}</th>)}
-              <th style={{ textAlign: 'right' }}>{b.kode === 'neraca' ? 'Posisi akhir' : 'Total'}</th>
+              {kolom.map((k) => <th key={k.periode} style={{ textAlign: 'right' }}>{b.kode === 'neraca' ? tanggalAkhirPeriode(k.periode, true) : k.label}</th>)}
+              <th style={{ textAlign: 'right' }}>{b.kode === 'neraca' && kolom.length ? `Per ${tanggalAkhirPeriode(kolom[kolom.length - 1].periode, true)}` : 'Total'}</th>
               {dua && <><th style={{ textAlign: 'right' }}>Selisih</th><th style={{ textAlign: 'right' }}>%</th></>}
             </tr>
           </thead>
@@ -110,9 +112,15 @@ function TabelBanding({ b, kolom }: { b: BagianBanding; kolom: Banding['kolom'] 
               const pct = r.nilai[0] !== 0 ? (selisih / Math.abs(r.nilai[0])) * 100 : null
               return (
                 <tr key={r.kunci} className={tebal}>
-                  <td style={{ ...sticky, paddingLeft: r.gaya === 'sub' ? 28 : undefined, color: r.gaya === 'sub' ? 'var(--text-muted)' : undefined }}>{r.label}</td>
-                  {r.nilai.map((v, i) => <td key={i} style={{ textAlign: 'right', color: v < 0 ? 'var(--text-danger)' : undefined }}>{angka(v)}</td>)}
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: r.total < 0 ? 'var(--text-danger)' : undefined }}>{angka(r.total)}</td>
+                  <td style={{ ...sticky, paddingLeft: r.gaya === 'sub' ? 28 : undefined, color: r.gaya === 'sub' ? 'var(--text-muted)' : undefined }}>
+                    {r.huruf && <span style={{ display: 'inline-block', width: 18, fontWeight: 700, color: 'var(--text-muted)' }}>{r.huruf}</span>}
+                    {r.label}
+                    {r.rumus && <span style={{ display: 'block', paddingLeft: r.huruf ? 18 : 0, fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>{r.rumus}</span>}
+                  </td>
+                  {[...r.nilai, r.total].map((v, i) => {
+                    const a = angkaSifat(v, r.sifat ?? '')
+                    return <td key={i} style={{ textAlign: 'right', fontWeight: i === r.nilai.length ? 700 : undefined, color: a.merah ? 'var(--text-danger)' : undefined }}>{a.teks}</td>
+                  })}
                   {dua && <>
                     <td style={{ textAlign: 'right', color: selisih < 0 ? 'var(--text-danger)' : selisih > 0 ? 'var(--accent-green)' : undefined }}>{angka(selisih)}</td>
                     <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{pct === null ? '—' : `${pct > 0 ? '+' : ''}${pct.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`}</td>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Sparkles } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { Tebal } from '@/components/InfoTip'
@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { getMetodeStok, getWilayah, saranKLU, saveBusiness, type MetodeNilaiStok, type MetodeStok, type Option, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
-import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, formatROI, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 import { cekLabaOmzet } from '@/lib/kalkulator'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
@@ -114,34 +114,35 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   )
 }
 
-// KLUPicker: cari bidang usaha (KLU 3 digit); daftar disaring sesuai jenis usaha.
+// KLUPicker: bidang usaha (KLU 3 digit) lewat dropdown yang bisa dicari; daftar disaring sesuai
+// jenis usaha. KLU yang sudah terpilih (dari saran AI / jenis usaha) disorot di atas.
 function KLUPicker({ value, onChange, options, jenis }: { value: string; onChange: (kode: string) => void; options: KLUOption[]; jenis?: string }) {
-  const [q, setQ] = useState('')
   const [semua, setSemua] = useState(false)
-  const name = useId()
-  const cari = q.trim().toLowerCase()
-  const list = options.filter((o) =>
-    (semua || cari !== '' || !jenis || o.jenis === jenis) &&
-    (cari === '' || o.nama.toLowerCase().includes(cari) || o.kode.startsWith(cari) || (o.contoh ?? []).some((c) => c.toLowerCase().includes(cari))))
+  const label = (o: KLUOption) => `${o.kode} · ${o.nama}`
+  const list = options.filter((o) => semua || !jenis || o.jenis === jenis || o.kode === value)
   const dipilih = options.find((o) => o.kode === value)
   return (
     <div className="grid gap-2">
-      {dipilih && <p className="text-sm">Dipilih: <strong>KLU {dipilih.kode}</strong> {dipilih.nama}</p>}
+      {dipilih ? (
+        <div className="flex items-start gap-2 rounded-lg border-2 p-3 text-sm" role="status"
+          style={{ borderColor: 'var(--accent-green)', background: 'color-mix(in srgb, var(--accent-green) 10%, transparent)' }}>
+          <CheckCircle2 size={18} aria-hidden="true" style={{ color: 'var(--accent-green)', flex: 'none', marginTop: 1 }} />
+          <span>
+            <span className="block text-xs font-semibold" style={{ color: 'var(--accent-green)' }}>Bidang usaha terpilih</span>
+            <strong>KLU {dipilih.kode}</strong> {dipilih.nama}
+            {dipilih.contoh && dipilih.contoh.length > 0 && <span className="block text-xs text-muted-foreground">Contoh: {dipilih.contoh.join(', ').toLowerCase()}</span>}
+          </span>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Belum ada bidang usaha yang dipilih.</p>
+      )}
       <BantuKLU jenis={jenis} value={value} onChange={onChange} />
-      <Input type="search" placeholder="Cari, mis. restoran, toko, binatu, konveksi" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari bidang usaha" />
-      <div role="radiogroup" aria-label="Bidang usaha (KLU)" className="max-h-72 overflow-y-auto rounded-lg border border-border">
-        {list.length === 0 && <p className="p-3 text-sm text-muted-foreground">Tidak ada bidang yang cocok. Coba kata lain.</p>}
-        {list.map((o) => (
-          <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-accent" data-selected={o.kode === value}>
-            <input type="radio" name={name} className="mt-1" checked={o.kode === value} onChange={() => onChange(o.kode)} />
-            <span>
-              <span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}
-              {o.contoh && o.contoh.length > 0 && <span className="block text-xs text-muted-foreground">Contoh: {o.contoh.join(', ').toLowerCase()}</span>}
-            </span>
-          </label>
-        ))}
-      </div>
-      {jenis && !semua && cari === '' && (
+      <Label htmlFor="klu-pilih">Atau pilih dari daftar</Label>
+      <Combobox id="klu-pilih" className="h-12 md:text-base" value={dipilih ? label(dipilih) : ''}
+        onChange={(v) => { const o = list.find((x) => label(x) === v); if (o) onChange(o.kode) }}
+        options={list.map(label)} placeholder="Pilih bidang usaha (KLU)"
+        searchPlaceholder="Cari, mis. restoran, toko, binatu, konveksi" empty="Tidak ada bidang yang cocok. Coba kata lain." />
+      {jenis && !semua && (
         <button type="button" className="justify-self-start text-xs text-muted-foreground underline underline-offset-4" onClick={() => setSemua(true)}>Tidak ketemu? Tampilkan semua bidang</button>
       )}
     </div>
@@ -161,7 +162,10 @@ function BantuKLU({ jenis, value, onChange }: { jenis?: string; value: string; o
     setBusy(true)
     setError('')
     try {
-      setHasil(await saranKLU(cerita, jenis))
+      const h = await saranKLU(cerita, jenis)
+      setHasil(h)
+      // saran paling cocok langsung terpilih; masih bisa diganti
+      if (h.saran.length > 0) onChange(h.saran[0].kode)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -386,7 +390,15 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <Label htmlFor="biz-laba">Laba bersih per tahun</Label>
           <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional dan Perencanaan Pajak selama belum ada data transaksi.</p>
+        <div className="grid gap-1.5">
+          <Label htmlFor="biz-modal">Modal yang ditanam</Label>
+          <Input id="biz-modal" className="tabular" inputMode="numeric" value={p.modal_awal ? formatRp(p.modal_awal) : ''} onChange={(e) => set({ modal_awal: Math.max(0, parseRp(e.target.value) || 0) })} placeholder="Rp0" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>ROI tahun pertama</Label>
+          <p className="flex h-9 items-center text-sm font-semibold tabular">{p.modal_awal ? `${formatROI(p.laba_sebelum_pajak ?? 0, p.modal_awal)} (laba ÷ modal)` : 'Isi modal untuk menghitung ROI'}</p>
+        </div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional, ROI, dan Perencanaan Pajak selama belum ada data transaksi.</p>
         {masalahLabaOmzet && <p className="text-sm text-destructive sm:col-span-2" role="alert">{masalahLabaOmzet}</p>}
       </div>
       <label className="flex items-center gap-3 text-sm" htmlFor="biz-pkp">
@@ -415,7 +427,8 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
 // tampilRp: tampilan input rupiah berformat ribuan; "-" sendirian dibiarkan supaya rugi bisa diketik.
 const tampilRp = (s = '') => {
   const n = parseRp(s)
-  return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : formatRp(n)
+  // isian rugi tetap memakai tanda minus supaya bisa diketik & dibaca ulang (parseRp)
+  return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : n < 0 ? '-' + formatRp(-n) : formatRp(n)
 }
 
 const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba bersih per tahun' } as const
@@ -515,7 +528,7 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
               {step === 'nama' ? (
                 <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base" autoComplete="organization" required value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" aria-describedby="onboarding-reason" />
               ) : (
-                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base tabular" inputMode={step === 'laba' ? 'text' : 'numeric'} autoComplete="off" required value={tampilRp(a[step])} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder={step === 'omzet' ? 'mis. Rp750.000.000' : 'mis. Rp90.000.000'} aria-describedby="onboarding-reason" />
+                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base tabular" inputMode={step === 'laba' ? 'text' : 'numeric'} autoComplete="off" required value={tampilRp(a[step])} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder={step === 'omzet' ? 'mis. Rp750.000.000' : step === 'modal' ? 'mis. Rp150.000.000' : 'mis. Rp90.000.000'} aria-describedby="onboarding-reason" />
               )}
             </div>
           )}

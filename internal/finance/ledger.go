@@ -176,6 +176,8 @@ type BalanceSheet struct {
 	Liabilities BalanceSheetLiabilities `json:"liabilities"`
 	Equity      BalanceSheetEquity      `json:"equity"`
 	IsBalanced  bool                    `json:"is_balanced"`
+	// Tanggal: tanggal posisi neraca (YYYY-MM-DD); akhir bulan untuk laporan per periode.
+	Tanggal string `json:"tanggal,omitempty"`
 }
 
 func BuildIncomeStatement(entries []LedgerEntry, depreciation, amortization int64) IncomeStatement {
@@ -327,7 +329,7 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 // perubahan modal kerja (NewReceivables/NewPayables harus sudah terisi).
 func (cf *CashFlow) susunTidakLangsung(is IncomeStatement) {
 	cf.OperasiTidakLangsung = CashFlowSection{}
-	cf.OperasiTidakLangsung.add("Laba bersih (dari laporan laba rugi)", is.NetProfit)
+	cf.OperasiTidakLangsung.add("Laba (rugi) bersih (dari laporan laba rugi)", is.NetProfit)
 	cf.OperasiTidakLangsung.add("Penyusutan aset tetap", is.Depreciation)
 	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
 	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)

@@ -70,7 +70,7 @@ func (s *Server) handleBacaNota(w http.ResponseWriter, r *http.Request) {
 	out := hasilNota{SaranNota: saran, Bukti: hex.EncodeToString(sum[:])}
 	t.mu.Lock()
 	t.tundaNotaLocked(out.Bukti, notaTunda{foto, mime, saran, time.Now().UTC()})
-	out.Duplikat = t.duplikatNotaLocked(out.Bukti, saran)
+	out.Duplikat = t.duplikatNotaLocked(out.Bukti)
 	t.mu.Unlock()
 	writeJSON(w, out)
 }

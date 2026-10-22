@@ -24,8 +24,9 @@ type saldoMinus struct {
 	Pesan  string `json:"pesan"`
 }
 
-// subtypeBolehMinus: akun penampung laba berjalan bisa rugi tanpa berarti salah catat.
-var subtypeBolehMinus = []string{"current_earnings"}
+// subtypeBolehMinus: laba (rugi) berjalan dan laba (rugi) ditahan boleh minus (rugi) tanpa
+// berarti salah catat, jadi tidak diperingatkan.
+var subtypeBolehMinus = []string{"current_earnings", "retained", "retained_earnings"}
 
 func (s *tenant) saldoMinus(period string) []saldoMinus {
 	out := []saldoMinus{}

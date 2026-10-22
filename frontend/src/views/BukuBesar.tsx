@@ -103,7 +103,7 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
       {!data.supported ? (
         <div className="card" style={{ padding: 22 }}>
           <div className="chart-title">Buku besar belum tersedia untuk jenis usaha ini</div>
-          <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>Buku besar memakai daftar akun (CoA) jenis usaha Anda; CoA untuk jenis usaha ini sedang disiapkan tim Master Pajak.</p>
+          <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>Buku besar memakai daftar akun (CoA) jenis usaha Anda; CoA untuk jenis usaha ini sedang disiapkan tim MasterPajak AI.</p>
         </div>
       ) : (
         <>

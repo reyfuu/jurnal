@@ -22,6 +22,15 @@ export function PenjelasanCTTOR() {
   )
 }
 
+export function PenjelasanROI() {
+  return (
+    <>
+      <span><strong>ROI (Return on Investment)</strong> = laba bersih ÷ modal. Artinya: dari setiap Rp100 modal yang Anda tanam, berapa rupiah yang kembali sebagai <strong>laba dalam setahun</strong>.</span>
+      <span>Dihitung untuk <strong>tahun pertama</strong> dari perkiraan laba dan modal yang Anda isi. ROI 25% berarti modal kembali sekitar <strong>4 tahun</strong> bila laba setahun tetap.</span>
+    </>
+  )
+}
+
 // 2 desimal, sama dengan data sumber dan pesan dari server
 const formatPct = (bps: number) => (bps / 100).toFixed(2).replace('.', ',') + '%'
 
@@ -45,6 +54,11 @@ function SaranCard({ s }: { s: SaranBentuk }) {
       <div>
         <div className="text-xs font-semibold" style={{ color: warna }}>Kesimpulan: bentuk usaha & skema pajak</div>
         <h3 id="saran-bentuk-title" className="mt-1 text-base font-bold">{s.judul}</h3>
+        {s.asumsi && (
+          <p className="mt-2 rounded-md px-2.5 py-1.5 text-xs leading-relaxed" style={{ color: 'var(--accent-blue)', background: 'color-mix(in srgb, var(--accent-blue) 10%, transparent)' }}>
+            <TebalAngka teks={s.asumsi} />
+          </p>
+        )}
       </div>
       {!sama && (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -141,6 +155,17 @@ export function CekAwalCard({ profile }: { profile: BusinessProfile }) {
             <div className="text-xs text-muted-foreground">CTTOR</div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="text-2xl font-bold tabular">{formatPct(c.cttor_bps)}</span><span className="text-xs text-muted-foreground tabular">nasional {formatPct(c.klu.cttor_bps)}</span></div>
           </div>
+        </div>
+      )}
+      {c.roi_bps != null && (
+        <div className="relative rounded-md border border-border p-3">
+          <span className="absolute right-2 top-2"><InfoTip label="ROI"><PenjelasanROI /></InfoTip></span>
+          <div className="text-xs text-muted-foreground">ROI tahun pertama</div>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-2xl font-bold tabular" style={{ color: c.roi_bps < 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>{formatPct(c.roi_bps)}</span>
+            <span className="text-xs text-muted-foreground tabular">modal {formatRp(c.modal_awal ?? 0)}</span>
+          </div>
+          {c.roi_pesan && <p className="mt-1 text-xs text-muted-foreground"><TebalAngka teks={c.roi_pesan} /></p>}
         </div>
       )}
       <p className="text-sm leading-relaxed"><TebalAngka teks={c.pesan} /></p>

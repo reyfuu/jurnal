@@ -23,6 +23,8 @@ type catatReq struct {
 	NoBukti    string           `json:"no_bukti,omitempty"`
 	Keterangan string           `json:"keterangan,omitempty"`
 	Baris      []coa.BarisCatat `json:"baris"`
+	// Sumber: "foto" bila baris diisi AI dari foto nota (dipakai pengecekan transaksi dobel).
+	Sumber string `json:"sumber,omitempty"`
 	// Bukti: token dari baca foto nota; fotonya disimpan sebagai bukti catatan baru (bukti_nota.go).
 	Bukti string `json:"bukti,omitempty"`
 }
@@ -83,6 +85,9 @@ func (s *tenant) susunTxCatat(c catatReq, grup int) ([]finance.Transaction, erro
 	for i := range txs {
 		t := &txs[i]
 		t.Tanggal, t.Pihak, t.NoBukti, t.Grup = c.Tanggal, c.Pihak, c.NoBukti, grup
+		if c.Sumber == "foto" {
+			t.Sumber = "foto"
+		}
 		if t.Keterangan == "" {
 			t.Keterangan = c.Keterangan
 		}

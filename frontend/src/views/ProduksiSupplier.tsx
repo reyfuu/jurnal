@@ -1,5 +1,6 @@
 import { Factory, Plus, Trash2 } from 'lucide-react'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useGulirKeForm } from '@/lib/gulir'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
   createProduk, createSupplier, deleteProduk, deleteSupplier, getProduksi, getStok, terapkanHPP,
@@ -207,8 +208,12 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
   // Halaman catat produksi; awal = produk yang dipilih dari baris tabel resep.
   const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(() => (bisaUbah && aksi === 'catat' ? {} : null))
   const [form, setForm] = useState<ProdukInput | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [supForm, setSupForm] = useState<SupplierInput | null>(null)
+  const supFormRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(supFormRef, !!supForm)
   const [supEditId, setSupEditId] = useState<number | null>(null)
   const [buka, setBuka] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -386,7 +391,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
 
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpanProduk}>
+        <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpanProduk}>
           <div className="chart-title">{editId === null ? 'Tambah Produk & Resep' : 'Ubah Produk & Resep'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -531,7 +536,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
         <div className="chart-title">Supplier</div>
 
         {supForm && (
-          <form className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12 }} onSubmit={simpanSupplier}>
+          <form ref={supFormRef} className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12, scrollMarginTop: 16 }} onSubmit={simpanSupplier}>
             <label>
               <span className="kpi-label">Nama Supplier</span>
               <input className="input-field" required value={supForm.nama} onChange={(e) => setSupForm({ ...supForm, nama: e.target.value })} />

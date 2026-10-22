@@ -113,8 +113,8 @@ func (o OpeningBalance) Period() string {
 
 // FormatRupiahPenuh: 5000000 → "Rp5.000.000" (tanpa pembulatan ke juta).
 func FormatRupiahPenuh(n int64) string {
-	if n < 0 {
-		return "-Rp" + rupiah(-n)
+	if n < 0 { // minus ditulis dalam kurung, seperti laporan keuangan
+		return "(Rp" + rupiah(-n) + ")"
 	}
 	return "Rp" + rupiah(n)
 }

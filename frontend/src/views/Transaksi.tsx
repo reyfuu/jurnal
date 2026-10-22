@@ -1,4 +1,6 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
+import { ThUrut } from '@/components/ThUrut'
+import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
@@ -71,6 +73,11 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   }, [refresh])
 
   const shown = useMemo(() => filterTx(txs, filter, jenis), [txs, filter, jenis])
+  const urut = useKolomUrut()
+  const kolomTx: Pengurut<Tx> = {
+    tanggal: (t) => t.tanggal, jenis: (t) => t.jenis, akun: (t) => t.akun || '', keterangan: (t) => t.keterangan, pihak: (t) => t.pihak,
+    nominal: (t) => t.nominal, status: (t) => (t.lunas ? 1 : 0),
+  }
   const sum = useMemo(() => summarize(shown, jenis), [shown, jenis])
   const posOf = useMemo(() => Object.fromEntries(jenis.map((j) => [j.nama, j.pos])), [jenis])
   const months = useMemo(() => monthsOf(txs), [txs])
@@ -156,6 +163,9 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
             </Button>
           </>
         )}
+      </div>
+      {/* Baris kedua: cari & filter, supaya tombol aksi tidak berdesakan dengan filter. */}
+      <div className="card filter-bar">
         <Input
           className="tx-search"
           aria-label="Cari transaksi"
@@ -241,12 +251,13 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
           <table className="data-table">
             <thead>
               <tr>
-                <th>Tanggal</th><th>Jenis</th>{coa?.supported && <th>Akun</th>}<th>Keterangan</th><th>Pihak</th><th style={{ textAlign: 'right' }}>Nominal</th><th>Status</th>
+                <ThUrut k="tanggal" urut={urut}>Tanggal</ThUrut><ThUrut k="jenis" urut={urut}>Jenis</ThUrut>{coa?.supported && <ThUrut k="akun" urut={urut}>Akun</ThUrut>}
+                <ThUrut k="keterangan" urut={urut}>Keterangan</ThUrut><ThUrut k="pihak" urut={urut}>Pihak</ThUrut><ThUrut k="nominal" urut={urut} kanan>Nominal</ThUrut><ThUrut k="status" urut={urut}>Status</ThUrut>
                 {bisaBuka && <th />}
               </tr>
             </thead>
             <tbody>
-              {shown.slice(0, limit).map((t) => {
+              {urutkan(shown, urut.kunci ? kolomTx[urut.kunci] : undefined, urut.arah).slice(0, limit).map((t) => {
                 const masuk = isMasuk(posOf[t.jenis])
                 const sub = [t.item && (t.qty_stok ? `${t.item} × ${formatQty(t.qty_stok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (

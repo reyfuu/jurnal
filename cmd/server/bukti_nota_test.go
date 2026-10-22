@@ -138,17 +138,17 @@ func TestBuktiNota_SimpanLihatDuplikatHapus(t *testing.T) {
 	}
 }
 
-// Catatan dengan tanggal & nominal sama (tanpa foto) tetap diperingatkan; token bukti asing tidak
-// menggagalkan penyimpanan, catatannya hanya tidak punya foto.
-func TestBuktiNota_DuplikatTanggalNominalDanTokenAsing(t *testing.T) {
+// Token bukti asing tidak menggagalkan penyimpanan, catatannya hanya tidak punya foto. Catatan
+// dengan tanggal & nominal sama tanpa foto bukan urusan baca foto: itu dicegat cek dobel
+// (finance.Mirip / cariMirip) saat menyimpan, jadi di sini tidak ada peringatan kedua.
+func TestBuktiNota_TokenAsingTanpaPeringatanGanda(t *testing.T) {
 	srv, qa := usahaNota(t)
 	grup := catatDenganBukti(t, srv, qa, "token-asing")
 	if g := getJSON[catatResp](t, srv, qa, "/api/v1/catat/"+strconv.Itoa(grup)); g.FotoNota != nil {
 		t.Fatalf("token asing tidak boleh menghasilkan bukti: %+v", g.FotoNota)
 	}
-	h := bacaFotoNota(t, srv, qa)
-	if len(h.Duplikat) != 1 || h.Duplikat[0].Grup != grup || !strings.Contains(h.Duplikat[0].Alasan, "tanggal dan nominal") {
-		t.Fatalf("duplikat tanggal+nominal: %+v", h.Duplikat)
+	if h := bacaFotoNota(t, srv, qa); len(h.Duplikat) != 0 {
+		t.Fatalf("tanggal+nominal sama sudah ditangani cek dobel saat simpan: %+v", h.Duplikat)
 	}
 }
 

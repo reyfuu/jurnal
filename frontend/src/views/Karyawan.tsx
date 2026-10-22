@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { useGulirKeForm } from '@/lib/gulir'
 import { PageHeader } from '@/components/PageHeader'
 import {
   createKaryawan, deleteKaryawan, getKaryawan, updateKaryawan,
@@ -22,6 +23,8 @@ function toInput(k: Karyawan): KaryawanInput {
 export function KaryawanView() {
   const [data, setData] = useState<KaryawanSummary | null>(null)
   const [form, setForm] = useState<KaryawanInput | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -94,7 +97,7 @@ export function KaryawanView() {
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Karyawan' : 'Ubah Karyawan'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>

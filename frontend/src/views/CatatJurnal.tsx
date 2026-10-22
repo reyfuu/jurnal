@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowLeftRight, Camera, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  bacaNota, buktiCatatUrl, getCatatanJurnal, getOpsiCatat, hapusCatatanJurnal, simpanCatatanJurnal,
+  bacaNota, buktiCatatUrl, cariMirip, getCatatanJurnal, getOpsiCatat, hapusCatatanJurnal, simpanCatatanJurnal, type Mirip,
   type AkunCatat, type BarisCatat, type FotoNota, type OpsiCatat, type SaranNota,
 } from '@/lib/api'
 import { angka } from '@/lib/angka'
@@ -59,6 +59,10 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
   const [membaca, setMembaca] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Cegah dobel: transaksi yang sudah ada (mis. dari impor mutasi) dengan arah & nominal kas/bank
+  // sama di tanggal berdekatan. Simpan baru jalan setelah pengguna menyatakan berbeda.
+  const [mirip, setMirip] = useState<{ baris: string; m: Mirip }[] | null>(null)
+  const [yakinBeda, setYakinBeda] = useState(false)
   const [dipulihkan, setDipulihkan] = useState(false)
 
   useEffect(() => {
@@ -119,13 +123,34 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
     }
   }
 
+  async function cekMirip(): Promise<{ baris: string; m: Mirip }[]> {
+    const hasil: { baris: string; m: Mirip }[] = []
+    for (const b of baris) {
+      const a = akunPeta.get(b.akun)
+      const n = b.debit || b.kredit
+      if (a?.lawan !== 'rekening' || !n) continue
+      const m = await cariMirip(kepala.tanggal, n, b.debit ? 'masuk' : 'keluar', grup).catch(() => [])
+      for (const x of m) hasil.push({ baris: `${a.kode} ${a.nama} ${formatRp(n)}`, m: x })
+    }
+    return hasil
+  }
+
   async function simpan(lagi: boolean) {
     setBusy(true)
     setError('')
     try {
+      if (!yakinBeda) {
+        const m = await cekMirip()
+        if (m.length) {
+          setMirip(m)
+          return
+        }
+      }
       const isi = baris.filter((b) => b.debit || b.kredit).map(({ akun, keterangan, debit, kredit, jatuh_tempo }) => ({ akun, keterangan, debit, kredit, jatuh_tempo }))
-      // catatan baru yang diisi dari foto: fotonya ikut disimpan sebagai bukti
-      await simpanCatatanJurnal({ ...kepala, baris: isi, ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
+      // dari foto: tandai sumbernya (cek dobel); catatan baru juga menyimpan fotonya sebagai bukti
+      await simpanCatatanJurnal({ ...kepala, baris: isi, ...(nota ? { sumber: 'foto' as const } : {}), ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
+      setMirip(null)
+      setYakinBeda(false)
       if (draftKey) hapusDraft(draftKey)
       await onTersimpan(grup ? 'Catatan diperbarui.' : 'Catatan tersimpan.')
       if (lagi && opsi) {
@@ -303,6 +328,24 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
             </p>
           </div>
           {error && <div className="pill-status pill-red" role="alert" style={{ whiteSpace: 'normal' }}>{error}</div>}
+          {mirip && mirip.length > 0 && (
+            <div className="note-box warn" role="alert" style={{ margin: 0 }}>
+              <strong>Mungkin sudah tercatat.</strong> Ada transaksi dengan arah &amp; nominal kas/bank yang sama di tanggal berdekatan:
+              <ul style={{ margin: '6px 0 6px 16px', listStyle: 'disc' }}>
+                {mirip.map((x, i) => (
+                  <li key={i} className="text-sm">
+                    {x.baris} ↔ {x.m.tanggal} · {x.m.invoice_id ? `invoice #${x.m.invoice_id}` : x.m.jenis}{x.m.pihak ? ` · ${x.m.pihak}` : x.m.keterangan ? ` · ${x.m.keterangan}` : ''}
+                    {x.m.sumber === 'mutasi' ? ' (dari impor mutasi)' : x.m.sumber === 'foto' ? ' (dari foto nota)' : ''}
+                    {x.m.belum_lunas && ' — masih belum lunas: kalau ini pembayarannya, catat lewat Piutang & Utang → Catat pelunasan'}
+                  </li>
+                ))}
+              </ul>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={yakinBeda} onChange={(e) => setYakinBeda(e.target.checked)} />
+                Saya sudah cek, ini transaksi yang berbeda — tetap simpan
+              </label>
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             {grup && <Button type="button" variant="ghost" className="text-destructive" disabled={busy} onClick={() => void hapus()}>Hapus</Button>}
             <Button type="button" variant="outline" onClick={() => { if (draftKey) hapusDraft(draftKey); onKembali() }}>Batal</Button>
