@@ -490,3 +490,8 @@ ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
 
 -- Cegah transaksi dobel (Okt 2026): asal pencatatan (mutasi / foto).
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;
+
+-- Nomor jurnal (Okt 2026, checklist No 31): JU-YYYYMM-NNNN per transaksi / catatan, tidak
+-- dipakai ulang; penghitung terakhir per bulan di tenants.nomor_jurnal ({"202610": 12}).
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS no_jurnal TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS nomor_jurnal JSONB;

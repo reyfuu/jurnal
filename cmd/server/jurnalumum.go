@@ -50,6 +50,10 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 	out := jurnalUmumResp{PeriodLabel: labelRentang(dari, sampai), Dari: dari, Sampai: sampai, Entri: []entriJurnalUmum{}, Pilihan: []pilihanAkun{}}
 	s.mu.RLock()
 	mulai := s.bukuAwalLocked().Tanggal
+	noJurnal := make(map[int]string, len(s.txs)) // nomor jurnal tetap per transaksi
+	for _, t := range s.txs {
+		noJurnal[t.ID] = t.NoJurnal
+	}
 	s.mu.RUnlock()
 	q = strings.ToLower(strings.TrimSpace(q))
 	for bulan := dari[:7]; bulan <= sampai[:7]; bulan = bulanBerikut(bulan) {
@@ -95,11 +99,11 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 				switch {
 				case l.TxID == 0:
 					nSistem++
-					e.Bukti = fmt.Sprintf("JU-%s-%d", strings.ReplaceAll(bulan, "-", ""), nSistem)
+					e.Bukti = fmt.Sprintf("SIS-%s-%d", strings.ReplaceAll(bulan, "-", ""), nSistem) // entri sistem; JU- untuk transaksi
 				case strings.HasPrefix(l.Ket, "Pelunasan"):
 					e.Bukti = "BYR-" + strconv.Itoa(l.TxID)
 				default:
-					e.Bukti = "TRX-" + strconv.Itoa(l.TxID)
+					e.Bukti = cmp.Or(noJurnal[l.TxID], "TRX-"+strconv.Itoa(l.TxID))
 				}
 				i = len(bulanIni)
 				indeks[k] = i
@@ -129,7 +133,8 @@ func cocokJurnal(e entriJurnalUmum, akun, q string) bool {
 	if akun != "" && !slices.ContainsFunc(e.Baris, func(b barisJurnalUmum) bool { return b.Kode == akun }) {
 		return false
 	}
-	if q == "" || strings.Contains(strings.ToLower(e.Keterangan+" "+e.Bukti), q) {
+	// TRX-<id>: referensi lama sebelum ada nomor jurnal, tetap bisa dicari
+	if q == "" || strings.Contains(strings.ToLower(e.Keterangan+" "+e.Bukti+" trx-"+strconv.Itoa(e.TxID)), q) {
 		return true
 	}
 	return slices.ContainsFunc(e.Baris, func(b barisJurnalUmum) bool { return strings.Contains(strings.ToLower(b.Kode+" "+b.Nama), q) })

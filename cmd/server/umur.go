@@ -91,6 +91,7 @@ func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, in
 	if tanggal != t.Tanggal {
 		t.TanggalLunas = tanggal
 	}
+	t.NoJurnal = s.txs[i].NoJurnal
 	s.txs[i] = t
 	return t, 0, nil
 }

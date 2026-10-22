@@ -115,9 +115,14 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int,
 			return nil, err
 		}
 	}
+	nomor := "" // catatan yang diubah tetap memakai nomor jurnalnya
+	if i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup }); i >= 0 {
+		nomor = s.txs[i].NoJurnal
+	}
 	s.txs = slices.DeleteFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup })
 	var ids []int
 	for _, t := range baru {
+		t.NoJurnal = nomor
 		t.ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, t)

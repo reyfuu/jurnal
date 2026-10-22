@@ -306,7 +306,10 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                 const sub = [t.item && (t.qty_stok ? `${t.item} × ${formatQty(t.qty_stok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (
                   <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
-                    <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
+                    <td className="tabular" style={{ whiteSpace: 'nowrap' }}>
+                      {formatTanggal(t.tanggal)}
+                      {t.no_jurnal && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.no_jurnal}</div>}
+                    </td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
                     {coa?.supported && (
                       <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-brand)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>

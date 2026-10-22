@@ -47,6 +47,7 @@ type state struct {
 	Gerak          []finance.GerakStok        `json:"gerak_stok"`
 	NextGerakID    int                        `json:"next_gerak_id"`
 	TutupBuku      string                     `json:"tutup_buku,omitempty"`
+	NomorJurnal    map[string]int             `json:"nomor_jurnal,omitempty"`
 	CoaTemplate    int                        `json:"coa_template,omitempty"`
 	Arsip          time.Time                  `json:"arsip,omitzero"`
 	ArsipAlasan    string                     `json:"arsip_alasan,omitempty"`
@@ -143,7 +144,7 @@ func (t *tenant) snapshot() state {
 		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
 		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
 		Catatan: slices.Clone(t.catatan), NextCatatanID: t.nextCatatanID,
-		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID, TutupBuku: t.tutupBuku,
+		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID, TutupBuku: t.tutupBuku, NomorJurnal: maps.Clone(t.nomorJurnal),
 		Arsip: t.arsip, ArsipAlasan: t.arsipAlasan,
 	}
 }
@@ -277,6 +278,9 @@ func (s *Server) persisting(h http.HandlerFunc) http.HandlerFunc {
 		buf := &bufferedResponse{header: http.Header{}}
 		h(buf, r)
 		after, newSession := s.sessionTenant((&http.Response{Header: buf.header}).Cookies())
+		if t := cmp.Or(after, before); t != nil && buf.status < 400 {
+			t.beriNomorJurnal() // transaksi baru dari jalur mana pun mendapat nomor sebelum disimpan
+		}
 		if buf.status < 400 && (hadSession || newSession) {
 			if err := s.saveFor(cmp.Or(after, before)); err != nil {
 				http.Error(w, "Gagal menyimpan data, coba lagi sebentar lagi.", http.StatusServiceUnavailable)

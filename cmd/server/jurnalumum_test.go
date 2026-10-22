@@ -29,7 +29,7 @@ func TestJurnalUmum_SeimbangDanCocokBukuBesar(t *testing.T) {
 		if d != k || d != e.Debit || e.Tanggal < "2026-08-01" || e.Tanggal > "2026-08-31" {
 			t.Fatalf("bukti %s %s tidak seimbang / di luar rentang: %+v", e.Bukti, e.Tanggal, e)
 		}
-		if strings.HasPrefix(e.Bukti, "TRX-") {
+		if strings.HasPrefix(e.Bukti, "JU-") { // nomor jurnal tetap per transaksi (checklist No 31)
 			tx[e.Bukti]++
 		}
 	}
@@ -40,7 +40,7 @@ func TestJurnalUmum_SeimbangDanCocokBukuBesar(t *testing.T) {
 		}
 	}
 	if len(tx) != n {
-		t.Errorf("transaksi Agustus %d, bukti TRX %d", n, len(tx))
+		t.Errorf("transaksi Agustus %d, bukti JU %d", n, len(tx))
 	}
 	for b, c := range tx {
 		if c != 1 {

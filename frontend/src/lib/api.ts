@@ -294,6 +294,8 @@ export interface Tx {
   no_bukti?: string
   /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
   sumber?: 'mutasi' | 'foto'
+  /** Nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server. */
+  no_jurnal?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>

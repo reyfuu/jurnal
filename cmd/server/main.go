@@ -74,6 +74,8 @@ type tenant struct {
 	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
 	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
 	tutupBuku string
+	// nomorJurnal: nomor jurnal terakhir per bulan ("202610" → 12); tidak pernah turun.
+	nomorJurnal map[string]int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
 	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
@@ -194,6 +196,8 @@ func (t *tenant) restore(st *state) {
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
 	t.tutupBuku = st.TutupBuku
+	t.nomorJurnal = st.NomorJurnal
+	t.beriNomorJurnalLocked() // transaksi lama tanpa nomor (migrasi, sekali)
 }
 
 func NewServer() *Server {
@@ -1070,7 +1074,7 @@ func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Trans
 		http.Error(w, "pindah dana dicatat lewat Catat: pilih rekening asal dan rekening tujuan", http.StatusBadRequest)
 		return t, false
 	}
-	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber, t.NoJurnal = 0, 0, "", "", "" // tautan invoice, catatan jurnal, asal & nomor hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1150,7 +1154,7 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
-	t.ID = s.txs[i].ID
+	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal
 	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
 }

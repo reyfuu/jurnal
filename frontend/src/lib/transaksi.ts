@@ -27,7 +27,7 @@ export function filterTx(
         if (f.arah === 'masuk' && !isM) return false
         if (f.arah === 'keluar' && isM) return false
       }
-      if (q && ![t.keterangan, t.item, t.pihak, t.channel, t.jenis].some((x) => (x || '').toLowerCase().includes(q))) return false
+      if (q && ![t.keterangan, t.item, t.pihak, t.channel, t.jenis, t.no_jurnal].some((x) => (x || '').toLowerCase().includes(q))) return false
       return true
     })
     .sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.id - a.id)
