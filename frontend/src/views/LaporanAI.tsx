@@ -96,8 +96,8 @@ function RincianLaporan({ f, period }: { f: BusinessFacts; period: string }) {
           <Baris l="Harga pokok penjualan" teks={rpSifat(-lr.hpp, 'pengurang')} />
           <Baris l="Laba (rugi) kotor" v={lr.laba_kotor} tebal />
           <Baris l="Beban operasional" teks={rpSifat(-lr.beban_operasional, 'pengurang')} />
-          <Baris l="Beban penyusutan" teks={rpSifat(-lr.penyusutan, 'kontra')} warna={lr.penyusutan ? RED : undefined} />
-          <Baris l="Beban amortisasi" teks={rpSifat(-lr.amortisasi, 'kontra')} warna={lr.amortisasi ? RED : undefined} />
+          <Baris l="Beban penyusutan" teks={rpSifat(-lr.penyusutan, 'pengurang')} />
+          <Baris l="Beban amortisasi" teks={rpSifat(-lr.amortisasi, 'pengurang')} />
           <Baris l="Laba (rugi) bersih tahun berjalan" v={lr.laba_bersih} tebal warna={lr.laba_bersih >= 0 ? GREEN : RED} />
         </Kartu>
 

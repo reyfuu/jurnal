@@ -61,7 +61,7 @@ export function KoreksiCard({ k, sub, aksi }: { k: KoreksiRow; sub: ReactNode; a
               <span key={d.periode} className="rounded-md border border-border" style={{ padding: '4px 10px' }}>
                 Laba {labelBulan(d.periode)}{' '}
                 <strong className="tabular" style={{ color: selisih < 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                  {selisih < 0 ? '−' : '+'}{formatRp(Math.abs(selisih))}
+                  {selisih < 0 ? formatRp(selisih) : `+${formatRp(selisih)}`}
                 </strong>
               </span>
             )

@@ -159,8 +159,8 @@ func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, tambah("*jumlah beban"))
 	baris(GayaTotal, "ebitda", "EBITDA (laba (rugi) sebelum penyusutan & amortisasi)", is.EBITDA, "", tambah("laba_kotor"), kurang("total_beban"))
 	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
-	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatKontra)
-	baris(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization, SifatKontra)
+	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatPengurang)
+	baris(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization, SifatPengurang)
 	baris(GayaTotal, "ebit", "Laba (rugi) usaha (EBIT)", is.EBIT, "", tambah("ebitda"), kurang("penyusutan"), kurang("amortisasi"))
 	baris(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome, "")
 	baris(GayaTotal, "laba_bersih", "Laba (rugi) bersih tahun berjalan", is.NetProfit, "", tambah("ebit"), tambah("pendapatan_lain"))
@@ -180,6 +180,7 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.tambah(GayaBaris, "aset_tetap", "Aset tetap & tak berwujud (nilai buku)", a.FixedAssets)
 	s.tambah(GayaSub, "harga_perolehan", "Harga perolehan", a.FixedAssetsCost)
 	s.tambah(GayaSub, "akumulasi", "Akumulasi penyusutan & amortisasi", -a.AccumDepreciation)
+	s.b.Baris[len(s.b.Baris)-1].Sifat = SifatKontra
 	s.tambah(GayaTotal, "total_aset", "Total aset", a.Total)
 	s.judul("judul_kewajiban", "Kewajiban (Utang)")
 	s.tambah(GayaBaris, "utang_usaha", "Utang usaha / operasional", bs.Liabilities.Payables)
