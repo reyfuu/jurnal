@@ -76,6 +76,12 @@ type Transaction struct {
 	// keluarannya); JatuhTempo dari invoice, dipakai daftar piutang.
 	InvoiceID  int    `json:"invoice_id,omitempty"`
 	JatuhTempo string `json:"jatuh_tempo,omitempty"`
+	// Grup: transaksi ini bagian dari satu catatan jurnal multi-akun (Catat cepat); diatur server.
+	// NoBukti: nomor nota / bukti catatan itu. Lawan: kode akun kas/bank persisnya (kosong =
+	// otomatis dari Lunas & Channel).
+	Grup    int    `json:"grup,omitempty"`
+	NoBukti string `json:"no_bukti,omitempty"`
+	Lawan   string `json:"lawan,omitempty"`
 	// StokID & QtyStok: barang yang dibeli (Beli Bahan / Stok) atau dijual (Penjualan) dan
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
@@ -84,7 +90,7 @@ type Transaction struct {
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.
 func Validate(t *Transaction) error {
-	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas, &t.Akun} {
+	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas, &t.Akun, &t.NoBukti, &t.Lawan} {
 		*s = strings.TrimSpace(*s)
 	}
 	if _, err := time.Parse(time.DateOnly, t.Tanggal); err != nil {

@@ -11,7 +11,8 @@ import {
 } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
-import { LaporanProduksiPanel, ProduksiDialog } from '@/views/KartuStok'
+import { LaporanProduksiPanel } from '@/views/KartuStok'
+import { CatatProduksi } from '@/views/CatatProduksi'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--text-profit)'
@@ -206,7 +207,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
   const [data, setData] = useState<ProduksiSummary | null>(null)
   const [stok, setStok] = useState<StokRow[]>([])
   const [stokMulai, setStokMulai] = useState('')
-  // Dialog catat produksi; awal = produk yang dipilih dari baris tabel resep.
+  // Halaman catat produksi; awal = produk yang dipilih dari baris tabel resep.
   const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(() => (bisaUbah && aksi === 'catat' ? {} : null))
   const [form, setForm] = useState<ProdukInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
@@ -303,6 +304,16 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
   const supplier = data.supplier ?? []
   const hppTertinggi = produk.reduce((m, p) => Math.max(m, p.hpp.per_unit), 0)
 
+  if (produksi && produk.length > 0) {
+    return (
+      <>
+        <PageHeader title="Catat produksi" subtitle="Bahan di stok berkurang, produk jadi bertambah. HPP per unit dihitung dari bahan + biaya lain." />
+        <CatatProduksi produkList={produk} stok={stok} stokMulai={stokMulai} awal={produksi.awal} onKembali={() => setProduksi(null)}
+          onTersimpan={(m) => { setProduksi(null); setPesan(m); setTab('produksi'); setMuatUlang((n) => n + 1); muat() }} />
+      </>
+    )
+  }
+
   return (
     <>
       <PageHeader
@@ -313,8 +324,8 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
       >
         {bisaUbah && tab === 'produksi' && (
           <button className="btn-cta accent" style={{ padding: '10px 20px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 8 }}
-            disabled={!stokMulai || produk.length === 0}
-            title={!stokMulai ? 'Mulai kartu stok dulu di Stok & Gudang' : produk.length === 0 ? 'Tambah produk & resep dulu' : undefined}
+            disabled={produk.length === 0}
+            title={produk.length === 0 ? 'Tambah produk & resep dulu' : undefined}
             onClick={() => { setError(''); setPesan(''); setProduksi({}) }}>
             <Factory size={17} aria-hidden /> Catat produksi
           </button>
@@ -342,18 +353,17 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{error}</div>}
       {pesan && <div className="pill-status pill-green" style={{ alignSelf: 'flex-start', marginBottom: 12 }}>{pesan}</div>}
 
-      {tab === 'produksi' && (!stokMulai ? (
-        <div className="card" style={{ padding: 24 }}>
-          <div className="chart-title">Mulai kartu stok dulu</div>
-          <div className="chart-subtitle" style={{ marginBottom: 12 }}>
-            Mencatat produksi butuh kartu stok supaya bahan yang terpakai dan produk jadi yang dihasilkan ikut tercatat. Mulai dari menu
-            <strong> Stok &amp; Gudang → Mulai kartu stok</strong> (hitung fisik pertama).
-          </div>
-        </div>
-      ) : produk.length === 0 ? (
+      {tab === 'produksi' && (produk.length === 0 ? (
         <div className="card" style={{ padding: 24 }}>
           <div className="chart-title">Belum ada produk & resep</div>
           <div className="chart-subtitle">Buka tab <strong>Produk &amp; Resep</strong> → <strong>+ Tambah Produk</strong> (sekali saja per produk), lalu kembali ke sini untuk mencatat produksi.</div>
+        </div>
+      ) : !stokMulai ? (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="chart-title">Belum ada produksi</div>
+          <div className="chart-subtitle">
+            Klik <strong>Catat produksi</strong> untuk mencatat yang pertama. Jumlah &amp; harga pokok di daftar barang hari itu otomatis dipakai sebagai stok awal.
+          </div>
         </div>
       ) : (
         <LaporanProduksiPanel muatUlang={muatUlang} bisaUbah={bisaUbah} bisaEkspor={bisaUbah} onChanged={() => { setMuatUlang((n) => n + 1); muat() }} />
@@ -502,7 +512,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {stokMulai && <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)', fontWeight: 600 }} onClick={() => { setError(''); setPesan(''); setProduksi({ awal: p }) }}>Catat produksi</button>}
+                        {bisaUbah && <button className="nav-item" style={{ ...aksiBtn, color: 'var(--link)', fontWeight: 600 }} onClick={() => { setError(''); setPesan(''); setProduksi({ awal: p }) }}>Catat produksi</button>}
                         <button className="nav-item" style={aksiBtn} onClick={() => { setError(''); setEditId(p.id); setForm(toProdukInput(p)) }}>Ubah</button>
                         <button className="nav-item" style={{ ...aksiBtn, color: RED }} onClick={() => void hapusProduk(p)}>Hapus</button>
                       </div>
@@ -612,10 +622,6 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
       </div>
       )}
 
-      {produksi && produk.length > 0 && stokMulai && (
-        <ProduksiDialog produkList={produk} awal={produksi.awal} stok={stok} mulai={stokMulai} onClose={() => setProduksi(null)}
-          onDone={(m) => { setProduksi(null); setPesan(m); setTab('produksi'); setMuatUlang((n) => n + 1); muat() }} />
-      )}
     </>
   )
 }

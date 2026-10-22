@@ -17,7 +17,6 @@ import { Login, type AwalDaftar } from '@/views/Login'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
-import { CatatCepat } from '@/components/CatatCepat'
 import { LangkahMulaiCard } from '@/components/LangkahMulai'
 import { LaporanPenjualan } from '@/views/LaporanPenjualan'
 import { InvoiceView } from '@/views/Invoice'
@@ -241,7 +240,8 @@ export default function App() {
   return (
     <main>
       <div className="app-shell">
-        <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} terkunci={terkunci} />
+        <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} terkunci={terkunci}
+          onCatat={!me.lihat && !terkunci ? navigate : undefined} />
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
           {terkunci && view !== 'langganan' && (
@@ -287,7 +287,6 @@ export default function App() {
           {data && (
             <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: 'var(--bg-raised)', padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-shell)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {!me.lihat && !terkunci && <CatatCepat boleh={(v) => canSee(v) && (v !== 'transaksi' || canSee('transaksi'))} onPilih={navigate} />}
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Periode Laporan:
                 </span>

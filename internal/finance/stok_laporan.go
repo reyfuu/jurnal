@@ -44,6 +44,8 @@ func (k KartuStok) Periode(period string) StokPeriode {
 			continue
 		case KartuBeli:
 			p.Kapitalisasi += b.Nilai
+		case KartuProduksiMasuk:
+			p.Kapitalisasi += b.Biaya // biaya lain produksi masuk persediaan, bukan HPP
 		case KartuJual:
 			p.HPPJual -= b.Nilai
 		case KartuOpname:

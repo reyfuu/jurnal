@@ -381,6 +381,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi/commit", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleMutasiCommit))))
+	s.mux.HandleFunc("GET /api/v1/catat/opsi", s.guard("transaksi", s.on((*tenant).handleOpsiCatat)))
+	s.mux.HandleFunc("POST /api/v1/catat", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateCatat))))
+	s.mux.HandleFunc("GET /api/v1/catat/{grup}", s.guard("transaksi", s.on((*tenant).handleGetCatat)))
+	s.mux.HandleFunc("PUT /api/v1/catat/{grup}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateCatat))))
+	s.mux.HandleFunc("DELETE /api/v1/catat/{grup}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteCatat))))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateTransaction))))
 	s.mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteTransaction))))
 
@@ -1021,7 +1026,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID = 0
+	t.InvoiceID, t.Grup, t.Lawan = 0, 0, "" // tautan invoice & catatan jurnal hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1087,6 +1092,10 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
 		return
 	}
+	if s.txs[i].Grup != 0 {
+		http.Error(w, errTxGrup.Error(), http.StatusConflict)
+		return
+	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1114,6 +1123,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	if s.txs[i].InvoiceID != 0 {
 		http.Error(w, errTxInvoice.Error(), http.StatusConflict)
+		return
+	}
+	if s.txs[i].Grup != 0 {
+		http.Error(w, errTxGrup.Error(), http.StatusConflict)
 		return
 	}
 	// Transaksi yang menjadi pembayaran aset terdaftar: menghapusnya membuat aset di neraca

@@ -287,9 +287,23 @@ export interface Tx {
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
+  /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
+  grup?: number
+  no_bukti?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>
+
+// --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
+export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
+export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[] }
+export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
+export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
+export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
+export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number }>(`/catat/${grup}`)
+export const simpanCatatanJurnal = (c: CatatanJurnal, grup?: number) =>
+  api<CatatanJurnal & { grup: number; transaksi: number[] }>(grup ? `/catat/${grup}` : '/catat', { method: grup ? 'PUT' : 'POST', body: c })
+export const hapusCatatanJurnal = (grup: number) => api<void>(`/catat/${grup}`, { method: 'DELETE' })
 
 export interface BreakEven {
   price: number
@@ -1189,6 +1203,13 @@ export interface PilihanBarang { id: number; sku: string; nama: string; kategori
 
 export const stokAwal = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/awal', { method: 'POST', body: b })
 export const stokOpname = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/opname', { method: 'POST', body: b })
+/** Catat produksi (halaman penuh): beberapa produk, bahan aktual, dan biaya lain dari Kas/Bank.
+ *  Kartu stok yang belum dimulai otomatis dimulai dari daftar barang. Jumlah per seribu satuan. */
+export interface ProduksiCatat {
+  tanggal: string; bayar_dari?: string
+  produk: { produk_id: number; hasil: number; bahan: { stok_id: number; qty: number }[]; biaya: { keterangan: string; nominal: number }[]; keterangan?: string }[]
+}
+export const catatProduksi = (b: ProduksiCatat) => api<{ gerak: GerakStok[]; stok_awal: boolean; transaksi: number }>('/stok/produksi/catat', { method: 'POST', body: b })
 export const stokProduksi = (b: { tanggal: string; produk_id: number; batch: number; keterangan?: string; bahan?: { stok_id: number; qty: number }[]; hasil?: number }) => api<GerakStok>('/stok/produksi', { method: 'POST', body: b })
 export const getGerakStok = () => api<GerakStok[]>('/stok/gerak')
 export const hapusGerakStok = (id: number) => api<void>(`/stok/gerak/${id}`, { method: 'DELETE' })
