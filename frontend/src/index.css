@@ -406,6 +406,70 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     font-weight: 600;
   }
 
+  /* Langkah memulai: border tebal berwarna supaya pengguna baru langsung melihatnya. */
+  .langkah-mulai {
+    border: 2px solid var(--accent-orange) !important;
+    box-shadow: 0 0 0 4px var(--accent-orange-soft), 0 8px 24px color-mix(in srgb, var(--accent-orange) 18%, transparent);
+  }
+  .langkah-mulai-badge {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: var(--neutral-0);
+    background: var(--accent-orange);
+  }
+
+  /* Layar setelah onboarding (belum berlangganan): paket di kiri, Alat Gratis di kanan. */
+  .layar-bayar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 960px) {
+    .layar-bayar { grid-template-columns: 1fr; }
+  }
+  .kartu-alat-gratis {
+    position: sticky;
+    top: 16px;
+    padding: 20px;
+    border-radius: 16px;
+    color: var(--neutral-0);
+    background: linear-gradient(150deg, var(--navy-700), var(--navy-900));
+    border: 2px solid var(--accent-orange);
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--accent-orange) 28%, transparent);
+  }
+  .kartu-alat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--neutral-0) 22%, transparent);
+    background: color-mix(in srgb, var(--neutral-0) 8%, transparent);
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .kartu-alat-item:hover { background: var(--accent-orange); border-color: var(--accent-orange); }
+
+  /* Grup menu yang bisa dibuka-tutup (submenu): kepala grup tebal, isinya menjorok bergaris. */
+  .nav-group-lipat { margin-top: 4px; }
+  .nav-group-head { font-weight: 600; color: var(--text-primary); }
+  .nav-sub {
+    margin: 2px 0 4px 17px;
+    padding-left: 8px;
+    border-left: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  }
+  .nav-sub.tertutup { display: none; }
+
   .nav-icon {
     width: 15px;
     height: 15px;
@@ -858,8 +922,14 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     .nav-group {
       display: contents;
     }
-    .nav-group-label {
+    .nav-group-label,
+    .nav-group-head {
       display: none;
+    }
+    /* Ponsel: semua menu tetap satu baris geser, grup tidak dilipat. */
+    .nav-sub,
+    .nav-sub.tertutup {
+      display: contents;
     }
     .nav-item {
       width: auto;

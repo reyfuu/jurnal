@@ -57,7 +57,7 @@ export function ArtikelView({ bolehTerbit }: { bolehTerbit: boolean }) {
 
   return (
     <>
-      <PageHeader title="Artikel Pajak" subtitle="Diindeks per kategori, dasar hukum, dan tag. Artikel terbit dipakai AI; yang ditandai juga tampil di Pustaka Pajak klien.">
+      <PageHeader title="Artikel Pajak" subtitle="Diindeks per kategori, dasar hukum, dan tag. Artikel terbit dipakai AI; yang ditandai juga tampil di menu Artikel Pajak klien.">
         <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => { setError(''); setEdit({ id: null, a: KOSONG, tag: '', terbit: false }) }}><Plus size={16} /> Tulis artikel</button>
       </PageHeader>
       <Pesan error={!edit ? error : ''} info={info} />
@@ -113,7 +113,7 @@ export function ArtikelView({ bolehTerbit }: { bolehTerbit: boolean }) {
               </div>
               <div className="grid gap-1.5"><Label htmlFor="ar-t">Tag (pisah koma)</Label><Input id="ar-t" placeholder="omzet 4,8 M, OP, batas waktu" value={edit.tag} onChange={(e) => setEdit({ ...edit, tag: e.target.value })} /></div>
               <div className="grid gap-1.5"><Label htmlFor="ar-i">Isi</Label><textarea id="ar-i" required rows={10} className={textareaClass} value={edit.a.isi} onChange={(e) => set({ isi: e.target.value })} /></div>
-              <div className="flex items-center justify-between"><Label htmlFor="ar-tk">Tampilkan ke klien di Pustaka Pajak</Label><Switch id="ar-tk" checked={edit.a.tampil_klien} onCheckedChange={(v) => set({ tampil_klien: v })} /></div>
+              <div className="flex items-center justify-between"><Label htmlFor="ar-tk">Tampilkan ke klien di Artikel Pajak</Label><Switch id="ar-tk" checked={edit.a.tampil_klien} onCheckedChange={(v) => set({ tampil_klien: v })} /></div>
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEdit(null)}>Batal</Button>
