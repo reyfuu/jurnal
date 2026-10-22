@@ -58,6 +58,10 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
   const bagianTab: BagianPDF | null = tab === 'laba-rugi' || tab === 'neraca' || tab === 'arus-kas' || tab === 'aset' ? tab : null
   // Rentang tanggal laba rugi & arus kas; bawaan = sebulan penuh periode yang dipilih.
   const [rentang, setRentang] = useState(() => rentangBulan(period))
+  // Rentang unduh semua daftar (checklist No 14); kembali ke bulan periode bila periode diganti.
+  const [daftarPilih, setDaftarPilih] = useState({ period, ...rentangBulan(period) })
+  const daftarRentang = daftarPilih.period === period ? daftarPilih : { period, ...rentangBulan(period) }
+  const daftarSalah = !daftarRentang.dari || !daftarRentang.sampai || daftarRentang.dari > daftarRentang.sampai
   const [hasil, setHasil] = useState<{ kunci: string; d?: LaporanRentang; error?: string } | null>(null)
   useEffect(() => { setRentang(rentangBulan(period)) }, [period])
   const bulanan = rentangBulan(period)
@@ -117,9 +121,16 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
 
       {bisaEkspor && tab !== 'banding' && (
         <div className="flex flex-wrap items-center justify-end gap-2" style={{ marginBottom: 10 }}>
-          <span className="text-sm text-muted-foreground">Daftar piutang, utang, invoice, barang, pelanggan &amp; pemasok {periodLabel}:</span>
-          <Button size="sm" variant="outline" onClick={() => void ekspor(daftarUrl(period, 'xlsx'))}><FileSpreadsheet /> Unduh Excel</Button>
-          <Button size="sm" variant="outline" onClick={() => void ekspor(daftarUrl(period, 'pdf'))}><FileDown /> Unduh PDF</Button>
+          <span className="text-sm text-muted-foreground">Daftar piutang, utang, invoice, barang, pelanggan &amp; pemasok</span>
+          <label className="flex items-center gap-1 text-sm text-muted-foreground">dari
+            <input className="input-field" type="date" style={{ width: 'auto' }} aria-label="Daftar dari tanggal" value={daftarRentang.dari}
+              onChange={(e) => setDaftarPilih({ ...daftarRentang, dari: e.target.value })} /></label>
+          <label className="flex items-center gap-1 text-sm text-muted-foreground">sampai
+            <input className="input-field" type="date" style={{ width: 'auto' }} aria-label="Daftar sampai tanggal" value={daftarRentang.sampai}
+              onChange={(e) => setDaftarPilih({ ...daftarRentang, sampai: e.target.value })} /></label>
+          {daftarSalah && <span className="text-sm text-destructive" role="alert">Tanggal mulai harus sebelum tanggal akhir.</span>}
+          <Button size="sm" variant="outline" disabled={daftarSalah} onClick={() => void ekspor(daftarUrl(daftarRentang, 'xlsx'))}><FileSpreadsheet /> Unduh Excel</Button>
+          <Button size="sm" variant="outline" disabled={daftarSalah} onClick={() => void ekspor(daftarUrl(daftarRentang, 'pdf'))}><FileDown /> Unduh PDF</Button>
         </div>
       )}
 

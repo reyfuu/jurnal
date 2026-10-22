@@ -13,7 +13,7 @@ var peranJenis = map[string]string{
 	"Kemasan": PeranKemasan, "Potongan Aplikasi": PeranPotonganAplikasi, "Ongkir & Transport": PeranOngkir, "Gaji & Upah": PeranGaji,
 	"Sewa Tempat": PeranSewa, "Listrik, Air, Internet": PeranListrik, "Iklan & Promosi": PeranIklan,
 	"Perawatan & Perlengkapan": PeranPerawatan, "Pajak & Izin": PeranBebanPajak, "Biaya Lain": PeranBiayaLain,
-	"Beli Alat / Aset": PeranPeralatan, "Bayar Cicilan": PeranPinjaman,
+	"Beli Alat / Aset": PeranPeralatan, "Bayar Cicilan": PeranPinjaman, "Pindah Dana": PeranBank, // tujuan bawaan; Catat selalu mengisi Akun
 	"PPN Keluaran": PeranPPNKeluaran, "Setor PPN": PeranPPNKeluaran,
 }
 
@@ -380,6 +380,12 @@ func SaldoBawaan(txs []finance.Transaction, sebelum string, p finance.BusinessPr
 		if t.Lunas && bayar < sebelum {
 			if k := AkunBayar(t, peta); k != kas {
 				out[k] += tanda * t.Nominal
+			}
+			// pindah dana: rekening tujuan bertambah (Kas tidak dicatat: sisa dari total kas)
+			if j.Pos == finance.PosPindah {
+				if k := AccountFor(t, p, peta); k != kas {
+					out[k] += t.Nominal
+				}
 			}
 		}
 		if t.Tanggal < sebelum && !isPT(p) && AccountFor(t, p, peta) == prive {

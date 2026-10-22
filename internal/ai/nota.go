@@ -57,6 +57,9 @@ func BacaNota(ctx context.Context, c *llm.Client, usaha, mime string, foto []byt
 	}
 	var masuk, keluar []string
 	for _, j := range finance.JenisList {
+		if j.Pos == finance.PosPindah { // perlu rekening asal & tujuan; hanya lewat Catat
+			continue
+		}
 		if j.Arah == "masuk" {
 			masuk = append(masuk, j.Nama)
 		} else {

@@ -33,6 +33,7 @@ type catatResp struct {
 	catatReq
 	Grup      int           `json:"grup"`
 	Transaksi []int         `json:"transaksi"`
+	NoJurnal  string        `json:"no_jurnal,omitempty"`
 	FotoNota  *fotoNotaInfo `json:"foto_nota,omitempty"`
 }
 
@@ -115,9 +116,14 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int,
 			return nil, err
 		}
 	}
+	nomor := "" // catatan yang diubah tetap memakai nomor jurnalnya
+	if i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup }); i >= 0 {
+		nomor = s.txs[i].NoJurnal
+	}
 	s.txs = slices.DeleteFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup })
 	var ids []int
 	for _, t := range baru {
+		t.NoJurnal = nomor
 		t.ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, t)
@@ -157,7 +163,7 @@ func (s *tenant) handleCreateCatat(w http.ResponseWriter, r *http.Request) {
 	}
 	foto := s.lampirkanBuktiLocked(r, grup, c.Bukti)
 	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, catatResp{c, grup, ids, foto})
+	writeJSON(w, catatResp{c, grup, ids, s.nomorTxLocked(ids[0]), foto})
 }
 
 func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +189,7 @@ func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := catatResp{Grup: grup, catatReq: catatReq{Tanggal: txs[0].Tanggal, Pihak: txs[0].Pihak, NoBukti: txs[0].NoBukti,
-		Keterangan: strings.Join(ket, "; "), Baris: coa.SusunCatat(txs, p, coa.PetaDari(all))}}
+		Keterangan: strings.Join(ket, "; "), Baris: coa.SusunCatat(txs, p, coa.PetaDari(all))}, NoJurnal: txs[0].NoJurnal}
 	for _, t := range txs {
 		out.Transaksi = append(out.Transaksi, t.ID)
 	}
@@ -217,7 +223,7 @@ func (s *tenant) handleUpdateCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	out := catatResp{catatReq: c, Grup: grup, Transaksi: ids}
+	out := catatResp{catatReq: c, Grup: grup, Transaksi: ids, NoJurnal: s.nomorTxLocked(ids[0])}
 	if m, ok := s.buktiLocked(grup); ok {
 		out.FotoNota = m.info()
 	}

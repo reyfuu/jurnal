@@ -31,6 +31,9 @@ func TemplateRows() [][]string {
 func JenisSheetRows() [][]string {
 	rows := [][]string{{"Jenis", "Arah uang", "Contoh kata yang juga dikenali"}}
 	for _, j := range JenisList {
+		if j.Pos == PosPindah { // hanya lewat Catat (perlu rekening asal & tujuan)
+			continue
+		}
 		rows = append(rows, []string{j.Nama, j.Arah, strings.Join(jenisAlias[j.Nama], ", ")})
 	}
 	return rows

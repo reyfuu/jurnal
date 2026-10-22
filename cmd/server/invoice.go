@@ -91,7 +91,7 @@ func (s *tenant) tambahInvoiceLocked(inv *finance.Invoice) error {
 	}
 	inv.ID = s.nextInvoiceID
 	inv.Dibukukan = true
-	inv.TransaksiID, inv.TransaksiPPNID = 0, 0
+	inv.TransaksiID, inv.TransaksiPPNID, inv.NoJurnal = 0, 0, ""
 	txs, nextTx := s.txs, s.nextTxID
 	if err := s.sinkronInvoiceLocked(inv); err != nil {
 		s.txs, s.nextTxID = txs, nextTx // transaksi DPP yang sempat dibuat ikut dibatalkan
@@ -99,6 +99,8 @@ func (s *tenant) tambahInvoiceLocked(inv *finance.Invoice) error {
 	}
 	s.nextInvoiceID++
 	s.invoices = append(s.invoices, *inv)
+	s.beriNomorJurnalLocked()
+	inv.NoJurnal = s.invoices[len(s.invoices)-1].NoJurnal
 	return nil
 }
 
@@ -174,13 +176,14 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	// Tautan pembukuan diatur server; "bukukan" dari klien hanya bisa menyalakan, bukan mematikan.
 	// Draft belum pernah terbit, jadi belum mungkin dicatat manual: begitu dikirim langsung dibukukan.
 	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan || lama.Status == finance.StatusDraft
-	inv.TransaksiID, inv.TransaksiPPNID = lama.TransaksiID, lama.TransaksiPPNID
+	inv.TransaksiID, inv.TransaksiPPNID, inv.NoJurnal = lama.TransaksiID, lama.TransaksiPPNID, lama.NoJurnal
 	if err := s.sinkronInvoiceLocked(&inv); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.invoices[i] = inv
-	writeJSON(w, inv)
+	s.beriNomorJurnalLocked()
+	writeJSON(w, s.invoices[i])
 }
 
 func (s *tenant) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {

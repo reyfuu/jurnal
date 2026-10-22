@@ -43,7 +43,7 @@ func PosisiPada(ob OpeningBalance, txs []Transaction, sampai string) Posisi {
 			continue
 		}
 		j, ok := jenisOf(t.Jenis)
-		if !ok {
+		if !ok || j.Pos == PosPindah { // pindah dana: total kas tetap
 			continue
 		}
 		masuk, n := j.Arah == "masuk", t.Nominal

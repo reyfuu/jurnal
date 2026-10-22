@@ -294,6 +294,8 @@ export interface Tx {
   no_bukti?: string
   /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
   sumber?: 'mutasi' | 'foto'
+  /** Nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server. */
+  no_jurnal?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -1488,6 +1490,34 @@ export const createSupplier = (s: SupplierInput) => api<Supplier>('/produksi/sup
 export const updateSupplier = (id: number, s: SupplierInput) => api<Supplier>(`/produksi/supplier/${id}`, { method: 'PUT', body: s })
 export const deleteSupplier = (id: number) => api<void>(`/produksi/supplier/${id}`, { method: 'DELETE' })
 
+/** Master pelanggan (Invoice → Daftar pelanggan); invoice tetap menyimpan nama sebagai teks. */
+export interface Pelanggan {
+  id: number
+  nama: string
+  kontak?: string
+  telepon?: string
+  email?: string
+  alamat?: string
+  npwp?: string
+  /** Termin pembayaran dalam hari; 0 = tunai. */
+  tempo_hari: number
+  catatan?: string
+}
+export type PelangganInput = Omit<Pelanggan, 'id'>
+export const getPelanggan = () => api<Pelanggan[]>('/pelanggan')
+export const createPelanggan = (p: PelangganInput) => api<Pelanggan>('/pelanggan', { method: 'POST', body: p })
+export const updatePelanggan = (id: number, p: PelangganInput) => api<Pelanggan>(`/pelanggan/${id}`, { method: 'PUT', body: p })
+export const deletePelanggan = (id: number) => api<void>(`/pelanggan/${id}`, { method: 'DELETE' })
+/** Riwayat transaksi satu pelanggan / supplier (dicocokkan lewat nama) dalam rentang tanggal. */
+export interface RiwayatPihak {
+  nama: string; dari: string; sampai: string; transaksi: Tx[]
+  total_masuk: number; total_keluar: number; piutang_terbuka: number; utang_terbuka: number
+}
+export const getRiwayatPihak = (nama: string, dari: string, sampai: string) =>
+  api<RiwayatPihak>(`/pihak/riwayat?nama=${encodeURIComponent(nama)}&dari=${dari}&sampai=${sampai}`)
+/** Tambahkan nama pelanggan dari transaksi penjualan & invoice yang belum ada di daftar. */
+export const pelangganDariData = () => api<{ ditambah: number }>('/pelanggan/dari-data', { method: 'POST' })
+
 // --- Invoice: faktur penjualan + cetak PDF ---
 
 export interface InvoiceItem {
@@ -1908,7 +1938,8 @@ export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>
 
 export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
-export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
+/** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk rentang tanggal. */
+export const daftarUrl = (r: { dari: string; sampai: string }, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?dari=${r.dari}&sampai=${r.sampai}`
 /** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
 export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
   `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`

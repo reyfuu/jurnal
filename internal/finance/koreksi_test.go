@@ -108,3 +108,27 @@ func TestHitungDampak(t *testing.T) {
 		t.Fatalf("dampak pindah bulan = %+v", d)
 	}
 }
+
+// Nomor jurnal (checklist No 31) tetap saat koreksi disetujui, usulan tidak bisa menyetel field
+// yang diatur server, dan usulan yang dibuat sebelum ada nomor jurnal tidak jadi basi.
+func TestKoreksiNomorJurnalDanFieldServer(t *testing.T) {
+	asli := finance.Transaction{ID: 7, Tanggal: "2026-10-05", Jenis: "Biaya Lain", Nominal: 1000, Lunas: true, Grup: 3}
+	k := finance.Koreksi{TransaksiID: 7, Jenis: finance.KoreksiUbah, Alasan: "nominal salah", Usulan: &finance.Transaction{Tanggal: "2026-10-05", Jenis: "Biaya Lain", Nominal: 2000, Lunas: true, NoJurnal: "JU-202610-0999", Grup: 99, InvoiceID: 5}}
+	if err := finance.SiapkanKoreksi(&k, []finance.Transaction{asli}); err != nil {
+		t.Fatal(err)
+	}
+	if k.Usulan.NoJurnal != "" || k.Usulan.Grup != 3 || k.Usulan.InvoiceID != 0 {
+		t.Fatalf("field server dari usulan: %+v", k.Usulan)
+	}
+	// setelah deploy: transaksi diberi nomor, Sebelum (lama) belum bernomor
+	bernomor := asli
+	bernomor.NoJurnal = "JU-202610-0001"
+	out, err := finance.TerapkanKoreksi([]finance.Transaction{bernomor}, k)
+	if err != nil || out[0].Nominal != 2000 || out[0].NoJurnal != "JU-202610-0001" {
+		t.Fatalf("terapkan: %+v %v", out, err)
+	}
+	pd := finance.Koreksi{TransaksiID: 7, Jenis: finance.KoreksiUbah, Alasan: "jadi pindah dana", Usulan: &finance.Transaction{Tanggal: "2026-10-05", Jenis: finance.JenisPindahDana, Nominal: 1, Lunas: true, Akun: "1101", Lawan: "2101"}}
+	if err := finance.SiapkanKoreksi(&pd, []finance.Transaction{asli}); err == nil {
+		t.Fatal("pindah dana lewat koreksi harus ditolak")
+	}
+}

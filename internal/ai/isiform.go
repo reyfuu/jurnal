@@ -94,6 +94,9 @@ func kolomForm(form string) string {
 	case "transaksi":
 		var jenis []string
 		for _, j := range finance.JenisList {
+			if j.Pos == finance.PosPindah { // perlu rekening asal & tujuan; hanya lewat Catat
+				continue
+			}
 			jenis = append(jenis, j.Nama)
 		}
 		return `- tanggal

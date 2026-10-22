@@ -37,10 +37,18 @@ var JenisList = []Jenis{
 	{"Beli Alat / Aset", "keluar", "aset"},
 	{"Bayar Cicilan", "keluar", "cicilan"},
 	{"Ambil Uang Pribadi", "keluar", "prive"},
+	// Pindah Dana: uang pindah antar rekening usaha sendiri (Lawan = asal, Akun = tujuan). Total kas,
+	// laba rugi, dan ringkasan masuk/keluar tidak berubah; hanya saldo per rekening.
+	{JenisPindahDana, "keluar", PosPindah},
 	// PPN keluaran (usaha PKP): dipungut dari pembeli bersama invoice, lalu disetor ke negara.
 	{"PPN Keluaran", "masuk", "ppn"},
 	{"Setor PPN", "keluar", "setor_ppn"},
 }
+
+const (
+	JenisPindahDana = "Pindah Dana"
+	PosPindah       = "pindah"
+)
 
 // LookupJenis: info arah & pos untuk nama jenis transaksi.
 func LookupJenis(nama string) (Jenis, bool) { return jenisOf(nama) }
@@ -81,10 +89,12 @@ type Transaction struct {
 	// otomatis dari Lunas & Channel).
 	// Sumber: asal pencatatan bila bukan input manual — "mutasi" (impor mutasi bank) atau "foto"
 	// (dibaca AI dari foto nota); dipakai pengecekan transaksi dobel.
-	Sumber  string `json:"sumber,omitempty"`
-	Grup    int    `json:"grup,omitempty"`
-	NoBukti string `json:"no_bukti,omitempty"`
-	Lawan   string `json:"lawan,omitempty"`
+	Sumber string `json:"sumber,omitempty"`
+	// NoJurnal: nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server (cmd/server/nomor_jurnal.go).
+	NoJurnal string `json:"no_jurnal,omitempty"`
+	Grup     int    `json:"grup,omitempty"`
+	NoBukti  string `json:"no_bukti,omitempty"`
+	Lawan    string `json:"lawan,omitempty"`
 	// StokID & QtyStok: barang yang dibeli (Beli Bahan / Stok) atau dijual (Penjualan) dan
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
@@ -101,6 +111,9 @@ func Validate(t *Transaction) error {
 	}
 	if _, ok := jenisOf(t.Jenis); !ok {
 		return errors.New("jenis transaksi tidak dikenal")
+	}
+	if t.Jenis == JenisPindahDana && (t.Akun == "" || t.Lawan == "" || t.Akun == t.Lawan || !t.Lunas) {
+		return errors.New("pindah dana dicatat lewat Catat: pilih rekening asal dan rekening tujuan yang berbeda")
 	}
 	if t.Nominal <= 0 {
 		return errors.New("nominal harus lebih dari 0")
@@ -144,6 +157,9 @@ func ToLedger(txs []Transaction) []LedgerEntry {
 	out := make([]LedgerEntry, 0, len(txs))
 	for _, t := range txs {
 		j, _ := jenisOf(t.Jenis)
+		if j.Pos == PosPindah {
+			continue // bukan pemasukan/pengeluaran
+		}
 		kind := KindExpense
 		if j.Arah == "masuk" {
 			kind = KindIncome
@@ -300,6 +316,9 @@ func ApplyKPIs(snap *DashboardSnapshot, is IncomeStatement, cf CashFlow, periodT
 			Title: cmp.Or(t.Keterangan, t.Jenis), Channel: t.Channel, Gross: t.Nominal, Net: -t.Nominal}
 		if j.Arah == "masuk" {
 			item.Type, item.Net = KindIncome, t.Nominal
+		}
+		if j.Pos == PosPindah {
+			item.Net = 0 // antar rekening sendiri: bukan pengeluaran
 		}
 		snap.RecentTransactions = append(snap.RecentTransactions, item)
 	}

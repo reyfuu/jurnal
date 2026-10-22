@@ -53,7 +53,7 @@ func (f filterTransaksi) cocok(t finance.Transaction) bool {
 	j, _ := finance.LookupJenis(t.Jenis)
 	switch {
 	case f.Jenis != "" && t.Jenis != f.Jenis,
-		f.Arah != "" && j.Arah != f.Arah,
+		f.Arah != "" && (j.Arah != f.Arah || j.Pos == finance.PosPindah), // pindah dana bukan masuk/keluar
 		f.Status == "lunas" && !t.Lunas,
 		f.Status == "belum" && t.Lunas,
 		f.Channel != "" && t.Channel != f.Channel:
@@ -102,9 +102,11 @@ func (s *tenant) laporanTransaksi(f filterTransaksi) laporanTransaksiResp {
 		}
 		j, _ := finance.LookupJenis(t.Jenis)
 		out.Transaksi = append(out.Transaksi, t)
-		if j.Arah == "masuk" {
+		switch {
+		case j.Pos == finance.PosPindah: // antar rekening sendiri: tidak menambah masuk/keluar
+		case j.Arah == "masuk":
 			out.TotalMasuk += t.Nominal
-		} else {
+		default:
 			out.TotalKeluar += t.Nominal
 		}
 		if !t.Lunas {
@@ -155,17 +157,20 @@ func (s *tenant) handleLaporanTransaksiXlsx(w http.ResponseWriter, r *http.Reque
 	rows := [][]string{{"Tanggal", "No", "Jenis", "Arah", "Keterangan", "Produk / Bahan", "Pelanggan / Supplier", "Channel", "Status", "Tanggal Lunas", "Masuk (Rp)", "Keluar (Rp)"}}
 	for _, t := range lt.Transaksi {
 		j, _ := finance.LookupJenis(t.Jenis)
-		masuk, keluar := "", ""
-		if j.Arah == "masuk" {
+		masuk, keluar, arah := "", "", j.Arah
+		switch {
+		case j.Pos == finance.PosPindah:
+			arah = "pindah"
+		case j.Arah == "masuk":
 			masuk = rp(t.Nominal)
-		} else {
+		default:
 			keluar = rp(t.Nominal)
 		}
 		status := "Lunas"
 		if !t.Lunas {
 			status = "Belum Lunas"
 		}
-		rows = append(rows, []string{t.Tanggal, rp(int64(t.ID)), t.Jenis, j.Arah, t.Keterangan, t.Item, t.Pihak, t.Channel, status, t.TanggalLunas, masuk, keluar})
+		rows = append(rows, []string{t.Tanggal, cmp.Or(t.NoJurnal, rp(int64(t.ID))), t.Jenis, arah, t.Keterangan, t.Item, t.Pihak, t.Channel, status, t.TanggalLunas, masuk, keluar})
 	}
 	rows = append(rows, []string{"", "", "", "", "TOTAL", "", "", "", "", "", rp(lt.TotalMasuk), rp(lt.TotalKeluar)})
 	rekap := [][]string{{"Jenis", "Arah", "Jumlah transaksi", "Total (Rp)"}}

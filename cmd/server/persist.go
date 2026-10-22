@@ -27,31 +27,34 @@ type state struct {
 	Assets       []finance.Asset       `json:"assets"`
 	NextAssetID  int                   `json:"next_asset_id"`
 	// Opening: neraca awal onboarding; nil = belum diisi.
-	Opening        *finance.OpeningBalance    `json:"opening"`
-	Karyawan       []finance.Karyawan         `json:"karyawan"`
-	NextKaryawanID int                        `json:"next_karyawan_id"`
-	Invoices       []finance.Invoice          `json:"invoices"`
-	NextInvoiceID  int                        `json:"next_invoice_id"`
-	Tagihan        []finance.Tagihan          `json:"tagihan"`
-	NextTagihanID  int                        `json:"next_tagihan_id"`
-	Stok           []finance.StokItem         `json:"stok"`
-	NextStokID     int                        `json:"next_stok_id"`
-	Produk         []finance.Produk           `json:"produk"`
-	NextProdukID   int                        `json:"next_produk_id"`
-	Supplier       []finance.Supplier         `json:"supplier"`
-	NextSupplierID int                        `json:"next_supplier_id"`
-	Koreksi        []finance.Koreksi          `json:"koreksi"`
-	NextKoreksiID  int                        `json:"next_koreksi_id"`
-	Catatan        []finance.CatatanKonsultan `json:"catatan"`
-	NextCatatanID  int                        `json:"next_catatan_id"`
-	Gerak          []finance.GerakStok        `json:"gerak_stok"`
-	NextGerakID    int                        `json:"next_gerak_id"`
-	TutupBuku      string                     `json:"tutup_buku,omitempty"`
-	CoaTemplate    int                        `json:"coa_template,omitempty"`
-	Arsip          time.Time                  `json:"arsip,omitzero"`
-	ArsipAlasan    string                     `json:"arsip_alasan,omitempty"`
-	Auth           auth.StoreSnapshot         `json:"auth"`
-	Langganan      *langganan                 `json:"langganan,omitempty"`
+	Opening         *finance.OpeningBalance    `json:"opening"`
+	Karyawan        []finance.Karyawan         `json:"karyawan"`
+	NextKaryawanID  int                        `json:"next_karyawan_id"`
+	Invoices        []finance.Invoice          `json:"invoices"`
+	NextInvoiceID   int                        `json:"next_invoice_id"`
+	Tagihan         []finance.Tagihan          `json:"tagihan"`
+	NextTagihanID   int                        `json:"next_tagihan_id"`
+	Stok            []finance.StokItem         `json:"stok"`
+	NextStokID      int                        `json:"next_stok_id"`
+	Produk          []finance.Produk           `json:"produk"`
+	NextProdukID    int                        `json:"next_produk_id"`
+	Supplier        []finance.Supplier         `json:"supplier"`
+	Pelanggan       []finance.Pelanggan        `json:"pelanggan"`
+	NextPelangganID int                        `json:"next_pelanggan_id"`
+	NextSupplierID  int                        `json:"next_supplier_id"`
+	Koreksi         []finance.Koreksi          `json:"koreksi"`
+	NextKoreksiID   int                        `json:"next_koreksi_id"`
+	Catatan         []finance.CatatanKonsultan `json:"catatan"`
+	NextCatatanID   int                        `json:"next_catatan_id"`
+	Gerak           []finance.GerakStok        `json:"gerak_stok"`
+	NextGerakID     int                        `json:"next_gerak_id"`
+	TutupBuku       string                     `json:"tutup_buku,omitempty"`
+	NomorJurnal     map[string]int             `json:"nomor_jurnal,omitempty"`
+	CoaTemplate     int                        `json:"coa_template,omitempty"`
+	Arsip           time.Time                  `json:"arsip,omitzero"`
+	ArsipAlasan     string                     `json:"arsip_alasan,omitempty"`
+	Auth            auth.StoreSnapshot         `json:"auth"`
+	Langganan       *langganan                 `json:"langganan,omitempty"`
 }
 
 // dataPath: berkas di $DATA_DIR; kosong = mode in-memory (test, dev lokal).
@@ -141,9 +144,10 @@ func (t *tenant) snapshot() state {
 		Stok: slices.Clone(t.stok), NextStokID: t.nextStokID,
 		Produk: slices.Clone(t.produk), NextProdukID: t.nextProdukID,
 		Supplier: slices.Clone(t.supplier), NextSupplierID: t.nextSupplierID,
+		Pelanggan: slices.Clone(t.pelanggan), NextPelangganID: t.nextPelangganID,
 		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
 		Catatan: slices.Clone(t.catatan), NextCatatanID: t.nextCatatanID,
-		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID, TutupBuku: t.tutupBuku,
+		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID, TutupBuku: t.tutupBuku, NomorJurnal: maps.Clone(t.nomorJurnal),
 		Arsip: t.arsip, ArsipAlasan: t.arsipAlasan,
 	}
 }
@@ -277,6 +281,9 @@ func (s *Server) persisting(h http.HandlerFunc) http.HandlerFunc {
 		buf := &bufferedResponse{header: http.Header{}}
 		h(buf, r)
 		after, newSession := s.sessionTenant((&http.Response{Header: buf.header}).Cookies())
+		if t := cmp.Or(after, before); t != nil && buf.status < 400 {
+			t.beriNomorJurnal() // transaksi baru dari jalur mana pun mendapat nomor sebelum disimpan
+		}
 		if buf.status < 400 && (hadSession || newSession) {
 			if err := s.saveFor(cmp.Or(after, before)); err != nil {
 				http.Error(w, "Gagal menyimpan data, coba lagi sebentar lagi.", http.StatusServiceUnavailable)

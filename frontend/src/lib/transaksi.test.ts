@@ -72,3 +72,11 @@ describe('bulan awal daftar transaksi (checklist No 26)', () => {
     expect(monthsOf([t(1, '2026-10-01', 'Penjualan', 1)], '2026-10')).toEqual(['2026-10'])
   })
 })
+
+describe('pindah dana (checklist No 20)', () => {
+  it('tidak dihitung sebagai pemasukan maupun pengeluaran', () => {
+    const jenis = [...JENIS, { nama: 'Pindah Dana', arah: 'keluar' as const, pos: 'pindah' }]
+    const s = summarize([t(1, '2026-10-01', 'Pindah Dana', 500), t(2, '2026-10-02', 'Gaji & Upah', 100)], jenis)
+    expect(s).toMatchObject({ masuk: 0, keluar: 100 })
+  })
+})

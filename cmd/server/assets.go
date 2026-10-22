@@ -81,6 +81,7 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 	s.pakaiRekeningBawaanLocked(&t, lawanLama)
 	if i >= 0 {
 		t.ID = s.txs[i].ID
+		t.NoJurnal = s.txs[i].NoJurnal
 		s.txs[i] = t
 	} else {
 		t.ID = s.nextTxID

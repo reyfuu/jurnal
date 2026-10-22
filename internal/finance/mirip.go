@@ -51,7 +51,8 @@ func CariMirip(txs []Transaction, tanggal string, nominal int64, arah string, ke
 	invoice := map[int]*Mirip{}
 	for _, t := range txs {
 		j, ok := jenisOf(t.Jenis)
-		if !ok || j.Arah != arah || kecuali[t.ID] {
+		// Pindah Dana keluar dari rekening asal dan masuk ke rekening tujuan: cocok di kedua arah.
+		if !ok || (j.Arah != arah && t.Jenis != JenisPindahDana) || kecuali[t.ID] {
 			continue
 		}
 		if t.InvoiceID != 0 && !t.Lunas {

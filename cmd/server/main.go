@@ -61,6 +61,9 @@ type tenant struct {
 	nextProdukID   int
 	supplier       []finance.Supplier
 	nextSupplierID int
+	// pelanggan: master pelanggan (Invoice → Daftar pelanggan).
+	pelanggan       []finance.Pelanggan
+	nextPelangganID int
 	// koreksi: usulan tim Master Pajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
@@ -74,6 +77,8 @@ type tenant struct {
 	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
 	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
 	tutupBuku string
+	// nomorJurnal: nomor jurnal terakhir per bulan ("202610" → 12); tidak pernah turun.
+	nomorJurnal map[string]int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
 	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
@@ -182,6 +187,9 @@ func (t *tenant) restore(st *state) {
 	if st.NextSupplierID > 0 {
 		t.supplier, t.nextSupplierID = st.Supplier, st.NextSupplierID
 	}
+	if st.NextPelangganID > 0 {
+		t.pelanggan, t.nextPelangganID = st.Pelanggan, st.NextPelangganID
+	}
 	if st.NextKoreksiID > 0 {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
 	}
@@ -194,6 +202,8 @@ func (t *tenant) restore(st *state) {
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
 	t.tutupBuku = st.TutupBuku
+	t.nomorJurnal = st.NomorJurnal
+	t.beriNomorJurnalLocked() // transaksi lama tanpa nomor (migrasi, sekali)
 }
 
 func NewServer() *Server {
@@ -219,7 +229,11 @@ func NewServer() *Server {
 	if !loaded {
 		// DB kosong: impor berkas JSON lama (atau seed) lalu simpan. Mode JSON: seed hanya
 		// disimpan bila state.json belum ada; SEED_PASSWORD hanya dipakai saat itu.
-		if fromFiles := s.loadFiles(); s.db != nil || !fromFiles {
+		fromFiles := s.loadFiles()
+		for _, t := range s.tenants { // usaha seed / berkas lama: nomor jurnal sebelum disimpan
+			t.beriNomorJurnal()
+		}
+		if s.db != nil || !fromFiles {
 			s.saveAll()
 		}
 	}
@@ -442,6 +456,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateProduk))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteProduk))))
 	s.mux.HandleFunc("POST /api/v1/produksi/produk/{id}/terapkan-hpp", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleTerapkanHPP))))
+	s.mux.HandleFunc("GET /api/v1/pihak/riwayat", s.guard("transaksi", s.on((*tenant).handleRiwayatPihak)))
+	s.mux.HandleFunc("GET /api/v1/pelanggan", s.guard("invoice", s.on((*tenant).handleListPelanggan)))
+	s.mux.HandleFunc("POST /api/v1/pelanggan", s.persisting(s.guard("invoice", s.on((*tenant).handleCreatePelanggan))))
+	s.mux.HandleFunc("POST /api/v1/pelanggan/dari-data", s.persisting(s.guard("invoice", s.on((*tenant).handlePelangganDariData))))
+	s.mux.HandleFunc("PUT /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdatePelanggan))))
+	s.mux.HandleFunc("DELETE /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeletePelanggan))))
 	s.mux.HandleFunc("POST /api/v1/produksi/supplier", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleCreateSupplier))))
 	s.mux.HandleFunc("PUT /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateSupplier))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteSupplier))))
@@ -1066,7 +1086,11 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
+	if ok && t.Jenis == finance.JenisPindahDana { // rekening asal (Lawan) hanya bisa dipilih di Catat
+		http.Error(w, "pindah dana dicatat lewat Catat: pilih rekening asal dan rekening tujuan", http.StatusBadRequest)
+		return t, false
+	}
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber, t.NoJurnal = 0, 0, "", "", "" // tautan invoice, catatan jurnal, asal & nomor hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1105,6 +1129,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
+	t.NoJurnal = s.nomorTxLocked(t.ID)
 	resp := s.withWarnings(t)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
@@ -1146,8 +1171,9 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
-	t.ID = s.txs[i].ID
+	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal
 	s.txs[i] = t
+	t.NoJurnal = s.nomorTxLocked(t.ID) // pindah bulan → nomor baru
 	writeJSON(w, s.withWarnings(t))
 }
 
