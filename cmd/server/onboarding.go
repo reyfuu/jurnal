@@ -357,6 +357,10 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "data neraca awal tidak valid", http.StatusBadRequest)
 		return
 	}
+	// ?paksa=1: pengguna sudah memeriksa dan tetap menyimpan saldo awal yang belum seimbang;
+	// selisihnya masuk akun Laba Ditahan - Selisih Saldo Awal (dihitung ulang tiap simpan).
+	paksa := r.URL.Query().Get("paksa") == "1"
+	o.Rincian = slices.DeleteFunc(o.Rincian, barisSelisihSaldoAwal)
 	if err := o.TerapkanRincian(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -369,6 +373,17 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	// Saldo awal per akun wajib seimbang: Harta (termasuk nilai buku register aset) =
 	// Kewajiban + Modal. Selisih yang lolos akan diam-diam menjadi modal di semua laporan.
+	if nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal; paksa && len(o.Rincian) > 0 && o.AsetTetap == nbv {
+		if d := o.Harta(nbv) - o.Kewajiban() - o.Modal(); d != 0 {
+			a := coa.AkunSelisihSaldoAwal(akun, coa.PetaDari(akun))
+			o.Rincian = append(o.Rincian, finance.SaldoAkun{Kode: a.Kode, Nama: a.Nama, Kategori: finance.KatLabaDitahan, Nominal: d, Keterangan: ketSelisihSaldoAwal})
+			if err := o.TerapkanRincian(); err != nil {
+				s.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+	}
 	if len(o.Rincian) > 0 {
 		if err := o.CekSeimbang(finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal); err != nil {
 			s.mu.Unlock()
@@ -503,4 +518,11 @@ func (s *tenant) handleDeleteKaryawan(w http.ResponseWriter, r *http.Request) {
 	}
 	s.karyawan = slices.Delete(s.karyawan, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ketSelisihSaldoAwal menandai baris penyeimbang saldo awal yang disimpan paksa.
+const ketSelisihSaldoAwal = "selisih saldo awal yang disimpan walau belum seimbang"
+
+func barisSelisihSaldoAwal(r finance.SaldoAkun) bool {
+	return r.Kategori == finance.KatLabaDitahan && r.Keterangan == ketSelisihSaldoAwal
 }

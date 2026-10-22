@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
+
+const DRAFT_INV = 'invoice-baru'
 import { PageHeader } from '@/components/PageHeader'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import {
@@ -58,6 +61,8 @@ export function InvoiceView() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [impor, setImpor] = useState(false)
+  // Invoice baru yang belum tersimpan disimpan sebagai draft (error / muat ulang tidak menghapusnya).
+  useSimpanDraft(form && editId === null ? DRAFT_INV : null, form)
 
   const muat = () => getInvoices().then(setInfo, (e) => setError((e as Error).message))
   useEffect(() => { void muat() }, [])
@@ -70,7 +75,7 @@ export function InvoiceView() {
   function buka(r?: InvoiceRow) {
     setError('')
     setEditId(r ? r.id : null)
-    setForm(r ? toInput(r) : kosong(info!.nomor_berikutnya, info!.ppn_bps))
+    setForm(r ? toInput(r) : bacaDraft<InvoiceInput>(DRAFT_INV) ?? kosong(info!.nomor_berikutnya, info!.ppn_bps))
   }
 
   async function simpan(e: React.FormEvent) {
@@ -79,6 +84,7 @@ export function InvoiceView() {
     setBusy(true)
     try {
       await (editId === null ? createInvoice(form) : updateInvoice(editId, form))
+      if (editId === null) hapusDraft(DRAFT_INV)
       setForm(null)
       setEditId(null)
       await muat()
@@ -322,7 +328,7 @@ export function InvoiceView() {
               {busy ? 'Menyimpan…' : editId === null ? 'Simpan Invoice' : 'Simpan Perubahan'}
             </button>
             <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }}
-              onClick={() => { setForm(null); setEditId(null) }}>Batal</button>
+              onClick={() => { if (editId === null) hapusDraft(DRAFT_INV); setForm(null); setEditId(null) }}>Batal</button>
           </div>
         </form>
       )}

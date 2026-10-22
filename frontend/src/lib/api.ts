@@ -1060,7 +1060,12 @@ export const laporanTransaksiXlsxUrl = (f: FilterTransaksi) => `/api/v1/reports/
 
 /** tanggal: tanggal pembanding nilai buku aset (saat tanggal mulai di form diganti). */
 export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (tanggal ? `?tanggal=${encodeURIComponent(tanggal)}` : ''))
-export const saveOpening = (o: OpeningBalance) => api<OpeningInfo>('/opening', { method: 'PUT', body: o })
+/** paksa: simpan walau belum seimbang; selisihnya masuk akun Laba Ditahan - Selisih Saldo Awal. */
+export const saveOpening = (o: OpeningBalance, paksa = false) => api<OpeningInfo>('/opening' + (paksa ? '?paksa=1' : ''), { method: 'PUT', body: o })
+
+/** Saldo akun yang berlawanan dengan saldo normalnya (PSAK) dan stok minus, per periode. */
+export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string }
+export const getSaldoMinus = (period: string) => api<SaldoMinus[]>(`/saldo-minus?period=${encodeURIComponent(period)}`)
 
 export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
 export const createKaryawan = (k: KaryawanInput) => api<Karyawan>('/karyawan', { method: 'POST', body: k })

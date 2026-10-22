@@ -30,6 +30,7 @@ import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
 import { AlatGratis } from '@/views/AlatGratis'
+import { PeringatanSaldoMinus } from '@/components/PeringatanSaldoMinus'
 import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
@@ -296,6 +297,9 @@ export default function App() {
                 {memuat && <span role="status" style={{ fontSize: 11, color: 'var(--text-muted)' }}>memuat…</span>}
               </div>
             </div>
+          )}
+          {data && !terkunci && ['dashboard', 'transaksi', 'stok-gudang', 'laporan-keuangan', 'buku-besar', 'jurnal-umum'].includes(view) && (
+            <PeringatanSaldoMinus period={period} versi={data} />
           )}
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
