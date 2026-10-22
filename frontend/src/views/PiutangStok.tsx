@@ -438,7 +438,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
         {/* Form tambah / ubah muncul di sini, tepat di atas tabel, dan halaman bergeser ke sini. */}
         <div ref={formRef} style={{ scrollMarginTop: 16 }}>
           {tambahBanyak && (
-            <TambahBarangBanyak skuTerpakai={list.map((x) => x.sku).filter(Boolean)} onBatal={() => setTambahBanyak(false)}
+            <TambahBarangBanyak skuTerpakai={list.map((x) => x.sku).filter(Boolean)} namaTerpakai={list.map((x) => x.nama)} onBatal={() => setTambahBanyak(false)}
               onSelesai={(n) => { setTambahBanyak(false); setPesan(`${n} barang ditambahkan.`); muat() }} />
           )}
         {form && (

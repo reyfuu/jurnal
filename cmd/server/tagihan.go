@@ -96,6 +96,11 @@ func (s *tenant) handleCreateStok(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if err := finance.CekUnik(s.stok, finance.InfoStok, 0, it.SKU, it.Nama, "barang"); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if s.nextStokID == 0 {
 		s.nextStokID = 1
 	}
@@ -122,6 +127,10 @@ func (s *tenant) handleUpdateStok(w http.ResponseWriter, r *http.Request) {
 	i := s.stokIndex(r)
 	if i < 0 {
 		http.Error(w, "barang tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := finance.CekUnik(s.stok, finance.InfoStok, s.stok[i].ID, it.SKU, it.Nama, "barang"); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	it.ID = s.stok[i].ID
@@ -204,6 +213,19 @@ func (s *tenant) handleImportStok(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, errs, nama := finance.ParseStokFile(sheets)
+	// Tambah (bukan ganti): barang yang SKU / namanya sudah ada di Stok & Gudang dilewati.
+	if r.URL.Query().Get("mode") != "ganti" {
+		s.mu.RLock()
+		ada := slices.Clone(s.stok)
+		s.mu.RUnlock()
+		list = slices.DeleteFunc(list, func(it finance.StokItem) bool {
+			if err := finance.CekUnik(ada, finance.InfoStok, 0, it.SKU, it.Nama, "barang"); err != nil {
+				errs = append(errs, finance.SheetError{Sheet: nama, Pesan: err.Error() + " (dilewati)"})
+				return true
+			}
+			return false
+		})
+	}
 	resp := menuImportResp{Sheet: nama, Valid: len(list), Errors: errs, Stok: list}
 	if r.URL.Query().Get("commit") != "1" {
 		writeJSON(w, resp)

@@ -268,12 +268,18 @@ func (s *tenant) gerakProduksiLocked(b gerakBody) (finance.GerakStok, error) {
 		}
 		baris = append(baris, finance.BarisGerak{StokID: id, Qty: -pakai[id], Standar: standar[id]})
 	}
-	jadi := slices.IndexFunc(s.stok, func(x finance.StokItem) bool {
-		if p.SKU != "" {
-			return strings.EqualFold(x.SKU, p.SKU)
-		}
-		return strings.EqualFold(x.Nama, p.Nama)
-	})
+	// barang jadi: cocokkan SKU dulu, lalu nama, supaya tidak membuat barang kembar
+	jadi := -1
+	if p.SKU != "" {
+		jadi = slices.IndexFunc(s.stok, func(x finance.StokItem) bool {
+			return strings.EqualFold(strings.TrimSpace(x.SKU), strings.TrimSpace(p.SKU))
+		})
+	}
+	if jadi < 0 {
+		jadi = slices.IndexFunc(s.stok, func(x finance.StokItem) bool {
+			return finance.CekUnik([]finance.StokItem{x}, finance.InfoStok, 0, "", p.Nama, "") != nil
+		})
+	}
 	if jadi < 0 {
 		it := finance.StokItem{ID: s.nextStokID, SKU: p.SKU, Nama: p.Nama, Kategori: "Produk Jadi", Satuan: p.Satuan, HargaJual: p.HargaJual}
 		s.nextStokID++

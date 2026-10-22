@@ -744,6 +744,10 @@ func parseStokRows(rows [][]string) ([]StokItem, []ImportError) {
 			fail("%s", err)
 			continue
 		}
+		if err := CekUnik(out, InfoStok, 0, s.SKU, s.Nama, "barang"); err != nil {
+			fail("%s (baris kembar di berkas)", err)
+			continue
+		}
 		out = append(out, s)
 	}
 	return out, errs
