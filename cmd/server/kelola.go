@@ -195,6 +195,11 @@ func (s *Server) handleHapusKlien(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if d := buktiDir(t.id); d != "" {
+		if err := os.RemoveAll(d); err != nil {
+			log.Printf("GAGAL menghapus foto bukti %s: %v", d, err)
+		}
+	}
 	if err := s.saveFor(nil); err != nil {
 		writeMasterErr(w, fmt.Errorf("%w: %w", errSimpan, err))
 		return

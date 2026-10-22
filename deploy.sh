@@ -109,7 +109,9 @@ SQL
   echo "✓ User baca-saja dbeaver_ro siap (DBeaver lewat SSH tunnel ke 127.0.0.1:${DB_PORT})"
 fi
 
-# Backup harian 02:15, simpan 14 hari.
+# Backup harian: 02:15 basis data (simpan 14 hari); 02:30 foto bukti nota di ./data/bukti
+# (tidak ikut pg_dump), disalin tanpa --delete supaya bukti yang terhapus tetap ada di salinan.
 cat > /etc/cron.d/laporan-bisnis-backup <<CRON
 15 2 * * * root mkdir -p /var/backups/laporan-bisnis && docker exec $DB_CONTAINER pg_dump -U laporan -Fc laporan_bisnis > /var/backups/laporan-bisnis/\$(date +\%F).dump && find /var/backups/laporan-bisnis -name '*.dump' -mtime +14 -delete
+30 2 * * * root [ ! -d $(pwd)/data/bukti ] || rsync -a $(pwd)/data/bukti/ /var/backups/laporan-bisnis/bukti/
 CRON
