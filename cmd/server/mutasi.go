@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,11 @@ import (
 // dibaca ulang, koreksi pengguna akan hilang dan tebakan mesin yang dibukukan — padahal
 // seluruh gunanya langkah pratinjau justru supaya tebakan itu bisa diperbaiki.
 
+var errPDFTanpaBaris = errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
+
+// maxUnggahMutasi: PDF hasil scan jauh lebih besar dari e-statement biasa.
+const maxUnggahMutasi = 15 << 20
+
 // bacaTabel membaca .xlsx, .csv, maupun PDF e-statement jadi baris-baris sel.
 //
 // peringatan: hasil pemeriksaan saldo berjalan untuk PDF (tabel Excel/CSV dibaca apa adanya).
@@ -38,7 +44,7 @@ func bacaTabel(nama string, data []byte, sandi string) (rows [][]string, peringa
 		}
 		rows, peringatan := finance.MutasiDariTeksCek(baris)
 		if rows == nil {
-			return nil, nil, errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
+			return nil, nil, errPDFTanpaBaris
 		}
 		return rows, peringatan, nil
 	}
@@ -98,7 +104,13 @@ const (
 // & kuota ada). Kegagalan AI tidak menggagalkan pratinjau — baris tetap bisa dipilih manual.
 func (s *Server) handleMutasiPreview(w http.ResponseWriter, r *http.Request) {
 	t := s.tenantOf(r)
-	h, ok := t.mutasiPreview(w, r)
+	var scan bacaScanFunc
+	if s.llmGambar != nil && s.llmGambar.Enabled() {
+		scan = func(ctx context.Context, data []byte, sandi string, tahun int) ([][]string, []string, error) {
+			return s.bacaMutasiScan(ctx, t.id, data, sandi, tahun)
+		}
+	}
+	h, ok := t.mutasiPreview(w, r, scan)
 	if !ok {
 		return
 	}
@@ -131,11 +143,13 @@ func (s *Server) handleMutasiPreview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h)
 }
 
-func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.MutasiHasil, bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+// mutasiPreview membaca berkas mutasi jadi pratinjau. scan (boleh nil) membaca PDF hasil scan
+// dan foto mutasi dengan AI.
+func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request, scan bacaScanFunc) (finance.MutasiHasil, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxUnggahMutasi)
 	f, fh, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "unggah berkas mutasi PDF, .xlsx, atau .csv (maks 5 MB) di field file", http.StatusBadRequest)
+		http.Error(w, "unggah berkas mutasi PDF, .xlsx, .csv, atau foto mutasi (maks 15 MB) di field file", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
 	defer f.Close()
@@ -144,8 +158,21 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		http.Error(w, "gagal membaca berkas", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
-	rows, peringatanPDF, err := bacaTabel(fh.Filename, data, r.FormValue("sandi"))
-	if err != nil && (isiPDF(data) || errors.Is(err, errExcelTerkunci)) {
+	sandi := r.FormValue("sandi")
+	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
+	rows, peringatanPDF, err := bacaTabel(fh.Filename, data, sandi)
+	gambar := isiGambar(data) != ""
+	dariScan := false
+	if gambar || (isiPDF(data) && (errors.Is(err, errPDFGambar) || errors.Is(err, errPDFTanpaBaris))) {
+		switch {
+		case scan != nil:
+			rows, peringatanPDF, err = scan(r.Context(), data, sandi, tahun)
+			dariScan = err == nil
+		case gambar:
+			rows, err = nil, errFotoMutasiMati
+		}
+	}
+	if err != nil && (isiPDF(data) || gambar || errors.Is(err, errExcelTerkunci)) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
@@ -153,7 +180,6 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 		http.Error(w, "berkas tidak terbaca; unggah hasil unduhan mutasi dari m-banking dalam format PDF, .xlsx, atau .csv", http.StatusBadRequest)
 		return finance.MutasiHasil{}, false
 	}
-	tahun, _ := strconv.Atoi(r.FormValue("tahun"))
 	s.mu.RLock()
 	existing := append([]finance.Transaction(nil), s.txs...)
 	awal, ditutup := "", s.tutupBuku
@@ -179,10 +205,12 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request) (finance.
 	if nTutup > 0 {
 		h.Peringatan = append(h.Peringatan, fmt.Sprintf("%d baris jatuh di bulan yang bukunya sudah ditutup (sampai %s) dan tidak dicentang. Buka kembali bulan itu di menu Tutup Buku bila memang mau dicatat.", nTutup, finance.LabelPeriode(ditutup)))
 	}
-	if isiPDF(data) {
-		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks.
+	if isiPDF(data) || gambar {
+		// PDF tidak punya kolom sungguhan; susunannya ditebak dari letak teks (atau dibaca AI).
 		h.Peringatan = append(h.Peringatan, peringatanPDF...)
-		h.Peringatan = append(h.Peringatan, "Dibaca dari PDF: cocokkan jumlah baris serta total uang masuk dan keluar di atas dengan rekening koran Anda sebelum menyimpan.")
+		if !dariScan {
+			h.Peringatan = append(h.Peringatan, "Dibaca dari PDF: cocokkan jumlah baris serta total uang masuk dan keluar di atas dengan rekening koran Anda sebelum menyimpan.")
+		}
 	}
 	return h, true
 }
