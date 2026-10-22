@@ -93,7 +93,7 @@ func AnalisaKlien(ctx context.Context, c *llm.Client, f FaktaKlien, sumber []pen
 	if err != nil {
 		return AnalisaKlienHasil{Alasan: "Gagal menyiapkan fakta: " + err.Error()}
 	}
-	raw, err := c.Complete(ctx, []llm.Message{
+	raw, model, err := c.CompleteModel(ctx, []llm.Message{
 		{Role: "system", Content: promptKlien},
 		{Role: "user", Content: "FAKTA:\n" + string(fakta) + "\n\nSUMBER:\n" + daftar.String()},
 	}, true, 1200)
@@ -102,9 +102,9 @@ func AnalisaKlien(ctx context.Context, c *llm.Client, f FaktaKlien, sumber []pen
 	}
 	var out AnalisaKlienHasil
 	if err := json.Unmarshal([]byte(llm.ExtractJSON(raw)), &out); err != nil || strings.TrimSpace(out.Penilaian) == "" {
-		return AnalisaKlienHasil{Model: c.Model(), Alasan: "Balasan model tidak berbentuk JSON yang diharapkan."}
+		return AnalisaKlienHasil{Model: model, Alasan: "Balasan model tidak berbentuk JSON yang diharapkan."}
 	}
-	out.Tersedia, out.Model, out.Alasan = true, c.Model(), ""
+	out.Tersedia, out.Model, out.Alasan = true, model, ""
 	out.Poin = out.Poin[:min(4, len(out.Poin))]
 	for i := range out.Poin {
 		// Rujukan karangan dibuang: penilaian tanpa sumber yang bisa dicek tidak boleh tampil

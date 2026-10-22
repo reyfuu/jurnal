@@ -25,8 +25,10 @@ import (
 //	LLM_API_KEY   kunci penyedia (kosong = fitur AI mati, aplikasi tetap jalan)
 //	LLM_BASE_URL  mis. https://api.openai.com/v1, https://api.groq.com/openai/v1,
 //	              https://openrouter.ai/api/v1, http://localhost:11434/v1 (Ollama)
-//	LLM_MODEL     nama model di penyedia tersebut
-//	LLM_TIMEOUT   detik, default 45
+//	LLM_MODEL     nama model di penyedia tersebut; boleh beberapa dipisah koma, mis.
+//	              "ag/gemini-4-argon-high,cx/gpt-5.6-terra": dicoba berurutan, model
+//	              berikutnya dipakai bila model sebelumnya gagal
+//	LLM_TIMEOUT   detik per percobaan model, default 45
 type Config struct {
 	APIKey  string
 	BaseURL string
@@ -74,9 +76,23 @@ func New(cfg Config) *Client {
 	return &Client{cfg: cfg, http: &http.Client{Timeout: cfg.Timeout}}
 }
 
-func (c *Client) Model() string   { return c.cfg.Model }
+// Model: daftar model yang dikonfigurasi, urut prioritas, mis. "utama, cadangan".
+func (c *Client) Model() string   { return strings.Join(c.models(), ", ") }
 func (c *Client) BaseURL() string { return c.cfg.BaseURL }
 func (c *Client) Enabled() bool   { return c.cfg.Enabled() }
+
+func (c *Client) models() []string {
+	var out []string
+	for m := range strings.SplitSeq(c.cfg.Model, ",") {
+		if m = strings.TrimSpace(m); m != "" {
+			out = append(out, m)
+		}
+	}
+	if len(out) == 0 {
+		return []string{defaultModel}
+	}
+	return out
+}
 
 type Message struct {
 	Role    string `json:"role"` // system | user | assistant
@@ -110,10 +126,33 @@ var ErrDisabled = errors.New("LLM_API_KEY belum diisi")
 // jsonMode meminta penyedia membalas JSON; penyedia yang tidak mendukung akan mengabaikannya,
 // karena itu pemanggil tetap harus tahan terhadap balasan yang dibungkus teks.
 func (c *Client) Complete(ctx context.Context, msgs []Message, jsonMode bool, maxTokens int) (string, error) {
+	isi, _, err := c.CompleteModel(ctx, msgs, jsonMode, maxTokens)
+	return isi, err
+}
+
+// CompleteModel seperti Complete, ditambah nama model yang menjawab. Model dicoba sesuai urutan
+// LLM_MODEL; yang berikutnya dipakai bila sebelumnya gagal (mis. penyedia hulunya di 9Router
+// sedang mati). Semua gagal: galat tiap model digabung.
+func (c *Client) CompleteModel(ctx context.Context, msgs []Message, jsonMode bool, maxTokens int) (string, string, error) {
 	if !c.cfg.Enabled() {
-		return "", ErrDisabled
+		return "", "", ErrDisabled
 	}
-	req := chatRequest{Model: c.cfg.Model, Messages: msgs, Temperature: 0.2, MaxTokens: maxTokens}
+	var errs []error
+	for _, m := range c.models() {
+		isi, err := c.complete(ctx, m, msgs, jsonMode, maxTokens)
+		if err == nil {
+			return isi, m, nil
+		}
+		errs = append(errs, err)
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return "", "", errors.Join(errs...)
+}
+
+func (c *Client) complete(ctx context.Context, model string, msgs []Message, jsonMode bool, maxTokens int) (string, error) {
+	req := chatRequest{Model: model, Messages: msgs, Temperature: 0.2, MaxTokens: maxTokens}
 	if jsonMode {
 		req.ResponseFormat = &struct {
 			Type string `json:"type"`
@@ -146,13 +185,17 @@ func (c *Client) Complete(ctx context.Context, msgs []Message, jsonMode bool, ma
 		return "", fmt.Errorf("balasan %s tidak terbaca (status %d)", c.cfg.BaseURL, res.StatusCode)
 	}
 	if out.Error != nil {
-		return "", fmt.Errorf("%s menolak: %s", c.cfg.Model, out.Error.Message)
+		return "", fmt.Errorf("%s menolak: %s", model, out.Error.Message)
 	}
 	if res.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("%s menjawab status %d", c.cfg.BaseURL, res.StatusCode)
 	}
-	if len(out.Choices) == 0 {
-		return "", errors.New("model tidak mengembalikan jawaban")
+	if len(out.Choices) == 0 || strings.TrimSpace(out.Choices[0].Message.Content) == "" {
+		return "", fmt.Errorf("%s tidak mengembalikan jawaban", model)
+	}
+	// Model penalaran bisa menghabiskan max_tokens untuk berpikir; JSON terpotong tidak berguna.
+	if out.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("%s: jawaban terpotong di batas %d token", model, maxTokens)
 	}
 	return out.Choices[0].Message.Content, nil
 }

@@ -56,7 +56,7 @@ Catatan mesin lokal: `go` di PATH masih 1.22.4 sementara `GOROOT` menunjuk ke 1.
 - **Akun Produksi**: email seed sama (`owner@`, `admin@`, `kasir@kedaikopisenja.id`), password dari env `SEED_PASSWORD` di VPS (file `.env` di direktori repo VPS, tidak di-commit). Password demo `senja2026` hanya berlaku lokal/dev; panel akun demo di halaman login hanya muncul di `npm run dev`.
 - **Container**: Docker `laporan-bisnis` di `127.0.0.1:8085->8080/tcp` (hanya lewat nginx).
 - **Nginx Reverse Proxy**: `/etc/nginx/sites-available/jurnal-pajak` dikonfigurasi ke `http://127.0.0.1:8085` dengan sertifikat SSL Let's Encrypt aktif.
-- **9Router**: Diperbarui ke versi terbaru `v0.5.104` di server hermes (layanan systemd `9router.service` aktif).
+- **9Router**: berjalan di server hermes sebagai proses node manual (`9router --host 0.0.0.0 --port 20128`, sejak 18 Okt 2026; bukan unit systemd, jadi tidak hidup lagi setelah reboot). Wajib API key.
 - **GitHub Repository**: [https://github.com/reyfuu/jurnal.git](https://github.com/reyfuu/jurnal.git)
   - Branch `backup/main-lama`: Menyimpan snapshot kode Laravel lama.
   - Branch `main`: Kode baru Go + React Vite + Auth RBAC + AI Agent Bubble (Laporan Bisnis).
@@ -397,9 +397,17 @@ atau LM Studio. Pindah penyedia cukup ganti env, tanpa ubah kode.
 ```
 LLM_API_KEY   kosong = fitur AI mati, aplikasi tetap jalan
 LLM_BASE_URL  default https://api.openai.com/v1
-LLM_MODEL     default gpt-4o-mini
-LLM_TIMEOUT   detik, default 45
+LLM_MODEL     default gpt-4o-mini; boleh daftar "utama,cadangan" (dicoba berurutan)
+LLM_TIMEOUT   detik per percobaan model, default 45
 ```
+
+**Produksi (Okt 2026):** AI lewat 9Router di host hermes. `deploy.sh` mengambil baris `LLM_*`
+dari `/var/www/jurnal/.env` (`LLM_ENV_FILE`; `.env` repo menimpanya bila diisi):
+`LLM_BASE_URL=http://172.16.4.1:20128/v1` (gateway `laporan-bisnis-net`; ufw membuka 20128 untuk
+172.16.4.0/24), `LLM_MODEL=ag/gemini-4-argon-high,cx/gpt-5.6-terra`, `LLM_TIMEOUT=55` (di bawah
+batas nginx 60 dtk). Percobaan gagal juga bila isi kosong atau `finish_reason=length`, supaya
+model penalaran yang menghabiskan `max_tokens` untuk berpikir jatuh ke cadangan. "Dibaca oleh"
+di Laporan AI menampilkan model yang benar-benar menjawab (`llm.CompleteModel`).
 
 **Model tidak pernah berhitung.** `finance.CollectFacts` merangkum SELURUH laporan satu periode
 (laba rugi, arus kas, neraca, aset, pajak, tagihan, operasional, tren) jadi `BusinessFacts`.

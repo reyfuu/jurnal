@@ -76,7 +76,7 @@ func AnalisaProfil(ctx context.Context, c *llm.Client, f FaktaProfil) Analysis {
 	if err != nil {
 		return Analysis{Tersedia: false, Alasan: "Gagal menyiapkan data: " + err.Error()}
 	}
-	raw, err := c.Complete(ctx, []llm.Message{
+	raw, model, err := c.CompleteModel(ctx, []llm.Message{
 		{Role: "system", Content: promptProfil},
 		{Role: "user", Content: "Data perkiraan dari form pendaftaran:\n\n" + string(fakta)},
 	}, true, 1200)
@@ -85,9 +85,9 @@ func AnalisaProfil(ctx context.Context, c *llm.Client, f FaktaProfil) Analysis {
 	}
 	var out Analysis
 	if err := json.Unmarshal([]byte(llm.ExtractJSON(raw)), &out); err != nil || (strings.TrimSpace(out.Ringkasan) == "" && len(out.Rekomendasi) == 0) {
-		return Analysis{Tersedia: false, Model: c.Model(), Alasan: "Model tidak mengembalikan analisis."}
+		return Analysis{Tersedia: false, Model: model, Alasan: "Model tidak mengembalikan analisis."}
 	}
-	out.Tersedia, out.Model = true, c.Model()
+	out.Tersedia, out.Model = true, model
 	out.rapikan()
 	return out
 }

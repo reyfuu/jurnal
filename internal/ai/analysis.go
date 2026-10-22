@@ -67,7 +67,7 @@ func Analyze(ctx context.Context, c *llm.Client, f finance.BusinessFacts) Analys
 		return Analysis{Tersedia: false, Alasan: "Gagal menyiapkan data laporan: " + err.Error()}
 	}
 
-	raw, err := c.Complete(ctx, []llm.Message{
+	raw, model, err := c.CompleteModel(ctx, []llm.Message{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: "Laporan keuangan periode " + f.PeriodeLabel + ":\n\n" + string(fakta)},
 	}, true, 1600)
@@ -77,14 +77,14 @@ func Analyze(ctx context.Context, c *llm.Client, f finance.BusinessFacts) Analys
 
 	var out Analysis
 	if err := json.Unmarshal([]byte(llm.ExtractJSON(raw)), &out); err != nil {
-		return Analysis{Tersedia: false, Model: c.Model(), Alasan: "Balasan model tidak berbentuk JSON yang diharapkan."}
+		return Analysis{Tersedia: false, Model: model, Alasan: "Balasan model tidak berbentuk JSON yang diharapkan."}
 	}
 	if strings.TrimSpace(out.Ringkasan) == "" && len(out.Rekomendasi) == 0 {
-		return Analysis{Tersedia: false, Model: c.Model(), Alasan: "Model tidak mengembalikan analisis."}
+		return Analysis{Tersedia: false, Model: model, Alasan: "Model tidak mengembalikan analisis."}
 	}
 
 	out.Tersedia = true
-	out.Model = c.Model()
+	out.Model = model // yang benar-benar menjawab; LLM_MODEL bisa berisi cadangan
 	out.rapikan()
 	return out
 }
