@@ -257,13 +257,13 @@ function RiwayatAksesTim() {
   useEffect(() => { getRiwayatAksesTim().then(setRows, (e: Error) => setError(e.message)) }, [])
   return (
     <div className="card" style={{ padding: 20 }}>
-      <div className="chart-title">Riwayat akses tim Master Pajak</div>
+      <div className="chart-title">Riwayat akses tim MasterPajak AI</div>
       <div className="chart-subtitle">
         Setiap kali tim kami membuka atau mengusulkan perubahan pada data usaha Anda, tercatat di sini atas nama anggota tim tersebut, bukan atas nama Anda.
         Mode “lihat sebagai” hanya baca; koreksi baru berlaku setelah Anda setujui.
       </div>
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      {rows && rows.length === 0 && <p className="text-sm text-muted-foreground" style={{ paddingTop: 10 }}>Belum ada akses dari tim Master Pajak.</p>}
+      {rows && rows.length === 0 && <p className="text-sm text-muted-foreground" style={{ paddingTop: 10 }}>Belum ada akses dari tim MasterPajak AI.</p>}
       {rows && rows.length > 0 && (
         <div className="table-scroll" style={{ maxHeight: 360, overflowY: 'auto', marginTop: 10 }}>
           <table className="data-table">
@@ -275,7 +275,7 @@ function RiwayatAksesTim() {
                   <td>
                     {r.peran === 'Owner klien'
                       ? <div className="font-semibold">Anda (pemilik usaha)</div>
-                      : <><div className="text-xs text-muted-foreground">Tim Master Pajak</div><div className="font-semibold">{r.nama} <span className="font-normal text-muted-foreground">({r.peran})</span></div></>}
+                      : <><div className="text-xs text-muted-foreground">Tim MasterPajak AI</div><div className="font-semibold">{r.nama} <span className="font-normal text-muted-foreground">({r.peran})</span></div></>}
                   </td>
                   <td style={{ whiteSpace: 'normal' }}>{r.aksi}</td>
                   <td className="text-sm text-muted-foreground" style={{ whiteSpace: 'normal' }}>{r.keterangan || '—'}</td>

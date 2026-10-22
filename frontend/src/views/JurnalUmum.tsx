@@ -49,7 +49,7 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
       {!data.supported ? (
         <div className="card" style={{ padding: 22 }}>
           <div className="chart-title">Jurnal umum belum tersedia untuk jenis usaha ini</div>
-          <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>Jurnal memakai daftar akun (CoA) jenis usaha Anda; CoA untuk jenis usaha ini sedang disiapkan tim Master Pajak.</p>
+          <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>Jurnal memakai daftar akun (CoA) jenis usaha Anda; CoA untuk jenis usaha ini sedang disiapkan tim MasterPajak AI.</p>
         </div>
       ) : (
         <>

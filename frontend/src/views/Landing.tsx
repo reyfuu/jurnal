@@ -65,10 +65,10 @@ const DAPAT: [string, boolean?][] = [
 ]
 
 const FAQ: [string, ReactNode][] = [
-  ['Saya tidak paham akuntansi. Apakah tetap bisa memakai Master Pajak?', 'Bisa. Master Pajak dibuat supaya Anda tidak perlu memahami debit, kredit, rekonsiliasi, atau tutup buku. Anda cukup memasukkan data, misalnya mencatat transaksi atau mengimpor mutasi bank, dan AI yang menyusun pembukuannya. Foto nota via WhatsApp segera hadir.'],
-  ['Apakah Master Pajak menggantikan software akuntansi saya?', 'Ya, Master Pajak dirancang sebagai pengganti software akuntansi konvensional. Pembukuan, laporan keuangan, dan pajak ada di satu platform.'],
-  ['Bedanya dengan Coretax DJP?', 'Coretax adalah tempat melapor. Master Pajak menyiapkan datanya: membukukan dan menghitung pajak. Rekonsiliasi otomatis dan ekspor file XML siap unggah ke Coretax segera hadir.'],
-  ['Siapa yang mengawasi hasil hitungannya?', 'Ahli pajak dan mantan petugas DJP berpengalaman lebih dari 20 tahun dalam tim Master Pajak. Untuk keputusan penting, Anda tetap disarankan mengecek dasar hukumnya.'],
+  ['Saya tidak paham akuntansi. Apakah tetap bisa memakai MasterPajak AI?', 'Bisa. MasterPajak AI dibuat supaya Anda tidak perlu memahami debit, kredit, rekonsiliasi, atau tutup buku. Anda cukup memasukkan data, misalnya mencatat transaksi atau mengimpor mutasi bank, dan AI yang menyusun pembukuannya. Foto nota via WhatsApp segera hadir.'],
+  ['Apakah MasterPajak AI menggantikan software akuntansi saya?', 'Ya, MasterPajak AI dirancang sebagai pengganti software akuntansi konvensional. Pembukuan, laporan keuangan, dan pajak ada di satu platform.'],
+  ['Bedanya dengan Coretax DJP?', 'Coretax adalah tempat melapor. MasterPajak AI menyiapkan datanya: membukukan dan menghitung pajak. Rekonsiliasi otomatis dan ekspor file XML siap unggah ke Coretax segera hadir.'],
+  ['Siapa yang mengawasi hasil hitungannya?', 'Ahli pajak dan mantan petugas DJP berpengalaman lebih dari 20 tahun dalam tim MasterPajak AI. Untuk keputusan penting, Anda tetap disarankan mengecek dasar hukumnya.'],
   ['Bagaimana kalau ada aturan pajak baru?', 'Tim ahli kami mengadakan Zoom mingguan untuk membahas pembaruan aturan pajak dan menjawab pertanyaan komunitas.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans: virtual account bank, QRIS, e-wallet, atau kartu.'],
   ['Bagaimana kalau ternyata tidak cocok?', 'Anda bisa mengajukan pengembalian dana dalam 7 hari sejak pembayaran pertama. Garansi gugur jika Anda sudah mengekspor data dalam bentuk PDF atau Excel.'],
@@ -156,7 +156,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
     <div className="lp min-h-[100dvh]">
       <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur">
         <nav className="lp-wide flex h-16 items-center justify-between gap-4" aria-label="Utama">
-          <a href="#atas" className="shrink-0 rounded-md" aria-label="Master Pajak, ke atas">
+          <a href="#atas" className="shrink-0 rounded-md" aria-label="MasterPajak AI, ke atas">
             <span className="sm:hidden"><Logo tinggi={22} /></span><span className="hidden sm:inline"><Logo tinggi={26} /></span>
           </a>
           <div className="flex items-center gap-1 sm:gap-2">
@@ -178,7 +178,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             <span className="lp-pill"><i />Platform pajak berbasis AI yang siap melayani Anda 24/7, kapan pun dan di mana pun</span>
             <h1>Pembukuan rapi, <mark>pajak beres.</mark></h1>
             <p className="lp-sub">
-              Tanpa perlu paham debit, kredit, rekonsiliasi, atau tutup buku. Catat transaksi atau impor mutasi bank, AI Master Pajak yang <b>membukukan, menghitung pajak, dan menyusun laporan keuangan Anda.</b>
+              Tanpa perlu paham debit, kredit, rekonsiliasi, atau tutup buku. Catat transaksi atau impor mutasi bank, MasterPajak AI yang <b>membukukan, menghitung pajak, dan menyusun laporan keuangan Anda.</b>
             </p>
             <p className="mx-auto mt-3 max-w-[34em] text-base text-[var(--text-secondary)]">Cukup foto nota via WhatsApp, lalu terima file XML siap unggah ke Coretax <SegeraHadir /></p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
@@ -237,7 +237,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
               ))}
             </div>
             <p className="mt-7 rounded-r-xl border-l-4 border-[var(--yellow-500)] bg-[var(--bg-raised)] px-6 py-[22px] text-lg">
-              Ini bukan karena Anda kurang teliti. Akuntansi memang dibuat untuk akuntan, bukan untuk pemilik usaha. <mark>Master Pajak dibuat untuk Anda.</mark>
+              Ini bukan karena Anda kurang teliti. Akuntansi memang dibuat untuk akuntan, bukan untuk pemilik usaha. <mark>MasterPajak AI dibuat untuk Anda.</mark>
             </p>
           </div>
         </section>
@@ -254,7 +254,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
 
         <section>
           <div className="lp-col">
-            <span className="lp-kicker">Siapa di balik Master Pajak</span>
+            <span className="lp-kicker">Siapa di balik MasterPajak AI</span>
             <h2 className="lp-h2">Teknologi AI, diawasi ahli pajak.</h2>
             <p className="lp-lead">Pembukuan otomatis dari sistem diawasi ahli pajak dan mantan petugas DJP yang berpengalaman lebih dari 20 tahun. Setiap minggu, tim ahli juga membagikan pembaruan aturan pajak lewat Zoom.</p>
             <div className="mt-[22px] flex flex-wrap gap-2.5">
@@ -334,10 +334,10 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
 
         <section>
           <div className="lp-wide">
-            <div className="max-w-[720px]"><span className="lp-kicker">Perbandingan</span><h2 className="lp-h2">Cara lama vs Master Pajak</h2></div>
+            <div className="max-w-[720px]"><span className="lp-kicker">Perbandingan</span><h2 className="lp-h2">Cara lama vs MasterPajak AI</h2></div>
             <div className="lp-cmp">
               <table>
-                <thead><tr><th><span className="sr-only">Hal</span></th><th>Software akuntansi konvensional</th><th>Konsultan pajak tradisional</th><th className="me">Master Pajak</th></tr></thead>
+                <thead><tr><th><span className="sr-only">Hal</span></th><th>Software akuntansi konvensional</th><th>Konsultan pajak tradisional</th><th className="me">MasterPajak AI</th></tr></thead>
                 <tbody>
                   {BANDING.map(([hal, [ks, kv], [ts, tv], mp]) => (
                     <tr key={hal}><td>{hal}</td><td className={ks}>{kv}</td><td className={ts}>{tv}</td><td className="me">{mp}</td></tr>
@@ -417,7 +417,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
             </div>
             <div className="mt-12 rounded-[18px] border border-[var(--border-subtle)] bg-[var(--bg-raised)] px-7 py-[26px] text-[16.5px]">
               <p><b className="font-heading">P.S.</b> Belum yakin? Mulai dari kalkulator dan perencanaan pajak gratis. <a href="#kalkulator" className="font-semibold text-[var(--text-brand)] underline underline-offset-2">Coba sekarang</a>, lalu putuskan setelah melihat angkanya sendiri.</p>
-              <p className="mt-3.5 text-sm lp-muted">Tim Master Pajak</p>
+              <p className="mt-3.5 text-sm lp-muted">Tim MasterPajak AI</p>
             </div>
           </div>
         </section>
@@ -427,7 +427,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
         <div className="lp-wide flex flex-wrap items-start justify-between gap-x-10 gap-y-4">
           <div>
             <Logo tinggi={24} />
-            <p className="mt-2.5 text-[11px] font-bold tracking-[0.14em] text-[var(--text-muted)] uppercase">Ekosistem Muamalah Pajak · Mahir Pajak · Master Pajak</p>
+            <p className="mt-2.5 text-[11px] font-bold tracking-[0.14em] text-[var(--text-muted)] uppercase">Ekosistem Muamalah Pajak · Mahir Pajak · MasterPajak AI</p>
           </div>
           <div className="grid max-w-[520px] gap-2">
             <p>© {new Date().getFullYear()} PT Master Pajak Indonesia. Tidak berafiliasi dengan Direktorat Jenderal Pajak; pelaporan pajak tetap melalui Coretax DJP.</p>

@@ -64,7 +64,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
   if (!me.master) {
     return (
       <main className="onboarding-page" style={{ padding: 32 }}>
-        <p role="alert">Akun ini belum terdaftar di tim Master Pajak. Minta Master menambahkan Anda di Tim &amp; Akses.</p>
+        <p role="alert">Akun ini belum terdaftar di tim MasterPajak AI. Minta Master menambahkan Anda di Tim &amp; Akses.</p>
         <button className="btn-cta" style={{ marginTop: 16 }} onClick={onLogout}>Keluar</button>
       </main>
     )

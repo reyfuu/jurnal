@@ -85,7 +85,7 @@ function KartuCatatan({ c, bisaTindak, onSelesai, onBuka }: { c: CatatanKonsulta
       </div>
       <p className="mt-2 text-sm leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>{c.isi}</p>
       <div className="mt-2 text-xs text-muted-foreground">
-        Tim Master Pajak — {c.oleh}{c.peran ? ` (${c.peran})` : ''} · {formatTanggal(c.dibuat)}
+        Tim MasterPajak AI — {c.oleh}{c.peran ? ` (${c.peran})` : ''} · {formatTanggal(c.dibuat)}
         {c.status === 'selesai' && c.selesai_oleh && ` · ditandai selesai oleh ${c.selesai_oleh} ${formatTanggal(c.selesai_pada)}`}
       </div>
       {c.status === 'terbuka' && (
@@ -117,7 +117,7 @@ export function CatatanKlienView({ bisaTindak, onBuka, onBerubah }: { bisaTindak
   }
   return (
     <>
-      <PageHeader title="Catatan Konsultan" subtitle="Catatan dari tim Master Pajak tentang laporan Anda. Perbaiki datanya, lalu tandai sudah diperbaiki." />
+      <PageHeader title="Catatan Konsultan" subtitle="Catatan dari tim MasterPajak AI tentang laporan Anda. Perbaiki datanya, lalu tandai sudah diperbaiki." />
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
       {daftar && daftar.length === 0 && <p className="text-sm text-muted-foreground">Belum ada catatan dari konsultan.</p>}
       {terbuka.length > 0 && <div className="chart-title">Perlu ditindaklanjuti ({terbuka.length})</div>}

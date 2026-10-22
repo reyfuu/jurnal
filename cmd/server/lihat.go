@@ -124,7 +124,7 @@ func (s *Server) catatBukaLihat(u auth.User, view string) {
 		return
 	}
 	g.dibuka[view] = true
-	peran := "Tim Master Pajak"
+	peran := "Tim MasterPajak AI"
 	if ak, ok := s.master.Akses(u.ID); ok {
 		peran = ak.Role.Nama
 	}

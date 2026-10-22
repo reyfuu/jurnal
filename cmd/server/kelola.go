@@ -20,7 +20,7 @@ import (
 // hapus permanen anggota tim. Hapus permanen hanya untuk data yang sudah diarsipkan /
 // dinonaktifkan dan wajib konfirmasi nama/email — tidak ada jalan kembali selain backup DB.
 
-const pesanArsip = "Usaha ini diarsipkan oleh tim Master Pajak. Hubungi tim Master Pajak untuk memulihkannya."
+const pesanArsip = "Usaha ini diarsipkan oleh tim MasterPajak AI. Hubungi tim MasterPajak AI untuk memulihkannya."
 
 func (s *Server) tenantByID(id int) *tenant {
 	s.tenantsMu.RLock()

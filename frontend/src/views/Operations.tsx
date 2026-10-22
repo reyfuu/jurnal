@@ -22,7 +22,7 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
 
   return (
     <>
-      <PageHeader title={title} subtitle="Data Master, Resep BOM, Stok Gudang & Panduan Master Pajak" />
+      <PageHeader title={title} subtitle="Data Master, Resep BOM, Stok Gudang & Panduan MasterPajak AI" />
 
       <div className="card" style={{ padding: '16px 20px', marginBottom: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>

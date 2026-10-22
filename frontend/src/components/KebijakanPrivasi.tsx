@@ -24,7 +24,7 @@ export function KebijakanPrivasi({ children }: { children: ReactNode }) {
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Kebijakan Privasi</DialogTitle>
-          <DialogDescription>Master Pajak · versi {VERSI_PDP}</DialogDescription>
+          <DialogDescription>MasterPajak AI · versi {VERSI_PDP}</DialogDescription>
         </DialogHeader>
         <dl className="grid gap-4 text-sm">
           {BAGIAN.map(([judul, isi]) => (

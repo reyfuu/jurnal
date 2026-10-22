@@ -77,7 +77,7 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
         <div className="card" style={{ padding: 20, borderColor: 'var(--accent-amber)' }} role="status">
           <div className="chart-title">Versi baru daftar akun tersedia (v{p.versi})</div>
           <p className="text-sm text-muted-foreground" style={{ marginTop: 4 }}>
-            Tim Master Pajak memperbarui template. Usaha Anda masih memakai v{c?.template?.versi} sampai Anda menerapkan versi baru.
+            Tim MasterPajak AI memperbarui template. Usaha Anda masih memakai v{c?.template?.versi} sampai Anda menerapkan versi baru.
           </p>
           <ul className="text-sm" style={{ margin: '10px 0', display: 'grid', gap: 4 }}>
             {p.diff.tambah.map((a) => <li key={'t' + a.kode}><span style={{ color: 'var(--accent-green)' }}>+ Akun baru</span> {a.kode} {a.nama}</li>)}
@@ -93,7 +93,7 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
         <div className="card" style={{ padding: 22 }}>
           <div className="chart-title">CoA belum tersedia untuk jenis usaha ini</div>
           <p className="text-sm text-muted-foreground" style={{ marginTop: 6 }}>
-            CoA untuk usaha jasa sedang disiapkan tim Master Pajak. Sementara itu laporan memakai format ringkas.
+            CoA untuk usaha jasa sedang disiapkan tim MasterPajak AI. Sementara itu laporan memakai format ringkas.
             Usaha perdagangan dan manufaktur sudah memakai CoA lengkap, masing-masing dengan daftar akunnya sendiri.
           </p>
         </div>
@@ -180,7 +180,7 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
               </div>
             )
           })}
-          <p className="text-xs text-muted-foreground">Sumber: Daftar COA tim Master Pajak untuk jenis usaha {c.template?.jenis ?? 'Anda'}{c.template ? ` · versi ${c.template.versi}` : ''}. Daftar akun dipilih otomatis dari jenis usaha di profil.</p>
+          <p className="text-xs text-muted-foreground">Sumber: Daftar COA tim MasterPajak AI untuk jenis usaha {c.template?.jenis ?? 'Anda'}{c.template ? ` · versi ${c.template.versi}` : ''}. Daftar akun dipilih otomatis dari jenis usaha di profil.</p>
         </>
       )}
     </>
