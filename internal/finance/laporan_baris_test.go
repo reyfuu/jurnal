@@ -283,3 +283,25 @@ func TestAngkaSifat_BebanHitamTanpaMinus(t *testing.T) {
 		}
 	}
 }
+
+func TestTanggalAkhirPeriode(t *testing.T) {
+	for p, mau := range map[string]string{"2026-10": "31 Oktober 2026", "2028-02": "29 Februari 2028", "2026-04": "30 April 2026"} {
+		if got := TanggalAkhirPeriode(p); got != mau {
+			t.Errorf("%s = %q, mau %q", p, got, mau)
+		}
+	}
+	if got := tanggalAkhirPendek("2026-08"); got != "31 Agu 2026" {
+		t.Errorf("pendek = %q", got)
+	}
+}
+
+func TestPDFNeraca_PerTanggal(t *testing.T) {
+	var buf bytes.Buffer
+	b := BagianNeraca(BalanceSheet{})
+	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", TanggalAkhirPeriode("2026-08"), []BagianLaporan{b}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s := buf.String(); !strings.Contains(s, "Per 31 Agustus 2026") || strings.Contains(s, "akhir Agustus") {
+		t.Error("neraca tidak ditulis per tanggal")
+	}
+}

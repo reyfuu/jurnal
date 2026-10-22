@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { angkaSifat } from '@/lib/angkaLaporan'
+import { tanggalAkhirPeriode } from '@/lib/rentang'
 import { Check, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { bandingPdfUrl, getBanding, MAKS_BANDING, type Banding, type BagianBanding, type PeriodOption } from '@/lib/api'
@@ -89,15 +90,15 @@ function TabelBanding({ b, kolom }: { b: BagianBanding; kolom: Banding['kolom'] 
     <div className="card" style={{ padding: 20 }}>
       <div className="chart-title">{b.judul}</div>
       <div className="chart-subtitle" style={{ marginBottom: 10 }}>
-        {b.kode === 'neraca' ? 'Posisi per akhir tiap bulan; kolom terakhir = posisi bulan terakhir.' : 'Kolom Total = jumlah seluruh bulan yang dipilih.'}
+        {b.kode === 'neraca' ? 'Posisi per tanggal terakhir tiap bulan; kolom terakhir = posisi tanggal paling akhir.' : 'Kolom Total = jumlah seluruh bulan yang dipilih.'}
       </div>
       <div className="table-scroll">
         <table className="data-table tabular" style={{ minWidth: 260 + 130 * (kolom.length + (dua ? 3 : 1)) }}>
           <thead>
             <tr>
               <th style={sticky}>Akun</th>
-              {kolom.map((k) => <th key={k.periode} style={{ textAlign: 'right' }}>{k.label}</th>)}
-              <th style={{ textAlign: 'right' }}>{b.kode === 'neraca' ? 'Posisi akhir' : 'Total'}</th>
+              {kolom.map((k) => <th key={k.periode} style={{ textAlign: 'right' }}>{b.kode === 'neraca' ? tanggalAkhirPeriode(k.periode, true) : k.label}</th>)}
+              <th style={{ textAlign: 'right' }}>{b.kode === 'neraca' && kolom.length ? `Per ${tanggalAkhirPeriode(kolom[kolom.length - 1].periode, true)}` : 'Total'}</th>
               {dua && <><th style={{ textAlign: 'right' }}>Selisih</th><th style={{ textAlign: 'right' }}>%</th></>}
             </tr>
           </thead>

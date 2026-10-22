@@ -49,7 +49,7 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	label, labelNeraca, berkas := finance.LabelPeriode(period), "", period
+	label, labelNeraca, berkas := finance.LabelPeriode(period), finance.TanggalAkhirPeriode(period), period
 	// Rentang tanggal: laba rugi & arus kas dari..sampai; neraca tetap posisi akhir periode.
 	dari, sampai, rentang, err := rentangLaporan(r)
 	if err != nil {
@@ -58,7 +58,7 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 	}
 	if rentang {
 		lr := t.laporanRentang(dari, sampai)
-		label, labelNeraca, berkas = finance.TanggalPanjang(dari)+" s.d. "+finance.TanggalPanjang(sampai), finance.LabelPeriode(period), dari+"_"+sampai
+		label, berkas = finance.TanggalPanjang(dari)+" s.d. "+finance.TanggalPanjang(sampai), dari+"_"+sampai
 		for i, b := range bagian {
 			switch b.Kode {
 			case "laba-rugi":

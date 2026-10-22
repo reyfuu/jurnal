@@ -187,8 +187,8 @@ func akuntansi(n int64) string {
 }
 
 // RenderLaporanPDF mencetak laporan satu periode; aset (boleh nil) dicetak sebagai register.
-// labelNeraca: periode posisi neraca ("" = sama dengan labelPeriode); berbeda bila laba rugi &
-// arus kas memakai rentang tanggal ("15 Januari 2026 s.d. 15 Desember 2026").
+// labelNeraca: tanggal posisi neraca, mis. "31 Oktober 2026" ("" = labelPeriode); neraca selalu
+// per tanggal, laba rugi & arus kas per periode atau rentang ("15 Januari 2026 s.d. 15 Desember 2026").
 func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagian []BagianLaporan, aset *AssetSummary) error {
 	c := cetakBaru(pdf.New(), usaha)
 	isi := c.kanan - c.kiri
@@ -198,7 +198,7 @@ func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagi
 	for _, b := range bagian {
 		sub := "Periode " + labelPeriode + " - dalam Rupiah"
 		if b.Kode == "neraca" {
-			sub = "Posisi per akhir " + labelNeraca + " - dalam Rupiah"
+			sub = "Per " + labelNeraca + " - dalam Rupiah"
 		}
 		c.halaman(b.Judul, sub)
 		berhuruf := slices.ContainsFunc(b.Baris, func(r BarisLaporan) bool { return r.Huruf != "" })
@@ -291,7 +291,11 @@ func RenderBandingPDF(w io.Writer, usaha string, b Banding) error {
 		}
 	}
 	for _, bg := range b.Bagian {
-		c.halaman("Perbandingan "+bg.Judul, fmt.Sprintf("%d bulan: %s - dalam Rupiah. Kolom Total: laba rugi & arus kas dijumlahkan; neraca dan saldo kas akhir memakai posisi bulan terakhir.", n, rentang))
+		sub := fmt.Sprintf("%d bulan: %s - dalam Rupiah. Kolom Total: laba rugi & arus kas dijumlahkan; saldo kas akhir memakai bulan terakhir.", n, rentang)
+		if bg.Kode == "neraca" {
+			sub = fmt.Sprintf("Posisi per tanggal terakhir tiap bulan (%s s.d. %s) - dalam Rupiah.", TanggalAkhirPeriode(b.Kolom[0].Periode), TanggalAkhirPeriode(b.Kolom[n-1].Periode))
+		}
+		c.halaman("Perbandingan "+bg.Judul, sub)
 		berhuruf := slices.ContainsFunc(bg.Baris, func(r BarisBanding) bool { return r.Huruf != "" })
 		kolom := []kolomPDF{{judul: "AKUN", lebar: label}}
 		if berhuruf {
@@ -299,14 +303,19 @@ func RenderBandingPDF(w io.Writer, usaha string, b Banding) error {
 		}
 		for _, k := range b.Kolom {
 			judul := k.Label
-			if pdf.Width(judul, pdf.Bold, c.ukuran) > angka-6 {
+			if bg.Kode == "neraca" { // neraca: posisi per tanggal, bukan per bulan
+				judul = TanggalAkhirPeriode(k.Periode)
+				if pdf.Width(judul, pdf.Bold, c.ukuran) > angka-6 {
+					judul = tanggalAkhirPendek(k.Periode) // "31 Agu 2026"
+				}
+			} else if pdf.Width(judul, pdf.Bold, c.ukuran) > angka-6 {
 				judul = labelPeriodePendek(k.Periode) // "Agu 2026" supaya tidak terpotong
 			}
 			kolom = append(kolom, kolomPDF{judul: judul, lebar: angka, kanan: true})
 		}
 		judulTotal := "TOTAL"
 		if bg.Kode == "neraca" {
-			judulTotal = "POSISI AKHIR"
+			judulTotal = "PER " + strings.ToUpper(tanggalAkhirPendek(b.Kolom[n-1].Periode))
 		}
 		kolom = append(kolom, kolomPDF{judul: judulTotal, lebar: angka, kanan: true})
 		var baris []barisPDF

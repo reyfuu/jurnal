@@ -24,3 +24,13 @@ export function pilihanCepat(period: string): { label: string; dari: string; sam
     { label: 'Tahun ini', dari: `${y}-01-01`, sampai: ini.sampai },
   ]
 }
+
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+
+/** Tanggal posisi neraca satu periode: "2026-10" → "31 Oktober 2026" (pendek: "31 Okt 2026"). */
+export function tanggalAkhirPeriode(period: string, pendek = false): string {
+  const [y, m] = period.split('-').map(Number)
+  if (!y || !m) return period
+  const nama = BULAN[m - 1]
+  return `${new Date(y, m, 0).getDate()} ${pendek ? nama.slice(0, 3) : nama} ${y}`
+}
