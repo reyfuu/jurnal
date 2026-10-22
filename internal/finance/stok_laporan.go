@@ -100,5 +100,5 @@ func (cf *CashFlow) terapkanPersediaan(kenaikan int64) {
 		lines = append(lines, l)
 	}
 	s.Lines = lines
-	s.add("Kenaikan persediaan stok", -kenaikan)
+	s.add("Kenaikan persediaan", -kenaikan)
 }

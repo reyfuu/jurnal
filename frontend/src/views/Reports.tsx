@@ -6,10 +6,10 @@ import { Aset } from '@/views/Aset'
 import { LaporanAI } from '@/views/LaporanAI'
 import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
-import { daftarUrl, getLaporanRentang, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
+import { daftarUrl, getLaporanRentang, getNeracaPada, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
-import { pilihanCepat, rentangBulan, tanggalAkhirPeriode } from '@/lib/rentang'
-import { angkaSifat, type Sifat } from '@/lib/angkaLaporan'
+import { pilihanCepat, rentangBulan, tanggalAkhirPeriode, tanggalPanjang } from '@/lib/rentang'
+import { angkaSifat, rapikanBaris, type Sifat } from '@/lib/angkaLaporan'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -76,22 +76,36 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
   const labelRentang = custom ? (dataRentang?.label ?? 'memuat…') : periodLabel
   const pakaiRentang = custom && (tab === 'laba-rugi' || tab === 'arus-kas')
   const pdfRentang = custom && !salah ? rentang : undefined
+  // Neraca per tanggal bebas; bawaan = akhir bulan periode yang dipilih.
+  const [tglNeraca, setTglNeraca] = useState(bulanan.sampai)
+  const [neracaPada, setNeracaPada] = useState<{ tgl: string; bs?: BalanceSheet; error?: string } | null>(null)
+  useEffect(() => { setTglNeraca(rentangBulan(period).sampai) }, [period])
+  const neracaCustom = !!tglNeraca && tglNeraca !== bulanan.sampai
+  useEffect(() => {
+    if (!neracaCustom) return
+    let hidup = true
+    getNeracaPada(tglNeraca).then((d) => hidup && setNeracaPada({ tgl: tglNeraca, bs: d }), (e: Error) => hidup && setNeracaPada({ tgl: tglNeraca, error: e.message }))
+    return () => { hidup = false }
+  }, [neracaCustom, tglNeraca])
+  const bsTampil = neracaCustom ? (neracaPada?.tgl === tglNeraca ? neracaPada.bs : undefined) : bs
+  const labelNeraca = tanggalPanjang(neracaCustom ? tglNeraca : bulanan.sampai)
+  const pdfTanggal = neracaCustom ? tglNeraca : undefined
 
   return (
     <>
-      <PageHeader title="Laporan Keuangan" subtitle={`${tab === 'neraca' ? `Per ${tanggalAkhirPeriode(period)}` : pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
+      <PageHeader title="Laporan Keuangan" subtitle={`${tab === 'neraca' ? `Per ${labelNeraca}` : pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
         {(tab === 'laba-rugi' || tab === 'neraca') && (
-          <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
-            {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
+          <span className={'pill-status ' + ((tab === 'neraca' ? bsTampil ?? bs : bs).is_balanced ? 'pill-green' : 'pill-amber')}>
+            {(tab === 'neraca' ? bsTampil ?? bs : bs).is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
           </span>
         )}
         {bisaEkspor && bagianTab && (
-          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined, bagianTab === 'laba-rugi' || bagianTab === 'arus-kas' ? pdfRentang : undefined))}>
+          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined, bagianTab === 'laba-rugi' || bagianTab === 'arus-kas' ? pdfRentang : undefined, bagianTab === 'neraca' ? pdfTanggal : undefined))}>
             <FileDown /> Unduh PDF {TABS.find((t) => t.id === tab)?.label}
           </Button>
         )}
         {bisaEkspor && tab !== 'banding' && (
-          <Button onClick={() => void ekspor(laporanPdfUrl(period, 'semua', metode, pdfRentang))} title="Laba Rugi, Neraca, dan Arus Kas dalam satu PDF">
+          <Button onClick={() => void ekspor(laporanPdfUrl(period, 'semua', metode, pdfRentang, pdfTanggal))} title="Laba Rugi, Neraca, dan Arus Kas dalam satu PDF">
             <FileDown /> Unduh semua laporan (PDF)
           </Button>
         )}
@@ -143,7 +157,21 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
         </div>
       )}
       {tab === 'laba-rugi' && (rr && cff ? <LabaRugi r={rr} cf={cff} /> : <p className="workspace-subtitle">Menghitung laporan…</p>)}
-      {tab === 'neraca' && <Neraca bs={bs} kartuAktif={!!r.hpp_stok} perTanggal={tanggalAkhirPeriode(period)} />}
+      {tab === 'neraca' && (
+        <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1"><span className="kpi-label">Neraca per tanggal</span>
+              <input className="input-field" type="date" value={tglNeraca} onChange={(e) => setTglNeraca(e.target.value || bulanan.sampai)} /></label>
+            <button type="button" className="pill-status" style={{ cursor: 'pointer', outline: !neracaCustom ? '1px solid var(--text-brand)' : undefined }}
+              onClick={() => setTglNeraca(bulanan.sampai)}>Akhir bulan ({tanggalAkhirPeriode(period)})</button>
+          </div>
+          {neracaCustom && neracaPada?.tgl === tglNeraca && neracaPada.error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 10 }}>{neracaPada.error}</p>}
+          <p className="text-xs text-muted-foreground" style={{ marginTop: 8 }}>
+            Posisi harta, utang, dan modal pada tanggal itu. Penyusutan & amortisasi bulan berjalan baru masuk di akhir bulan.
+          </p>
+        </div>
+      )}
+      {tab === 'neraca' && (bsTampil ? <Neraca bs={bsTampil} kartuAktif={!!r.hpp_stok} perTanggal={labelNeraca} /> : <p className="workspace-subtitle">Menghitung neraca…</p>)}
       {tab === 'arus-kas' && (rr && cff
         ? <ArusKas cf={cff} netProfit={rr.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!rr.hpp_stok} />
         : <p className="workspace-subtitle">Menghitung laporan…</p>)}
@@ -190,37 +218,41 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
         <div className="list-rows tabular">
           {(() => {
             // Opsi B (sama dengan PDF): baris utama berhuruf, baris jumlah menulis rumusnya.
-            const ada = r.other_income !== 0
-            return <>
-              <BarisLR h="A" label="Omzet (penjualan kotor)" v={r.omzet} />
-              <BarisLR h="B" label="Potongan channel / aplikasi" v={-r.channel_fees} sifat="kontra" />
-              <BarisLR h="C" label="Penjualan bersih" rumus="C = A - B" v={r.net_sales} tebal />
-              <BarisLR h="D" label={r.hpp_stok ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)'} v={-r.cogs} sifat="pengurang" />
-              {r.hpp_stok && (() => {
-                const h = r.hpp_stok
-                const takDilacak = r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi
-                return <>
-                  <SubLR label="Modal barang terjual (kartu stok)" v={-h.hpp_jual} />
-                  {h.selisih_opname !== 0 && <SubLR label={`Selisih stok opname ${h.selisih_opname < 0 ? '(hilang / rusak)' : '(lebih)'}`} v={h.selisih_opname} />}
-                  {h.koreksi !== 0 && <SubLR label="Koreksi nilai stok minus" v={h.koreksi} />}
-                  {takDilacak !== 0 && <SubLR label="Belanja bahan tanpa barang di stok" v={-takDilacak} />}
-                </>
-              })()}
-              <BarisLR h="E" label="Laba (rugi) kotor" rumus="E = C - D" v={r.gross_profit} tebal />
-              <div className="section-head">Beban operasional</div>
-              {(r.opex_lines ?? []).map((l, i) => <BarisLR key={i} label={l.label} v={-l.amount} sifat="pengurang" />)}
-              <BarisLR h="F" label="Total beban operasional (tunai)" rumus="F = jumlah beban" v={-r.opex} sifat="pengurang" tebal />
-              <BarisLR h="G" label="EBITDA (laba (rugi) sebelum penyusutan & amortisasi)" rumus="G = E - F" v={r.ebitda} tebal
-                style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }} />
-              <div className="list-row sub"><span>Kemampuan usaha menghasilkan kas dari operasi</span><span /></div>
-              <div className="section-head">Penutupan bulan: penyusutan & amortisasi</div>
-              <BarisLR h="H" label="Beban penyusutan aset tetap" v={-r.depreciation} sifat="kontra" />
-              <BarisLR h="I" label="Beban amortisasi harta tak berwujud" v={-r.amortization} sifat="kontra" />
-              <BarisLR h="J" label="Laba (rugi) usaha (EBIT)" rumus="J = G - H - I" v={r.ebit} tebal />
-              {ada && <BarisLR h="K" label="Pendapatan lain" v={r.other_income} />}
-              <BarisLR h={ada ? 'L' : 'K'} label="Laba (rugi) bersih tahun berjalan" rumus={ada ? 'L = J + K' : 'K = J'} v={r.net_profit} tebal
-                style={{ background: 'color-mix(in srgb, var(--accent-green) 9%, transparent)' }} />
-            </>
+            // Akun bernilai 0 tidak ditampilkan; huruf disusun dari baris yang tersisa.
+            const h = r.hpp_stok
+            const takDilacak = h ? r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi : 0
+            const rows = rapikanBaris([
+              { kunci: 'omzet', label: 'Omzet (penjualan kotor)', nilai: r.omzet, gaya: 'baris', berhuruf: true, wajib: true },
+              { kunci: 'potongan', label: 'Potongan channel / aplikasi', nilai: -r.channel_fees, gaya: 'baris', sifat: 'kontra', berhuruf: true },
+              { kunci: 'penjualan_bersih', label: 'Penjualan bersih', nilai: r.net_sales, gaya: 'total', berhuruf: true, suku: ['omzet', '-potongan'] },
+              { kunci: 'hpp', label: h ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)', nilai: -r.cogs, gaya: 'baris', sifat: 'pengurang', berhuruf: true },
+              ...(h ? [
+                { kunci: 'hpp:jual', label: 'Modal barang terjual (kartu stok)', nilai: -h.hpp_jual, gaya: 'sub' as const, sifat: 'pengurang' as const },
+                { kunci: 'hpp:opname', label: `Selisih stok opname ${h.selisih_opname < 0 ? '(hilang / rusak)' : '(lebih)'}`, nilai: h.selisih_opname, gaya: 'sub' as const, sifat: 'pengurang' as const },
+                { kunci: 'hpp:koreksi', label: 'Koreksi nilai stok minus', nilai: h.koreksi, gaya: 'sub' as const, sifat: 'pengurang' as const },
+                { kunci: 'hpp:tanpa_stok', label: 'Belanja bahan tanpa barang di stok', nilai: -takDilacak, gaya: 'sub' as const, sifat: 'pengurang' as const },
+              ] : []),
+              { kunci: 'laba_kotor', label: 'Laba (rugi) kotor', nilai: r.gross_profit, gaya: 'total', berhuruf: true, suku: ['penjualan_bersih', '-hpp'] },
+              { kunci: 'judul_beban', label: 'Beban operasional', nilai: 0, gaya: 'judul' },
+              ...(r.opex_lines ?? []).map((l, i) => ({ kunci: `beban:${i}`, label: l.label, nilai: -l.amount, gaya: 'baris' as const, sifat: 'pengurang' as const })),
+              { kunci: 'total_beban', label: 'Total beban operasional (tunai)', nilai: -r.opex, gaya: 'total', sifat: 'pengurang', berhuruf: true, suku: ['*jumlah beban'] },
+              { kunci: 'ebitda', label: 'EBITDA (laba (rugi) sebelum penyusutan & amortisasi)', nilai: r.ebitda, gaya: 'total', berhuruf: true, suku: ['laba_kotor', '-total_beban'] },
+              { kunci: 'judul_penutupan', label: 'Penutupan bulan: penyusutan & amortisasi', nilai: 0, gaya: 'judul' },
+              { kunci: 'penyusutan', label: 'Beban penyusutan aset tetap', nilai: -r.depreciation, gaya: 'baris', sifat: 'kontra', berhuruf: true },
+              { kunci: 'amortisasi', label: 'Beban amortisasi harta tak berwujud', nilai: -r.amortization, gaya: 'baris', sifat: 'kontra', berhuruf: true },
+              { kunci: 'ebit', label: 'Laba (rugi) usaha (EBIT)', nilai: r.ebit, gaya: 'total', berhuruf: true, suku: ['ebitda', '-penyusutan', '-amortisasi'] },
+              { kunci: 'pendapatan_lain', label: 'Pendapatan lain', nilai: r.other_income, gaya: 'baris', berhuruf: true },
+              { kunci: 'laba_bersih', label: 'Laba (rugi) bersih tahun berjalan', nilai: r.net_profit, gaya: 'total', berhuruf: true, suku: ['ebit', 'pendapatan_lain'] },
+            ])
+            const gaya: Record<string, React.CSSProperties> = {
+              ebitda: { border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' },
+              laba_bersih: { background: 'color-mix(in srgb, var(--accent-green) 9%, transparent)' },
+            }
+            return rows.map((x) => x.gaya === 'judul'
+              ? <div key={x.kunci} className="section-head">{x.label}</div>
+              : x.gaya === 'sub'
+                ? <SubLR key={x.kunci} label={x.label} v={x.nilai} />
+                : <BarisLR key={x.kunci} h={x.huruf} label={x.label} rumus={x.rumus} v={x.nilai} sifat={x.sifat} tebal={x.gaya === 'total'} style={gaya[x.kunci]} />)
           })()}
         </div>
         <p className="kpi-meta-row" style={{ marginTop: 10 }}>Beban & HPP ditulis apa adanya (mengurangi laba). Angka merah dalam kurung = akun kontra (potongan, penyusutan, amortisasi) atau rugi.</p>
@@ -263,11 +295,12 @@ function Neraca({ bs, kartuAktif, perTanggal }: { bs: BalanceSheet; kartuAktif: 
         <div className="list-rows tabular">
           <div className="section-head">Aset (Aktiva)</div>
           <AmountRow label="TOTAL ASET" value={formatRp(a.total)} color={BLUE} bold />
-          <AmountRow label="Saldo Kas & Bank" value={formatRp(a.cash)} color={BLUE} />
-          <AmountRow label="Piutang Belum Tertagih" value={formatRp(a.receivables)} color={RED} />
-          <AmountRow label="Nilai Persediaan Stok" value={formatRp(a.inventory)} />
+          {a.cash !== 0 && <AmountRow label="Saldo Kas & Bank" value={formatRp(a.cash)} color={BLUE} />}
+          {a.receivables !== 0 && <AmountRow label="Piutang Belum Tertagih" value={formatRp(a.receivables)} />}
+          {a.inventory !== 0 && <AmountRow label="Nilai Persediaan" value={formatRp(a.inventory)} />}
           {!!a.other_assets && <AmountRow label="Aset Lancar Lain (uang muka, dibayar di muka)" value={formatRp(a.other_assets)} />}
-          <AmountRow label="Aset Tetap & Tak Berwujud (nilai buku)" value={formatRp(a.fixed_assets)} />
+          {(a.fixed_assets !== 0 || a.fixed_assets_cost !== 0) && <AmountRow label="Aset Tetap & Tak Berwujud (nilai buku)" value={formatRp(a.fixed_assets)} />}
+          {a.fixed_assets_cost !== 0 && <>
           <div className="list-row sub">
             <span>Harga perolehan</span>
             <span className="tabular">{formatRp(a.fixed_assets_cost)}</span>
@@ -276,21 +309,22 @@ function Neraca({ bs, kartuAktif, perTanggal }: { bs: BalanceSheet; kartuAktif: 
             <span>Akumulasi penyusutan &amp; amortisasi</span>
             <span className="tabular" style={{ color: RED }}>{formatRp(-a.accum_depreciation)}</span>
           </div>
+          </>}
 
           <div className="section-head">Kewajiban (Utang)</div>
           <AmountRow label="TOTAL KEWAJIBAN" value={formatRp(bs.liabilities.total)} color={RED} bold />
-          <AmountRow label="Utang Usaha / Operasional" value={formatRp(bs.liabilities.payables)} color={RED} />
-          {bs.liabilities.loans !== 0 && <AmountRow label="Pinjaman" value={formatRp(bs.liabilities.loans)} color={RED} />}
-          {!!bs.liabilities.other && <AmountRow label="Kewajiban Lain (utang pajak, beban terutang)" value={formatRp(bs.liabilities.other)} color={RED} />}
+          {bs.liabilities.payables !== 0 && <AmountRow label="Utang Usaha / Operasional" value={formatRp(bs.liabilities.payables)} />}
+          {bs.liabilities.loans !== 0 && <AmountRow label="Pinjaman" value={formatRp(bs.liabilities.loans)} />}
+          {!!bs.liabilities.other && <AmountRow label="Kewajiban Lain (utang pajak, beban terutang)" value={formatRp(bs.liabilities.other)} />}
 
           <div className="section-head">Modal (Ekuitas)</div>
           <AmountRow label="TOTAL MODAL" value={formatRp(bs.equity.total)} color={GREEN} bold />
-          <AmountRow label="Modal Awal (saldo awal pembukuan)" value={formatRp(bs.equity.opening_capital)} />
+          {bs.equity.opening_capital !== 0 && <AmountRow label="Modal Awal (saldo awal pembukuan)" value={formatRp(bs.equity.opening_capital)} />}
           {bs.equity.added_capital !== 0 && (
             <AmountRow label="Tambahan Modal (setoran − ambil pribadi + aset & stok tanpa kas)" value={formatRp(bs.equity.added_capital)} />
           )}
-          <AmountRow label="Laba Ditahan (saldo awal + laba bulan-bulan sebelumnya)" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : GREEN} />
-          <AmountRow label="Laba (Rugi) Tahun Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : GREEN} />
+          {bs.equity.retained_earnings !== 0 && <AmountRow label="Laba (Rugi) Ditahan" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : undefined} />}
+          {bs.equity.current_profit !== 0 && <AmountRow label="Laba (Rugi) Tahun Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : undefined} />}
 
           <AmountRow
             label="TOTAL PASIVA (Utang + Modal)"
@@ -337,7 +371,7 @@ function Section({ title, section, total }: { title: string; section: CashFlowSe
   return (
     <>
       <div className="section-head">{title}</div>
-      {section.lines.map((l, i) => (
+      {section.lines.filter((l) => l.amount !== 0 || l.non_kas).map((l, i) => (
         <div key={i}>
           <AmountRow
             label={l.label}

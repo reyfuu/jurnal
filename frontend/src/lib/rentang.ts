@@ -34,3 +34,10 @@ export function tanggalAkhirPeriode(period: string, pendek = false): string {
   const nama = BULAN[m - 1]
   return `${new Date(y, m, 0).getDate()} ${pendek ? nama.slice(0, 3) : nama} ${y}`
 }
+
+/** "2026-08-15" → "15 Agustus 2026". */
+export function tanggalPanjang(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return `${d} ${BULAN[m - 1]} ${y}`
+}

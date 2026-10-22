@@ -858,8 +858,28 @@ func (s *tenant) handleCashflow(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.report(periodOrDefault(r)).CashFlow)
 }
 
+// handleBalanceSheet: neraca per akhir periode, atau per tanggal bebas (?tanggal=YYYY-MM-DD).
 func (s *tenant) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
+	if tgl := r.URL.Query().Get("tanggal"); tgl != "" {
+		bs, err := s.neracaPada(tgl)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, bs)
+		return
+	}
 	writeJSON(w, s.report(periodOrDefault(r)).BalanceSheet)
+}
+
+// neracaPada: neraca per tanggal (YYYY-MM-DD) dari buku berjalan.
+func (s *tenant) neracaPada(tgl string) (finance.BalanceSheet, error) {
+	if _, err := time.Parse(time.DateOnly, tgl); err != nil {
+		return finance.BalanceSheet{}, errors.New("tanggal harus YYYY-MM-DD")
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return finance.BuildNeracaPada(s.txs, s.assets, tgl, s.bukuAwalLocked(), s.kartuLocked()), nil
 }
 
 func (s *tenant) handleDashboard(w http.ResponseWriter, r *http.Request) {

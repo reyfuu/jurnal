@@ -303,7 +303,7 @@ func TrialBalanceFrom(template, active []Account, opening map[string]int64, line
 
 // SaldoAwalLain: akun aset lancar lain & kewajiban lain dari saldo awal (posisi debit positif).
 // Kode dari rincian dipakai bila ada di daftar akun; selain itu 1401 Biaya Dibayar Dimuka dan
-// 2105 Hutang Lain-lain menampung totalnya.
+// 2105 Utang Lain-lain menampung totalnya.
 func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[string]int64 {
 	out := map[string]int64{}
 	asetLain, kewLain := peta.Kode(PeranDibayarDimuka), peta.Kode(PeranUtangLain)

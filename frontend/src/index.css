@@ -540,14 +540,21 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   }
 
   /* Layar setelah onboarding (belum berlangganan): paket di kiri, Alat Gratis di kanan. */
+  /* Layar bayar: paket berjajar ke samping (3 kolom). Alat gratis di kanan bila layar cukup
+     lebar; selain itu di bawah paket dengan tombol berjajar. */
+  .onboarding-shell:has(.layar-bayar) { max-width: 1240px; }
   .layar-bayar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: 1fr;
     gap: 20px;
     align-items: start;
   }
-  @media (max-width: 960px) {
-    .layar-bayar { grid-template-columns: 1fr; }
+  .layar-bayar .kartu-alat-gratis { position: static; }
+  .layar-bayar .kartu-alat-gratis > .grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (min-width: 1240px) {
+    .layar-bayar { grid-template-columns: minmax(0, 1fr) 300px; }
+    .layar-bayar .kartu-alat-gratis { position: sticky; }
+    .layar-bayar .kartu-alat-gratis > .grid { grid-template-columns: 1fr; }
   }
   .kartu-alat-gratis {
     position: sticky;

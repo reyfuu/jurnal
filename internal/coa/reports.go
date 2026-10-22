@@ -28,6 +28,9 @@ func linesOf(tb []Balance, k Kelompok, skip ...string) ([]ReportLine, int64) {
 			continue
 		}
 		v := amount(b)
+		if v == 0 { // akun bersaldo 0 tidak ditampilkan di laporan
+			continue
+		}
 		out = append(out, ReportLine{b.Kode, b.Nama, v})
 		total += v
 	}

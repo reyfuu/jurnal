@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Sparkles } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { Tebal } from '@/components/InfoTip'
@@ -114,34 +114,35 @@ function LokasiFields({ v, set, provinsi, required = false, big = false }: {
   )
 }
 
-// KLUPicker: cari bidang usaha (KLU 3 digit); daftar disaring sesuai jenis usaha.
+// KLUPicker: bidang usaha (KLU 3 digit) lewat dropdown yang bisa dicari; daftar disaring sesuai
+// jenis usaha. KLU yang sudah terpilih (dari saran AI / jenis usaha) disorot di atas.
 function KLUPicker({ value, onChange, options, jenis }: { value: string; onChange: (kode: string) => void; options: KLUOption[]; jenis?: string }) {
-  const [q, setQ] = useState('')
   const [semua, setSemua] = useState(false)
-  const name = useId()
-  const cari = q.trim().toLowerCase()
-  const list = options.filter((o) =>
-    (semua || cari !== '' || !jenis || o.jenis === jenis) &&
-    (cari === '' || o.nama.toLowerCase().includes(cari) || o.kode.startsWith(cari) || (o.contoh ?? []).some((c) => c.toLowerCase().includes(cari))))
+  const label = (o: KLUOption) => `${o.kode} · ${o.nama}`
+  const list = options.filter((o) => semua || !jenis || o.jenis === jenis || o.kode === value)
   const dipilih = options.find((o) => o.kode === value)
   return (
     <div className="grid gap-2">
-      {dipilih && <p className="text-sm">Dipilih: <strong>KLU {dipilih.kode}</strong> {dipilih.nama}</p>}
+      {dipilih ? (
+        <div className="flex items-start gap-2 rounded-lg border-2 p-3 text-sm" role="status"
+          style={{ borderColor: 'var(--accent-green)', background: 'color-mix(in srgb, var(--accent-green) 10%, transparent)' }}>
+          <CheckCircle2 size={18} aria-hidden="true" style={{ color: 'var(--accent-green)', flex: 'none', marginTop: 1 }} />
+          <span>
+            <span className="block text-xs font-semibold" style={{ color: 'var(--accent-green)' }}>Bidang usaha terpilih</span>
+            <strong>KLU {dipilih.kode}</strong> {dipilih.nama}
+            {dipilih.contoh && dipilih.contoh.length > 0 && <span className="block text-xs text-muted-foreground">Contoh: {dipilih.contoh.join(', ').toLowerCase()}</span>}
+          </span>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Belum ada bidang usaha yang dipilih.</p>
+      )}
       <BantuKLU jenis={jenis} value={value} onChange={onChange} />
-      <Input type="search" placeholder="Cari, mis. restoran, toko, binatu, konveksi" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari bidang usaha" />
-      <div role="radiogroup" aria-label="Bidang usaha (KLU)" className="max-h-72 overflow-y-auto rounded-lg border border-border">
-        {list.length === 0 && <p className="p-3 text-sm text-muted-foreground">Tidak ada bidang yang cocok. Coba kata lain.</p>}
-        {list.map((o) => (
-          <label key={o.kode} className="flex cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-sm last:border-0 hover:bg-accent" data-selected={o.kode === value}>
-            <input type="radio" name={name} className="mt-1" checked={o.kode === value} onChange={() => onChange(o.kode)} />
-            <span>
-              <span className="tabular text-muted-foreground">{o.kode}</span> {o.nama}
-              {o.contoh && o.contoh.length > 0 && <span className="block text-xs text-muted-foreground">Contoh: {o.contoh.join(', ').toLowerCase()}</span>}
-            </span>
-          </label>
-        ))}
-      </div>
-      {jenis && !semua && cari === '' && (
+      <Label htmlFor="klu-pilih">Atau pilih dari daftar</Label>
+      <Combobox id="klu-pilih" className="h-12 md:text-base" value={dipilih ? label(dipilih) : ''}
+        onChange={(v) => { const o = list.find((x) => label(x) === v); if (o) onChange(o.kode) }}
+        options={list.map(label)} placeholder="Pilih bidang usaha (KLU)"
+        searchPlaceholder="Cari, mis. restoran, toko, binatu, konveksi" empty="Tidak ada bidang yang cocok. Coba kata lain." />
+      {jenis && !semua && (
         <button type="button" className="justify-self-start text-xs text-muted-foreground underline underline-offset-4" onClick={() => setSemua(true)}>Tidak ketemu? Tampilkan semua bidang</button>
       )}
     </div>
@@ -161,7 +162,10 @@ function BantuKLU({ jenis, value, onChange }: { jenis?: string; value: string; o
     setBusy(true)
     setError('')
     try {
-      setHasil(await saranKLU(cerita, jenis))
+      const h = await saranKLU(cerita, jenis)
+      setHasil(h)
+      // saran paling cocok langsung terpilih; masih bisa diganti
+      if (h.saran.length > 0) onChange(h.saran[0].kode)
     } catch (e) {
       setError((e as Error).message)
     } finally {
