@@ -11,3 +11,8 @@ data/
 
 # artefak build lokal: Dockerfile membangun ke /out/laporan-bisnis, biner ini tidak dipakai
 /server
+
+# katalog Primbon: naskah PDF/HTML (±2,5 GB) dibangun ulang dari docs/peraturan/index.csv
+docs/peraturan/*/
+docs/peraturan/rekap_download.xlsx
+__pycache__/
