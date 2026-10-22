@@ -677,7 +677,7 @@ export interface CekAwal {
   roi_pesan?: string
 }
 export interface SaranBentuk {
-  termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]
+  termurah: string; sekarang: string; judul: string; asumsi?: string; alasan: string[]; catatan: string[]
   hemat: number; skema: TaxSkema[]; laba: number; ptkp: number
   /** hemat ÷ pajak skema sekarang, basis poin (8523 = 85,23% lebih kecil). */
   hemat_bps: number; omzet: number

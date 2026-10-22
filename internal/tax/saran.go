@@ -13,6 +13,7 @@ type SaranBentuk struct {
 	Termurah string   `json:"termurah"`
 	Sekarang string   `json:"sekarang"` // skema bentuk usaha yang dipilih sekarang
 	Judul    string   `json:"judul"`
+	Asumsi   string   `json:"asumsi"` // dasar perhitungan: usaha di tahun pertama
 	Alasan   []string `json:"alasan"`
 	Catatan  []string `json:"catatan"`
 	Hemat    int64    `json:"hemat"`     // per tahun dibanding skema sekarang
@@ -54,6 +55,10 @@ func SaranBentukUsaha(bentuk, ptkpCode string, omzet, laba int64) *SaranBentuk {
 	umkm := persenBps(int(pr.UMKMTarifBps))
 	margin := pct(laba * 10_000 / omzet)
 
+	s.Asumsi = "Asumsi: usaha di tahun pertama, dengan omzet dan laba setahun sesuai perkiraan yang Anda isi."
+	if omzet > pr.BatasOmzetUMKM {
+		s.Asumsi += fmt.Sprintf(" Karena itu PPh final %s masih dibandingkan walau omzet di atas %s; tahun berikutnya skema ini tidak berlaku lagi.", umkm, rp(pr.BatasOmzetUMKM))
+	}
 	if s.Termurah == s.Sekarang {
 		s.Judul = "Skema pajak Anda sekarang sudah paling hemat: " + best.Nama
 	} else {
