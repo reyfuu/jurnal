@@ -300,11 +300,15 @@ export type TxInput = Omit<Tx, 'id'>
 
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
-export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto' }
+/** bukti: token dari bacaNota; fotonya disimpan sebagai bukti catatan baru. */
+export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string }
+/** Jejak foto nota yang menjadi bukti catatan: kapan dibaca AI, siapa yang menyimpan. */
+export interface FotoNota { dibaca_pada: string; disimpan_oleh: string; disimpan_pada: string; yakin?: string }
 export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
 export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
 export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
-export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number }>(`/catat/${grup}`)
+export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number; foto_nota?: FotoNota }>(`/catat/${grup}`)
+export const buktiCatatUrl = (grup: number) => `/api/v1/catat/${grup}/bukti`
 export const simpanCatatanJurnal = (c: CatatanJurnal, grup?: number) =>
   api<CatatanJurnal & { grup: number; transaksi: number[] }>(grup ? `/catat/${grup}` : '/catat', { method: grup ? 'PUT' : 'POST', body: c })
 export const hapusCatatanJurnal = (grup: number) => api<void>(`/catat/${grup}`, { method: 'DELETE' })
@@ -569,11 +573,16 @@ export async function importTransactions(file: File, commit: boolean): Promise<I
   return res.json()
 }
 
-/** Hasil AI membaca foto nota/struk: pratinjau isian transaksi, belum tersimpan. */
+/** Catatan yang mungkin sama dengan nota yang baru dibaca (grup = catatan jurnal, id = transaksi). */
+export interface DuplikatNota { grup: number; tanggal: string; nominal: number; pihak?: string; keterangan?: string; alasan: string }
+
+/** Hasil AI membaca foto nota/struk: pratinjau isian transaksi, belum tersimpan.
+ *  bukti: token untuk menyimpan fotonya bersama catatan; duplikat: peringatan saja. */
 export interface SaranNota {
   tanggal: string; jenis: string; nominal: number; pihak?: string; keterangan?: string; lunas: boolean
   item?: { nama: string; qty?: string; harga?: number }[]
   alasan?: string; yakin: 'tinggi' | 'sedang' | 'rendah'; catatan: string[]; model?: string
+  bukti: string; duplikat?: DuplikatNota[]
 }
 
 export async function bacaNota(foto: Blob): Promise<SaranNota> {

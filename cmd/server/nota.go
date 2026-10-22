@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,8 +15,9 @@ import (
 )
 
 // Input transaksi dari foto: foto nota/struk dibaca AI menjadi pratinjau isian transaksi. Tidak
-// ada yang tersimpan di sini — pengguna memeriksa pratinjaunya lalu menyimpan lewat form biasa.
-// Fotonya tidak disimpan di server.
+// ada transaksi yang tersimpan di sini — pengguna memeriksa pratinjaunya lalu menyimpan lewat
+// halaman Catat. Fotonya ditahan sebentar dan baru disimpan sebagai bukti bila catatannya
+// disimpan (bukti_nota.go).
 
 const (
 	maxFotoNota   = 6 << 20 // frontend sudah mengecilkan foto; ini batas aman
@@ -45,20 +49,28 @@ func (s *Server) handleBacaNota(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.llmGambar == nil || !s.llmGambar.Enabled() {
-		http.Error(w, "Baca foto belum aktif: isi LLM_API_KEY (atau LLM_VISION_*) di server. Sementara catat manual.", http.StatusServiceUnavailable)
+		http.Error(w, "Baca foto belum aktif. Sementara catat manual.", http.StatusServiceUnavailable)
 		return
 	}
 	t := s.tenantOf(r)
 	if !s.jatahAI("nota|"+strconv.Itoa(t.id), maxBacaNotaAI) {
-		http.Error(w, "Kuota baca foto hari ini habis; catat manual dulu, besok bisa dipakai lagi.", http.StatusTooManyRequests)
+		http.Error(w, "Kuota baca foto sudah habis; catat manual dulu, coba lagi dalam 24 jam.", http.StatusTooManyRequests)
 		return
 	}
 	p := t.currentProfile()
 	usaha := strings.TrimSpace(p.JenisUsaha + " · " + p.NamaUsaha)
 	saran, err := ai.BacaNota(r.Context(), s.llmGambar, usaha, mime, foto, time.Now().In(finance.WIB).Format(time.DateOnly))
 	if err != nil {
-		http.Error(w, "AI gagal membaca foto ("+err.Error()+"). Coba foto yang lebih terang dan tegak, atau catat manual.", http.StatusBadGateway)
+		// detail (alamat penyedia, nama model) hanya untuk log server, bukan untuk pengguna
+		log.Printf("baca nota usaha %d: %v", t.id, err)
+		http.Error(w, "AI gagal membaca foto. Coba foto yang lebih terang dan tegak, atau catat manual.", http.StatusBadGateway)
 		return
 	}
-	writeJSON(w, saran)
+	sum := sha256.Sum256(foto)
+	out := hasilNota{SaranNota: saran, Bukti: hex.EncodeToString(sum[:])}
+	t.mu.Lock()
+	t.tundaNotaLocked(out.Bukti, notaTunda{foto, mime, saran, time.Now().UTC()})
+	out.Duplikat = t.duplikatNotaLocked(out.Bukti)
+	t.mu.Unlock()
+	writeJSON(w, out)
 }

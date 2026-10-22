@@ -82,6 +82,9 @@ type tenant struct {
 	seedTx      map[string]int           // jumlah transaksi seed per periode, untuk total transaksi tenant
 	profile     *finance.BusinessProfile // nil = Owner belum mengisi (onboarding)
 	langganan   langganan                // masa coba & pembayaran Midtrans
+	// notaTunda: foto nota yang sudah dibaca AI, menunggu catatannya disimpan (bukti_nota.go).
+	notaTunda map[string]notaTunda
+	buktiMem  map[int]buktiMem // bukti foto nota tanpa DATA_DIR (test, dev lokal)
 }
 
 type Server struct {
@@ -399,6 +402,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/catat/opsi", s.guard("transaksi", s.on((*tenant).handleOpsiCatat)))
 	s.mux.HandleFunc("POST /api/v1/catat", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateCatat))))
 	s.mux.HandleFunc("GET /api/v1/catat/{grup}", s.guard("transaksi", s.on((*tenant).handleGetCatat)))
+	s.mux.HandleFunc("GET /api/v1/catat/{grup}/bukti", s.guard("transaksi", s.on((*tenant).handleBuktiCatat)))
 	s.mux.HandleFunc("PUT /api/v1/catat/{grup}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateCatat))))
 	s.mux.HandleFunc("DELETE /api/v1/catat/{grup}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleDeleteCatat))))
 	s.mux.HandleFunc("PUT /api/v1/transactions/{id}", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleUpdateTransaction))))
@@ -667,7 +671,7 @@ func setSession(w http.ResponseWriter, r *http.Request, token string) {
 
 // versiPDP: versi Kebijakan Privasi yang disetujui pendaftar (frontend KebijakanPrivasi.tsx).
 // Naikkan bila isi kebijakan berubah, supaya persetujuan lama bisa dibedakan.
-const versiPDP = "2026-10"
+const versiPDP = "2026-10-22"
 
 // handleRegister: daftar mandiri (terbuka untuk umum). Pendaftar menjadi
 // Owner sebuah usaha baru yang kosong, lalu langsung login dan masuk wizard onboarding.

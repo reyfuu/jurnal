@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowLeftRight, Camera, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  bacaNota, cariMirip, getCatatanJurnal, getOpsiCatat, hapusCatatanJurnal, simpanCatatanJurnal, type Mirip,
-  type AkunCatat, type BarisCatat, type OpsiCatat, type SaranNota,
+  bacaNota, buktiCatatUrl, cariMirip, getCatatanJurnal, getOpsiCatat, hapusCatatanJurnal, simpanCatatanJurnal, type Mirip,
+  type AkunCatat, type BarisCatat, type FotoNota, type OpsiCatat, type SaranNota,
 } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
-import { formatRp } from '@/lib/format'
+import { formatRp, formatTanggal } from '@/lib/format'
 import { kecilkan } from '@/lib/foto'
 import { JENIS_CATAT } from '@/lib/catat'
 
@@ -55,6 +55,7 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
   const [kepala, setKepala] = useState<Kepala>(KEPALA_KOSONG)
   const [baris, setBaris] = useState<Baris[]>([])
   const [nota, setNota] = useState<SaranNota | null>(null)
+  const [fotoNota, setFotoNota] = useState<FotoNota | null>(null) // bukti catatan yang sedang diubah
   const [membaca, setMembaca] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -74,6 +75,7 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
         if (!hidup) return
         setKepala({ tanggal: c.tanggal, pihak: c.pihak ?? '', no_bukti: c.no_bukti ?? '', keterangan: c.keterangan ?? '' })
         setBaris(c.baris.map((b) => baru(b)))
+        setFotoNota(c.foto_nota ?? null)
         return
       }
       const d = draftKey ? bacaDraft<{ kepala: Kepala; baris: BarisCatat[] }>(draftKey) : null
@@ -145,7 +147,8 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
         }
       }
       const isi = baris.filter((b) => b.debit || b.kredit).map(({ akun, keterangan, debit, kredit, jatuh_tempo }) => ({ akun, keterangan, debit, kredit, jatuh_tempo }))
-      await simpanCatatanJurnal({ ...kepala, baris: isi, ...(nota ? { sumber: 'foto' as const } : {}) }, grup)
+      // dari foto: tandai sumbernya (cek dobel); catatan baru juga menyimpan fotonya sebagai bukti
+      await simpanCatatanJurnal({ ...kepala, baris: isi, ...(nota ? { sumber: 'foto' as const } : {}), ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
       setMirip(null)
       setYakinBeda(false)
       if (draftKey) hapusDraft(draftKey)
@@ -223,6 +226,11 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
                       {nota.alasan && <> Rekomendasi AI: {nota.alasan}.</>}
                       {nota.catatan.length > 0 && <span style={{ color: 'var(--text-warn)' }}> Cek: {nota.catatan.join('; ')}.</span>}
                     </span>
+                  ) : grup && fotoNota ? (
+                    <span className="text-sm">
+                      <strong>Foto nota tersimpan sebagai bukti.</strong> Dibaca AI, disimpan oleh {fotoNota.disimpan_oleh} pada {formatTanggal(fotoNota.disimpan_pada)}.{' '}
+                      <a className="underline underline-offset-4" href={buktiCatatUrl(grup)} target="_blank" rel="noopener">Lihat foto nota</a>
+                    </span>
                   ) : <span className="text-sm"><strong>Isi dari foto nota</strong>: foto nota, struk, atau bukti transfer, AI mengisi baris di bawah.</span>}
               </div>
               <label className="btn-cta accent" style={{ padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
@@ -230,6 +238,16 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
                 <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={membaca} onChange={(e) => { void bacaFoto(e.target.files?.[0]); e.target.value = '' }} />
               </label>
             </div>
+            {nota?.duplikat?.length ? (
+              <div className="note-box warn" role="status" style={{ marginTop: 0 }}>
+                <strong>Mungkin sudah pernah dicatat.</strong> Periksa dulu supaya tidak tercatat dua kali; tetap bisa disimpan bila memang berbeda.
+                <ul style={{ margin: '4px 0 0 16px', listStyle: 'disc' }}>
+                  {nota.duplikat.map((d, i) => (
+                    <li key={i}>{formatTanggal(d.tanggal)} · {formatRp(d.nominal)}{d.pihak ? ` · ${d.pihak}` : ''}: {d.alasan}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
               <label><span className="kpi-label">Tanggal</span>

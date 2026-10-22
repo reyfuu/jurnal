@@ -25,12 +25,15 @@ type catatReq struct {
 	Baris      []coa.BarisCatat `json:"baris"`
 	// Sumber: "foto" bila baris diisi AI dari foto nota (dipakai pengecekan transaksi dobel).
 	Sumber string `json:"sumber,omitempty"`
+	// Bukti: token dari baca foto nota; fotonya disimpan sebagai bukti catatan baru (bukti_nota.go).
+	Bukti string `json:"bukti,omitempty"`
 }
 
 type catatResp struct {
 	catatReq
-	Grup      int   `json:"grup"`
-	Transaksi []int `json:"transaksi"`
+	Grup      int           `json:"grup"`
+	Transaksi []int         `json:"transaksi"`
+	FotoNota  *fotoNotaInfo `json:"foto_nota,omitempty"`
 }
 
 type akunCatat struct {
@@ -152,8 +155,9 @@ func (s *tenant) handleCreateCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	foto := s.lampirkanBuktiLocked(r, grup, c.Bukti)
 	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, catatResp{c, grup, ids})
+	writeJSON(w, catatResp{c, grup, ids, foto})
 }
 
 func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
@@ -176,6 +180,11 @@ func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
 	for _, t := range txs {
 		out.Transaksi = append(out.Transaksi, t.ID)
 	}
+	s.mu.RLock()
+	if m, ok := s.buktiLocked(grup); ok {
+		out.FotoNota = m.info()
+	}
+	s.mu.RUnlock()
 	writeJSON(w, out)
 }
 
@@ -201,7 +210,11 @@ func (s *tenant) handleUpdateCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	writeJSON(w, catatResp{c, grup, ids})
+	out := catatResp{catatReq: c, Grup: grup, Transaksi: ids}
+	if m, ok := s.buktiLocked(grup); ok {
+		out.FotoNota = m.info()
+	}
+	writeJSON(w, out)
 }
 
 func (s *tenant) handleDeleteCatat(w http.ResponseWriter, r *http.Request) {
@@ -216,5 +229,6 @@ func (s *tenant) handleDeleteCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	s.hapusBuktiLocked(grup)
 	w.WriteHeader(http.StatusNoContent)
 }
