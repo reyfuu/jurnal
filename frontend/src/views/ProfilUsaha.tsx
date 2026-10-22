@@ -427,7 +427,8 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
 // tampilRp: tampilan input rupiah berformat ribuan; "-" sendirian dibiarkan supaya rugi bisa diketik.
 const tampilRp = (s = '') => {
   const n = parseRp(s)
-  return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : formatRp(n)
+  // isian rugi tetap memakai tanda minus supaya bisa diketik & dibaca ulang (parseRp)
+  return Number.isNaN(n) ? (s.trim().startsWith('-') ? '-' : '') : n < 0 ? '-' + formatRp(-n) : formatRp(n)
 }
 
 const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba bersih per tahun' } as const

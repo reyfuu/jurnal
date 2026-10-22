@@ -102,7 +102,7 @@ func rp(n int64) string {
 		s = s[:i] + "." + s[i:]
 	}
 	if n < 0 {
-		return "-Rp" + s
+		return "(Rp" + s + ")" // minus dalam kurung, seperti laporan keuangan
 	}
 	return "Rp" + s
 }

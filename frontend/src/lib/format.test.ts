@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { formatPct, formatRelatif, formatRp, formatTanggal } from './format'
 
 describe('formatRp', () => {
-  it('memakai titik ribuan dan tanda minus di depan', () => {
+  it('memakai titik ribuan, minus ditulis dalam kurung', () => {
     expect(formatRp(1_680_000)).toBe('Rp1.680.000')
-    expect(formatRp(-3_450_000)).toBe('-Rp3.450.000')
+    expect(formatRp(-3_450_000)).toBe('(Rp3.450.000)')
     expect(formatRp(0)).toBe('Rp0')
   })
 })

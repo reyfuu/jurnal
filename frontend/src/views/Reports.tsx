@@ -238,8 +238,8 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
               { kunci: 'total_beban', label: 'Total beban operasional (tunai)', nilai: -r.opex, gaya: 'total', sifat: 'pengurang', berhuruf: true, suku: ['*jumlah beban'] },
               { kunci: 'ebitda', label: 'EBITDA (laba (rugi) sebelum penyusutan & amortisasi)', nilai: r.ebitda, gaya: 'total', berhuruf: true, suku: ['laba_kotor', '-total_beban'] },
               { kunci: 'judul_penutupan', label: 'Penutupan bulan: penyusutan & amortisasi', nilai: 0, gaya: 'judul' },
-              { kunci: 'penyusutan', label: 'Beban penyusutan aset tetap', nilai: -r.depreciation, gaya: 'baris', sifat: 'kontra', berhuruf: true },
-              { kunci: 'amortisasi', label: 'Beban amortisasi harta tak berwujud', nilai: -r.amortization, gaya: 'baris', sifat: 'kontra', berhuruf: true },
+              { kunci: 'penyusutan', label: 'Beban penyusutan aset tetap', nilai: -r.depreciation, gaya: 'baris', sifat: 'pengurang', berhuruf: true },
+              { kunci: 'amortisasi', label: 'Beban amortisasi harta tak berwujud', nilai: -r.amortization, gaya: 'baris', sifat: 'pengurang', berhuruf: true },
               { kunci: 'ebit', label: 'Laba (rugi) usaha (EBIT)', nilai: r.ebit, gaya: 'total', berhuruf: true, suku: ['ebitda', '-penyusutan', '-amortisasi'] },
               { kunci: 'pendapatan_lain', label: 'Pendapatan lain', nilai: r.other_income, gaya: 'baris', berhuruf: true },
               { kunci: 'laba_bersih', label: 'Laba (rugi) bersih tahun berjalan', nilai: r.net_profit, gaya: 'total', berhuruf: true, suku: ['ebit', 'pendapatan_lain'] },
@@ -255,7 +255,7 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
                 : <BarisLR key={x.kunci} h={x.huruf} label={x.label} rumus={x.rumus} v={x.nilai} sifat={x.sifat} tebal={x.gaya === 'total'} style={gaya[x.kunci]} />)
           })()}
         </div>
-        <p className="kpi-meta-row" style={{ marginTop: 10 }}>Beban & HPP ditulis apa adanya (mengurangi laba). Angka merah dalam kurung = akun kontra (potongan, penyusutan, amortisasi) atau rugi.</p>
+        <p className="kpi-meta-row" style={{ marginTop: 10 }}>Beban, HPP, penyusutan & amortisasi ditulis apa adanya (mengurangi laba). Angka dalam kurung = potongan (akun kontra); merah dalam kurung = rugi / minus.</p>
       </div>
 
       <div className="card" style={{ padding: 20 }}>
@@ -307,7 +307,7 @@ function Neraca({ bs, kartuAktif, perTanggal }: { bs: BalanceSheet; kartuAktif: 
           </div>
           <div className="list-row sub">
             <span>Akumulasi penyusutan &amp; amortisasi</span>
-            <span className="tabular" style={{ color: RED }}>{formatRp(-a.accum_depreciation)}</span>
+            <span className="tabular">{formatRp(-a.accum_depreciation)}</span>
           </div>
           </>}
 
