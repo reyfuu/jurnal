@@ -7,14 +7,13 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
   createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
-  stokProduksi,
-  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
+  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type StokRow,
 } from '@/lib/api'
 import { NAMA_METODE, useMetodeStok } from '@/lib/metodeStok'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
-import { formatQty, parseQty, qtyKeTeks } from '@/lib/qty'
+import { formatQty, parseQty } from '@/lib/qty'
 
 // Kartu stok: titik nol (stok awal), opname, beli bahan, kartu per barang, laporan mutasi,
 // dan riwayat dokumen stok. Beli bahan dicatat sebagai transaksi "Beli Bahan / Stok" yang
@@ -311,136 +310,6 @@ export function RiwayatGerakPanel({ items, bisaUbah, onChanged }: { items: StokR
   )
 }
 
-/** Catat produksi: isian otomatis dari resep × batch (standar); pemakaian bahan & hasil boleh
- *  diubah ke angka sebenarnya, dan selisihnya terlihat di Laporan Produksi. */
-export function ProduksiDialog({ produkList, awal, stok, mulai, onClose, onDone }: {
-  produkList: ProdukRow[]; awal?: ProdukRow; stok: StokRow[]; mulai: string; onClose: () => void; onDone: (pesan: string) => void
-}) {
-  const [pilihId, setPilihId] = useState(awal?.id ?? produkList[0]?.id ?? 0)
-  const produk = produkList.find((p) => p.id === pilihId) ?? produkList[0]
-  const [tanggal, setTanggal] = useState(hariIni)
-  const [batch, setBatch] = useState(1)
-  // Isian yang diubah pengguna (teks); yang tidak diubah mengikuti standar resep × batch.
-  const [ubah, setUbah] = useState<Record<number, string>>({})
-  const [tambahan, setTambahan] = useState<number[]>([])
-  const [hasilTeks, setHasilTeks] = useState<string | null>(null)
-  const [ket, setKet] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  const standar = new Map<number, number>()
-  for (const b of produk.bahan ?? []) if (b.stok_id > 0) standar.set(b.stok_id, (standar.get(b.stok_id) ?? 0) + b.takaran * batch)
-  const ids = [...standar.keys(), ...tambahan.filter((id) => !standar.has(id))]
-  const baris = ids.map((id) => {
-    const s = stok.find((x) => x.id === id)
-    const std = standar.get(id) ?? 0
-    const teks = ubah[id] ?? qtyKeTeks(std)
-    const pakai = parseQty(teks)
-    return { id, nama: s?.nama ?? `#${id}`, satuan: s?.satuan ?? '', std, teks, pakai, sisa: (s?.jumlah_mili ?? 0) - pakai }
-  })
-  const hasilStd = produk.hasil_per_batch * batch * 1000
-  const hasil = hasilTeks === null ? hasilStd : parseQty(hasilTeks)
-  const diubah = hasilTeks !== null || tambahan.length > 0 || baris.some((b) => b.pakai !== b.std)
-  const manual = (produk.bahan ?? []).filter((b) => b.stok_id === 0).length
-  const bisaTambah = stok.filter((x) => !ids.includes(x.id) && x.id !== stok.find((s) => s.sku && s.sku === produk.sku)?.id)
-  const reset = () => { setUbah({}); setTambahan([]); setHasilTeks(null) }
-
-  async function kirim(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await stokProduksi({
-        tanggal, produk_id: produk.id, batch, keterangan: ket,
-        ...(diubah ? { bahan: baris.map((b) => ({ stok_id: b.id, qty: b.pakai })), hasil } : {}),
-      })
-      onDone(`Produksi ${produk.nama}: +${formatQty(hasil)} ${produk.satuan} masuk stok.`)
-    } catch (err) {
-      setError((err as Error).message)
-      setBusy(false)
-    }
-  }
-  // lebihBuruk: bahan → lebih banyak dari resep itu buruk; hasil → lebih sedikit itu buruk.
-  const selisih = (aktual: number, std: number, lebihBuruk = true) => {
-    if (aktual === std) return null
-    const pct = std ? ` (${aktual > std ? '+' : ''}${Math.round(((aktual - std) / std) * 100)}%)` : ''
-    return <span style={{ color: (aktual > std) === lebihBuruk ? RED : GREEN, fontSize: 11 }}>{aktual > std ? '+' : ''}{formatQty(aktual - std)}{pct}</span>
-  }
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
-        <form onSubmit={kirim} className="grid gap-3">
-          <DialogHeader>
-            <DialogTitle>Catat produksi</DialogTitle>
-            <DialogDescription>
-              Jumlah bahan & hasil terisi otomatis dari resep. Kalau kenyataannya beda (bahan lebih banyak, ada yang gagal), ubah ke angka sebenarnya —
-              stok mengikuti angka ini dan selisihnya tercatat di Laporan Produksi.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-1.5"><Label htmlFor="pr-produk">Produk</Label>
-            <select id="pr-produk" className="input-field" value={produk.id} onChange={(e) => { setPilihId(Number(e.target.value)); reset() }}>
-              {produkList.map((p) => <option key={p.id} value={p.id}>{p.nama}{p.sku ? ` (${p.sku})` : ''}</option>)}
-            </select></div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="grid gap-1.5"><Label htmlFor="pr-tgl">Tanggal</Label>
-              <Input id="pr-tgl" type="date" min={mulai} required value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label htmlFor="pr-batch">Jumlah batch</Label>
-              <Input id="pr-batch" type="number" min={1} max={100000} required value={batch} onChange={(e) => setBatch(Math.max(1, Number(e.target.value) || 1))} /></div>
-            <div className="grid gap-1.5"><Label htmlFor="pr-hasil">Hasil sebenarnya ({produk.satuan})</Label>
-              <Input id="pr-hasil" inputMode="decimal" className="tabular" value={hasilTeks ?? qtyKeTeks(hasilStd)}
-                onChange={(e) => setHasilTeks(e.target.value.replace(/[^\d.,]/g, ''))} />
-              <span className="text-xs text-muted-foreground">resep: {formatQty(hasilStd)} {selisih(hasil, hasilStd, false)}</span></div>
-          </div>
-          <table className="data-table tabular">
-            <thead><tr><th>Bahan</th><th style={{ textAlign: 'right' }}>Resep</th><th style={{ textAlign: 'right' }}>Dipakai sebenarnya</th><th style={{ textAlign: 'right' }}>Sisa stok</th></tr></thead>
-            <tbody>
-              {baris.map((b) => (
-                <tr key={b.id}>
-                  <td>{b.nama}{!standar.has(b.id) && <span className="pill-status pill-amber" style={{ marginLeft: 6, fontSize: 10 }}>di luar resep</span>}</td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{b.std ? `${formatQty(b.std)} ${b.satuan}` : '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Input aria-label={`Dipakai ${b.nama}`} inputMode="decimal" className="tabular" style={{ width: 96, textAlign: 'right' }}
-                        value={b.teks} onChange={(e) => setUbah({ ...ubah, [b.id]: e.target.value.replace(/[^\d.,]/g, '') })} />
-                      <span className="text-xs text-muted-foreground" style={{ minWidth: 28 }}>{b.satuan}</span>
-                    </span>
-                    <div>{selisih(b.pakai, b.std)}</div>
-                  </td>
-                  <td style={{ textAlign: 'right', color: b.sisa < 0 ? RED : undefined, fontWeight: b.sisa < 0 ? 700 : undefined }}>
-                    {formatQty(b.sisa)} {b.satuan}{b.sisa < 0 && ' (minus)'}
-                  </td>
-                </tr>
-              ))}
-              {baris.length === 0 && <tr><td colSpan={4} className="text-muted-foreground">Resep ini belum memakai bahan dari Stok & Gudang.</td></tr>}
-            </tbody>
-          </table>
-          {bisaTambah.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">+ Bahan tambahan:</span>
-              <select aria-label="Tambah bahan di luar resep" className="input-field" style={{ maxWidth: 280 }} value=""
-                onChange={(e) => { const id = Number(e.target.value); if (id) { setTambahan([...tambahan, id]); setUbah({ ...ubah, [id]: '' }) } }}>
-                <option value="">pilih bahan…</option>
-                {bisaTambah.map((x) => <option key={x.id} value={x.id}>{x.nama}</option>)}
-              </select>
-              {diubah && <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={reset}>kembalikan ke resep</Button>}
-            </div>
-          )}
-          {diubah && (
-            <div className="grid gap-1.5"><Label htmlFor="pr-ket">Alasan selisih (opsional)</Label>
-              <Input id="pr-ket" placeholder="mis. ada yang tumpah, takaran dinaikkan" value={ket} onChange={(e) => setKet(e.target.value)} /></div>
-          )}
-          {baris.some((b) => b.sisa < 0) && <div className="note-box warn">Ada bahan yang jadi minus. Produksi tetap bisa dicatat, tapi cek apakah pembelian bahan belum dicatat.</div>}
-          {manual > 0 && <p className="text-xs text-muted-foreground">{manual} bahan diisi manual (di luar daftar stok) tidak mengurangi stok. Tenaga kerja & overhead tetap dicatat sebagai biaya saat dibayar.</p>}
-          <Galat teks={error} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
-            <Button type="submit" disabled={busy || hasil <= 0}>{busy ? 'Menyimpan…' : 'Catat produksi'}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 /** Laporan produksi per bulan: apa yang diproduksi, berapa, bahan terpakai, dan nilainya. */
 export function LaporanProduksiPanel({ muatUlang, bisaUbah, bisaEkspor, onChanged }: { muatUlang: number; bisaUbah: boolean; bisaEkspor: boolean; onChanged: () => void }) {

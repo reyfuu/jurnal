@@ -1193,6 +1193,13 @@ export interface PilihanBarang { id: number; sku: string; nama: string; kategori
 
 export const stokAwal = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/awal', { method: 'POST', body: b })
 export const stokOpname = (b: { tanggal: string; keterangan?: string; baris: BarisGerak[] }) => api<GerakStok>('/stok/opname', { method: 'POST', body: b })
+/** Catat produksi (halaman penuh): beberapa produk, bahan aktual, dan biaya lain dari Kas/Bank.
+ *  Kartu stok yang belum dimulai otomatis dimulai dari daftar barang. Jumlah per seribu satuan. */
+export interface ProduksiCatat {
+  tanggal: string; bayar_dari?: string
+  produk: { produk_id: number; hasil: number; bahan: { stok_id: number; qty: number }[]; biaya: { keterangan: string; nominal: number }[]; keterangan?: string }[]
+}
+export const catatProduksi = (b: ProduksiCatat) => api<{ gerak: GerakStok[]; stok_awal: boolean; transaksi: number }>('/stok/produksi/catat', { method: 'POST', body: b })
 export const stokProduksi = (b: { tanggal: string; produk_id: number; batch: number; keterangan?: string; bahan?: { stok_id: number; qty: number }[]; hasil?: number }) => api<GerakStok>('/stok/produksi', { method: 'POST', body: b })
 export const getGerakStok = () => api<GerakStok[]>('/stok/gerak')
 export const hapusGerakStok = (id: number) => api<void>(`/stok/gerak/${id}`, { method: 'DELETE' })

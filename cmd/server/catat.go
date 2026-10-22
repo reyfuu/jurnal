@@ -92,6 +92,9 @@ func (s *tenant) susunTxCatat(c catatReq, grup int) ([]finance.Transaction, erro
 
 // simpanCatatLocked mengganti transaksi grup (lama boleh kosong) dengan yang baru. s.mu dipegang.
 func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int, error) {
+	if slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool { return g.Grup == grup }) {
+		return nil, errors.New("catatan ini biaya lain produksi; ubah atau hapus lewat Produksi & Supplier → riwayat produksi")
+	}
 	for _, t := range s.txs {
 		if t.Grup == grup {
 			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {

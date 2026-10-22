@@ -52,8 +52,12 @@ type GerakStok struct {
 	ProdukID   int          `json:"produk_id,omitempty"`
 	Batch      int64        `json:"batch,omitempty"`
 	Keterangan string       `json:"keterangan,omitempty"`
-	Oleh       string       `json:"oleh,omitempty"`
-	Dibuat     time.Time    `json:"dibuat"`
+	// Biaya: biaya lain produksi (tenaga harian, gas, ongkir) yang ikut menjadi nilai produk jadi;
+	// Grup: transaksi pembayaran biaya itu (Transaction.Grup), dihapus bersama dokumen ini.
+	Biaya  int64     `json:"biaya,omitempty"`
+	Grup   int       `json:"grup,omitempty"`
+	Oleh   string    `json:"oleh,omitempty"`
+	Dibuat time.Time `json:"dibuat"`
 }
 
 type BarisKartu struct {
@@ -68,7 +72,9 @@ type BarisKartu struct {
 	Nilai       int64  `json:"nilai"` // rupiah, bertanda
 	// Koreksi: saat stok minus ditutup pembelian, sisa stok dinilai ulang dengan harga masuk;
 	// selisihnya koreksi HPP barang yang sebelumnya keluar dengan harga perkiraan.
-	Koreksi    int64 `json:"koreksi,omitempty"`
+	Koreksi int64 `json:"koreksi,omitempty"`
+	// Biaya: bagian biaya lain produksi di nilai barang jadi yang masuk (produksi_masuk).
+	Biaya      int64 `json:"biaya,omitempty"`
 	SaldoQty   int64 `json:"saldo_qty"`
 	SaldoNilai int64 `json:"saldo_nilai"`
 	Minus      bool  `json:"minus,omitempty"`
@@ -372,19 +378,20 @@ func HitungKartuMetode(metode string, stok []StokItem, txs []Transaction, gerak 
 						hasil += b.Qty
 					}
 				}
-				sisa := pakai
+				// Nilai barang jadi = bahan terpakai + biaya lain produksi, dibagi per jumlah hasil.
+				sisa, sisaLain := pakai+g.Biaya, g.Biaya
 				for _, b := range g.Baris {
 					if b.Qty <= 0 {
 						continue
 					}
-					biaya := mulDiv(pakai, b.Qty, hasil)
+					biaya, lain := mulDiv(pakai+g.Biaya, b.Qty, hasil), mulDiv(g.Biaya, b.Qty, hasil)
 					hasil -= b.Qty
 					if hasil == 0 {
-						biaya = sisa // baris terakhir menerima sisa pembulatan
+						biaya, lain = sisa, sisaLain // baris terakhir menerima sisa pembulatan
 					}
-					sisa -= biaya
+					sisa, sisaLain = sisa-biaya, sisaLain-lain
 					kor := masuk(b.StokID, b.Qty, biaya)
-					catat(BarisKartu{Tanggal: g.Tanggal, StokID: b.StokID, Jenis: KartuProduksiMasuk, GerakID: g.ID, Keterangan: g.Keterangan, Qty: b.Qty, Nilai: biaya, Koreksi: kor})
+					catat(BarisKartu{Tanggal: g.Tanggal, StokID: b.StokID, Jenis: KartuProduksiMasuk, GerakID: g.ID, Keterangan: g.Keterangan, Qty: b.Qty, Nilai: biaya, Koreksi: kor, Biaya: lain})
 				}
 			}})
 		case GerakOpname:

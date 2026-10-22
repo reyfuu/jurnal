@@ -480,3 +480,8 @@ CREATE TABLE IF NOT EXISTS primbon_catatan (
 	diubah  TIMESTAMPTZ NOT NULL,
 	PRIMARY KEY (user_id, uuid)
 );
+
+-- Catat produksi (Okt 2026): biaya lain produksi yang ikut nilai produk jadi, dan grup
+-- transaksi pembayarannya (Transaction.Grup).
+ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS biaya BIGINT;
+ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
