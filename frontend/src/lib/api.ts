@@ -258,9 +258,13 @@ export interface BalanceSheet {
     other_assets?: number
     total: number
   }
-  liabilities: { payables: number; loans: number; other?: number; total: number }
-  equity: { opening_capital: number; added_capital: number; retained_earnings: number; current_profit: number; total: number }
+  /** Utang dividen yang belum dibayar (PT). */
+  liabilities: { payables: number; dividends_payable?: number; loans: number; other?: number; total: number }
+  /** prive: pengambilan pemilik (CV/OP); dividen: dividen diumumkan (PT). Keduanya mengurangi modal. */
+  equity: { opening_capital: number; added_capital: number; prive?: number; dividen?: number; retained_earnings: number; current_profit: number; total: number }
   is_balanced: boolean
+  /** Bentuk usaha PT / PT Perorangan: susunan neraca memuat utang dividen & dividen, selain itu prive. */
+  pt?: boolean
 }
 
 export interface JenisInfo {

@@ -102,7 +102,7 @@ func TestNonOperating_KeepsBooksBalanced(t *testing.T) {
 	if !bs.IsBalanced {
 		t.Fatalf("balance sheet not balanced: %+v", bs)
 	}
-	if bs.Assets.FixedAssets != 19_000_000 || bs.Liabilities.Loans != 18_000_000 || bs.Equity.AddedCapital != 7_000_000 {
+	if bs.Assets.FixedAssets != 19_000_000 || bs.Liabilities.Loans != 18_000_000 || bs.Equity.AddedCapital != 10_000_000 || bs.Equity.Prive != 3_000_000 { // prive baris sendiri
 		t.Fatalf("non-operating lines wrong: %+v", bs)
 	}
 	// Aset yang dibeli kredit tetap jadi utang, tapi tidak menambah kas operasi.

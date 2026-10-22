@@ -32,6 +32,7 @@ const (
 
 	JenisBeliStok = "Beli Bahan / Stok"
 	JenisJual     = "Penjualan"
+	JenisDividen  = "Pembagian Dividen"
 )
 
 type BarisGerak struct {

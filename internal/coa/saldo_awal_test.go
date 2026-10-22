@@ -90,7 +90,7 @@ func TestKasAwalLain(t *testing.T) {
 }
 
 // Baris tanpa kode mendapat kode: nama sama dengan akun CoA → akun itu; nama sama dengan baris
-// lain → kode baris itu; selain itu kode baru. Kategori berakun peran tidak diberi kode baru.
+// lain → kode baris itu; selain itu kode baru. Kategori berakun peran mendapat kode akun perannya.
 func TestIsiKodeSaldo(t *testing.T) {
 	active := ActiveFrom(Master, finance.BusinessProfile{BentukUsaha: "op"})
 	rincian := []finance.SaldoAkun{
@@ -103,7 +103,7 @@ func TestIsiKodeSaldo(t *testing.T) {
 		{Nama: "Bank BCA", Kategori: finance.KatKas},
 	}
 	IsiKodeSaldo(rincian, active, PetaDari(Master))
-	want := []string{"1105", "1106", "1106", "1102", "", "1401", "1105"}
+	want := []string{"1105", "1106", "1106", "1102", "2102", "1401", "1105"}
 	for i, r := range rincian {
 		if r.Kode != want[i] {
 			t.Errorf("%s: kode %q, mau %q", r.Nama, r.Kode, want[i])

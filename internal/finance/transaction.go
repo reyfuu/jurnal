@@ -37,6 +37,8 @@ var JenisList = []Jenis{
 	{"Beli Alat / Aset", "keluar", "aset"},
 	{"Bayar Cicilan", "keluar", "cicilan"},
 	{"Ambil Uang Pribadi", "keluar", "prive"},
+	// Dividen (khusus PT): dicatat saat RUPS memutuskan; belum dibayar = Utang Dividen.
+	{JenisDividen, "keluar", "dividen"},
 	// PPN keluaran (usaha PKP): dipungut dari pembeli bersama invoice, lalu disetor ke negara.
 	{"PPN Keluaran", "masuk", "ppn"},
 	{"Setor PPN", "keluar", "setor_ppn"},
@@ -56,7 +58,7 @@ func jenisOf(nama string) (Jenis, bool) {
 var posCategory = map[string]string{
 	"omzet": CatSales, "lain": CatOtherIncome, "modal": CatCapital, "pinjaman": CatLoan,
 	"hpp": CatCOGS, "potongan": CatChannelFee, "biaya": CatOpex,
-	"aset": CatAsset, "cicilan": CatLoanPayment, "prive": CatPrive, "ppn": CatPPN, "setor_ppn": CatPPN,
+	"aset": CatAsset, "cicilan": CatLoanPayment, "prive": CatPrive, "dividen": CatPrive, "ppn": CatPPN, "setor_ppn": CatPPN,
 }
 
 type Transaction struct {

@@ -119,6 +119,9 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.tambah(GayaTotal, "total_aset", "Total aset", a.Total)
 	s.judul("judul_kewajiban", "Kewajiban (Utang)")
 	s.tambah(GayaBaris, "utang_usaha", "Utang usaha / operasional", bs.Liabilities.Payables)
+	if bs.PT || bs.Liabilities.DividendsPayable != 0 {
+		s.tambah(GayaBaris, "utang_dividen", "Utang dividen", bs.Liabilities.DividendsPayable)
+	}
 	s.tambah(GayaBaris, "pinjaman", "Pinjaman", bs.Liabilities.Loans)
 	if bs.Liabilities.Other != 0 {
 		s.tambah(GayaBaris, "kewajiban_lain", "Kewajiban lain (utang pajak, beban terutang)", bs.Liabilities.Other)
@@ -126,7 +129,13 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.tambah(GayaTotal, "total_kewajiban", "Total kewajiban", bs.Liabilities.Total)
 	s.judul("judul_modal", "Modal (Ekuitas)")
 	s.tambah(GayaBaris, "modal_awal", "Modal awal", bs.Equity.OpeningCapital)
-	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal - ambil pribadi", bs.Equity.AddedCapital)
+	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal", bs.Equity.AddedCapital)
+	if !bs.PT || bs.Equity.Prive != 0 {
+		s.tambah(GayaBaris, "prive", "Prive (pengambilan pemilik)", -bs.Equity.Prive)
+	}
+	if bs.PT || bs.Equity.Dividen != 0 {
+		s.tambah(GayaBaris, "dividen", "Dividen dibagikan", -bs.Equity.Dividen)
+	}
 	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (saldo awal + bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
 	s.tambah(GayaBaris, "laba_berjalan", "Laba (rugi) tahun berjalan", bs.Equity.CurrentProfit)
 	s.tambah(GayaTotal, "total_modal", "Total modal", bs.Equity.Total)

@@ -319,7 +319,7 @@ export default function App() {
             </div>
           )}
           {data && !terkunci && ['dashboard', 'transaksi', 'stok-gudang', 'laporan-keuangan', 'buku-besar', 'jurnal-umum'].includes(view) && (
-            <PeringatanSaldoMinus period={period} versi={data} />
+            <PeringatanSaldoMinus period={period} versi={data} navigate={navigate} />
           )}
           {data && !terkunci && (view === 'transaksi' || view === 'dashboard') && <PeringatanDobel period={period} versi={data} />}
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
@@ -401,7 +401,7 @@ export default function App() {
       case 'laporan-transaksi':
         return <LaporanTransaksi period={period} bisaEkspor={!me!.lihat} />
       case 'buku-besar':
-        return <BukuBesar period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
+        return <BukuBesar key={bukaTab.n} period={period} bisaEkspor={!me!.lihat} navigate={navigate} akunAwal={bukaTab.tab} />
       case 'jurnal-umum':
         return <JurnalUmum period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
       case 'saldo-awal':

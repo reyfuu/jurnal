@@ -314,11 +314,31 @@ func AkunSaldoAwal(rincian []finance.SaldoAkun, all []Account, peta Peta) []Acco
 	return out
 }
 
+// kategoriPeran: kategori saldo awal yang selalu dibukukan ke akun perannya (lihat akunSendiri).
+var kategoriPeran = []string{finance.KatPiutang, finance.KatPersediaan, finance.KatUtang, finance.KatPinjaman}
+
+// KodePeranSaldo: salinan rincian dengan baris kategori peran berkode akun peran CoA usaha ini,
+// supaya kode yang tampil sama dengan akun tempat saldonya dibukukan. Kode bawaan lama mengikuti
+// penomoran dagang: di CoA manufaktur "2102 Hutang Bank" sebenarnya dibukukan ke 2131.
+func KodePeranSaldo(rincian []finance.SaldoAkun, peta Peta) []finance.SaldoAkun {
+	out := slices.Clone(rincian)
+	for i := range out {
+		if !slices.Contains(kategoriPeran, out[i].Kategori) {
+			continue
+		}
+		if k := peta.Kode(peranKategori[out[i].Kategori]); k != "" {
+			out[i].Kode = k
+		}
+	}
+	return out
+}
+
 // IsiKodeSaldo memberi kode pada baris saldo awal tanpa kode (akun ditambah sendiri, atau jenis
 // yang diketik bebas di template Excel): nama sama dengan baris lain → kodenya; nama sama
 // dengan akun CoA berkategori sama → akun itu; selain itu kode baru di kelompoknya. Kategori
-// yang tetap di akun perannya tidak diberi kode.
+// yang tetap di akun perannya selalu berkode akun peran itu (KodePeranSaldo).
 func IsiKodeSaldo(rincian []finance.SaldoAkun, active []Account, peta Peta) {
+	copy(rincian, KodePeranSaldo(rincian, peta))
 	kode := map[string]string{} // nama (huruf kecil) → kode
 	var dipakai []string
 	for _, r := range rincian {

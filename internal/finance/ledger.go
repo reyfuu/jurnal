@@ -155,7 +155,9 @@ type BalanceSheetAssets struct {
 
 type BalanceSheetLiabilities struct {
 	Payables int64 `json:"payables"`
-	Loans    int64 `json:"loans"`
+	// DividendsPayable: dividen yang sudah diumumkan tapi belum dibayar (PT).
+	DividendsPayable int64 `json:"dividends_payable,omitempty"`
+	Loans            int64 `json:"loans"`
 	// Other: kewajiban lain dari saldo awal (utang pajak, beban yang masih harus dibayar, dll.).
 	Other int64 `json:"other,omitempty"`
 	Total int64 `json:"total"`
@@ -163,7 +165,11 @@ type BalanceSheetLiabilities struct {
 
 type BalanceSheetEquity struct {
 	OpeningCapital int64 `json:"opening_capital"`
-	AddedCapital   int64 `json:"added_capital"` // setor modal − ambil pribadi + aset masuk tanpa kas
+	AddedCapital   int64 `json:"added_capital"` // setor modal + aset masuk tanpa kas
+	// Prive: pengambilan pemilik (CV/OP); Dividen: dividen yang diumumkan (PT). Keduanya
+	// kumulatif sejak saldo awal dan mengurangi modal.
+	Prive   int64 `json:"prive,omitempty"`
+	Dividen int64 `json:"dividen,omitempty"`
 	// RetainedEarnings: laba (rugi) bulan-bulan sebelumnya sejak saldo awal — hasil penutupan
 	// buku tiap akhir bulan. 0 pada laporan per periode lama (BuildPeriodReport).
 	RetainedEarnings int64 `json:"retained_earnings"`
@@ -172,6 +178,9 @@ type BalanceSheetEquity struct {
 }
 
 type BalanceSheet struct {
+	// PT: bentuk usaha PT / PT Perorangan — susunan neraca memuat Utang Dividen & Dividen,
+	// selain itu Prive. Diisi server dari profil usaha.
+	PT          bool                    `json:"pt,omitempty"`
 	Assets      BalanceSheetAssets      `json:"assets"`
 	Liabilities BalanceSheetLiabilities `json:"liabilities"`
 	Equity      BalanceSheetEquity      `json:"equity"`
@@ -391,10 +400,11 @@ func BuildBalanceSheet(entries []LedgerEntry, is IncomeStatement, cf CashFlow, a
 	l.Total = l.Payables + l.Loans + l.Other
 	q := BalanceSheetEquity{
 		OpeningCapital: opening.Cash + opening.Receivables + opening.Inventory + as.NilaiBukuAwal - opening.Payables - opening.Loans,
-		AddedCapital:   cf.SetorModal - cf.Prive + as.TambahanTanpaKas,
+		AddedCapital:   cf.SetorModal + as.TambahanTanpaKas,
+		Prive:          cf.Prive,
 		CurrentProfit:  is.NetProfit,
 	}
-	q.Total = q.OpeningCapital + q.AddedCapital + q.CurrentProfit
+	q.Total = q.OpeningCapital + q.AddedCapital - q.Prive + q.CurrentProfit
 	return BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total}
 }
 

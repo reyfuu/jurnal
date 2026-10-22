@@ -30,7 +30,9 @@ type Posisi struct {
 	// Bagian operasional piutang/utang (modal kerja) — selebihnya dari pendanaan/investasi.
 	PiutangOps, UtangOps int64
 	SetorModal, Prive    int64 // kumulatif sejak saldo awal
-	UtangPPN             int64 // PPN keluaran dipungut − disetor
+	// Dividen: dividen diumumkan (kumulatif); UtangDividen: bagian Utang yang belum dibayar.
+	Dividen, UtangDividen int64
+	UtangPPN              int64 // PPN keluaran dipungut − disetor
 }
 
 // PosisiPada menghitung saldo pada akhir tanggal sampai (YYYY-MM-DD; "YYYY-MM-00" = sebelum
@@ -72,6 +74,11 @@ func PosisiPada(ob OpeningBalance, txs []Transaction, sampai string) Posisi {
 			p.SetorModal += n
 		case "prive":
 			p.Prive += n
+		case "dividen":
+			p.Dividen += n
+			if !lunasPada(t, sampai) {
+				p.UtangDividen += n
+			}
 		case "ppn":
 			p.UtangPPN += n
 		case "setor_ppn":
@@ -156,19 +163,23 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 		OtherAssets: ob.AsetLain,
 	}
 	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets + a.OtherAssets
-	l := BalanceSheetLiabilities{Payables: p1.Utang, Loans: p1.Pinjaman, Other: ob.KewajibanLain + p1.UtangPPN}
-	l.Total = l.Payables + l.Loans + l.Other
+	l := BalanceSheetLiabilities{Payables: p1.Utang - p1.UtangDividen, DividendsPayable: p1.UtangDividen, Loans: p1.Pinjaman, Other: ob.KewajibanLain + p1.UtangPPN}
+	l.Total = l.Payables + l.DividendsPayable + l.Loans + l.Other
 	// Modal awal = yang dimiliki − kewajiban − laba ditahan saldo awal; untuk saldo awal yang
 	// seimbang sama dengan modal disetor. Laba ditahan saldo awal digabung dengan laba
 	// bulan-bulan sesudahnya.
 	q := BalanceSheetEquity{
 		OpeningCapital:   ob.ModalAwal(nilaiBukuAwal) - ob.LabaDitahan,
-		AddedCapital:     p1.SetorModal - p1.Prive + asetTanpaKas + selisihTitikNol,
+		AddedCapital:     p1.SetorModal + asetTanpaKas + selisihTitikNol,
+		Prive:            p1.Prive,
+		Dividen:          p1.Dividen,
 		RetainedEarnings: labaDitahan + ob.LabaDitahan,
 		CurrentProfit:    is.NetProfit,
 	}
-	q.Total = q.OpeningCapital + q.AddedCapital + q.RetainedEarnings + q.CurrentProfit
-	cf.SetorModal, cf.Prive = p1.SetorModal-p0.SetorModal, p1.Prive-p0.Prive
+	q.Total = q.OpeningCapital + q.AddedCapital - q.Prive - q.Dividen + q.RetainedEarnings + q.CurrentProfit
+	// Arus kas pendanaan: prive & dividen diperlakukan sama (bagian Utang yang belum dibayar
+	// masuk perubahan utang non-operasi).
+	cf.SetorModal, cf.Prive = p1.SetorModal-p0.SetorModal, (p1.Prive+p1.Dividen)-(p0.Prive+p0.Dividen)
 	return PeriodReport{
 		Period: period, Income: is, CashFlow: cf, Assets: as,
 		BalanceSheet: BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total},
