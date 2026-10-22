@@ -541,6 +541,21 @@ export async function importTransactions(file: File, commit: boolean): Promise<I
   return res.json()
 }
 
+/** Hasil AI membaca foto nota/struk: pratinjau isian transaksi, belum tersimpan. */
+export interface SaranNota {
+  tanggal: string; jenis: string; nominal: number; pihak?: string; keterangan?: string; lunas: boolean
+  item?: { nama: string; qty?: string; harga?: number }[]
+  alasan?: string; yakin: 'tinggi' | 'sedang' | 'rendah'; catatan: string[]; model?: string
+}
+
+export async function bacaNota(foto: Blob): Promise<SaranNota> {
+  const form = new FormData()
+  form.append('foto', foto, 'nota.jpg')
+  const res = await fetch('/api/v1/transactions/foto', { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
 export const TEMPLATE_URL = '/api/v1/transactions/template'
 
 export type Granularity = 'day' | 'week' | 'month'

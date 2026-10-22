@@ -9,6 +9,7 @@ package llm
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -100,10 +101,11 @@ type Message struct {
 }
 
 type chatRequest struct {
-	Model          string    `json:"model"`
-	Messages       []Message `json:"messages"`
-	Temperature    float64   `json:"temperature"`
-	MaxTokens      int       `json:"max_tokens,omitempty"`
+	Model string `json:"model"`
+	// Messages: []Message (teks) atau []pesanGambar (teks + gambar, CompleteGambar).
+	Messages       any     `json:"messages"`
+	Temperature    float64 `json:"temperature"`
+	MaxTokens      int     `json:"max_tokens,omitempty"`
 	ResponseFormat *struct {
 		Type string `json:"type"`
 	} `json:"response_format,omitempty"`
@@ -151,7 +153,7 @@ func (c *Client) CompleteModel(ctx context.Context, msgs []Message, jsonMode boo
 	return "", "", errors.Join(errs...)
 }
 
-func (c *Client) complete(ctx context.Context, model string, msgs []Message, jsonMode bool, maxTokens int) (string, error) {
+func (c *Client) complete(ctx context.Context, model string, msgs any, jsonMode bool, maxTokens int) (string, error) {
 	req := chatRequest{Model: model, Messages: msgs, Temperature: 0.2, MaxTokens: maxTokens}
 	if jsonMode {
 		req.ResponseFormat = &struct {
@@ -198,6 +200,69 @@ func (c *Client) complete(ctx context.Context, model string, msgs []Message, jso
 		return "", fmt.Errorf("%s: jawaban terpotong di batas %d token", model, maxTokens)
 	}
 	return out.Choices[0].Message.Content, nil
+}
+
+// --- Membaca gambar (nota / struk) ---
+
+// VisionConfigFromEnv: model untuk membaca gambar. LLM_VISION_MODEL, LLM_VISION_BASE_URL, dan
+// LLM_VISION_API_KEY; yang kosong ikut LLM_*. Model teks yang dipakai (mis. lewat router) belum
+// tentu bisa membaca gambar, jadi pembaca nota bisa diarahkan ke model OpenAI tersendiri, mis.
+// LLM_VISION_MODEL=gpt-4o-mini dengan LLM_VISION_BASE_URL=https://api.openai.com/v1.
+func VisionConfigFromEnv() Config {
+	c := ConfigFromEnv()
+	if v := strings.TrimSpace(os.Getenv("LLM_VISION_API_KEY")); v != "" {
+		c.APIKey = v
+	}
+	if v := strings.TrimRight(strings.TrimSpace(os.Getenv("LLM_VISION_BASE_URL")), "/"); v != "" {
+		c.BaseURL = v
+	}
+	if v := strings.TrimSpace(os.Getenv("LLM_VISION_MODEL")); v != "" {
+		c.Model = v
+	}
+	return c
+}
+
+type bagianPesan struct {
+	Type     string `json:"type"` // text | image_url
+	Text     string `json:"text,omitempty"`
+	ImageURL *struct {
+		URL string `json:"url"`
+	} `json:"image_url,omitempty"`
+}
+
+type pesanGambar struct {
+	Role    string        `json:"role"`
+	Content []bagianPesan `json:"content"`
+}
+
+// CompleteGambar mengirim instruksi sistem, teks, dan satu gambar (format konten chat completions
+// OpenAI: image_url berisi data URI). Mengembalikan balasan dan model yang menjawab.
+func (c *Client) CompleteGambar(ctx context.Context, sistem, teks, mime string, gambar []byte, jsonMode bool, maxTokens int) (string, string, error) {
+	if !c.cfg.Enabled() {
+		return "", "", ErrDisabled
+	}
+	url := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(gambar)
+	msgs := []any{
+		Message{Role: "system", Content: sistem},
+		pesanGambar{Role: "user", Content: []bagianPesan{
+			{Type: "text", Text: teks},
+			{Type: "image_url", ImageURL: &struct {
+				URL string `json:"url"`
+			}{URL: url}},
+		}},
+	}
+	var errs []error
+	for _, m := range c.models() {
+		isi, err := c.complete(ctx, m, msgs, jsonMode, maxTokens)
+		if err == nil {
+			return isi, m, nil
+		}
+		errs = append(errs, err)
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return "", "", errors.Join(errs...)
 }
 
 // ExtractJSON mengambil objek JSON dari balasan model. Sebagian penyedia membungkusnya dengan

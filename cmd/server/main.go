@@ -92,6 +92,8 @@ type Server struct {
 	failures  map[string]loginFailure // per IP
 	aiEngine  *ai.Engine
 	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
+	// llmGambar: model pembaca foto nota (LLM_VISION_*; kosong = ikut LLM_*).
+	llmGambar *llm.Client
 	mux       *http.ServeMux
 	bugs      *bugStore
 	db        *sql.DB // nil = berkas JSON di DATA_DIR (atau memori saja)
@@ -192,12 +194,13 @@ func (t *tenant) restore(st *state) {
 
 func NewServer() *Server {
 	s := &Server{
-		llm:      llm.New(llm.ConfigFromEnv()),
-		failures: map[string]loginFailure{},
-		aiEngine: ai.NewEngine(),
-		mux:      http.NewServeMux(),
-		bugHook:  newBugHook(),
-		lihat:    map[int]lihatGrant{},
+		llm:       llm.New(llm.ConfigFromEnv()),
+		llmGambar: llm.New(llm.VisionConfigFromEnv()),
+		failures:  map[string]loginFailure{},
+		aiEngine:  ai.NewEngine(),
+		mux:       http.NewServeMux(),
+		bugHook:   newBugHook(),
+		lihat:     map[int]lihatGrant{},
 	}
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
@@ -374,6 +377,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
+	s.mux.HandleFunc("POST /api/v1/transactions/foto", s.guard("transaksi", s.handleBacaNota))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi/commit", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleMutasiCommit))))

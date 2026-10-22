@@ -5,6 +5,7 @@ import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { BacaFotoNota } from '@/components/BacaFotoNota'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -51,6 +52,14 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   const [coa, setCoa] = useState<CoAInfo | null>(null)
   const [alasan, setAlasan] = useState('')
   const [terkirim, setTerkirim] = useState('')
+  // Catat dari foto: AI membaca nota jadi pratinjau, lalu mengisi form manual untuk diperiksa.
+  const [modeIsi, setModeIsi] = useState<'manual' | 'foto'>('manual')
+  const [dariFoto, setDariFoto] = useState(false)
+  // Dialog ditutup: transaksi berikutnya mulai dari isi manual lagi.
+  const dialogTertutup = editing === null
+  useEffect(() => {
+    if (dialogTertutup) { setModeIsi('manual'); setDariFoto(false) }
+  }, [dialogTertutup])
   const usulMode = !!lihat?.bolehUsul
   const bisaBuka = canEdit || usulMode
 
@@ -306,6 +315,27 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                 </p>
               )}
 
+              {editing.id === null && !usulMode && (
+                <div className="tabbar" role="tablist" aria-label="Cara mencatat" style={{ marginTop: -4 }}>
+                  <button type="button" role="tab" className="tab-btn" aria-selected={modeIsi === 'manual'} onClick={() => setModeIsi('manual')}>Isi manual</button>
+                  <button type="button" role="tab" className="tab-btn" aria-selected={modeIsi === 'foto'} onClick={() => setModeIsi('foto')}>Dari foto nota</button>
+                </div>
+              )}
+              {editing.id === null && !usulMode && modeIsi === 'foto' && (
+                <BacaFotoNota onPakai={(n) => {
+                  set({ tanggal: n.tanggal, nominal: n.nominal, pihak: n.pihak ?? '', keterangan: n.keterangan ?? '', lunas: n.lunas, tanggal_lunas: '',
+                    ...(n.jenis ? { jenis: n.jenis, ...(n.jenis === 'Penjualan' || n.jenis === 'Beli Bahan / Stok' ? {} : { stok_id: undefined, qty_stok: undefined }) } : {}) })
+                  setDariFoto(true)
+                  setModeIsi('manual')
+                }} />
+              )}
+              {dariFoto && modeIsi === 'manual' && (
+                <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginTop: -6 }}>
+                  Diisi dari foto nota oleh AI. Periksa setiap isian (terutama jenis dan nominal), lalu tekan Simpan.
+                </p>
+              )}
+              <div className={modeIsi === 'foto' && editing.id === null && !usulMode ? 'hidden' : 'grid gap-4'}>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field id="tx-tanggal" label="Tanggal">
                   <Input id="tx-tanggal" type="date" required value={editing.input.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
@@ -421,6 +451,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                 </Field>
               )}
 
+              </div>
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
               <DialogFooter className="sm:justify-between">
@@ -445,7 +476,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                 ) : <span />}
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={() => { if (editing.id === null) hapusDraft(DRAFT_TX); setEditing(null) }}>Batal</Button>
-                  <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
+                  <Button type="submit" disabled={busy || (modeIsi === 'foto' && editing.id === null && !usulMode)}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
                 </div>
               </DialogFooter>
             </form>
