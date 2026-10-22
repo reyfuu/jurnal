@@ -1,8 +1,9 @@
-import { ClipboardCheck, Flag, ShoppingCart, Upload } from 'lucide-react'
+import { Flag, ShoppingCart, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
-import { BeliBahanDialog, KartuBarangDialog, MulaiKartuDialog, MutasiStokPanel, OpnameDialog, RiwayatGerakPanel } from '@/views/KartuStok'
+import { BeliBahanDialog, KartuBarangDialog, MutasiStokPanel, RiwayatGerakPanel } from '@/views/KartuStok'
+import { StokOpnamePanel } from '@/views/StokOpname'
 import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
@@ -274,10 +275,10 @@ const STATUS_CLS: Record<StokRow['status'], string> = {
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
 export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
   const [data, setData] = useState<StokSummary | null>(null)
-  const [tab, setTab] = useState<'daftar' | 'mutasi' | 'riwayat'>('daftar')
-  // aksi dari tombol + Catat / Langkah memulai: buka dialognya langsung.
-  const [dialog, setDialog] = useState<'mulai' | 'opname' | 'beli' | null>(() =>
-    bisaUbah && (aksi === 'mulai' || aksi === 'opname' || aksi === 'beli') ? aksi : null)
+  // aksi dari tombol + Catat / Langkah memulai: stok awal & opname langsung ke tab Stok opname.
+  const [tab, setTab] = useState<'daftar' | 'opname' | 'mutasi' | 'riwayat'>(() => (aksi === 'mulai' || aksi === 'opname' ? 'opname' : 'daftar'))
+  const [dialog, setDialog] = useState<'beli' | null>(() => (bisaUbah && aksi === 'beli' ? 'beli' : null))
+  const [pesan, setPesan] = useState('')
   const [kartu, setKartu] = useState<StokRow | null>(null)
   const [form, setForm] = useState<StokInput | null>(null)
   const [editId, setEditId] = useState<number | null>(null)
@@ -343,9 +344,6 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
         : 'Daftar bahan baku & produk jadi, nilai persediaan, dan peringatan stok menipis.'}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {bisaUbah && mulai && <>
-            <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setDialog('opname')}>
-              <ClipboardCheck size={15} aria-hidden /> Stok opname
-            </button>
             <button className="btn-cta accent" style={{ padding: '8px 16px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setDialog('beli')} disabled={list.length === 0}>
               <ShoppingCart size={15} aria-hidden /> Beli bahan
             </button>
@@ -375,22 +373,24 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
                 berkurang dari penjualan, dan dicocokkan lewat stok opname. Disarankan untuk usaha dagang & produksi; usaha jasa boleh melewatinya.
               </div>
             </div>
-            {bisaUbah && <button className="btn-cta" style={{ padding: '9px 18px', fontSize: 13 }} disabled={list.length === 0} onClick={() => setDialog('mulai')}>Mulai kartu stok</button>}
+            {bisaUbah && <button className="btn-cta" style={{ padding: '9px 18px', fontSize: 13 }} disabled={list.length === 0} onClick={() => setTab('opname')}>Hitung stok awal</button>}
           </div>
         </div>
       )}
 
-      {mulai && (
-        <div className="tabbar" role="tablist" aria-label="Bagian stok" style={{ marginBottom: 12 }}>
-          <button role="tab" className="tab-btn" aria-selected={tab === 'daftar'} onClick={() => setTab('daftar')}>Daftar stok</button>
-          <button role="tab" className="tab-btn" aria-selected={tab === 'mutasi'} onClick={() => setTab('mutasi')}>Laporan mutasi</button>
-          <button role="tab" className="tab-btn" aria-selected={tab === 'riwayat'} onClick={() => setTab('riwayat')}>Riwayat opname & produksi</button>
-        </div>
-      )}
+      {pesan && <div className="pill-status pill-green" role="status" style={{ alignSelf: 'flex-start', marginBottom: 12, whiteSpace: 'normal' }}>{pesan}</div>}
+      <div className="tabbar" role="tablist" aria-label="Bagian stok" style={{ marginBottom: 12 }}>
+        <button role="tab" className="tab-btn" aria-selected={tab === 'daftar'} onClick={() => setTab('daftar')}>Daftar barang</button>
+        <button role="tab" className="tab-btn" aria-selected={tab === 'opname'} onClick={() => { setPesan(''); setTab('opname') }}>{mulai ? 'Stok opname' : 'Stok opname / saldo awal'}</button>
+        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'mutasi'} onClick={() => setTab('mutasi')}>Laporan mutasi</button>}
+        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'riwayat'} onClick={() => setTab('riwayat')}>Riwayat opname & produksi</button>}
+      </div>
+      {tab === 'opname' && <StokOpnamePanel key={mulai + list.length} items={list} mulai={mulai} bisaUbah={bisaUbah}
+        onDone={(m) => { setPesan(m); setTab('daftar'); muat() }} />}
       {mulai && tab === 'mutasi' && <MutasiStokPanel mulai={mulai} bisaEkspor={bisaUbah} />}
       {mulai && tab === 'riwayat' && <RiwayatGerakPanel items={list} bisaUbah={bisaUbah} onChanged={muat} />}
 
-      {(!mulai || tab === 'daftar') && <>
+      {tab === 'daftar' && <>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: 16 }}>
         <Kpi label="Item Tercatat" value={String(data.total_item)} meta={`${tampil.length} tampil sesuai filter`} />
         <Kpi label="Nilai Persediaan" value={formatRp(data.nilai_persediaan)} color={BLUE} meta="jumlah × harga pokok" />
@@ -522,12 +522,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
 
       </>}
 
-      {dialog === 'mulai' && <MulaiKartuDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
-      {dialog === 'opname' && mulai && <OpnameDialog items={list} mulai={mulai} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
       {dialog === 'beli' && list.length > 0 && <BeliBahanDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
-      {(dialog === 'opname' && !mulai) && (
-        <div className="note-box warn" role="status">Stok opname tersedia setelah kartu stok dimulai. Klik <strong>Mulai kartu stok</strong> di atas.</div>
-      )}
       {kartu && <KartuBarangDialog item={kartu} onClose={() => setKartu(null)} />}
 
       <MenuImportDialog
