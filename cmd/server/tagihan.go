@@ -72,8 +72,21 @@ func (s *tenant) handleDeleteTagihan(w http.ResponseWriter, r *http.Request) {
 
 // --- Stok ---
 
-func (s *tenant) handleListStok(w http.ResponseWriter, _ *http.Request) {
+// handleListStok: posisi sekarang, atau ?pada=YYYY-MM-DD untuk jumlah & nilai per tanggal itu
+// dari kartu stok (checklist No 22).
+func (s *tenant) handleListStok(w http.ResponseWriter, r *http.Request) {
 	k, list := s.kartu()
+	if pada := r.URL.Query().Get("pada"); pada != "" {
+		if _, err := time.Parse(time.DateOnly, pada); err != nil {
+			http.Error(w, "pada harus YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		if k.Mulai == "" || pada < k.Mulai {
+			http.Error(w, "stok per tanggal hanya bisa sejak kartu stok dimulai", http.StatusBadRequest)
+			return
+		}
+		k = k.Pada(pada)
+	}
 	writeJSON(w, finance.RingkasStok(list, k))
 }
 

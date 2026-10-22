@@ -397,6 +397,10 @@ export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
 export interface DaftarInput { name: string; email: string; password: string; wa: string; setuju_pdp: boolean }
 export const register = (body: DaftarInput) => api<Me>('/auth/register', { method: 'POST', body })
+/** Lupa password: balasan selalu sama (keberadaan akun tidak bocor). */
+export const lupaPassword = (email: string) => api<{ pesan: string }>('/auth/lupa-password', { method: 'POST', body: { email } })
+/** Atur password baru dari tautan email (token sekali pakai, 30 menit). */
+export const aturPassword = (token: string, password: string) => api<void>('/auth/atur-password', { method: 'POST', body: { token, password } })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */
@@ -510,6 +514,8 @@ export interface AssetSummary {
 }
 
 export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
+/** Register aset per tanggal bebas (YYYY-MM-DD), sama dengan Neraca per tanggal itu. */
+export const getAssetsPada = (pada: string) => api<AssetSummary>(`/assets?pada=${encodeURIComponent(pada)}`)
 export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
 export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
 export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
@@ -1259,7 +1265,8 @@ export const getTagihan = () => api<TagihanSummary>('/tagihan')
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
 export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
 
-export const getStok = () => api<StokSummary>('/stok')
+/** pada (YYYY-MM-DD): jumlah & nilai per tanggal itu dari kartu stok; kosong = sekarang. */
+export const getStok = (pada = '') => api<StokSummary>(pada ? `/stok?pada=${encodeURIComponent(pada)}` : '/stok')
 export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'POST', body: s })
 export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
 export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })
@@ -1940,9 +1947,9 @@ export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk rentang tanggal. */
 export const daftarUrl = (r: { dari: string; sampai: string }, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?dari=${r.dari}&sampai=${r.sampai}`
-/** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
-export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
-  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
+/** rentang: laba rugi & arus kas; tanggal: posisi neraca atau register aset. */
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggal?: string) =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggal ? `&tanggal=${tanggal}` : ''}`
 /** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
 /** Nama akun CoA usaha untuk tiap baris laporan (kunci baris → nama akun), mis. piutang → "Piutang Usaha". */
 export const getNamaAkunLaporan = () => api<Record<string, string>>('/reports/nama-akun')

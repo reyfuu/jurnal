@@ -227,7 +227,7 @@ func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagi
 		c.tabel(kolom, baris)
 	}
 	if aset != nil {
-		c.halaman("Register Aset & Penyusutan", "Periode "+labelPeriode+" - dalam Rupiah")
+		c.halaman("Register Aset & Penyusutan", "Per "+labelNeraca+" - dalam Rupiah")
 		c.ukuran = 7.5
 		angka := (isi - 295) / 4
 		kolom := []kolomPDF{{judul: "NAMA ASET", lebar: 125}, {judul: "KELOMPOK", lebar: 122}, {judul: "DIPEROLEH", lebar: 48},

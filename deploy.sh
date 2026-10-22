@@ -19,6 +19,9 @@ APP_PORT="${1:-8085}"
 # sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
 # dbeaver_ro untuk DBeaver. Buat dengan `openssl rand -hex 24` dan simpan di .env.
+# APP_URL (mis. https://pajak.aipreneur.co.id) + SMTP_HOST / SMTP_PORT (587) / SMTP_USER /
+# SMTP_PASSWORD / SMTP_FROM (opsional, di .env): email "Lupa password". Tanpa SMTP, tautan atur
+# ulang hanya tercatat di log container (docker logs), tidak terkirim ke pengguna.
 # PERATURAN_DIR (opsional): katalog Primbon Pajak (index.csv + naskah, ±2,5 GB) di host, di luar
 # repo supaya git pull tidak menyentuhnya; diisi lewat rsync (lihat HANDOFF.md). Kosong = menu
 # Primbon menampilkan "katalog belum tersedia".
@@ -74,6 +77,12 @@ docker run -d \
   -e MIDTRANS_PRODUCTION="${MIDTRANS_PRODUCTION:-false}" \
   -e MASTER_EMAIL="${MASTER_EMAIL:-}" \
   -e MASTER_PASSWORD="${MASTER_PASSWORD:-}" \
+  -e APP_URL="${APP_URL:-}" \
+  -e SMTP_HOST="${SMTP_HOST:-}" \
+  -e SMTP_PORT="${SMTP_PORT:-}" \
+  -e SMTP_USER="${SMTP_USER:-}" \
+  -e SMTP_PASSWORD="${SMTP_PASSWORD:-}" \
+  -e SMTP_FROM="${SMTP_FROM:-}" \
   -e LLM_API_KEY="${LLM_API_KEY:-}" \
   -e LLM_BASE_URL="${LLM_BASE_URL:-}" \
   -e LLM_MODEL="${LLM_MODEL:-}" \

@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
+  ArrowLeftRight, BookOpen, CalendarCheck, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
   Landmark, ListFilter, NotebookPen, Settings, BookOpenText, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
   ArrowDownLeft, ArrowUpRight, ClipboardCheck, HandCoins, ShoppingCart,
 } from 'lucide-react'
@@ -28,14 +28,8 @@ export const NAV: { group: string; icon?: LucideIcon; items: { view: View; label
       { view: 'produksi-supplier', label: 'Produksi & Supplier', icon: Factory },
     ],
   },
-  {
-    group: 'Tagihan',
-    icon: Receipt,
-    items: [
-      { view: 'piutang-utang', label: 'Piutang & Utang', icon: Hourglass },
-      { view: 'invoice', label: 'Invoice', icon: Receipt },
-    ],
-  },
+  // Satu menu Tagihan (checklist No 13): halaman bertab Invoice · Piutang & Utang · Pelanggan.
+  { group: 'Tagihan', items: [{ view: 'invoice', label: 'Tagihan', icon: Receipt }] },
   {
     group: 'Laporan',
     icon: FileText,
@@ -82,7 +76,13 @@ export const NAV: { group: string; icon?: LucideIcon; items: { view: View; label
   },
 ]
 
-export const VIEW_LABEL = Object.fromEntries([...NAV, NAV_COBA, NAV_LAIN].flatMap((g) => g.items.map((i) => [i.view, i.label]))) as Record<View, string>
+export const VIEW_LABEL = {
+  ...Object.fromEntries([...NAV, NAV_COBA, NAV_LAIN].flatMap((g) => g.items.map((i) => [i.view, i.label]))),
+  invoice: 'Invoice', 'piutang-utang': 'Piutang & Utang', // tab di menu Tagihan
+} as Record<View, string>
+
+/** View yang tampil sebagai tab menu lain: sorot menu induknya di sidebar. */
+export const MENU_INDUK: Partial<Record<View, View>> = { 'piutang-utang': 'invoice' }
 
 /** Catat cepat (dulu tombol "+ Catat"): tampil di sidebar grup Catat Harian. Tiap pilihan membuka
  *  halaman tujuan langsung dengan formulirnya (aksi). */

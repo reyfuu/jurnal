@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, Lock, LogOut, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { BEBAS_TERKUNCI, NAV, NAV_CATAT, NAV_COBA } from '@/lib/nav'
+import { BEBAS_TERKUNCI, MENU_INDUK, NAV, NAV_CATAT, NAV_COBA } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
 
 interface Props {
@@ -50,7 +50,8 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci, onCa
           const GrupIcon = (g as { icon?: LucideIcon }).icon
           const lipat = !!GrupIcon
           const buka = !lipat || terbuka.includes(g.group)
-          const adaAktif = items.some((i) => i.view === view)
+          const aktif = MENU_INDUK[view] ?? view
+          const adaAktif = items.some((i) => i.view === aktif)
           return (
             <div className={'nav-group' + (lipat ? ' nav-group-lipat' : '')} key={g.group}>
               {GrupIcon ? (
@@ -64,7 +65,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci, onCa
               {items.map(({ view: v, label, icon: Icon }) => {
                 const gembok = terkunci && !BEBAS_TERKUNCI.includes(v)
                 return (
-                  <button key={v} className={'nav-item' + (v === view ? ' active' : '')} onClick={() => onNavigate(v)}
+                  <button key={v} className={'nav-item' + (v === aktif ? ' active' : '')} onClick={() => onNavigate(v)}
                     style={gembok ? { opacity: 0.6 } : undefined} aria-label={gembok ? `${label} (terkunci)` : undefined}>
                     <Icon className="nav-icon" strokeWidth={2} />
                     {label}

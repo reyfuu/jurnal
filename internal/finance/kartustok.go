@@ -443,6 +443,16 @@ func HitungKartuMetode(metode string, stok []StokItem, txs []Transaction, gerak 
 	return k
 }
 
+// Pada: salinan kartu dengan posisi setiap barang per tanggal itu (laporan stok per tanggal).
+func (k KartuStok) Pada(tanggal string) KartuStok {
+	posisi := make(map[int]PosisiStok, len(k.Posisi))
+	for id := range k.Posisi {
+		posisi[id] = k.PosisiPada(id, tanggal)
+	}
+	k.Posisi = posisi
+	return k
+}
+
 // PosisiPada: saldo satu barang setelah semua pergerakan sampai tanggal itu (inklusif).
 func (k KartuStok) PosisiPada(stokID int, tanggal string) PosisiStok {
 	var p PosisiStok
