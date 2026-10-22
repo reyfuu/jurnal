@@ -1,6 +1,6 @@
 import {
   ArrowLeftRight, BookOpen, CalendarCheck, Hourglass, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
-  Landmark, ListFilter, BookOpenText, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
+  Landmark, ListFilter, NotebookPen, Settings, BookOpenText, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
 } from 'lucide-react'
 import type { View } from './api'
 
@@ -14,11 +14,13 @@ export const NAV_COBA = { group: 'Coba gratis', items: [
 ] }
 export const BEBAS_TERKUNCI: View[] = ['laporan-ai', 'alat-gratis', 'langganan', 'profil-usaha', 'lapor-bug', 'catatan']
 
-export const NAV: { group: string; items: { view: View; label: string; icon: LucideIcon }[] }[] = [
+// icon: ikon kepala grup di sidebar (grup bisa dibuka-tutup seperti submenu).
+export const NAV: { group: string; icon?: LucideIcon; items: { view: View; label: string; icon: LucideIcon }[] }[] = [
   { group: 'Ringkasan', items: [{ view: 'dashboard', label: 'Dashboard', icon: LayoutGrid }] },
   {
     // Pekerjaan sehari-hari: semua yang dicatat. Tombol "+ Catat" di atas membuka formulirnya langsung.
     group: 'Catat Harian',
+    icon: NotebookPen,
     items: [
       { view: 'transaksi', label: 'Transaksi', icon: ArrowLeftRight },
       { view: 'stok-gudang', label: 'Stok & Gudang', icon: Package },
@@ -27,6 +29,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
   },
   {
     group: 'Tagihan',
+    icon: Receipt,
     items: [
       { view: 'piutang-utang', label: 'Piutang & Utang', icon: Hourglass },
       { view: 'invoice', label: 'Invoice', icon: Receipt },
@@ -34,6 +37,7 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
   },
   {
     group: 'Laporan',
+    icon: FileText,
     items: [
       { view: 'laporan-keuangan', label: 'Laporan Keuangan', icon: FileText },
       { view: 'buku-besar', label: 'Buku Besar', icon: NotebookText },
@@ -45,20 +49,23 @@ export const NAV: { group: string; items: { view: View; label: string; icon: Luc
   },
   {
     group: 'Pajak',
+    icon: Shield,
     items: [
       { view: 'pajak-umkm', label: 'Pajak UMKM', icon: Shield },
       { view: 'kalkulator-pajak', label: 'Kalkulator Pajak', icon: SquarePercent },
       { view: 'perencanaan-pajak', label: 'Perencanaan Pajak', icon: Target },
-      { view: 'pustaka', label: 'Pustaka Pajak', icon: Library },
-      { view: 'primbon-pajak', label: 'Primbon Pajak', icon: LibraryBig },
+      { view: 'pustaka', label: 'Artikel Pajak', icon: Library },
+      { view: 'primbon-pajak', label: 'Aturan Pajak', icon: LibraryBig },
     ],
   },
   {
     group: 'Alat',
+    icon: SlidersVertical,
     items: [{ view: 'simulasi-harga', label: 'Simulasi & Harga', icon: SlidersVertical }],
   },
   {
     group: 'Pengaturan',
+    icon: Settings,
     items: [
       { view: 'profil-usaha', label: 'Profil Usaha', icon: Building2 },
       { view: 'saldo-awal', label: 'Saldo Awal', icon: Landmark },

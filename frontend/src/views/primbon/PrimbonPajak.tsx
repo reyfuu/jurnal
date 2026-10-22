@@ -25,9 +25,9 @@ export function PrimbonPajak() {
   }
   return (
     <>
-      <PageHeader title="Primbon Pajak"
+      <PageHeader title="Aturan Pajak"
         subtitle="Katalog peraturan perpajakan resmi: cari, saring, baca naskah aslinya, lalu simpan bookmark dan catatan pribadi." />
-      <div className="tabbar" role="tablist" aria-label="Primbon Pajak" style={{ marginBottom: 0 }}>
+      <div className="tabbar" role="tablist" aria-label="Aturan Pajak" style={{ marginBottom: 0 }}>
         {TAB.map((t) => (
           <button key={t.id} role="tab" className="tab-btn" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}

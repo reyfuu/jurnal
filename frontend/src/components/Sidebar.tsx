@@ -1,4 +1,5 @@
-import { Lock, LogOut } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronDown, Lock, LogOut, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { BEBAS_TERKUNCI, NAV, NAV_COBA } from '@/lib/nav'
@@ -14,7 +15,22 @@ interface Props {
   terkunci?: boolean
 }
 
+const KUNCI_GRUP = 'nav-grup-terbuka'
+const grupAktif = (v: View) => [NAV_COBA, ...NAV].find((g) => g.items.some((i) => i.view === v))?.group
+
+function bacaGrup(): string[] {
+  try { return JSON.parse(localStorage.getItem(KUNCI_GRUP) ?? '[]') } catch { return [] }
+}
+
 export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Props) {
+  // Grup menu bisa dibuka-tutup (submenu); grup halaman yang sedang dibuka selalu terbuka.
+  const [terbuka, setTerbuka] = useState<string[]>(() => [...new Set([...bacaGrup(), grupAktif(view) ?? ''])])
+  useEffect(() => {
+    const g = grupAktif(view)
+    if (g) setTerbuka((t) => (t.includes(g) ? t : [...t, g]))
+  }, [view])
+  useEffect(() => { try { localStorage.setItem(KUNCI_GRUP, JSON.stringify(terbuka)) } catch { /* abaikan */ } }, [terbuka])
+  const toggle = (g: string) => setTerbuka((t) => (t.includes(g) ? t.filter((x) => x !== g) : [...t, g]))
   const initials = me.user.name.replace(/\(.*?\)/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
     <aside className="sidebar dark">
@@ -27,9 +43,21 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Pr
         {(terkunci ? [NAV_COBA, ...NAV] : NAV).map((g) => {
           const items = g.items.filter((i) => me.views.includes(i.view) || (terkunci && g === NAV_COBA))
           if (items.length === 0) return null
+          // Grup satu menu (Ringkasan) & menu coba gratis tampil langsung, tanpa kepala grup.
+          const GrupIcon = (g as { icon?: LucideIcon }).icon
+          const lipat = !!GrupIcon
+          const buka = !lipat || terbuka.includes(g.group)
+          const adaAktif = items.some((i) => i.view === view)
           return (
-            <div className="nav-group" key={g.group}>
-              <div className="nav-group-label">{g.group}</div>
+            <div className={'nav-group' + (lipat ? ' nav-group-lipat' : '')} key={g.group}>
+              {GrupIcon ? (
+                <button type="button" className={'nav-item nav-group-head' + (adaAktif && !buka ? ' active' : '')} aria-expanded={buka} onClick={() => toggle(g.group)}>
+                  <GrupIcon className="nav-icon" strokeWidth={2} />
+                  <span style={{ flex: 1 }}>{g.group}</span>
+                  <ChevronDown size={14} aria-hidden="true" style={{ transition: 'transform .15s', transform: buka ? 'rotate(180deg)' : undefined }} />
+                </button>
+              ) : <div className="nav-group-label">{g.group}</div>}
+              <div className={lipat ? 'nav-sub' + (buka ? '' : ' tertutup') : undefined}>
               {items.map(({ view: v, label, icon: Icon }) => {
                 const gembok = terkunci && !BEBAS_TERKUNCI.includes(v)
                 return (
@@ -41,6 +69,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Pr
                   </button>
                 )
               })}
+              </div>
             </div>
           )
         })}

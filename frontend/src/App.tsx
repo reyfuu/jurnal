@@ -29,7 +29,7 @@ import { ProduksiSupplier } from '@/views/ProduksiSupplier'
 import { Transaksi } from '@/views/Transaksi'
 import { Pengguna } from '@/views/Pengguna'
 import { PerencanaanPajak } from '@/views/PerencanaanPajak'
-import { AlatGratis } from '@/views/AlatGratis'
+import { AlatGratis, KartuAlatGratis, type TabAlat } from '@/views/AlatGratis'
 import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
@@ -62,6 +62,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [layarBayar, setLayarBayar] = useState<'langganan' | 'alat'>('langganan') // usaha belum berlangganan
+  const [alatTab, setAlatTab] = useState<TabAlat>('pkp')
   // Belum berlangganan tapi memilih "Masuk ke aplikasi": workspace dengan menu bergembok.
   const [masukTerkunci, setMasukTerkunci] = useState(() => { try { return sessionStorage.getItem('masuk-terkunci') === '1' } catch { return false } })
   const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
@@ -205,18 +206,20 @@ export default function App() {
   if (terkunci && !masukTerkunci) {
     return (
       <OnboardingShell onLogout={onLogout} onMasuk={() => { ingatMasuk(true); setView('laporan-ai') }}>
-        {canSee('kalkulator-pajak') && (
-          <div className="tabbar" role="tablist" aria-label="Langganan atau alat gratis" style={{ marginBottom: 20 }}>
-            <button role="tab" className="tab-btn" aria-selected={layarBayar === 'langganan'} onClick={() => setLayarBayar('langganan')}>Langganan</button>
-            <button role="tab" className="tab-btn" aria-selected={layarBayar === 'alat'} onClick={() => setLayarBayar('alat')}>Alat Gratis</button>
-          </div>
-        )}
         {layarBayar === 'alat' && canSee('kalkulator-pajak') ? (
-          <AlatGratis profile={business.profile} ptkpCodes={business.options.ptkp} onLangganan={() => setLayarBayar('langganan')} />
-        ) : canSee('langganan') ? (
-          <Langganan onPaid={onPaid} />
+          <>
+            <Button variant="outline" size="sm" style={{ marginBottom: 14 }} onClick={() => setLayarBayar('langganan')}>← Kembali ke pilihan paket</Button>
+            <AlatGratis key={alatTab} tabAwal={alatTab} profile={business.profile} ptkpCodes={business.options.ptkp} onLangganan={() => setLayarBayar('langganan')} />
+          </>
         ) : (
-          <p className="text-sm">Langganan usaha belum aktif. Hubungi Owner Anda untuk memilih paket, lalu muat ulang halaman ini.</p>
+          // Paket di kiri, Alat Gratis di kanan sebagai kartu yang mencolok.
+          <div className="layar-bayar">
+            <div style={{ minWidth: 0 }}>
+              {canSee('langganan') ? <Langganan onPaid={onPaid} />
+                : <p className="text-sm">Langganan usaha belum aktif. Hubungi Owner Anda untuk memilih paket, lalu muat ulang halaman ini.</p>}
+            </div>
+            {canSee('kalkulator-pajak') && <KartuAlatGratis onBuka={(t) => { setAlatTab(t); setLayarBayar('alat') }} />}
+          </div>
         )}
       </OnboardingShell>
     )

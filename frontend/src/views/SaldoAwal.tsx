@@ -348,11 +348,11 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
 
             <div className="list-rows tabular" style={{ marginTop: 16 }} aria-live="polite">
               <div className="list-row"><span>Total Harta</span><span>{formatRp(harta)}</span></div>
-              <div className="list-row"><span>Total Kewajiban</span><span>{formatRp(kewajiban)}</span></div>
+              <div className="list-row"><span>Total Utang (Kewajiban)</span><span>{formatRp(kewajiban)}</span></div>
               <div className="list-row"><span>Total Modal</span><span>{formatRp(modal)}</span></div>
               <div className="list-row" style={{ border: `1px solid ${selisih === 0 ? GREEN : RED}` }}>
-                <strong>Harta − (Kewajiban + Modal)</strong>
-                <strong style={{ color: selisih === 0 ? GREEN : RED }}>{selisih === 0 ? 'Seimbang' : formatRp(selisih)}</strong>
+                <strong>Harta = Utang + Modal</strong>
+                <strong style={{ color: selisih === 0 ? GREEN : RED }}>{selisih === 0 ? 'Seimbang' : `Belum seimbang · selisih ${formatRp(selisih)}`}</strong>
               </div>
               {selisih !== 0 && (
                 <p className="text-sm" style={{ color: RED }}>

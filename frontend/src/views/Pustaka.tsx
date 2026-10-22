@@ -17,7 +17,7 @@ export function Pustaka() {
     && [a.judul, a.isi, a.dasar_hukum, ...a.tag].join(' ').toLowerCase().includes(q.trim().toLowerCase()))
   return (
     <>
-      <PageHeader title="Pustaka Pajak" subtitle="Penjelasan aturan pajak dan pembukuan dari tim Master Pajak, ditulis untuk pemilik usaha." />
+      <PageHeader title="Artikel Pajak" subtitle="Penjelasan aturan pajak dan pembukuan dari tim Master Pajak, ditulis untuk pemilik usaha." />
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
       <div className="flex flex-wrap items-center gap-3">
         <div className="tabbar" role="tablist" aria-label="Kategori">

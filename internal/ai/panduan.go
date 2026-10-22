@@ -151,13 +151,13 @@ var daftarTopik = []topik{
 		tautan:  []Tautan{{View: "lapor-bug", Label: "Buka Lapor Bug"}}},
 	{kode: "pustaka", ringkas: "artikel & penjelasan aturan pajak dari tim Master Pajak",
 		kata:    []string{"artikel", "pustaka", "artikel pajak", "penjelasan aturan"},
-		jawaban: "Artikel dan penjelasan aturan pajak dari tim Master Pajak ada di **Pustaka Pajak**.",
-		tautan:  []Tautan{{View: "pustaka", Label: "Buka Pustaka Pajak"}}},
+		jawaban: "Artikel dan penjelasan aturan pajak dari tim Master Pajak ada di **Artikel Pajak**.",
+		tautan:  []Tautan{{View: "pustaka", Label: "Buka Artikel Pajak"}}},
 	{kode: "primbon", ringkas: "katalog & naskah resmi peraturan pajak (UU, PP, PMK, PER DJP)",
 		kata: []string{"primbon", "peraturan", "peraturan pajak", "cari peraturan", "baca peraturan", "naskah peraturan", "naskah", "baca aturan", "dasar hukum",
 			"regulasi", "pmk", "perdirjen", "per dirjen", "jdih", "undang undang"},
-		jawaban: "Naskah resmi peraturan perpajakan (UU, PP, PMK, PER DJP, dan lainnya) bisa dicari dan dibaca di **Primbon Pajak**, lengkap dengan bookmark dan catatan pribadi.",
-		tautan:  []Tautan{{View: "primbon-pajak", Label: "Buka Primbon Pajak"}}},
+		jawaban: "Naskah resmi peraturan perpajakan (UU, PP, PMK, PER DJP, dan lainnya) bisa dicari dan dibaca di **Aturan Pajak**, lengkap dengan bookmark dan catatan pribadi.",
+		tautan:  []Tautan{{View: "primbon-pajak", Label: "Buka Aturan Pajak"}}},
 }
 
 // kataTanya: penanda pertanyaan "di mana / bagaimana cara memakai menu".
