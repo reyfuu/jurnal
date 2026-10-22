@@ -42,7 +42,7 @@ func PelangganDariData(txs []Transaction, inv []Invoice) []Pelanggan {
 	var out []Pelanggan
 	idx := map[string]int{}
 	tambah := func(p Pelanggan) {
-		k := kunciUnik(p.Nama)
+		k := KunciNama(p.Nama)
 		if k == "" {
 			return
 		}

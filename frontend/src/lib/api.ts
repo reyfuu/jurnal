@@ -1508,6 +1508,13 @@ export const getPelanggan = () => api<Pelanggan[]>('/pelanggan')
 export const createPelanggan = (p: PelangganInput) => api<Pelanggan>('/pelanggan', { method: 'POST', body: p })
 export const updatePelanggan = (id: number, p: PelangganInput) => api<Pelanggan>(`/pelanggan/${id}`, { method: 'PUT', body: p })
 export const deletePelanggan = (id: number) => api<void>(`/pelanggan/${id}`, { method: 'DELETE' })
+/** Riwayat transaksi satu pelanggan / supplier (dicocokkan lewat nama) dalam rentang tanggal. */
+export interface RiwayatPihak {
+  nama: string; dari: string; sampai: string; transaksi: Tx[]
+  total_masuk: number; total_keluar: number; piutang_terbuka: number; utang_terbuka: number
+}
+export const getRiwayatPihak = (nama: string, dari: string, sampai: string) =>
+  api<RiwayatPihak>(`/pihak/riwayat?nama=${encodeURIComponent(nama)}&dari=${dari}&sampai=${sampai}`)
 /** Tambahkan nama pelanggan dari transaksi penjualan & invoice yang belum ada di daftar. */
 export const pelangganDariData = () => api<{ ditambah: number }>('/pelanggan/dari-data', { method: 'POST' })
 

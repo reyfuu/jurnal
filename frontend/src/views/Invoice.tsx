@@ -14,6 +14,7 @@ import {
   type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow, type Pelanggan,
 } from '@/lib/api'
 import { DaftarPelanggan } from '@/views/Pelanggan'
+import { RiwayatPihakDialog } from '@/views/RiwayatPihak'
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -76,6 +77,7 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const [busy, setBusy] = useState(false)
   const [impor, setImpor] = useState(false)
   const [lihatPelanggan, setLihatPelanggan] = useState(false)
+  const [riwayat, setRiwayat] = useState<string | null>(null)
   const [pelanggan, setPelanggan] = useState<Pelanggan[]>([])
   useEffect(() => { getPelanggan().then(setPelanggan, () => {}) }, [])
   // Pilih nama dari daftar pelanggan: alamat & NPWP yang masih kosong ikut terisi.
@@ -172,7 +174,8 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
         </button>
       </PageHeader>
 
-      {lihatPelanggan && <DaftarPelanggan onBerubah={setPelanggan} />}
+      {lihatPelanggan && <DaftarPelanggan onBerubah={setPelanggan} onRiwayat={(p) => setRiwayat(p.nama)} />}
+      <RiwayatPihakDialog nama={riwayat} onTutup={() => setRiwayat(null)} />
 
       <MenuImportDialog
         open={impor} onOpenChange={setImpor} onImported={() => void muat()}
