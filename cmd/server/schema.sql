@@ -489,3 +489,10 @@ ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
 
 -- Cegah transaksi dobel (Okt 2026): asal pencatatan (mutasi / foto).
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;
+
+-- Idempotency checkout & aktivasi manual (Okt 2026): kunci dari klien, token Snap disimpan supaya
+-- checkout yang diulang mendapat transaksi Snap yang sama. Tanpa kunci = NULL (tidak bentrok).
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS kunci TEXT;
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS token TEXT;
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS redirect_url TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS billing_orders_kunci ON billing_orders (tenant_id, kunci);

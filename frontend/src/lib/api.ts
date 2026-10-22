@@ -77,7 +77,7 @@ export const getPlans = () => api<{ paket: Paket[] }>('/billing/plans')
 export const getBilling = () => api<Billing>('/billing')
 export const refreshBilling = () => api<Billing>('/billing/refresh', { method: 'POST' })
 export const klaimGaransi = (alasan: string) => api<Me>('/billing/garansi', { method: 'POST', body: { alasan } })
-export const checkout = (paket: string) => api<{ order_id: string; token: string; redirect_url: string }>('/billing/checkout', { method: 'POST', body: { paket } })
+export const checkout = (paket: string, kunci: string) => api<{ order_id: string; token: string; redirect_url: string }>('/billing/checkout', { method: 'POST', body: { paket }, kunci })
 
 export interface RoleInfo {
   label: string
@@ -367,10 +367,16 @@ export async function galatDari(res: Response): Promise<ApiError> {
   return new ApiError(res.status, pesanGalat(res.status, await res.text().catch(() => ''), res.statusText))
 }
 
-async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+/** Idempotency-Key baru: buat sekali per niat (satu klik Bayar, satu buka dialog), pakai ulang saat mengulang. */
+export const kunciBaru = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
+async function api<T>(path: string, init?: { method?: string; body?: unknown; kunci?: string }): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (init?.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (init?.kunci) headers['Idempotency-Key'] = init.kunci
   const res = await fetch('/api/v1' + path, {
     method: init?.method ?? 'GET',
-    headers: init?.body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers,
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
   }).catch(() => {
     throw new ApiError(0, 'Tidak bisa terhubung ke server. Periksa koneksi internet lalu coba lagi.')
@@ -816,8 +822,8 @@ export const getRiwayatAksesTim = () => api<AuditRow[]>('/akses-tim')
 export const getRingkasanMaster = () => api<RingkasanMaster>('/master/ringkasan')
 export const listKlien = () => api<KlienRow[]>('/master/klien')
 export const getKlien = (id: number) => api<KlienDetail>(`/master/klien/${id}`)
-export const aturLangganan = (id: number, body: { aksi: 'trial' | 'aktifkan'; hari?: number; paket?: string; alasan: string }) =>
-  api<LanggananStatus>(`/master/klien/${id}/langganan`, { method: 'POST', body })
+export const aturLangganan = (id: number, body: { aksi: 'trial' | 'aktifkan'; hari?: number; paket?: string; alasan: string }, kunci: string) =>
+  api<LanggananStatus>(`/master/klien/${id}/langganan`, { method: 'POST', body, kunci })
 export const listTiket = () => api<TiketRow[]>('/master/tiket')
 export const ubahTiket = (id: number, body: { status?: TiketStatus; balasan?: string }) => api<BugReport>(`/master/tiket/${id}`, { method: 'PUT', body })
 export const tiketScreenshotUrl = (id: number) => `/api/v1/master/tiket/${id}/screenshot`

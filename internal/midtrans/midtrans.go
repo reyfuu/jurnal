@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -72,7 +73,8 @@ type SnapResponse struct {
 	RedirectURL string `json:"redirect_url"`
 }
 
-func (c *Client) do(ctx context.Context, method, url string, body any, out any) error {
+// do mengirim permintaan; kunci = Idempotency-Key ("" = tidak dikirim).
+func (c *Client) do(ctx context.Context, method, url, kunci string, body any, out any) error {
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -89,6 +91,9 @@ func (c *Client) do(ctx context.Context, method, url string, body any, out any) 
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if kunci != "" {
+		req.Header.Set("Idempotency-Key", kunci)
 	}
 	hc := c.HTTP
 	if hc == nil {
@@ -117,7 +122,13 @@ func (c *Client) CreateSnap(ctx context.Context, r SnapRequest) (SnapResponse, e
 		body["callbacks"] = map[string]any{"finish": r.FinishURL}
 	}
 	var out SnapResponse
-	err := c.do(ctx, http.MethodPost, c.snapURL()+"/snap/v1/transactions", body, &out)
+	// Idempotency-Key = order_id: retry order yang sama dalam 5 menit mendapat respons yang sama.
+	// Midtrans mengabaikan kunci > 46 karakter.
+	kunci := r.OrderID
+	if len(kunci) > 46 {
+		kunci = ""
+	}
+	err := c.do(ctx, http.MethodPost, c.snapURL()+"/snap/v1/transactions", kunci, body, &out)
 	return out, err
 }
 
@@ -151,6 +162,6 @@ func (c *Client) VerifySignature(n Notification) bool {
 // Status mengambil status transaksi langsung dari Midtrans (sumber kebenaran, bukan isi notifikasi).
 func (c *Client) Status(ctx context.Context, orderID string) (Notification, error) {
 	var out Notification
-	err := c.do(ctx, http.MethodGet, c.apiURL()+"/v2/"+orderID+"/status", nil, &out)
+	err := c.do(ctx, http.MethodGet, c.apiURL()+"/v2/"+url.PathEscape(orderID)+"/status", "", nil, &out)
 	return out, err
 }
