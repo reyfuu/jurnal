@@ -381,3 +381,28 @@ func SusunBanding(laporan []PeriodeLaporan) Banding {
 	}
 	return out
 }
+
+// BeriNama mengganti label baris dengan nama akun CoA usaha (kunci baris → nama akun), supaya
+// istilah di laporan sama dengan Daftar Akun. Kunci yang tidak ada di peta tetap memakai label
+// bawaan.
+func (b BagianLaporan) BeriNama(nama map[string]string) BagianLaporan {
+	if len(nama) == 0 {
+		return b
+	}
+	b.Baris = slices.Clone(b.Baris)
+	for i := range b.Baris {
+		if n := nama[b.Baris[i].Kunci]; n != "" {
+			b.Baris[i].Label = n
+		}
+	}
+	return b
+}
+
+// BeriNamaSemua: BeriNama untuk beberapa bagian sekaligus.
+func BeriNamaSemua(bagian []BagianLaporan, nama map[string]string) []BagianLaporan {
+	out := make([]BagianLaporan, len(bagian))
+	for i, b := range bagian {
+		out[i] = b.BeriNama(nama)
+	}
+	return out
+}

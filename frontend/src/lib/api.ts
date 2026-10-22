@@ -1880,6 +1880,8 @@ export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/re
 export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
   `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
 /** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
+/** Nama akun CoA usaha untuk tiap baris laporan (kunci baris → nama akun), mis. piutang → "Piutang Usaha". */
+export const getNamaAkunLaporan = () => api<Record<string, string>>('/reports/nama-akun')
 export const getNeracaPada = (tanggal: string) => api<BalanceSheet>(`/reports/balance-sheet?tanggal=${tanggal}`)
 
 /** Laba rugi & arus kas untuk rentang tanggal bebas. */
