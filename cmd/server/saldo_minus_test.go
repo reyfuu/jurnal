@@ -72,11 +72,11 @@ func TestSaldoAwal_PaksaSimpanKeAkunSelisih(t *testing.T) {
 	}
 }
 
-// Kas yang dibelanjakan melebihi saldonya = saldo kas di kredit (minus, PSAK). Penjualan yang
-// bersaldo kredit itu normal, jadi tidak ikut diperingatkan.
+// Bank yang dibelanjakan melebihi saldonya = saldo bank di kredit (minus, PSAK). Transaksi baru
+// bawaannya lewat Bank. Penjualan yang bersaldo kredit itu normal, jadi tidak ikut diperingatkan.
 func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 	srv, qa := usahaBaru(t)
-	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Kas","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
 		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
 	}
 	for _, tx := range []string{
@@ -86,7 +86,7 @@ func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 		buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", tx)
 	}
 	minus := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
-	if len(minus) != 1 || minus[0].Kode != "1101" || minus[0].Nilai != 2_500_000 || minus[0].Normal != "debit" {
+	if len(minus) != 1 || minus[0].Kode != "1102" || minus[0].Nilai != 2_500_000 || minus[0].Normal != "debit" {
 		t.Fatalf("peringatan: %+v", minus)
 	}
 }

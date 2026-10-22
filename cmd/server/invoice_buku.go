@@ -66,6 +66,11 @@ func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) e
 	if err := s.cekTxLocked(t); err != nil {
 		return err
 	}
+	lama := ""
+	if i >= 0 {
+		lama = s.txs[i].Lawan
+	}
+	s.pakaiRekeningBawaanLocked(&t, lama)
 	if i >= 0 {
 		t.ID = s.txs[i].ID
 		s.txs[i] = t

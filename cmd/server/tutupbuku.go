@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"pajak/internal/coa"
 	"slices"
 	"time"
 
@@ -235,6 +236,12 @@ func (s *tenant) handlePelunasanAwal(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.cekTerbukaLocked(p.Tanggal); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if p.Akun == "" {
+		p.Akun = s.rekeningBawaanLocked() // bawaan Bank
+	} else if a, ok := coa.Find(s.coaTemplateLocked(), p.Akun); !ok || coa.JenisLawan(a, coa.PetaDari(s.coaTemplateLocked())) != coa.LawanRekening {
+		http.Error(w, "pelunasan hanya bisa lewat akun Kas / Bank", http.StatusBadRequest)
 		return
 	}
 	ob := *s.opening

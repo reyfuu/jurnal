@@ -1091,6 +1091,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	s.pakaiRekeningBawaanLocked(&t, "")
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
@@ -1134,6 +1135,7 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
 	t.ID = s.txs[i].ID
 	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
@@ -1216,6 +1218,7 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 			}
 		}
 		for _, t := range txs {
+			s.pakaiRekeningBawaanLocked(&t, "")
 			t.ID = s.nextTxID
 			s.nextTxID++
 			s.txs = append(s.txs, t)

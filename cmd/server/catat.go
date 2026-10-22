@@ -48,7 +48,7 @@ func (s *tenant) handleOpsiCatat(w http.ResponseWriter, _ *http.Request) {
 		Akun   []akunCatat       `json:"akun"`
 		Bawaan map[string]string `json:"bawaan"`
 	}{Akun: []akunCatat{}, Bawaan: map[string]string{
-		"kas": peta.Kode(coa.PeranKas), "piutang": peta.Kode(coa.PeranPiutang), "utang": peta.Kode(coa.PeranUtangUsaha)}}
+		"kas": peta.Kode(coa.PeranKas), "bank": peta.Kode(coa.PeranBank), "piutang": peta.Kode(coa.PeranPiutang), "utang": peta.Kode(coa.PeranUtangUsaha)}}
 	for _, a := range active {
 		out.Akun = append(out.Akun, akunCatat{a.Kode, a.Nama, string(a.Kelompok), coa.JenisLawan(a, peta)})
 	}

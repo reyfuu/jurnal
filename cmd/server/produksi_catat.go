@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -60,7 +61,7 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 	}
 	all, _, p := s.akunSaldoAwal()
 	peta := coa.PetaDari(all)
-	bayar := peta.Kode(coa.PeranKas)
+	bayar := cmp.Or(peta.Kode(coa.PeranBank), peta.Kode(coa.PeranKas)) // bawaan Bank
 	if req.BayarDari != "" {
 		a, ok := coa.Find(all, req.BayarDari)
 		if !ok || coa.JenisLawan(a, peta) != coa.LawanRekening {

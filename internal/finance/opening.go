@@ -47,6 +47,8 @@ type PelunasanAwal struct {
 	Tanggal    string `json:"tanggal"`
 	Nominal    int64  `json:"nominal"`
 	Keterangan string `json:"keterangan,omitempty"`
+	// Akun: rekening kas/bank tempat uang bergerak; kosong = Kas (pelunasan lama).
+	Akun string `json:"akun,omitempty"`
 }
 
 // sisaAwal: piutang/utang saldo awal yang belum dilunasi sampai tanggal itu.

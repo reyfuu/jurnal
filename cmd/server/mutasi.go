@@ -269,6 +269,7 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		dilunasi++
 	}
 	for i := range txs {
+		s.pakaiRekeningBawaanLocked(&txs[i], "")
 		txs[i].ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, txs[i])

@@ -22,21 +22,25 @@ const baru = (b: Partial<BarisCatat>, ai = false): Baris => ({ akun: '', debit: 
 const hariIni = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
 const KEPALA_KOSONG = (): Kepala => ({ tanggal: hariIni(), pihak: '', no_bukti: '', keterangan: '' })
 
-/** Baris awal: akun pokok jenis itu + kas, di sisi yang benar. */
+/** Rekening bawaan untuk uang masuk / keluar: Bank (Kas bila usaha tanpa akun bank). */
+export const rekeningBawaan = (o: OpsiCatat) => o.bawaan.bank || o.bawaan.kas
+
+/** Baris awal: akun pokok jenis itu + rekening bawaan (Bank), di sisi yang benar. */
 function barisAwal(jenis: string, o: OpsiCatat): Baris[] {
   const masuk = JENIS_CATAT.find((j) => j.id === jenis)?.masuk ?? false
   const pokok = o.bawaan[jenis] ?? ''
   return masuk
-    ? [baru({ akun: o.bawaan.kas }), baru({ akun: pokok })]
-    : [baru({ akun: pokok }), baru({ akun: o.bawaan.kas })]
+    ? [baru({ akun: rekeningBawaan(o) }), baru({ akun: pokok })]
+    : [baru({ akun: pokok }), baru({ akun: rekeningBawaan(o) })]
 }
 
 /** Hasil baca foto → baris jurnal: barang per baris bila jumlahnya pas dengan total. */
-function barisDariNota(n: SaranNota, o: OpsiCatat): Baris[] {
+export function barisDariNota(n: SaranNota, o: OpsiCatat): Baris[] {
   const jenis = n.jenis || 'Biaya Lain'
   const masuk = ['Penjualan', 'Pendapatan Lain', 'Setor Modal', 'Terima Pinjaman', 'PPN Keluaran'].includes(jenis)
   const pokok = o.bawaan[jenis] ?? ''
-  const lawan = n.lunas ? o.bawaan.kas : masuk ? o.bawaan.piutang : o.bawaan.utang
+  // Nota / struk yang sudah dibayar: uang bergerak di Bank (bukan Kas); boleh diganti.
+  const lawan = n.lunas ? rekeningBawaan(o) : masuk ? o.bawaan.piutang : o.bawaan.utang
   const item = (n.item ?? []).filter((i) => (i.harga ?? 0) > 0)
   const rinci = item.length > 1 && item.reduce((t, i) => t + (i.harga ?? 0), 0) === n.nominal
     ? item.map((i) => ({ ket: i.nama + (i.qty ? ` × ${i.qty}` : ''), n: i.harga! }))
