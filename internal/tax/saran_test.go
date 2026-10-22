@@ -36,20 +36,25 @@ func TestSaranBentukUsaha_SudahPalingHemat(t *testing.T) {
 	if !strings.Contains(strings.Join(s.Alasan, " "), "Rp500.000.000") {
 		t.Errorf("alasan: %v", s.Alasan)
 	}
+	// dasar hukum berhenti di "jo. PP 20/2026", tanpa rincian 7/4/3 tahun
+	if g := strings.Join(s.Alasan, " "); !strings.Contains(g, "batas waktu pemakaian (PP 55/2022 jo. PP 20/2026).") || strings.Contains(g, "7 tahun") {
+		t.Errorf("dasar PPh final: %s", g)
+	}
 }
 
 func TestSaranBentukUsaha_BadanDanTanpaOmzet(t *testing.T) {
 	if s := SaranBentukUsaha("pt", "", 0, 0); s != nil {
 		t.Fatal("tanpa omzet tidak ada saran")
 	}
-	// PT beromzet 6 M (tanpa PPh final): Pasal 31E; badan memakai PTKP TK/0 untuk skema OP
+	// PT beromzet 6 M: Pasal 31E; badan memakai PTKP TK/0 untuk skema OP. PPh final tetap
+	// dibandingkan sebagai tahun pertama melewati batas omzet.
 	s := SaranBentukUsaha("pt", "", 6_000_000_000, 300_000_000)
 	if s.Sekarang != SkemaPasal31E || s.PTKP != 54_000_000 {
 		t.Fatalf("saran = %+v", s)
 	}
 	for _, k := range s.Skema {
-		if k.ID == SkemaPPOP || k.ID == SkemaPPBadan {
-			t.Fatal("PPh final ditawarkan untuk omzet di atas batas")
+		if (k.ID == SkemaPPOP || k.ID == SkemaPPBadan) && !strings.Contains(k.Nama, "tahun pertama") {
+			t.Fatalf("PPh final di atas batas tanpa tanda tahun pertama: %q", k.Nama)
 		}
 	}
 	if !strings.Contains(strings.Join(s.Catatan, " "), "TK/0") {
