@@ -6,7 +6,7 @@ import { Aset } from '@/views/Aset'
 import { LaporanAI } from '@/views/LaporanAI'
 import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
-import { daftarUrl, getLaporanRentang, getNamaAkunLaporan, getNeracaPada, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
+import { daftarUrl, getAssetsPada, getLaporanRentang, getNamaAkunLaporan, getNeracaPada, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
 import { pilihanCepat, rentangBulan, tanggalAkhirPeriode, tanggalPanjang } from '@/lib/rentang'
 import { angkaSifat, rapikanBaris, type Sifat } from '@/lib/angkaLaporan'
@@ -58,6 +58,15 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
   const bagianTab: BagianPDF | null = tab === 'laba-rugi' || tab === 'neraca' || tab === 'arus-kas' || tab === 'aset' ? tab : null
   // Rentang tanggal laba rugi & arus kas; bawaan = sebulan penuh periode yang dipilih.
   const [rentang, setRentang] = useState(() => rentangBulan(period))
+  // Tab Aset: register per tanggal bebas (checklist No 22); kosong = akhir periode laporan.
+  const [asetPada, setAsetPada] = useState('')
+  const [asetHasil, setAsetHasil] = useState<{ pada: string; d?: AssetSummary; error?: string } | null>(null)
+  useEffect(() => {
+    if (!asetPada) return
+    let hidup = true
+    getAssetsPada(asetPada).then((d) => hidup && setAsetHasil({ pada: asetPada, d }), (e: Error) => hidup && setAsetHasil({ pada: asetPada, error: e.message }))
+    return () => { hidup = false }
+  }, [asetPada, assets])
   // Rentang unduh semua daftar (checklist No 14); kembali ke bulan periode bila periode diganti.
   const [daftarPilih, setDaftarPilih] = useState({ period, ...rentangBulan(period) })
   const daftarRentang = daftarPilih.period === period ? daftarPilih : { period, ...rentangBulan(period) }
@@ -191,7 +200,20 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
         ? <ArusKas cf={cff} netProfit={rr.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!rr.hpp_stok} />
         : <p className="workspace-subtitle">Menghitung laporan…</p>)}
       {tab === 'banding' && <BandingLaporan periods={periods} period={period} bisaEkspor={bisaEkspor} />}
-      {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
+      {tab === 'aset' && (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" style={{ marginBottom: 10 }}>
+            <label className="flex items-center gap-1">Nilai per tanggal
+              <input className="input-field" type="date" style={{ width: 'auto' }} aria-label="Aset per tanggal" value={asetPada} onChange={(e) => setAsetPada(e.target.value)} /></label>
+            {asetPada
+              ? <button type="button" className="underline underline-offset-4" onClick={() => setAsetPada('')}>Kembali ke akhir periode {periodLabel}</button>
+              : <span>(kosong = akhir periode {periodLabel})</span>}
+          </div>
+          {asetPada && asetHasil?.pada !== asetPada ? <p className="workspace-subtitle">Menghitung aset…</p>
+            : asetHasil?.error && asetPada ? <p className="text-sm text-destructive" role="alert">{asetHasil.error}</p>
+            : <Aset data={asetPada && asetHasil?.d ? asetHasil.d : assets} onChanged={onAssetsChanged} />}
+        </>
+      )}
       {tab === 'ai' && <LaporanAI key={period} period={period} />}
     </>
   )

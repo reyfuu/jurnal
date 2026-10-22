@@ -304,7 +304,9 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
   const formRef = useRef<HTMLDivElement>(null)
   useGulirKeForm(formRef, tambahBanyak || !!form)
 
-  const muat = useCallback(() => { getStok().then(setData, (e: Error) => setError(e.message)) }, [])
+  // Per tanggal (checklist No 22): jumlah & nilai dari kartu stok pada tanggal itu; '' = sekarang.
+  const [pada, setPada] = useState('')
+  const muat = useCallback(() => { getStok(pada).then(setData, (e: Error) => setError(e.message)) }, [pada])
   useEffect(muat, [muat])
   const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null; tambahBanyak: boolean }, Partial<StokInput>>(isiAI, 'stok', {
     ambil: () => ({ tab, form, editId, tambahBanyak }),
@@ -445,11 +447,19 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
             <div className="chart-title">Daftar Stok</div>
             <div className="chart-subtitle">{mulai ? 'Klik nama barang untuk melihat kartu stoknya (riwayat masuk & keluar). Klik judul kolom untuk mengurutkan.' : 'Klik judul kolom untuk mengurutkan. Banyak barang sekaligus bisa lewat + Tambah barang atau Impor Excel.'}</div>
           </div>
-          {bisaUbah && (
-            <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => { setError(''); setForm(null); setEditId(null); setTambahBanyak(true) }}>
-              + Tambah barang
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {mulai && (
+              <label className="flex items-center gap-1 text-sm text-muted-foreground" title="Jumlah & nilai menurut kartu stok pada tanggal itu">Per tanggal
+                <input className="input-field" type="date" style={{ width: 'auto' }} aria-label="Stok per tanggal" value={pada} min={mulai}
+                  onChange={(e) => { setForm(null); setTambahBanyak(false); setPada(e.target.value) }} /></label>
+            )}
+            {pada && <button type="button" className="text-sm underline underline-offset-4" onClick={() => setPada('')}>Posisi sekarang</button>}
+            {bisaUbah && !pada && (
+              <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => { setError(''); setForm(null); setEditId(null); setTambahBanyak(true) }}>
+                + Tambah barang
+              </button>
+            )}
+          </div>
         </div>
         {/* Form tambah / ubah muncul di sini, tepat di atas tabel, dan halaman bergeser ke sini. */}
         <div ref={formRef} style={{ scrollMarginTop: 16 }}>
@@ -551,7 +561,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                   </td>
                   <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(it.nilai)}</td>
                   <td><span className={'pill-status ' + STATUS_CLS[it.status]} style={{ fontSize: 10 }}>{it.status}</span></td>
-                  <Aksi onEdit={() => { setError(''); setEditId(it.id); setForm(toStokInput(it)) }} onDelete={() => void hapus(it)} />
+                  {pada ? <td /> : <Aksi onEdit={() => { setError(''); setEditId(it.id); setForm(toStokInput(it)) }} onDelete={() => void hapus(it)} />}
                 </tr>
               ))}
             </tbody>

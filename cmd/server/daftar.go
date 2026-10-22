@@ -25,7 +25,7 @@ func (t *tenant) daftarUsaha(dari, sampai string) []finance.Daftar {
 	utang := finance.UmurSaldo(ob, t.txs, sampai, false)
 	pelanggan := finance.RekapPelanggan(t.txs, dari, sampai)
 	invoices := slices.Clone(t.invoices)
-	stok := finance.TerapkanKartu(slices.Clone(t.stok), t.kartuLocked())
+	stok := finance.TerapkanKartu(slices.Clone(t.stok), t.kartuLocked().Pada(sampai)) // posisi per tanggal sampai
 	pemasok := slices.Clone(t.supplier)
 	t.mu.RUnlock()
 

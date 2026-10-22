@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"time"
 
 	"pajak/internal/finance"
 )
@@ -23,6 +24,15 @@ type asetListResp struct {
 
 func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
 	out := asetListResp{AssetSummary: s.report(periodOrDefault(r)).Assets}
+	if pada := r.URL.Query().Get("pada"); pada != "" { // per tanggal bebas (checklist No 22)
+		if _, err := time.Parse(time.DateOnly, pada); err != nil {
+			http.Error(w, "pada harus YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		s.mu.RLock()
+		out.AssetSummary = finance.AssetsPada(s.assets, s.txs, pada)
+		s.mu.RUnlock()
+	}
 	s.mu.RLock()
 	out.TanggalSaldoAwal = s.bukuAwalLocked().Tanggal
 	for _, a := range s.assets {
