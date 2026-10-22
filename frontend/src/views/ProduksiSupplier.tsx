@@ -1,6 +1,6 @@
 import { Factory, Plus, Trash2 } from 'lucide-react'
-import { FormPopup } from '@/components/FormPopup'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useGulirKeForm } from '@/lib/gulir'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
   createProduk, createSupplier, deleteProduk, deleteSupplier, getProduksi, getStok, terapkanHPP,
@@ -208,8 +208,12 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
   // Halaman catat produksi; awal = produk yang dipilih dari baris tabel resep.
   const [produksi, setProduksi] = useState<{ awal?: ProdukRow } | null>(() => (bisaUbah && aksi === 'catat' ? {} : null))
   const [form, setForm] = useState<ProdukInput | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [supForm, setSupForm] = useState<SupplierInput | null>(null)
+  const supFormRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(supFormRef, !!supForm)
   const [supEditId, setSupEditId] = useState<number | null>(null)
   const [buka, setBuka] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -387,8 +391,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
 
 
       {form && (
-        <FormPopup judul={editId === null ? 'Tambah produk' : 'Ubah produk'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-5xl">
-        <form className="grid gap-3" onSubmit={simpanProduk}>
+        <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpanProduk}>
           <div className="chart-title">{editId === null ? 'Tambah Produk & Resep' : 'Ubah Produk & Resep'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -451,7 +454,6 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
             <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
           </div>
         </form>
-        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>
@@ -534,8 +536,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
         <div className="chart-title">Supplier</div>
 
         {supForm && (
-          <FormPopup judul={supEditId === null ? 'Tambah supplier' : 'Ubah supplier'} onClose={() => { setSupForm(null); setSupEditId(null) }} lebar="sm:max-w-3xl">
-          <form className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12 }} onSubmit={simpanSupplier}>
+          <form ref={supFormRef} className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12, scrollMarginTop: 16 }} onSubmit={simpanSupplier}>
             <label>
               <span className="kpi-label">Nama Supplier</span>
               <input className="input-field" required value={supForm.nama} onChange={(e) => setSupForm({ ...supForm, nama: e.target.value })} />
@@ -574,7 +575,6 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
               <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setSupForm(null)}>Batal</button>
             </div>
           </form>
-          </FormPopup>
         )}
 
         <div className="table-scroll">

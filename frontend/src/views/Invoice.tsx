@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { FormPopup } from '@/components/FormPopup'
+import { useEffect, useState, useRef } from 'react'
+import { ThUrut } from '@/components/ThUrut'
+import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
+import { useGulirKeForm } from '@/lib/gulir'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 
 const DRAFT_INV = 'invoice-baru'
@@ -14,6 +16,11 @@ import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
 
 const AMBER = 'var(--text-warn)'
+
+const KOLOM_INVOICE: Pengurut<InvoiceRow> = {
+  nomor: (r) => r.nomor, pelanggan: (r) => r.pelanggan_nama, terbit: (r) => r.tanggal, tempo: (r) => r.jatuh_tempo,
+  status: (r) => r.status, total: (r) => r.totals.total,
+}
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
 
@@ -58,10 +65,13 @@ function hitung(f: InvoiceInput) {
 export function InvoiceView() {
   const [info, setInfo] = useState<InvoiceInfo | null>(null)
   const [form, setForm] = useState<InvoiceInput | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [impor, setImpor] = useState(false)
+  const urut = useKolomUrut()
   // Invoice baru yang belum tersimpan disimpan sebagai draft (error / muat ulang tidak menghapusnya).
   useSimpanDraft(form && editId === null ? DRAFT_INV : null, form)
 
@@ -209,8 +219,7 @@ export function InvoiceView() {
       </div>
 
       {form && (
-        <FormPopup judul={editId === null ? 'Buat invoice' : 'Ubah invoice'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-5xl">
-        <form className="grid gap-3" onSubmit={simpan}>
+        <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Buat Invoice' : `Ubah ${form.nomor}`}</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginTop: 14 }}>
@@ -333,7 +342,6 @@ export function InvoiceView() {
               onClick={() => { if (editId === null) hapusDraft(DRAFT_INV); setForm(null); setEditId(null) }}>Batal</button>
           </div>
         </form>
-        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>
@@ -343,12 +351,12 @@ export function InvoiceView() {
           <table className="data-table tabular" style={{ minWidth: 880 }}>
             <thead>
               <tr>
-                <th>No. Invoice</th>
-                <th>Pelanggan</th>
-                <th>Terbit</th>
-                <th>Jatuh Tempo</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
+                <ThUrut k="nomor" urut={urut}>No. Invoice</ThUrut>
+                <ThUrut k="pelanggan" urut={urut}>Pelanggan</ThUrut>
+                <ThUrut k="terbit" urut={urut}>Terbit</ThUrut>
+                <ThUrut k="tempo" urut={urut}>Jatuh Tempo</ThUrut>
+                <ThUrut k="status" urut={urut}>Status</ThUrut>
+                <ThUrut k="total" urut={urut} kanan>Total</ThUrut>
                 <th style={{ width: 170 }} />
               </tr>
             </thead>
@@ -356,7 +364,7 @@ export function InvoiceView() {
               {rows.length === 0 && (
                 <tr><td colSpan={7} style={{ color: 'var(--text-muted)' }}>Belum ada faktur. Klik "Buat Invoice" untuk menerbitkan yang pertama.</td></tr>
               )}
-              {rows.map((r) => (
+              {urutkan(rows, urut.kunci ? KOLOM_INVOICE[urut.kunci] : undefined, urut.arah).map((r) => (
                 <tr key={r.id}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.nomor}</div>
