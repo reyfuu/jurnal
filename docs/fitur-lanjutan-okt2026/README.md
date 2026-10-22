@@ -38,3 +38,21 @@ Kode `F-xx` dipakai di semua dokumen. Kolom "No" = nomor baris di Excel checklis
 Fase 1 = perbaikan kecil di frontend/label (bisa satu PR per butir, hari yang sama).
 Fase 2 = fitur menengah dengan sedikit perubahan backend. Fase 3 = perubahan alur akuntansi
 atau data yang perlu keputusan produk dulu (lihat BRD §6).
+
+## Keputusan & status (22 Okt 2026)
+
+- **Diterima:** D-1 (lupa password lewat email SMTP), D-2 (halaman Tagihan bertab), D-4 (`JU-YYYYMM-NNNN`).
+- **Ditunda menunggu tim pajak:** D-3 (F-12 selisih persediaan), D-5 (label "Laba Ditahan"), D-6 (F-14 saldo
+  awal per pihak). Penjelasan untuk tim pajak: [Keputusan_Pajak_D3_D5_D6.pptx](Keputusan_Pajak_D3_D5_D6.pptx).
+- **Implementasi:** Fase 1 #125, Fase 2 #126 (di atas #125), Fase 3 menyusul (di atas #126).
+
+Perbedaan implementasi dari rancangan (lebih sederhana, perilaku sama untuk pengguna):
+
+| Fitur | Rancangan | Implementasi |
+|---|---|---|
+| F-03 | Input angka boleh negatif | Tidak: butir 28 hanya soal kursor; minus tetap lewat impor Excel |
+| F-04 | Pinjaman satu baris per akun | Tidak dipecah: label sudah nama akun CoA ("Utang Bank"), saldo awal tidak membuat akun pinjaman tambahan |
+| F-08 | Kolom `akun_tujuan` | Tanpa kolom baru: `lawan` = rekening asal, `akun` = rekening tujuan; hanya lewat Catat |
+| F-10 | `invoices.pelanggan_id`, nonaktifkan pelanggan, impor Excel | Nama sebagai teks (dicocokkan tanpa beda huruf besar/kecil), hapus biasa, "Ambil dari data lama" |
+| F-11 | `transactions.pihak_id` | Dicocokkan lewat nama pihak |
+| F-16 | Tabel `password_resets` | Hash token di memori (30 menit); server dimulai ulang = minta tautan baru |
