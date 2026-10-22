@@ -1908,7 +1908,8 @@ export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>
 
 export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
-export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
+/** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk rentang tanggal. */
+export const daftarUrl = (r: { dari: string; sampai: string }, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?dari=${r.dari}&sampai=${r.sampai}`
 /** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
 export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
   `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
