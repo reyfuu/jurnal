@@ -70,11 +70,25 @@ func TestCekAwal(t *testing.T) {
 	}
 
 	r = CekAwal(CekAwalInput{BentukUsaha: "op", PTKP: "TK/0", KLU: "471", Omzet: 6_000_000_000, Laba: 600_000_000})
-	if l := levels(r); l["Wajib menjadi PKP"] != "tinggi" || l["Tidak bisa memakai PPh Final 0,5%"] != "tinggi" {
+	if l := levels(r); l["Wajib menjadi PKP"] != "tinggi" || l["PPh Final 0,5% hanya untuk tahun pertama"] != "sedang" {
 		t.Fatalf("omzet 6 M OP belum PKP: %+v", r.Risiko)
 	}
 	if l := levels(CekAwal(CekAwalInput{BentukUsaha: "cv", KLU: "962", Omzet: 1_000_000_000, Laba: -5_000_000})); l["Usaha dilaporkan rugi"] != "tinggi" {
 		t.Fatalf("rugi: %+v", l)
+	}
+}
+
+// ROI tahun pertama = laba / modal, hanya bila modal diisi.
+func TestCekAwal_ROI(t *testing.T) {
+	if r := CekAwal(CekAwalInput{BentukUsaha: "op", KLU: "471", Omzet: 450_000_000, Laba: 18_000_000}); r.ROIBps != nil {
+		t.Fatalf("tanpa modal tidak ada ROI: %+v", r.ROIBps)
+	}
+	r := CekAwal(CekAwalInput{BentukUsaha: "op", KLU: "471", Omzet: 450_000_000, Laba: 18_000_000, Modal: 120_000_000})
+	if r.ROIBps == nil || *r.ROIBps != 1500 || !strings.Contains(r.ROIPesan, "15,00%") || !strings.Contains(r.ROIPesan, "6 tahun 8 bulan") {
+		t.Fatalf("ROI = %v %q", r.ROIBps, r.ROIPesan)
+	}
+	if r := CekAwal(CekAwalInput{BentukUsaha: "op", Omzet: 100_000_000, Laba: -10_000_000, Modal: 50_000_000}); r.ROIBps == nil || *r.ROIBps != -2000 || strings.Contains(r.ROIPesan, "kembali") {
+		t.Fatalf("ROI rugi = %v %q", r.ROIBps, r.ROIPesan)
 	}
 }
 

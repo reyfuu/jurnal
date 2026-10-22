@@ -6,7 +6,7 @@ const a = (x: Answers): Answers => ({ ...DEFAULT_ANSWERS, ...x })
 describe('toProfile', () => {
   it('warung pribadi, menikah, 2 tanggungan', () => {
     expect(toProfile(a({ nama: '  Warung Bu Siti ', jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah', tanggungan: '2' }))).toEqual({
-      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, klu: '', metode_persediaan: 'periodik', metode_penyusutan: 'garis_lurus', metode_nilai_stok: 'fifo', omzet_tahunan: 0, laba_sebelum_pajak: 0,
+      nama_usaha: 'Warung Bu Siti', alamat: '', kecamatan: '', kota: '', provinsi: '', jenis_usaha: 'perdagangan', bentuk_usaha: 'op', ptkp: 'K/2', pkp: false, klu: '', metode_persediaan: 'periodik', metode_penyusutan: 'garis_lurus', metode_nilai_stok: 'fifo', omzet_tahunan: 0, laba_sebelum_pajak: 0, modal_awal: 0,
     })
   })
 
@@ -55,12 +55,12 @@ describe('omzet & laba', () => {
 describe('steps', () => {
   it('pribadi yang jual barang dan sudah menikah melihat semua langkah', () => {
     expect(steps(a({ jenis: 'perdagangan', bentuk: 'op', menikah: 'sudah' }))).toEqual(
-      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'hpp', 'omzet', 'laba', 'bentuk', 'kelamin', 'menikah', 'tanggungan', 'gabung', 'pkp', 'susut', 'ringkasan'],
+      ['nama', 'lokasi', 'jenis', 'klu', 'stok', 'hpp', 'omzet', 'laba', 'modal', 'bentuk', 'kelamin', 'menikah', 'tanggungan', 'gabung', 'pkp', 'susut', 'ringkasan'],
     )
   })
 
   it('jasa berbentuk PT melewati stok dan pertanyaan keluarga', () => {
-    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'bentuk', 'pkp', 'susut', 'ringkasan'])
+    expect(steps(a({ jenis: 'jasa', bentuk: 'pt' }))).toEqual(['nama', 'lokasi', 'jenis', 'klu', 'omzet', 'laba', 'modal', 'bentuk', 'pkp', 'susut', 'ringkasan'])
   })
 
   it('istri yang masih menikah melewati tanggungan & gabung, PTKP TK/0', () => {
@@ -110,6 +110,9 @@ describe('answered', () => {
     expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: '-1.000.000.001' }))).toBe(false)
     expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: '-Rp200.000.000' }))).toBe(true)
     expect(answered('laba', a({ omzet: 'Rp1.000.000.000', laba: 'Rp1.000.000.000' }))).toBe(true)
+    expect(answered('modal', a({}))).toBe(false)
+    expect(answered('modal', a({ modal: 'Rp0' }))).toBe(false)
+    expect(answered('modal', a({ modal: 'Rp150.000.000' }))).toBe(true)
   })
 })
 
@@ -126,5 +129,15 @@ describe('summary', () => {
     const s = summary(toProfile(a({ nama: 'X', jenis: 'jasa', bentuk: 'pt' })))
     expect(s.map((x) => x.judul)).not.toContain('Pencatatan stok')
     expect(s.map((x) => x.judul)).not.toContain('Modal barang terjual')
+  })
+})
+
+describe('modal & ROI', () => {
+  it('modal masuk profil dan ROI tampil di ringkasan', () => {
+    const p = toProfile(a({ jenis: 'jasa', bentuk: 'pt_perorangan', omzet: 'Rp1.000.000.000', laba: 'Rp30.000.000', modal: 'Rp200.000.000' }))
+    expect(p.modal_awal).toBe(200_000_000)
+    const roi = summary(p).find((s) => s.judul === 'Modal & ROI tahun pertama')
+    expect(roi?.isi).toContain('15,00%')
+    expect(summary(p).find((s) => s.judul === 'Pajak penghasilan')?.isi).toContain('PTP')
   })
 })

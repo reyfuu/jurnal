@@ -25,13 +25,14 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
         aria-label={`Apa itu ${label}?`}
         aria-describedby={buka ? id : undefined}
         aria-expanded={buka}
-        className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1"
+        className="inline-flex size-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-1"
+        style={{ color: 'var(--accent-blue)', background: 'color-mix(in srgb, var(--accent-blue) 14%, transparent)' }}
         onFocus={() => setBuka(true)}
         onBlur={() => setBuka(false)}
         onClick={() => setBuka((b) => !b)}
         onKeyDown={(e) => { if (e.key === 'Escape') setBuka(false) }}
       >
-        <CircleHelp size={15} aria-hidden="true" />
+        <CircleHelp size={16} strokeWidth={2.4} aria-hidden="true" />
       </button>
       {buka && (
         <span role="tooltip" id={id} className="absolute right-0 top-full z-50 mt-1 grid w-80 max-w-[80vw] gap-1.5 rounded-md border border-border bg-popover p-3 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-lg">

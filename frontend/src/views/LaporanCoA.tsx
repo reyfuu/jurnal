@@ -60,7 +60,7 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan awal</>} value={formatRp(is.persediaan_awal)} />}
             <Lines lines={is.hpp_lines} />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan akhir</>} value={formatRp(-is.persediaan_akhir)} />}
-            <AmountRow label="Harga pokok penjualan" value={formatRp(-is.hpp)} color={RED} bold />
+            <AmountRow label={is.metode === 'periodik' ? 'Harga pokok penjualan (periodik: awal + pembelian - akhir)' : `Harga pokok penjualan (${is.metode}: dari kartu stok)`} value={formatRp(-is.hpp)} color={RED} bold />
             <AmountRow label="Laba kotor" value={formatRp(is.laba_kotor)} bold />
             <Lines lines={is.beban_operasional} negate />
             <AmountRow label="Total beban operasional" value={formatRp(-is.total_beban_operasional)} color={RED} bold />
