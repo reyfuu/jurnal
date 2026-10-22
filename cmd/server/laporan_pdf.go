@@ -49,17 +49,36 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	label, labelNeraca, berkas := finance.LabelPeriode(period), "", period
+	// Rentang tanggal: laba rugi & arus kas dari..sampai; neraca tetap posisi akhir periode.
+	dari, sampai, rentang, err := rentangLaporan(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if rentang {
+		lr := t.laporanRentang(dari, sampai)
+		label, labelNeraca, berkas = finance.TanggalPanjang(dari)+" s.d. "+finance.TanggalPanjang(sampai), finance.LabelPeriode(period), dari+"_"+sampai
+		for i, b := range bagian {
+			switch b.Kode {
+			case "laba-rugi":
+				bagian[i] = finance.BagianLabaRugi(lr.Income)
+			case "arus-kas":
+				bagian[i] = finance.BagianArusKas(lr.CashFlow, q.Get("metode") == "tidak-langsung")
+			}
+		}
+	}
 	var ringkasAset *finance.AssetSummary
 	if aset {
 		ringkasAset = &rep.Assets
 	}
 	var buf bytes.Buffer
-	if err := finance.RenderLaporanPDF(&buf, t.currentProfile().NamaUsaha, finance.LabelPeriode(period), bagian, ringkasAset); err != nil {
+	if err := finance.RenderLaporanPDF(&buf, t.currentProfile().NamaUsaha, label, labelNeraca, bagian, ringkasAset); err != nil {
 		log.Printf("render laporan PDF %s: %v", period, err)
 		http.Error(w, "gagal membuat PDF", http.StatusInternalServerError)
 		return
 	}
-	kirimPDF(w, fmt.Sprintf("%s-%s.pdf", namaBerkasBagian[q.Get("bagian")], period), buf.Bytes())
+	kirimPDF(w, fmt.Sprintf("%s-%s.pdf", namaBerkasBagian[q.Get("bagian")], berkas), buf.Bytes())
 }
 
 func kirimPDF(w http.ResponseWriter, nama string, isi []byte) {
