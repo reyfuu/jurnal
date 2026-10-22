@@ -1,10 +1,10 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BacaFotoNota } from '@/components/BacaFotoNota'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { BacaFotoNota } from '@/components/BacaFotoNota'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -49,6 +49,14 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   const [coa, setCoa] = useState<CoAInfo | null>(null)
   const [alasan, setAlasan] = useState('')
   const [terkirim, setTerkirim] = useState('')
+  // Catat dari foto: AI membaca nota jadi pratinjau, lalu mengisi form manual untuk diperiksa.
+  const [modeIsi, setModeIsi] = useState<'manual' | 'foto'>('manual')
+  const [dariFoto, setDariFoto] = useState(false)
+  // Dialog ditutup: transaksi berikutnya mulai dari isi manual lagi.
+  const dialogTertutup = editing === null
+  useEffect(() => {
+    if (dialogTertutup) { setModeIsi('manual'); setDariFoto(false) }
+  }, [dialogTertutup])
   const usulMode = !!lihat?.bolehUsul
   const bisaBuka = canEdit || usulMode
 
@@ -79,17 +87,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   const channels = useMemo(() => channelsOf(txs), [txs])
 
   const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
-  // Catat dari foto: AI membaca nota jadi pratinjau, lalu mengisi form manual untuk diperiksa.
-  const [modeIsi, setModeIsi] = useState<'manual' | 'foto'>('manual')
-  const [dariFoto, setDariFoto] = useState(false)
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
 
   function openNew() {
     setError('')
     setQtyTeks('')
     getPilihanBarang().then(setBarang, () => {})
-    setModeIsi('manual')
-    setDariFoto(false)
     setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false })
   }
   function openEdit(t: Tx) {
