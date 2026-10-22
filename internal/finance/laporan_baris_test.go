@@ -230,3 +230,31 @@ func TestLabelPeriode(t *testing.T) {
 		t.Errorf("%q %q %q", LabelPeriode("2026-08"), labelPeriodePendek("2026-02"), labelPeriodePendek("2026-05"))
 	}
 }
+
+// PDF laba rugi: baris berhuruf dengan rumus di baris jumlah; beban hitam tanpa kurung, akun
+// kontra (potongan, penyusutan, amortisasi) dalam kurung.
+func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
+	b := BagianLabaRugi(contohLabaRugi())
+	rumus := map[string]string{}
+	for _, r := range b.Baris {
+		rumus[r.Kunci] = r.Rumus
+	}
+	if rumus["penjualan_bersih"] != "C = A - B" || rumus["laba_kotor"] != "E = C - D" || rumus["ebit"] != "J = G - H - I" || rumus["laba_bersih"] != "L = J + K" {
+		t.Fatalf("rumus: %+v", rumus)
+	}
+	var buf bytes.Buffer
+	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", "", []BagianLaporan{b}, nil); err != nil {
+		t.Fatal(err)
+	}
+	s := buf.String()
+	for _, mau := range []string{`Laba kotor   \(E = C - D\)`, `\(10.000\)`, `\(5.000\)`, "30.000", "15.000"} { // potongan & penyusutan: kontra
+		if !strings.Contains(s, mau) {
+			t.Errorf("PDF tidak memuat %q", mau)
+		}
+	}
+	for _, tidak := range []string{`\(30.000\)`, `\(15.000\)`, `\(20.000\)`} { // HPP, beban, total beban: tanpa kurung
+		if strings.Contains(s, tidak) {
+			t.Errorf("beban tidak boleh dalam kurung: %q", tidak)
+		}
+	}
+}
