@@ -1947,9 +1947,9 @@ export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk rentang tanggal. */
 export const daftarUrl = (r: { dari: string; sampai: string }, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?dari=${r.dari}&sampai=${r.sampai}`
-/** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
-export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
-  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
+/** rentang: laba rugi & arus kas; tanggal: posisi neraca atau register aset. */
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggal?: string) =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggal ? `&tanggal=${tanggal}` : ''}`
 /** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
 /** Nama akun CoA usaha untuk tiap baris laporan (kunci baris → nama akun), mis. piutang → "Piutang Usaha". */
 export const getNamaAkunLaporan = () => api<Record<string, string>>('/reports/nama-akun')

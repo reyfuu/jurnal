@@ -68,7 +68,7 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// Neraca per tanggal bebas (?tanggal=YYYY-MM-DD), mis. "Per 15 Agustus 2026".
+	// Neraca dan register aset per tanggal bebas (?tanggal=YYYY-MM-DD).
 	if tgl := q.Get("tanggal"); tgl != "" {
 		bs, err := t.neracaPada(tgl)
 		if err != nil {
@@ -81,7 +81,12 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		labelNeraca = finance.TanggalPanjang(tgl)
-		if q.Get("bagian") == "neraca" {
+		if aset {
+			t.mu.RLock()
+			rep.Assets = finance.AssetsPada(t.assets, t.txs, tgl)
+			t.mu.RUnlock()
+		}
+		if q.Get("bagian") == "neraca" || aset {
 			berkas = tgl
 		}
 	}

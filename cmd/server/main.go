@@ -877,10 +877,7 @@ func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rep := s.reportLocked(period)
-	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
-		saran, seragam := finance.MetodeSeragam(s.assets)
-		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
-	}
+	s.isiMetodeAsetLocked(&rep.Assets)
 	return rep
 }
 

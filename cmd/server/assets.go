@@ -22,6 +22,14 @@ type asetListResp struct {
 	TanggalSaldoAwal   string `json:"tanggal_saldo_awal"`
 }
 
+// Pemanggil memegang s.mu; metadata metode sama untuk laporan bulanan dan per tanggal.
+func (s *tenant) isiMetodeAsetLocked(as *finance.AssetSummary) {
+	if as.MetodeUsaha = s.metodeUsaha(); as.MetodeUsaha == "" {
+		saran, seragam := finance.MetodeSeragam(s.assets)
+		as.MetodeSaran, as.MetodeCampur = saran, !seragam
+	}
+}
+
 func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
 	var out asetListResp
 	if pada := r.URL.Query().Get("pada"); pada != "" { // per tanggal bebas (checklist No 22)
@@ -31,6 +39,7 @@ func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
 		}
 		s.mu.RLock()
 		out.AssetSummary = finance.AssetsPada(s.assets, s.txs, pada)
+		s.isiMetodeAsetLocked(&out.AssetSummary)
 		s.mu.RUnlock()
 	} else {
 		out.AssetSummary = s.report(periodOrDefault(r)).Assets

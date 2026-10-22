@@ -110,14 +110,14 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
 
   return (
     <>
-      <PageHeader title="Laporan Keuangan" subtitle={`${tab === 'neraca' ? `Per ${labelNeraca}` : pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
+      <PageHeader title="Laporan Keuangan" subtitle={`${tab === 'neraca' ? `Per ${labelNeraca}` : tab === 'aset' && asetPada ? `Per ${tanggalPanjang(asetPada)}` : pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
         {(tab === 'laba-rugi' || tab === 'neraca') && (
           <span className={'pill-status ' + ((tab === 'neraca' ? bsTampil ?? bs : bs).is_balanced ? 'pill-green' : 'pill-amber')}>
             {(tab === 'neraca' ? bsTampil ?? bs : bs).is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
           </span>
         )}
         {bisaEkspor && bagianTab && (
-          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined, bagianTab === 'laba-rugi' || bagianTab === 'arus-kas' ? pdfRentang : undefined, bagianTab === 'neraca' ? pdfTanggal : undefined))}>
+          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined, bagianTab === 'laba-rugi' || bagianTab === 'arus-kas' ? pdfRentang : undefined, bagianTab === 'aset' ? asetPada || undefined : bagianTab === 'neraca' ? pdfTanggal : undefined))}>
             <FileDown /> Unduh PDF {TABS.find((t) => t.id === tab)?.label}
           </Button>
         )}
