@@ -8,7 +8,7 @@ import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
 import { daftarUrl, getLaporanRentang, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
-import { pilihanCepat, rentangBulan } from '@/lib/rentang'
+import { pilihanCepat, rentangBulan, tanggalAkhirPeriode } from '@/lib/rentang'
 import { angkaSifat, type Sifat } from '@/lib/angkaLaporan'
 
 const RED = 'var(--text-danger)'
@@ -29,7 +29,7 @@ const TABS: { id: Tab; label: string; badge?: string }[] = [
 
 const SUBTITLE: Record<Tab, string> = {
   'laba-rugi': 'Laba Rugi, Neraca, Arus Kas & Aset dalam satu tempat',
-  neraca: 'Posisi keuangan per akhir periode',
+  neraca: 'Posisi keuangan (aset, utang, modal)',
   'arus-kas': 'Dua metode penyajian: Langsung & Tidak Langsung',
   banding: 'Bandingkan beberapa bulan sekaligus, lengkap dengan totalnya',
   aset: 'Register aset, penyusutan & amortisasi',
@@ -79,7 +79,7 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
 
   return (
     <>
-      <PageHeader title="Laporan Keuangan" subtitle={`${pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
+      <PageHeader title="Laporan Keuangan" subtitle={`${tab === 'neraca' ? `Per ${tanggalAkhirPeriode(period)}` : pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
         {(tab === 'laba-rugi' || tab === 'neraca') && (
           <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
             {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
@@ -138,12 +138,12 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
           {custom && hasil?.kunci === kunci && hasil.error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 10 }}>{hasil.error}</p>}
           <p className="text-xs text-muted-foreground" style={{ marginTop: 8 }}>
             {custom ? <><strong>{labelRentang}</strong>. </> : null}
-            Penyusutan aset dihitung sebulan penuh untuk tiap bulan yang akhir bulannya masuk rentang. Neraca tetap posisi akhir periode {periodLabel}.
+            Penyusutan aset dihitung sebulan penuh untuk tiap bulan yang akhir bulannya masuk rentang. Neraca tetap per tanggal {tanggalAkhirPeriode(period)}.
           </p>
         </div>
       )}
       {tab === 'laba-rugi' && (rr && cff ? <LabaRugi r={rr} cf={cff} /> : <p className="workspace-subtitle">Menghitung laporan…</p>)}
-      {tab === 'neraca' && <Neraca bs={bs} kartuAktif={!!r.hpp_stok} />}
+      {tab === 'neraca' && <Neraca bs={bs} kartuAktif={!!r.hpp_stok} perTanggal={tanggalAkhirPeriode(period)} />}
       {tab === 'arus-kas' && (rr && cff
         ? <ArusKas cf={cff} netProfit={rr.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!rr.hpp_stok} />
         : <p className="workspace-subtitle">Menghitung laporan…</p>)}
@@ -253,13 +253,13 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
   )
 }
 
-function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
+function Neraca({ bs, kartuAktif, perTanggal }: { bs: BalanceSheet; kartuAktif: boolean; perTanggal: string }) {
   const a = bs.assets
   return (
     <div className="report-grid">
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Neraca (Posisi Keuangan)</div>
-        <div className="chart-subtitle" style={{ marginBottom: 12 }}>Posisi kas, piutang, stok &amp; aset vs utang &amp; modal</div>
+        <div className="chart-subtitle" style={{ marginBottom: 12 }}>Per {perTanggal} · kas, piutang, stok &amp; aset vs utang &amp; modal · dalam Rupiah</div>
         <div className="list-rows tabular">
           <div className="section-head">Aset (Aktiva)</div>
           <AmountRow label="TOTAL ASET" value={formatRp(a.total)} color={BLUE} bold />

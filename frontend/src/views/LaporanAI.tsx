@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { tanggalAkhirPeriode } from '@/lib/rentang'
 import { AlertTriangle, CheckCircle2, Lightbulb, Sparkles, TrendingUp } from 'lucide-react'
 import { CekAwalCard } from '@/components/CekAwalCard'
 import { getAIReport, type AIReport, type BusinessFacts } from '@/lib/api'
@@ -70,12 +71,12 @@ export function LaporanAI({ period }: { period: string }) {
         </div>
       )}
 
-      <RincianLaporan f={f} />
+      <RincianLaporan f={f} period={period} />
     </>
   )
 }
 
-function RincianLaporan({ f }: { f: BusinessFacts }) {
+function RincianLaporan({ f, period }: { f: BusinessFacts; period: string }) {
   const lr = f.laba_rugi
   return (
     <>
@@ -108,7 +109,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
           <Baris l="Saldo kas akhir" v={f.arus_kas.saldo_akhir} tebal warna={BLUE} />
         </Kartu>
 
-        <Kartu judul="Neraca" sub={f.neraca.seimbang ? 'Aktiva = Pasiva (seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}>
+        <Kartu judul={`Neraca per ${tanggalAkhirPeriode(period)}`} sub={f.neraca.seimbang ? 'Aktiva = Pasiva (seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}>
           <Baris l="Kas" v={f.neraca.kas} />
           <Baris l="Piutang" v={f.neraca.piutang} />
           <Baris l="Persediaan" v={f.neraca.persediaan} />

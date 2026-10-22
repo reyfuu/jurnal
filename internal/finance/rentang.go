@@ -108,3 +108,21 @@ func BuildLaporanRentang(txs []Transaction, assets []Asset, dari, sampai string,
 	}
 	return LaporanRentang{Dari: dari, Sampai: sampai, Label: LabelRentang(dari, sampai), Income: is, CashFlow: cf}
 }
+
+// TanggalAkhirPeriode: "2026-10" → "31 Oktober 2026", tanggal posisi neraca satu periode.
+func TanggalAkhirPeriode(p string) string {
+	t, err := time.Parse("2006-01", p)
+	if err != nil {
+		return p
+	}
+	return TanggalPanjang(t.AddDate(0, 1, -1).Format(time.DateOnly))
+}
+
+// tanggalAkhirPendek: "2026-10" → "31 Okt 2026" untuk judul kolom neraca perbandingan.
+func tanggalAkhirPendek(p string) string {
+	t, err := time.Parse("2006-01", p)
+	if err != nil {
+		return p
+	}
+	return strconv.Itoa(t.AddDate(0, 1, -1).Day()) + " " + labelPeriodePendek(p)
+}
