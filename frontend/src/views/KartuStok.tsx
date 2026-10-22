@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  createTransaction, getGerakStok, getMetodeStok, pilihMetodeStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
-  stokAwal, stokOpname, stokProduksi,
-  type BarisKartu, type GerakStok, type MetodeNilaiStok, type MetodeStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
+  createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
+  stokProduksi,
+  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type ProdukRow, type StokRow,
 } from '@/lib/api'
+import { NAMA_METODE, useMetodeStok } from '@/lib/metodeStok'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
@@ -27,185 +28,11 @@ const LABEL_KARTU: Record<JenisKartu, string> = {
   awal: 'Stok awal', beli: 'Beli', produksi_masuk: 'Hasil produksi', produksi_pakai: 'Dipakai produksi', jual: 'Terjual', opname: 'Stok opname',
 }
 
-const NAMA_METODE: Record<MetodeNilaiStok, string> = { fifo: 'FIFO (yang dibeli duluan keluar duluan)', rata_rata: 'rata-rata bergerak' }
-
-/** Metode nilai stok usaha (null selama dimuat); dipakai teks penjelasan & dialog mulai kartu. */
-function useMetodeStok() {
-  const [m, setM] = useState<MetodeStok | null>(null)
-  useEffect(() => { getMetodeStok().then(setM, () => setM(null)) }, [])
-  return m
-}
-
 function Galat({ teks }: { teks: string }) {
   return teks ? <p className="text-sm text-destructive" role="alert">{teks}</p> : null
 }
 
-/** Titik nol kartu stok: hitung fisik pertama + harga pokok per satuan. */
-export function MulaiKartuDialog({ items, onClose, onDone }: { items: StokRow[]; onClose: () => void; onDone: () => void }) {
-  const [tanggal, setTanggal] = useState(hariIni)
-  const [isi, setIsi] = useState(() => items.map((it) => ({ id: it.id, fisik: qtyKeTeks(it.jumlah_mili), harga: it.harga_pokok })))
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const metode = useMetodeStok()
-  const [pilih, setPilih] = useState<MetodeNilaiStok | ''>('')
-  const set = (i: number, p: Partial<(typeof isi)[number]>) => setIsi((x) => x.map((r, j) => (j === i ? { ...r, ...p } : r)))
-  const total = isi.reduce((n, r) => n + Math.round((parseQty(r.fisik) * r.harga) / 1000), 0)
 
-  async function kirim(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      // Metode dikunci saat kartu stok dimulai; FIFO (bawaan) dikunci otomatis oleh server.
-      if (metode && !metode.terkunci && pilih && pilih !== metode.metode) {
-        await pilihMetodeStok(pilih).catch((err: Error) => {
-          throw new Error(/akses|forbidden|izin/i.test(err.message) ? 'Hanya Owner yang bisa memilih metode rata-rata; biarkan FIFO atau minta Owner memilihnya di Profil Usaha.' : err.message)
-        })
-      }
-      await stokAwal({ tanggal, baris: isi.map((r) => ({ stok_id: r.id, fisik: parseQty(r.fisik), harga_unit: r.harga })) })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-      setBusy(false)
-    }
-  }
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
-        <form onSubmit={kirim} className="grid gap-3">
-          <DialogHeader>
-            <DialogTitle>Mulai kartu stok (titik nol)</DialogTitle>
-            <DialogDescription>
-              Hitung fisik semua barang di gudang pada tanggal ini, lalu isi jumlah & harga pokoknya. Mulai tanggal ini stok bergerak otomatis
-              dari transaksi beli & jual, produksi, dan stok opname. Laporan sebelum tanggal ini tidak berubah.
-            </DialogDescription>
-          </DialogHeader>
-          {metode && (metode.terkunci ? (
-            <p className="text-sm">Nilai stok &amp; modal barang terjual dihitung dengan <strong>{NAMA_METODE[metode.metode]}</strong> (sudah dikunci).</p>
-          ) : (
-            <div className="note-box warn" style={{ margin: 0 }}>
-              <Label htmlFor="ks-metode"><strong>Cara menghitung nilai stok &amp; modal barang terjual</strong></Label>
-              <select id="ks-metode" className="input-field" style={{ marginTop: 6, maxWidth: 420 }} value={pilih || metode.metode} onChange={(e) => setPilih(e.target.value as MetodeNilaiStok)}>
-                {metode.pilihan.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <p className="text-xs" style={{ marginTop: 6 }}>
-                {metode.pilihan.find((o) => o.value === (pilih || metode.metode))?.hint} Berlaku untuk semua barang dan <strong>dikunci begitu kartu stok dimulai</strong>; perubahan metode memerlukan persetujuan DJP.
-              </p>
-            </div>
-          ))}
-          <div className="grid gap-1.5" style={{ maxWidth: 200 }}>
-            <Label htmlFor="ks-tgl">Tanggal hitung fisik</Label>
-            <Input id="ks-tgl" type="date" required value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
-          </div>
-          <div className="table-scroll" style={{ maxHeight: 360 }}>
-            <table className="data-table tabular" style={{ minWidth: 560 }}>
-              <thead><tr><th>Barang</th><th style={{ textAlign: 'right' }}>Jumlah fisik</th><th style={{ textAlign: 'right' }}>Harga pokok / satuan</th><th style={{ textAlign: 'right' }}>Nilai</th></tr></thead>
-              <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.id}>
-                    <td><div className="font-semibold">{it.nama}</div><div className="text-xs text-muted-foreground">{it.sku || it.kategori}</div></td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Input aria-label={`Jumlah fisik ${it.nama}`} inputMode="decimal" className="tabular" style={{ width: 110, textAlign: 'right' }}
-                          value={isi[i].fisik} onChange={(e) => set(i, { fisik: e.target.value.replace(/[^\d.,]/g, '') })} />
-                        <span className="text-xs text-muted-foreground" style={{ minWidth: 30 }}>{it.satuan}</span>
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Input aria-label={`Harga pokok ${it.nama}`} className="tabular" style={{ width: 130, textAlign: 'right', marginLeft: 'auto' }}
-                        {...angka(isi[i].harga, (n) => set(i, { harga: n }))} />
-                    </td>
-                    <td style={{ textAlign: 'right' }}>{formatRp(Math.round((parseQty(isi[i].fisik) * isi[i].harga) / 1000))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-sm">Nilai persediaan awal: <strong>{formatRp(total)}</strong></p>
-          <Galat teks={error} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
-            <Button type="submit" disabled={busy || items.length === 0}>{busy ? 'Menyimpan…' : 'Mulai kartu stok'}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** Stok opname: isi hasil hitung fisik; barang yang dikosongkan tidak ikut dihitung. */
-export function OpnameDialog({ items, mulai, onClose, onDone }: { items: StokRow[]; mulai: string; onClose: () => void; onDone: () => void }) {
-  const [tanggal, setTanggal] = useState(hariIni)
-  const [ket, setKet] = useState('')
-  const [fisik, setFisik] = useState<Record<number, string>>({})
-  const [cari, setCari] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const tampil = items.filter((it) => (it.nama + ' ' + it.sku).toLowerCase().includes(cari.trim().toLowerCase()))
-  const diisi = Object.entries(fisik).filter(([, v]) => v.trim() !== '')
-
-  async function kirim(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await stokOpname({ tanggal, keterangan: ket, baris: diisi.map(([id, v]) => ({ stok_id: Number(id), fisik: parseQty(v) })) })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-      setBusy(false)
-    }
-  }
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
-        <form onSubmit={kirim} className="grid gap-3">
-          <DialogHeader>
-            <DialogTitle>Stok opname</DialogTitle>
-            <DialogDescription>Isi jumlah hasil hitung fisik. Selisih dengan stok sistem dicatat sebagai penyesuaian (barang hilang, rusak, atau salah catat). Barang yang tidak diisi tidak berubah.</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-wrap gap-3">
-            <div className="grid gap-1.5"><Label htmlFor="op-tgl">Tanggal</Label>
-              <Input id="op-tgl" type="date" min={mulai} required value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
-            <div className="grid flex-1 gap-1.5" style={{ minWidth: 200 }}><Label htmlFor="op-ket">Keterangan</Label>
-              <Input id="op-ket" placeholder="mis. Opname akhir bulan" value={ket} onChange={(e) => setKet(e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label htmlFor="op-cari">Cari barang</Label>
-              <Input id="op-cari" value={cari} onChange={(e) => setCari(e.target.value)} /></div>
-          </div>
-          <div className="table-scroll" style={{ maxHeight: 360 }}>
-            <table className="data-table tabular" style={{ minWidth: 560 }}>
-              <thead><tr><th>Barang</th><th style={{ textAlign: 'right' }}>Stok sistem</th><th style={{ textAlign: 'right' }}>Hitung fisik</th><th style={{ textAlign: 'right' }}>Selisih</th></tr></thead>
-              <tbody>
-                {tampil.map((it) => {
-                  const v = fisik[it.id] ?? ''
-                  const selisih = v.trim() === '' ? null : parseQty(v) - it.jumlah_mili
-                  return (
-                    <tr key={it.id}>
-                      <td><div className="font-semibold">{it.nama}</div><div className="text-xs text-muted-foreground">{it.sku || it.kategori}</div></td>
-                      <td style={{ textAlign: 'right', color: it.minus ? RED : undefined }}>{formatQty(it.jumlah_mili)} {it.satuan}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <Input aria-label={`Hitung fisik ${it.nama}`} inputMode="decimal" className="tabular" style={{ width: 110, textAlign: 'right', marginLeft: 'auto' }}
-                          value={v} placeholder="—" onChange={(e) => setFisik({ ...fisik, [it.id]: e.target.value.replace(/[^\d.,]/g, '') })} />
-                      </td>
-                      <td style={{ textAlign: 'right', color: selisih === null || selisih === 0 ? 'var(--text-muted)' : selisih < 0 ? RED : GREEN }}>
-                        {selisih === null ? '' : `${selisih > 0 ? '+' : ''}${formatQty(selisih)}`}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Galat teks={error} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
-            <Button type="submit" disabled={busy || diisi.length === 0}>{busy ? 'Menyimpan…' : `Simpan opname (${diisi.length} barang)`}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 /** Beli bahan/barang: transaksi "Beli Bahan / Stok" yang memilih barang → stok & HPP (FIFO / rata-rata). */
 export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; onClose: () => void; onDone: () => void }) {
