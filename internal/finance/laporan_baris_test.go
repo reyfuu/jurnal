@@ -173,7 +173,7 @@ func TestValidasiPeriodeBanding(t *testing.T) {
 func TestRenderLaporanPDF(t *testing.T) {
 	var buf bytes.Buffer
 	bag := []BagianLaporan{BagianLabaRugi(contohLabaRugi()), BagianNeraca(BalanceSheet{})}
-	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", bag, nil); err != nil {
+	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", "", bag, nil); err != nil {
 		t.Fatal(err)
 	}
 	s := buf.String()
@@ -194,7 +194,7 @@ func TestRenderLaporanPDFAsetDanHalamanPanjang(t *testing.T) {
 	}
 	aset.TotalHargaPerolehan = 80_000_000
 	var buf bytes.Buffer
-	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", nil, &aset); err != nil {
+	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", "", nil, &aset); err != nil {
 		t.Fatal(err)
 	}
 	s := buf.String()

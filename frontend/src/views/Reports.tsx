@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AmountRow, PageHeader } from '@/components/PageHeader'
@@ -6,8 +6,9 @@ import { Aset } from '@/views/Aset'
 import { LaporanAI } from '@/views/LaporanAI'
 import { BandingLaporan } from '@/views/BandingLaporan'
 import { ekspor } from '@/lib/garansi'
-import { daftarUrl, laporanPdfUrl, type AssetSummary, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
+import { daftarUrl, getLaporanRentang, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
+import { pilihanCepat, rentangBulan } from '@/lib/rentang'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -54,22 +55,42 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
   const [tab, setTab] = useState<Tab>(() => TABS.find((t) => t.id === tabAwal)?.id ?? 'laba-rugi')
   const [metode, setMetode] = useState<Metode>('langsung')
   const bagianTab: BagianPDF | null = tab === 'laba-rugi' || tab === 'neraca' || tab === 'arus-kas' || tab === 'aset' ? tab : null
+  // Rentang tanggal laba rugi & arus kas; bawaan = sebulan penuh periode yang dipilih.
+  const [rentang, setRentang] = useState(() => rentangBulan(period))
+  const [hasil, setHasil] = useState<{ kunci: string; d?: LaporanRentang; error?: string } | null>(null)
+  useEffect(() => { setRentang(rentangBulan(period)) }, [period])
+  const bulanan = rentangBulan(period)
+  const custom = rentang.dari !== bulanan.dari || rentang.sampai !== bulanan.sampai
+  const kunci = `${rentang.dari}|${rentang.sampai}`
+  const salah = rentang.dari && rentang.sampai && rentang.dari > rentang.sampai ? 'Tanggal sampai tidak boleh sebelum tanggal dari.' : ''
+  useEffect(() => {
+    if (!custom || salah || !rentang.dari || !rentang.sampai) return
+    let hidup = true
+    getLaporanRentang(rentang.dari, rentang.sampai).then((d) => hidup && setHasil({ kunci, d }), (e: Error) => hidup && setHasil({ kunci, error: e.message }))
+    return () => { hidup = false }
+  }, [custom, salah, kunci, rentang.dari, rentang.sampai])
+  const dataRentang = custom && hasil?.kunci === kunci ? hasil.d : undefined
+  const rr = custom ? dataRentang?.income : r
+  const cff = custom ? dataRentang?.cashflow : cf
+  const labelRentang = custom ? (dataRentang?.label ?? 'memuat…') : periodLabel
+  const pakaiRentang = custom && (tab === 'laba-rugi' || tab === 'arus-kas')
+  const pdfRentang = custom && !salah ? rentang : undefined
 
   return (
     <>
-      <PageHeader title="Laporan Keuangan" subtitle={`${periodLabel} · ${SUBTITLE[tab]}`}>
+      <PageHeader title="Laporan Keuangan" subtitle={`${pakaiRentang ? labelRentang : periodLabel} · ${SUBTITLE[tab]}`}>
         {(tab === 'laba-rugi' || tab === 'neraca') && (
           <span className={'pill-status ' + (bs.is_balanced ? 'pill-green' : 'pill-amber')}>
             {bs.is_balanced ? 'Aktiva = Pasiva (Seimbang)' : 'Aktiva ≠ Pasiva, periksa data'}
           </span>
         )}
         {bisaEkspor && bagianTab && (
-          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined))}>
+          <Button variant="outline" onClick={() => void ekspor(laporanPdfUrl(period, bagianTab, bagianTab === 'arus-kas' ? metode : undefined, bagianTab === 'laba-rugi' || bagianTab === 'arus-kas' ? pdfRentang : undefined))}>
             <FileDown /> Unduh PDF {TABS.find((t) => t.id === tab)?.label}
           </Button>
         )}
         {bisaEkspor && tab !== 'banding' && (
-          <Button onClick={() => void ekspor(laporanPdfUrl(period, 'semua', metode))} title="Laba Rugi, Neraca, dan Arus Kas dalam satu PDF">
+          <Button onClick={() => void ekspor(laporanPdfUrl(period, 'semua', metode, pdfRentang))} title="Laba Rugi, Neraca, dan Arus Kas dalam satu PDF">
             <FileDown /> Unduh semua laporan (PDF)
           </Button>
         )}
@@ -98,9 +119,33 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
         ))}
       </div>
 
-      {tab === 'laba-rugi' && <LabaRugi r={r} cf={cf} />}
+      {(tab === 'laba-rugi' || tab === 'arus-kas') && (
+        <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1"><span className="kpi-label">Dari tanggal</span>
+              <input className="input-field" type="date" value={rentang.dari} onChange={(e) => setRentang({ ...rentang, dari: e.target.value })} /></label>
+            <label className="grid gap-1"><span className="kpi-label">Sampai tanggal</span>
+              <input className="input-field" type="date" value={rentang.sampai} onChange={(e) => setRentang({ ...rentang, sampai: e.target.value })} /></label>
+            <div className="flex flex-wrap gap-1.5">
+              {pilihanCepat(period).map((p) => (
+                <button key={p.label} type="button" className="pill-status" style={{ cursor: 'pointer', outline: rentang.dari === p.dari && rentang.sampai === p.sampai ? '1px solid var(--text-brand)' : undefined }}
+                  onClick={() => setRentang({ dari: p.dari, sampai: p.sampai })}>{p.label}</button>
+              ))}
+            </div>
+          </div>
+          {salah && <p className="pill-status pill-red" role="alert" style={{ marginTop: 10 }}>{salah}</p>}
+          {custom && hasil?.kunci === kunci && hasil.error && <p className="pill-status pill-red" role="alert" style={{ marginTop: 10 }}>{hasil.error}</p>}
+          <p className="text-xs text-muted-foreground" style={{ marginTop: 8 }}>
+            {custom ? <><strong>{labelRentang}</strong>. </> : null}
+            Penyusutan aset dihitung sebulan penuh untuk tiap bulan yang akhir bulannya masuk rentang. Neraca tetap posisi akhir periode {periodLabel}.
+          </p>
+        </div>
+      )}
+      {tab === 'laba-rugi' && (rr && cff ? <LabaRugi r={rr} cf={cff} /> : <p className="workspace-subtitle">Menghitung laporan…</p>)}
       {tab === 'neraca' && <Neraca bs={bs} kartuAktif={!!r.hpp_stok} />}
-      {tab === 'arus-kas' && <ArusKas cf={cf} netProfit={r.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!r.hpp_stok} />}
+      {tab === 'arus-kas' && (rr && cff
+        ? <ArusKas cf={cff} netProfit={rr.net_profit} metode={metode} setMetode={setMetode} kartuAktif={!!rr.hpp_stok} />
+        : <p className="workspace-subtitle">Menghitung laporan…</p>)}
       {tab === 'banding' && <BandingLaporan periods={periods} period={period} bisaEkspor={bisaEkspor} />}
       {tab === 'aset' && <Aset data={assets} onChanged={onAssetsChanged} />}
       {tab === 'ai' && <LaporanAI key={period} period={period} />}

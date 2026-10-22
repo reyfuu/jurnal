@@ -164,13 +164,18 @@ func akuntansi(n int64) string {
 }
 
 // RenderLaporanPDF mencetak laporan satu periode; aset (boleh nil) dicetak sebagai register.
-func RenderLaporanPDF(w io.Writer, usaha, labelPeriode string, bagian []BagianLaporan, aset *AssetSummary) error {
+// labelNeraca: periode posisi neraca ("" = sama dengan labelPeriode); berbeda bila laba rugi &
+// arus kas memakai rentang tanggal ("15 Januari 2026 s.d. 15 Desember 2026").
+func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagian []BagianLaporan, aset *AssetSummary) error {
 	c := cetakBaru(pdf.New(), usaha)
 	isi := c.kanan - c.kiri
+	if labelNeraca == "" {
+		labelNeraca = labelPeriode
+	}
 	for _, b := range bagian {
 		sub := "Periode " + labelPeriode + " - dalam Rupiah"
 		if b.Kode == "neraca" {
-			sub = "Posisi per akhir " + labelPeriode + " - dalam Rupiah"
+			sub = "Posisi per akhir " + labelNeraca + " - dalam Rupiah"
 		}
 		c.halaman(b.Judul, sub)
 		kolom := []kolomPDF{{judul: "KETERANGAN", lebar: isi - 140}, {judul: "JUMLAH (RP)", lebar: 140, kanan: true}}
