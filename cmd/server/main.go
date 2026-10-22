@@ -1066,6 +1066,10 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
+	if ok && t.Jenis == finance.JenisPindahDana { // rekening asal (Lawan) hanya bisa dipilih di Catat
+		http.Error(w, "pindah dana dicatat lewat Catat: pilih rekening asal dan rekening tujuan", http.StatusBadRequest)
+		return t, false
+	}
 	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)

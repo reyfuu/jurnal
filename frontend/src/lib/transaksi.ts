@@ -40,7 +40,7 @@ export function summarize(txs: Tx[], jenis: JenisInfo[]) {
     count: txs.length,
     masuk: sum(isMasuk),
     omzet: sum((p) => p === 'omzet'),
-    keluar: sum((p) => !isMasuk(p)),
+    keluar: sum((p) => !isMasuk(p) && p !== 'pindah'), // pindah dana antar rekening bukan pengeluaran
     biayaUsaha: sum((p) => ['hpp', 'biaya', 'potongan'].includes(p)),
   }
 }

@@ -128,6 +128,9 @@ func PecahCatat(baris []BarisCatat, akun []Account, p finance.BusinessProfile, p
 	semuaLawan := func(xs []bagian) bool {
 		return !slices.ContainsFunc(xs, func(x bagian) bool { return x.lawan == "" })
 	}
+	semuaRekening := func(xs []bagian) bool {
+		return !slices.ContainsFunc(xs, func(x bagian) bool { return x.lawan != LawanRekening })
+	}
 	var pokok, lawan []bagian
 	masuk := false
 	switch {
@@ -136,7 +139,11 @@ func PecahCatat(baris []BarisCatat, akun []Account, p finance.BusinessProfile, p
 	case semuaLawan(debit) && !semuaLawan(kredit):
 		pokok, lawan, masuk = kredit, debit, true
 	case semuaLawan(debit) && semuaLawan(kredit):
-		return nil, errors.New("perpindahan antar kas/bank/piutang/utang belum bisa lewat Catat cepat; catat pelunasan di menu Piutang & Utang")
+		// antar rekening sendiri = Pindah Dana; piutang/utang tetap lewat menu Piutang & Utang
+		if !semuaRekening(debit) || !semuaRekening(kredit) {
+			return nil, errors.New("pelunasan piutang/utang dicatat di menu Piutang & Utang; Catat cepat hanya untuk pindah dana antar Kas/Bank")
+		}
+		pokok, lawan = debit, kredit
 	default:
 		return nil, errors.New("satu sisi harus berisi akun Kas/Bank, Piutang Usaha, atau Utang Usaha saja (sisi pembayaran); sisi lainnya akun pendapatan, beban, persediaan, atau aset")
 	}
@@ -148,17 +155,28 @@ func PecahCatat(baris []BarisCatat, akun []Account, p finance.BusinessProfile, p
 	var out []finance.Transaction
 	li := 0
 	for _, po := range pokok {
-		jenis, err := JenisUntukAkun(po.a, masuk, p, peta)
-		if err != nil {
-			return nil, err
+		jenis := finance.JenisPindahDana
+		if po.lawan != LawanRekening {
+			var err error
+			if jenis, err = JenisUntukAkun(po.a, masuk, p, peta); err != nil {
+				return nil, err
+			}
 		}
 		for sisa := po.n; sisa > 0; {
 			l := &lawan[li]
 			n := min(sisa, l.n)
 			t := finance.Transaction{Jenis: jenis, Nominal: n, Keterangan: po.b.Keterangan, Akun: po.a.Kode, Lunas: l.lawan == LawanRekening}
-			if t.Lunas {
+			if jenis == finance.JenisPindahDana {
+				if l.lawan != LawanRekening || l.a.Kode == po.a.Kode {
+					return nil, fmt.Errorf("pindah dana: rekening asal dan tujuan harus Kas/Bank yang berbeda (%s %s)", po.a.Kode, po.a.Nama)
+				}
+				if masuk { // pokok di sisi kredit = rekening asal
+					t.Akun, t.Lawan = l.a.Kode, po.a.Kode
+				}
+			}
+			if t.Lunas && t.Lawan == "" {
 				t.Lawan = l.a.Kode
-			} else {
+			} else if !t.Lunas {
 				t.JatuhTempo = l.b.JatuhTempo
 			}
 			out = append(out, t)

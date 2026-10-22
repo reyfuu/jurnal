@@ -162,7 +162,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
   }
 
   const masukJenis = jenis.filter((j) => j.arah === 'masuk')
-  const keluarJenis = jenis.filter((j) => j.arah === 'keluar')
+  // Pindah Dana hanya lewat Catat (perlu rekening asal & tujuan)
+  const keluarJenis = jenis.filter((j) => j.arah === 'keluar' && j.pos !== 'pindah')
 
   if (halaman) {
     return (
@@ -301,6 +302,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
             <tbody>
               {urutkan(shown, urut.kunci ? kolomTx[urut.kunci] : undefined, urut.arah).slice(0, limit).map((t) => {
                 const masuk = isMasuk(posOf[t.jenis])
+                const pindah = posOf[t.jenis] === 'pindah' // antar rekening sendiri: bukan masuk/keluar
                 const sub = [t.item && (t.qty_stok ? `${t.item} × ${formatQty(t.qty_stok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (
                   <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
@@ -315,7 +317,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{t.pihak}</td>
                     <td className="tabular" style={{ textAlign: 'right', fontWeight: 600, color: masuk ? 'var(--text-profit)' : 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                      {masuk ? '+' : '-'}{formatRp(t.nominal).replace('Rp', '')}
+                      {pindah ? '⇄ ' : masuk ? '+' : '-'}{formatRp(t.nominal).replace('Rp', '')}
                     </td>
                     <td>
                       {!t.lunas

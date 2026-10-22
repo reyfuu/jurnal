@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"pajak/internal/finance"
 	"strconv"
 	"testing"
 
@@ -91,5 +92,48 @@ func TestCatat_KeteranganKepalaBertahanSaatDiubah(t *testing.T) {
 	lama := buatCatat(`{"tanggal":"2026-01-11","baris":[{"akun":"6106","keterangan":"Ongkir","debit":10000},{"akun":"6190","keterangan":"Lain-lain","debit":5000},{"akun":"1101","kredit":15000}]}`)
 	if g := getJSON[catatResp](t, srv, qa, lama); g.Keterangan != "Ongkir; Lain-lain" {
 		t.Fatalf("keterangan per baris lama digabung = %q", g.Keterangan)
+	}
+}
+
+// Checklist tester No 20: pindah dana Bank → Kas dan Kas → Bank menggeser saldo per rekening,
+// tidak mengubah laba, dan saldonya terbawa ke bulan berikutnya.
+func TestCatat_PindahDanaAntarRekening(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Kas","kategori":"kas","nominal":100000},{"nama":"Bank","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1100000}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	for _, body := range []string{
+		`{"tanggal":"2026-01-10","keterangan":"Tarik tunai","baris":[{"akun":"1101","debit":300000},{"akun":"1102","kredit":300000}]}`,
+		`{"tanggal":"2026-01-20","keterangan":"Setor ke bank","baris":[{"akun":"1102","debit":50000},{"akun":"9102","debit":2500},{"akun":"1101","kredit":52500}]}`,
+	} {
+		if rec := do(srv, qa, http.MethodPost, "/api/v1/catat", body); rec.Code != http.StatusCreated {
+			t.Fatalf("catat: %d %s", rec.Code, rec.Body)
+		}
+	}
+	saldo := func(period string) map[string]int64 {
+		var rep struct {
+			TrialBalance []coa.Balance `json:"trial_balance"`
+		}
+		_ = json.Unmarshal(do(srv, qa, http.MethodGet, "/api/v1/reports/coa?period="+period, "").Body.Bytes(), &rep)
+		out := map[string]int64{}
+		for _, b := range rep.TrialBalance {
+			out[b.Kode] = b.Saldo
+		}
+		return out
+	}
+	for _, period := range []string{"2026-01", "2026-02"} {
+		s := saldo(period)
+		if s["1101"] != 347_500 || s["1102"] != 750_000 {
+			t.Fatalf("%s: kas=%d bank=%d, mau 347.500 & 750.000", period, s["1101"], s["1102"])
+		}
+	}
+	// form transaksi lama tidak bisa memilih rekening asal: harus lewat Catat
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-01-25","jenis":"Pindah Dana","nominal":1000,"lunas":true,"akun":"1101","lawan":"1102"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("form pindah dana harus ditolak: %d", rec.Code)
+	}
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	bs := getJSON[finance.BalanceSheet](t, srv, qa, "/api/v1/reports/balance-sheet?period=2026-01")
+	if is.NetProfit != -2_500 || bs.Assets.Cash != 1_097_500 {
+		t.Fatalf("laba bersih %d (mau -2.500, hanya biaya admin), kas & bank %d", is.NetProfit, bs.Assets.Cash)
 	}
 }

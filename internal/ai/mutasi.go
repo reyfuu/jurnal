@@ -37,6 +37,9 @@ func KelompokkanMutasi(ctx context.Context, c *llm.Client, usaha string, kel []f
 	}
 	var masuk, keluar []string
 	for _, j := range finance.JenisList {
+		if j.Pos == finance.PosPindah { // perlu rekening asal & tujuan; hanya lewat Catat
+			continue
+		}
 		if j.Arah == "masuk" {
 			masuk = append(masuk, j.Nama)
 		} else {

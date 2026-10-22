@@ -29,6 +29,8 @@ export const rekeningBawaan = (o: OpsiCatat) => o.bawaan.bank || o.bawaan.kas
 function barisAwal(jenis: string, o: OpsiCatat): Baris[] {
   const masuk = JENIS_CATAT.find((j) => j.id === jenis)?.masuk ?? false
   const pokok = o.bawaan[jenis] ?? ''
+  // pindah dana: bawaan tarik tunai (Kas di debit, Bank di kredit); keduanya bisa diganti
+  if (jenis === 'Pindah Dana') return [baru({ akun: o.bawaan.kas }), baru({ akun: o.bawaan.bank })]
   return masuk
     ? [baru({ akun: rekeningBawaan(o) }), baru({ akun: pokok })]
     : [baru({ akun: pokok }), baru({ akun: rekeningBawaan(o) })]
