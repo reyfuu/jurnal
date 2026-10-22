@@ -25,14 +25,15 @@ type saldoMinus struct {
 }
 
 // subtypeBolehMinus: laba (rugi) berjalan dan laba (rugi) ditahan boleh minus (rugi) tanpa
-// berarti salah catat, jadi tidak diperingatkan.
+// berarti salah catat, jadi tidak diperingatkan. Kecuali 3299 penampung selisih saldo awal:
+// subtype-nya juga retained, tetapi saldonya minus berarti isian saldo awal yang salah.
 var subtypeBolehMinus = []string{"current_earnings", "retained", "retained_earnings"}
 
 func (s *tenant) saldoMinus(period string) []saldoMinus {
 	out := []saldoMinus{}
 	if j, ok := s.jurnalPeriode(period); ok {
 		for _, b := range j.tb {
-			if b.Saldo >= 0 || slices.Contains(subtypeBolehMinus, b.Subtype) {
+			if b.Saldo >= 0 || slices.Contains(subtypeBolehMinus, b.Subtype) && b.Kode != coa.KodeSelisihSaldoAwal {
 				continue
 			}
 			normal, lawan := "debit", "kredit"

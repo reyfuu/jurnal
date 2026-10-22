@@ -101,6 +101,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const jumlah = (s: string) => tampil.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
   const harta = jumlah('harta'), kewajiban = jumlah('kewajiban'), modal = jumlah('modal')
   const selisih = harta - kewajiban - modal
+  // Laba ditahan minus = rugi tahun lalu, wajar; tidak ikut diperingatkan.
+  const minus = biasa.filter((b) => b.nominal < 0 && b.kategori !== 'laba_ditahan')
   const tanpaKategori = biasa.filter((b) => (b.nama.trim() || b.nominal) && !b.kategori)
   const totalPersediaan = biasa.filter((b) => b.kategori === 'persediaan').reduce((t, b) => t + (b.nominal || 0), 0)
   const nilaiBarang = info?.persediaan ?? 0
@@ -436,10 +438,9 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                   </span>
                 </label>
               )}
-              {biasa.some((b) => b.nominal < 0) && (
+              {minus.length > 0 && (
                 <p className="text-sm" style={{ color: AMBER }}>
-                  Ada saldo minus: {biasa.filter((b) => b.nominal < 0).map((b) => `${b.nama} ${formatRp(b.nominal)}`).join(', ')}. Saldo minus berarti berlawanan dengan saldo normal akunnya
-                  (mis. laba ditahan minus = rugi tahun lalu); pastikan memang begitu.
+                  Ada saldo minus: {minus.map((b) => `${b.nama} ${formatRp(b.nominal)}`).join(', ')}. Saldo minus berarti berlawanan dengan saldo normal akunnya; pastikan memang begitu.
                 </p>
               )}
               {tanpaKategori.length > 0 && (

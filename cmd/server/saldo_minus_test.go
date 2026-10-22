@@ -90,3 +90,19 @@ func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 		t.Fatalf("peringatan: %+v", minus)
 	}
 }
+
+// Checklist tester No 23: laba ditahan minus (rugi tahun lalu) tidak diperingatkan, tetapi
+// 3299 penampung selisih saldo awal yang minus tetap diperingatkan karena berarti salah isi.
+func TestSaldoMinus_LabaDitahanBolehMinus_SelisihSaldoAwalTidak(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	// Harta 1 jt; modal 3 jt, laba ditahan -1 jt → kurang 1 jt, disimpan paksa ke 3299 (debit = minus)
+	body := `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},` +
+		`{"nama":"Modal Pemilik","kategori":"modal","nominal":3000000},{"nama":"Laba Ditahan","kategori":"laba_ditahan","nominal":-1000000}]}`
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening?paksa=1", body); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	minus := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
+	if len(minus) != 1 || minus[0].Kode != coa.KodeSelisihSaldoAwal || minus[0].Nilai != 1_000_000 {
+		t.Fatalf("hanya 3299 yang diperingatkan: %+v", minus)
+	}
+}
