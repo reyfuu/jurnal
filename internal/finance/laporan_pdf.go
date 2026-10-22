@@ -157,21 +157,25 @@ func (c *cetak) selesai(w io.Writer) error {
 
 // angkaBaris: beban (pengurang) ditulis hitam tanpa kurung karena barisnya sudah jelas
 // mengurangi; akun kontra merah dalam kurung; selain itu angka minus (mis. rugi) merah dalam kurung.
-func angkaBaris(r BarisLaporan) (string, bool) {
-	n := r.Nilai
-	if n < 0 {
-		n = -n
-	}
-	switch {
-	case r.Sifat == SifatPengurang:
-		return rupiah(n), false
-	case r.Sifat == SifatKontra:
-		if n == 0 {
+func angkaBaris(r BarisLaporan) (string, bool) { return angkaSifat(r.Nilai, r.Sifat) }
+
+// angkaSifat: beban (pengurang) ditulis hitam tanpa tanda; akun kontra merah dalam kurung;
+// lainnya minus = merah dalam kurung. Beban yang justru menambah laba (nilai positif, mis.
+// koreksi) tetap ditulis dalam kurung supaya arahnya terlihat.
+func angkaSifat(v int64, sifat string) (string, bool) {
+	switch sifat {
+	case SifatPengurang:
+		if v > 0 {
+			return "(" + rupiah(v) + ")", true
+		}
+		return rupiah(-v), false
+	case SifatKontra:
+		if v == 0 {
 			return rupiah(0), false
 		}
-		return "(" + rupiah(n) + ")", true
+		return "(" + rupiah(max(v, -v)) + ")", true
 	}
-	return akuntansi(r.Nilai), r.Nilai < 0
+	return akuntansi(v), v < 0
 }
 
 // akuntansi: angka minus ditulis dalam kurung, kebiasaan laporan keuangan.
@@ -257,7 +261,12 @@ func RenderLaporanPDF(w io.Writer, usaha, labelPeriode, labelNeraca string, bagi
 func RenderBandingPDF(w io.Writer, usaha string, b Banding) error {
 	c := cetakBaru(pdf.NewLandscape(), usaha)
 	n := len(b.Kolom)
-	label := 200.0
+	// Sampai 6 bulan kolom akun cukup lebar untuk label + rumus laba rugi ("G = E - F");
+	// lebih dari itu rumus tidak ditulis (huruf tetap) supaya angka tidak terpotong.
+	label, pakaiRumus := 290.0, n <= 6
+	if !pakaiRumus {
+		label = 200
+	}
 	angka := (c.kanan - c.kiri - label) / float64(n+1)
 	// Huruf terbesar yang masih memuat angka terlebar di kolomnya.
 	terlebar := "(000.000.000)"
@@ -283,7 +292,11 @@ func RenderBandingPDF(w io.Writer, usaha string, b Banding) error {
 	}
 	for _, bg := range b.Bagian {
 		c.halaman("Perbandingan "+bg.Judul, fmt.Sprintf("%d bulan: %s - dalam Rupiah. Kolom Total: laba rugi & arus kas dijumlahkan; neraca dan saldo kas akhir memakai posisi bulan terakhir.", n, rentang))
+		berhuruf := slices.ContainsFunc(bg.Baris, func(r BarisBanding) bool { return r.Huruf != "" })
 		kolom := []kolomPDF{{judul: "AKUN", lebar: label}}
+		if berhuruf {
+			kolom = []kolomPDF{{judul: "", lebar: 18}, {judul: "AKUN", lebar: label - 18}}
+		}
 		for _, k := range b.Kolom {
 			judul := k.Label
 			if pdf.Width(judul, pdf.Bold, c.ukuran) > angka-6 {
@@ -298,11 +311,19 @@ func RenderBandingPDF(w io.Writer, usaha string, b Banding) error {
 		kolom = append(kolom, kolomPDF{judul: judulTotal, lebar: angka, kanan: true})
 		var baris []barisPDF
 		for _, r := range bg.Baris {
-			bp := barisPDF{sel: []string{r.Label}, gaya: r.Gaya, minus: []bool{false}}
+			lbl := r.Label
+			if r.Rumus != "" && pakaiRumus {
+				lbl += " (" + r.Rumus + ")"
+			}
+			bp := barisPDF{sel: []string{lbl}, gaya: r.Gaya, minus: []bool{false}}
+			if berhuruf {
+				bp.sel, bp.minus = []string{r.Huruf, lbl}, []bool{false, false}
+			}
 			if r.Gaya != GayaJudul {
 				for _, v := range append(slices.Clone(r.Nilai), r.Total) {
-					bp.sel = append(bp.sel, akuntansi(v))
-					bp.minus = append(bp.minus, v < 0)
+					teks, merah := angkaSifat(v, r.Sifat)
+					bp.sel = append(bp.sel, teks)
+					bp.minus = append(bp.minus, merah)
 				}
 			}
 			baris = append(baris, bp)

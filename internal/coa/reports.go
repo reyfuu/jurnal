@@ -146,7 +146,7 @@ func BalanceSheet(tb []Balance, labaBerjalan int64) BalanceSheetResult {
 		Liabilitas: []BalanceSection{sec(LiabilitasPendek), sec(LiabilitasJangka)},
 		Ekuitas:    sec(Ekuitas),
 	}
-	r.Ekuitas.Lines = append(r.Ekuitas.Lines, ReportLine{"", "Laba Tahun Berjalan", labaBerjalan})
+	r.Ekuitas.Lines = append(r.Ekuitas.Lines, ReportLine{"", "Laba (Rugi) Tahun Berjalan", labaBerjalan})
 	r.Ekuitas.Total += labaBerjalan
 	for _, s := range r.Aset {
 		r.TotalAset += s.Total

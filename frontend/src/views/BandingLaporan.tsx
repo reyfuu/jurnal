@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { angkaSifat } from '@/lib/angkaLaporan'
 import { Check, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { bandingPdfUrl, getBanding, MAKS_BANDING, type Banding, type BagianBanding, type PeriodOption } from '@/lib/api'
@@ -110,9 +111,15 @@ function TabelBanding({ b, kolom }: { b: BagianBanding; kolom: Banding['kolom'] 
               const pct = r.nilai[0] !== 0 ? (selisih / Math.abs(r.nilai[0])) * 100 : null
               return (
                 <tr key={r.kunci} className={tebal}>
-                  <td style={{ ...sticky, paddingLeft: r.gaya === 'sub' ? 28 : undefined, color: r.gaya === 'sub' ? 'var(--text-muted)' : undefined }}>{r.label}</td>
-                  {r.nilai.map((v, i) => <td key={i} style={{ textAlign: 'right', color: v < 0 ? 'var(--text-danger)' : undefined }}>{angka(v)}</td>)}
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: r.total < 0 ? 'var(--text-danger)' : undefined }}>{angka(r.total)}</td>
+                  <td style={{ ...sticky, paddingLeft: r.gaya === 'sub' ? 28 : undefined, color: r.gaya === 'sub' ? 'var(--text-muted)' : undefined }}>
+                    {r.huruf && <span style={{ display: 'inline-block', width: 18, fontWeight: 700, color: 'var(--text-muted)' }}>{r.huruf}</span>}
+                    {r.label}
+                    {r.rumus && <span style={{ display: 'block', paddingLeft: r.huruf ? 18 : 0, fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>{r.rumus}</span>}
+                  </td>
+                  {[...r.nilai, r.total].map((v, i) => {
+                    const a = angkaSifat(v, r.sifat ?? '')
+                    return <td key={i} style={{ textAlign: 'right', fontWeight: i === r.nilai.length ? 700 : undefined, color: a.merah ? 'var(--text-danger)' : undefined }}>{a.teks}</td>
+                  })}
                   {dua && <>
                     <td style={{ textAlign: 'right', color: selisih < 0 ? 'var(--text-danger)' : selisih > 0 ? 'var(--accent-green)' : undefined }}>{angka(selisih)}</td>
                     <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{pct === null ? '—' : `${pct > 0 ? '+' : ''}${pct.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`}</td>

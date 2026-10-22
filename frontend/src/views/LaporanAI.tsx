@@ -81,7 +81,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
     <>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginBottom: 14 }}>
         <KPI label="Omzet" v={lr.omzet} banding={lr.omzet_sebelumnya} />
-        <KPI label="Laba Bersih" v={lr.laba_bersih} banding={lr.laba_sebelumnya} warna={lr.laba_bersih >= 0 ? GREEN : RED} />
+        <KPI label="Laba (Rugi) Bersih" v={lr.laba_bersih} banding={lr.laba_sebelumnya} warna={lr.laba_bersih >= 0 ? GREEN : RED} />
         <KPI label="Margin Laba" teks={persenBps(lr.margin_bps)} warna={SOROT} />
         <KPI label="Saldo Kas Akhir" v={f.arus_kas.saldo_akhir} warna={BLUE} />
       </div>
@@ -90,11 +90,11 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
         <Kartu judul="Laba Rugi">
           <Baris l="Omzet" v={lr.omzet} />
           <Baris l="Harga pokok penjualan" v={-lr.hpp} />
-          <Baris l="Laba kotor" v={lr.laba_kotor} tebal />
+          <Baris l="Laba (rugi) kotor" v={lr.laba_kotor} tebal />
           <Baris l="Beban operasional" v={-lr.beban_operasional} />
           <Baris l="Beban penyusutan" v={-lr.penyusutan} />
           <Baris l="Beban amortisasi" v={-lr.amortisasi} />
-          <Baris l="Laba bersih" v={lr.laba_bersih} tebal warna={lr.laba_bersih >= 0 ? GREEN : RED} />
+          <Baris l="Laba (rugi) bersih tahun berjalan" v={lr.laba_bersih} tebal warna={lr.laba_bersih >= 0 ? GREEN : RED} />
         </Kartu>
 
         <Kartu judul="Arus Kas">
@@ -179,7 +179,7 @@ function RincianLaporan({ f }: { f: BusinessFacts }) {
                 <tr>
                   <th>Bulan</th>
                   <th style={{ textAlign: 'right' }}>Omzet</th>
-                  <th style={{ textAlign: 'right' }}>Laba Bersih</th>
+                  <th style={{ textAlign: 'right' }}>Laba (Rugi) Bersih</th>
                   <th style={{ textAlign: 'right' }}>Saldo Kas</th>
                 </tr>
               </thead>
@@ -271,7 +271,7 @@ function AnalisisAI({ a, llm, profil, f }: { a: AIReport['analysis']; llm: AIRep
         {lr && (
           <div className="ai-angka tabular">
             <div><span>Omzet</span><strong>{formatRp(lr.omzet)}</strong></div>
-            <div><span>Laba bersih</span><strong style={{ color: lr.laba_bersih >= 0 ? 'var(--ai-hijau)' : 'var(--ai-merah)' }}>{formatRp(lr.laba_bersih)}</strong></div>
+            <div><span>Laba (rugi) bersih</span><strong style={{ color: lr.laba_bersih >= 0 ? 'var(--ai-hijau)' : 'var(--ai-merah)' }}>{formatRp(lr.laba_bersih)}</strong></div>
             <div><span>Margin</span><strong>{persenBps(lr.margin_bps)}</strong></div>
             <div><span>Kas akhir</span><strong>{formatRp(f!.arus_kas.saldo_akhir)}</strong></div>
           </div>

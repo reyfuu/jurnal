@@ -61,14 +61,14 @@ export function LaporanKeuanganCoA({ period, periodLabel }: { period: string; pe
             <Lines lines={is.hpp_lines} />
             {is.metode === 'periodik' && <AmountRow label={<><span className="tabular" style={{ color: 'var(--text-muted)', marginRight: 8 }}>1301</span>Persediaan akhir</>} value={formatRp(-is.persediaan_akhir)} />}
             <AmountRow label={is.metode === 'periodik' ? 'Harga pokok penjualan (periodik: awal + pembelian - akhir)' : `Harga pokok penjualan (${is.metode}: dari kartu stok)`} value={formatRp(-is.hpp)} color={RED} bold />
-            <AmountRow label="Laba kotor" value={formatRp(is.laba_kotor)} bold />
+            <AmountRow label="Laba (rugi) kotor" value={formatRp(is.laba_kotor)} bold />
             <Lines lines={is.beban_operasional} negate />
             <AmountRow label="Total beban operasional" value={formatRp(-is.total_beban_operasional)} color={RED} bold />
             <AmountRow label="EBITDA (sebelum penyusutan 6113 & amortisasi 6118)" value={formatRp(is.ebitda)} />
-            <AmountRow label="Laba usaha (EBIT)" value={formatRp(is.laba_usaha)} bold />
+            <AmountRow label="Laba (rugi) usaha (EBIT)" value={formatRp(is.laba_usaha)} bold />
             <Lines lines={is.pendapatan_lain} />
             <Lines lines={is.beban_lain} negate />
-            <AmountRow label="Laba bersih" value={formatRp(is.laba_bersih)} color={GREEN} bold />
+            <AmountRow label="Laba (rugi) bersih tahun berjalan" value={formatRp(is.laba_bersih)} color={is.laba_bersih < 0 ? RED : GREEN} bold />
           </div>
           {(is.catatan ?? []).map((c) => <p key={c} className="kpi-meta-row" style={{ marginTop: 10 }}>{c}</p>)}
         </div>

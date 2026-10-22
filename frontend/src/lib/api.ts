@@ -1884,6 +1884,8 @@ export interface BarisBanding {
   /** Isi kolom Total: jumlah (laba rugi, arus kas), awal (saldo awal), akhir (neraca, saldo akhir). */
   agregat?: 'jumlah' | 'awal' | 'akhir'
   nilai: number[]; total: number
+  /** Laba rugi opsi B: huruf baris, rumus baris jumlah, sifat angka (lib/angkaLaporan). */
+  huruf?: string; rumus?: string; sifat?: '' | 'pengurang' | 'kontra'
 }
 export interface BagianBanding { kode: 'laba-rugi' | 'neraca' | 'arus-kas'; judul: string; baris: BarisBanding[] }
 export interface Banding { kolom: { periode: string; label: string }[]; bagian: BagianBanding[] }
