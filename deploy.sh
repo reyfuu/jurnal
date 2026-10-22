@@ -13,6 +13,8 @@ APP_PORT="${1:-8085}"
 # Di produksi diambil dari LLM_ENV_FILE (default /var/www/jurnal/.env, 9Router di host lewat
 # http://172.16.4.1:20128/v1; ufw membuka 20128 untuk 172.16.4.0/24). LLM_MODEL boleh daftar
 # berurutan "utama,cadangan". Baris LLM_* di .env repo ini menimpanya bila diisi.
+# LLM_VISION_API_KEY / LLM_VISION_BASE_URL / LLM_VISION_MODEL (opsional): model pembaca foto nota
+# (Catat transaksi → Dari foto), mis. OpenAI gpt-4o-mini di https://api.openai.com/v1. Kosong = ikut LLM_*.
 # MASTER_EMAIL + MASTER_PASSWORD (opsional, di .env): membuat akun Master pertama Panel Master
 # sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
@@ -76,6 +78,9 @@ docker run -d \
   -e LLM_BASE_URL="${LLM_BASE_URL:-}" \
   -e LLM_MODEL="${LLM_MODEL:-}" \
   -e LLM_TIMEOUT="${LLM_TIMEOUT:-}" \
+  -e LLM_VISION_API_KEY="${LLM_VISION_API_KEY:-}" \
+  -e LLM_VISION_BASE_URL="${LLM_VISION_BASE_URL:-}" \
+  -e LLM_VISION_MODEL="${LLM_VISION_MODEL:-}" \
   -e DATA_DIR=/data \
   -v "$(pwd)/data:/data" \
   -e REGULASI_DIR=/peraturan \
