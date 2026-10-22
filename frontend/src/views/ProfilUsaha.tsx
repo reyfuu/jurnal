@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { getMetodeStok, getWilayah, saranKLU, saveBusiness, type MetodeNilaiStok, type MetodeStok, type Option, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
-import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
+import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, formatROI, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 import { cekLabaOmzet } from '@/lib/kalkulator'
 
 const EMPTY: BusinessProfile = { nama_usaha: '', jenis_usaha: '' as JenisUsaha, bentuk_usaha: '' as BentukUsaha, ptkp: '', pkp: false, metode_persediaan: 'periodik' }
@@ -386,7 +386,15 @@ export function ProfilForm({ info, onSaved, submitLabel }: { info: BusinessInfo;
           <Label htmlFor="biz-laba">Laba bersih per tahun</Label>
           <Input id="biz-laba" className="tabular" value={tampilRp(String(p.laba_sebelum_pajak ?? ''))} onChange={(e) => set({ laba_sebelum_pajak: parseRp(e.target.value) || 0 })} placeholder="Rp0 (minus = rugi)" />
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional dan Perencanaan Pajak selama belum ada data transaksi.</p>
+        <div className="grid gap-1.5">
+          <Label htmlFor="biz-modal">Modal yang ditanam</Label>
+          <Input id="biz-modal" className="tabular" inputMode="numeric" value={p.modal_awal ? formatRp(p.modal_awal) : ''} onChange={(e) => set({ modal_awal: Math.max(0, parseRp(e.target.value) || 0) })} placeholder="Rp0" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>ROI tahun pertama</Label>
+          <p className="flex h-9 items-center text-sm font-semibold tabular">{p.modal_awal ? `${formatROI(p.laba_sebelum_pajak ?? 0, p.modal_awal)} (laba ÷ modal)` : 'Isi modal untuk menghitung ROI'}</p>
+        </div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">Dipakai untuk cek benchmark nasional, ROI, dan Perencanaan Pajak selama belum ada data transaksi.</p>
         {masalahLabaOmzet && <p className="text-sm text-destructive sm:col-span-2" role="alert">{masalahLabaOmzet}</p>}
       </div>
       <label className="flex items-center gap-3 text-sm" htmlFor="biz-pkp">
@@ -515,7 +523,7 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
               {step === 'nama' ? (
                 <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base" autoComplete="organization" required value={a[step] ?? ''} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder="mis. Kedai Kopi Senja" aria-describedby="onboarding-reason" />
               ) : (
-                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base tabular" inputMode={step === 'laba' ? 'text' : 'numeric'} autoComplete="off" required value={tampilRp(a[step])} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder={step === 'omzet' ? 'mis. Rp750.000.000' : 'mis. Rp90.000.000'} aria-describedby="onboarding-reason" />
+                <Input key={step} id="onboarding-input" className="h-12 px-4 md:text-base tabular" inputMode={step === 'laba' ? 'text' : 'numeric'} autoComplete="off" required value={tampilRp(a[step])} onChange={(e) => setA((x) => ({ ...x, [step]: e.target.value }))} placeholder={step === 'omzet' ? 'mis. Rp750.000.000' : step === 'modal' ? 'mis. Rp150.000.000' : 'mis. Rp90.000.000'} aria-describedby="onboarding-reason" />
               )}
             </div>
           )}

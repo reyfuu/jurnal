@@ -67,6 +67,7 @@ type CekAwalInput struct {
 	BentukUsaha, PTKP, KLU string
 	PKP                    bool
 	Omzet, Laba            int64 // per tahun; laba sebelum pajak (boleh negatif)
+	Modal                  int64 // modal yang ditanam pemilik; 0 = belum diisi (ROI tidak dihitung)
 }
 
 type Risiko struct {
@@ -85,6 +86,10 @@ type CekAwalResult struct {
 	Sumber     string        `json:"sumber"`
 	Risiko     []Risiko      `json:"risiko"`
 	Saran      *SaranBentuk  `json:"saran"` // skema pajak paling hemat; nil bila omzet kosong
+	// ROI tahun pertama = laba / modal; dihitung hanya bila modal diisi.
+	ModalAwal int64  `json:"modal_awal,omitempty"`
+	ROIBps    *int64 `json:"roi_bps,omitempty"`
+	ROIPesan  string `json:"roi_pesan,omitempty"`
 }
 
 func pct(bps int64) string {
@@ -103,8 +108,8 @@ func rp(n int64) string {
 }
 
 // skemaSaatIni: skema PPh yang berlaku untuk bentuk usaha sekarang (sama dengan ringkasan onboarding).
-func skemaSaatIni(bentuk string, omzet int64) string {
-	finalOK := omzet <= P().BatasOmzetUMKM
+func skemaSaatIni(bentuk string, omzet int64, tahunPertama bool) string {
+	finalOK := finalBoleh(omzet, tahunPertama)
 	switch {
 	case bentuk == "op" && finalOK:
 		return SkemaPPOP
@@ -138,6 +143,14 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	r := CekAwalResult{Sumber: aktif.Load().sumber, Risiko: []Risiko{}, Saran: SaranBentukUsaha(in.BentukUsaha, in.PTKP, in.Omzet, in.Laba)}
 	if k, ok := FindKLU(in.KLU); ok {
 		r.KLU = &k
+	}
+	if in.Modal > 0 {
+		roi := mulDiv(in.Laba, 10_000, in.Modal)
+		r.ModalAwal, r.ROIBps = in.Modal, &roi
+		r.ROIPesan = fmt.Sprintf("ROI tahun pertama %s: laba %s dari modal %s.", pct(roi), rp(in.Laba), rp(in.Modal))
+		if in.Laba > 0 {
+			r.ROIPesan += fmt.Sprintf(" Dengan laba setahun yang sama, modal kembali dalam sekitar %s.", lamaBalikModal(in.Modal, in.Laba))
+		}
 	}
 	switch {
 	case in.Omzet <= 0:
@@ -180,7 +193,7 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	}
 	umkm := persenBps(int(pr.UMKMTarifBps))
 	if in.Omzet > pr.BatasOmzetUMKM {
-		add("tinggi", "Tidak bisa memakai PPh Final "+umkm, "Omzet di atas "+rp(pr.BatasOmzetUMKM)+" tidak memenuhi syarat PPh Final UMKM; wajib pembukuan dan tarif umum.")
+		add("sedang", "PPh Final "+umkm+" hanya untuk tahun pertama", "Omzet di atas "+rp(pr.BatasOmzetUMKM)+": PPh Final UMKM masih berlaku sampai akhir tahun pajak saat omzet pertama kali melewati batas. Mulai tahun berikutnya wajib pembukuan dan tarif umum (Pasal 17 / Pasal 31E).")
 	}
 	if in.BentukUsaha == "op" && in.Omzet >= pr.UMKMBebasOP*8/10 && in.Omzet <= pr.UMKMBebasOP {
 		add("info", "Mendekati batas bebas pajak", "Omzet di atas "+rp(pr.UMKMBebasOP)+" per tahun mulai dikenai PPh Final "+umkm+" atas kelebihannya.")
@@ -190,15 +203,13 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 	if in.BentukUsaha != "op" {
 		ptkp = "TK/0"
 	}
-	bu, err := CompareBentukUsaha(in.Omzet, r.NPMBps, ptkp)
+	// perkiraan onboarding = tahun pertama: PPh final tetap boleh walau omzet melewati batas
+	bu, err := compareLaba(in.Omzet, mulDiv(in.Omzet, r.NPMBps, 10_000), ptkp, true)
 	if err != nil {
 		return r
 	}
 	skema := bu.Skema
-	if in.Omzet > pr.BatasOmzetUMKM { // PPh final hanya sampai batas omzet UMKM
-		skema = slices.DeleteFunc(slices.Clone(skema), func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
-	}
-	now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet) })]
+	now := skema[slices.IndexFunc(skema, func(s Skema) bool { return s.ID == skemaSaatIni(in.BentukUsaha, in.Omzet, true) })]
 
 	// CTTOR: pajak skema sekarang / omzet. Untuk PPh Final, pajaknya ditetapkan dari omzet oleh
 	// aturan, jadi angkanya hanya informasi, bukan sinyal risiko.
@@ -214,4 +225,17 @@ func CekAwal(in CekAwalInput) CekAwalResult {
 		r.CTTORPesan = fmt.Sprintf("CTTOR Anda %s, setara atau di atas rata-rata nasional %s.", pct(r.CTTORBps), pct(k.CTTORBps))
 	}
 	return r
+}
+
+// lamaBalikModal: perkiraan waktu modal kembali (modal / laba setahun), dibulatkan ke atas per bulan.
+func lamaBalikModal(modal, labaSetahun int64) string {
+	bulan := (modal*12 + labaSetahun - 1) / labaSetahun
+	switch {
+	case bulan < 12:
+		return fmt.Sprintf("%d bulan", bulan)
+	case bulan%12 == 0:
+		return fmt.Sprintf("%d tahun", bulan/12)
+	default:
+		return fmt.Sprintf("%d tahun %d bulan", bulan/12, bulan%12)
+	}
 }

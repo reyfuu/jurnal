@@ -500,7 +500,7 @@ export const pilihMetodePenyusutan = (metode: MetodePenyusutan) =>
   api<BusinessProfile>('/business/metode-penyusutan', { method: 'POST', body: { metode } })
 
 /** Metode nilai stok usaha: bawaan FIFO; terkunci setelah dipilih atau kartu stok dimulai. */
-export interface MetodeStok { metode: MetodeNilaiStok; terkunci: boolean; pilihan: Option[] }
+export interface MetodeStok { metode: MetodeNilaiStok; terkunci: boolean; pilihan: Option[]; pencatatan: 'periodik' | 'perpetual' }
 export const getMetodeStok = () => api<MetodeStok>('/stok/metode')
 export const pilihMetodeStok = (metode: MetodeNilaiStok) => api<MetodeStok>('/stok/metode', { method: 'POST', body: { metode } })
 
@@ -609,6 +609,8 @@ export interface BusinessProfile {
   /** Perkiraan setahun dari onboarding; laba sebelum pajak boleh negatif (rugi). */
   omzet_tahunan?: number
   laba_sebelum_pajak?: number
+  /** Modal yang ditanam pemilik; dasar ROI tahun pertama (laba ÷ modal). */
+  modal_awal?: number
   /** Lokasi usaha (onboarding); alamat juga dicetak di invoice. */
   alamat?: string
   kecamatan?: string
@@ -669,6 +671,10 @@ export interface CekAwal {
   risiko: { level: 'tinggi' | 'sedang' | 'info'; judul: string; isi: string }[]
   /** Kesimpulan sheet "Bentuk Usaha": skema pajak paling hemat + alasan. null bila omzet kosong. */
   saran: SaranBentuk | null
+  /** ROI tahun pertama (laba ÷ modal); hanya ada bila modal diisi. */
+  modal_awal?: number
+  roi_bps?: number
+  roi_pesan?: string
 }
 export interface SaranBentuk {
   termurah: string; sekarang: string; judul: string; alasan: string[]; catatan: string[]

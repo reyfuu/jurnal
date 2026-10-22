@@ -9,7 +9,7 @@ import {
   createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
   type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type StokRow,
 } from '@/lib/api'
-import { NAMA_METODE, useMetodeStok } from '@/lib/metodeStok'
+import { NAMA_METODE, NAMA_PENCATATAN, useMetodeStok } from '@/lib/metodeStok'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
@@ -117,7 +117,7 @@ export function KartuBarangDialog({ item, onClose }: { item: StokRow; onClose: (
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Kartu stok — {item.nama}</DialogTitle>
-          <DialogDescription>Setiap barang masuk & keluar beserta saldonya. Nilai memakai metode {metode ? NAMA_METODE[metode.metode] : 'nilai stok usaha'}.</DialogDescription>
+          <DialogDescription>Setiap barang masuk & keluar beserta saldonya. Nilai memakai metode {metode ? NAMA_METODE[metode.metode] : 'nilai stok usaha'}.{metode?.pencatatan && <> Pencatatan {NAMA_PENCATATAN[metode.pencatatan]}.</>}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5"><Label htmlFor="kb-dari">Dari</Label><Input id="kb-dari" type="date" value={dari} onChange={(e) => setDari(e.target.value)} /></div>
@@ -254,6 +254,7 @@ export function MutasiStokPanel({ mulai, bisaEkspor }: { mulai: string; bisaEksp
         Rumus: Akhir = Awal + Beli + Hasil produksi − Terjual − Dipakai produksi ± Opname. Terjual berasal dari transaksi Penjualan yang memilih barang;
         nilai memakai metode {metode ? NAMA_METODE[metode.metode] : 'nilai stok usaha'}. Jumlah antarbarang tidak dijumlahkan karena satuannya berbeda.
       </p>
+      {metode?.pencatatan && <p className="text-xs text-muted-foreground"><strong>Cara pencatatan stok ({metode.pencatatan}).</strong> {NAMA_PENCATATAN[metode.pencatatan]}. Bisa diubah di Profil Usaha.</p>}
     </>
   )
 }

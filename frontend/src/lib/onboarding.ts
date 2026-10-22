@@ -5,7 +5,7 @@ import { cekLabaOmzet } from './kalkulator'
 // Onboarding bahasa awam: tiap jawaban dipetakan ke field BusinessProfile.
 // Validasi akhir tetap di backend (finance.BusinessProfile.Validate).
 
-export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'kelamin' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut' | 'hpp'
+export type Field = 'nama' | 'alamat' | 'kecamatan' | 'kota' | 'provinsi' | 'jenis' | 'klu' | 'stok' | 'omzet' | 'laba' | 'bentuk' | 'kelamin' | 'menikah' | 'tanggungan' | 'gabung' | 'pkp' | 'susut' | 'hpp' | 'modal'
 // lokasi: satu layar berisi alamat, kecamatan, kota, provinsi
 export const LOKASI_FIELDS = ['alamat', 'kecamatan', 'kota', 'provinsi'] as const
 export type StepId = Exclude<Field, (typeof LOKASI_FIELDS)[number]> | 'lokasi' | 'ringkasan'
@@ -48,8 +48,8 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
     judul: 'Bagaimana Anda mencatat stok barang?',
     alasan: 'Laba usaha dihitung dari penjualan dikurangi **modal barang yang terjual**. Modal itu baru bisa dihitung kalau kami tahu cara Anda mencatat stok: **dihitung sebulan sekali**, atau **dicatat setiap ada barang masuk dan keluar**. Jawaban ini tidak menambah pekerjaan Anda; kami hanya menyesuaikan cara hitungnya.',
     options: [
-      { value: 'periodik', label: 'Saya menghitung sisa stok sesekali, misalnya setiap akhir bulan', hint: 'Paling umum di UMKM. Pilih ini kalau ragu.' },
-      { value: 'perpetual', label: 'Setiap barang masuk dan keluar langsung saya catat', hint: 'Misalnya dengan aplikasi kasir atau kartu stok, jadi sisa stok selalu diketahui' },
+      { value: 'periodik', label: 'Saya menghitung sisa stok sesekali, misalnya setiap akhir bulan (periodik)', hint: 'Modal barang terjual = stok awal + pembelian - stok akhir hasil hitung. Paling umum di UMKM; pilih ini kalau ragu.' },
+      { value: 'perpetual', label: 'Setiap barang masuk dan keluar langsung saya catat (perpetual)', hint: 'Misalnya dengan aplikasi kasir atau kartu stok; modal barang tercatat setiap kali barang terjual, jadi sisa stok selalu diketahui' },
     ],
   },
   omzet: {
@@ -59,6 +59,10 @@ export const QUESTIONS: Record<Exclude<StepId, 'ringkasan'>, Question> = {
   laba: {
     judul: 'Kira-kira berapa laba bersih usaha per tahun?',
     alasan: 'Omzet dikurangi semua biaya usaha. Kami bandingkan dengan rasio benchmark nasional untuk usaha sejenis. Isi 0 bila impas, atau beri tanda minus bila rugi.',
+  },
+  modal: {
+    judul: 'Berapa modal yang Anda tanam di usaha ini?',
+    alasan: 'Uang pribadi yang dipakai untuk memulai usaha: peralatan, stok awal, sewa, renovasi, dan kas awal. Dipakai menghitung **ROI tahun pertama** (laba ÷ modal), yaitu berapa persen modal yang kembali sebagai laba dalam setahun. Perkiraan kasar sudah cukup.',
   },
   bentuk: {
     judul: 'Usaha Anda terdaftar atas nama siapa?',
@@ -147,6 +151,7 @@ export function steps(a: Answers): StepId[] {
     ...(jualBarang(a) ? ['stok' as const, 'hpp' as const] : []),
     'omzet',
     'laba',
+    'modal',
     'bentuk',
     ...(pribadi(a) ? ['kelamin' as const, 'menikah' as const] : []),
     ...(pribadi(a) && !istri(a) ? ['tanggungan' as const] : []),
@@ -164,7 +169,7 @@ export const masalahLaba = (a: Answers) => {
 }
 
 export const answered = (s: StepId, a: Answers) =>
-  s === 'ringkasan' || (s === 'lokasi' ? LOKASI_FIELDS.every((f) => Boolean(a[f]?.trim())) : s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) && !masalahLaba(a) : Boolean(a[s]?.trim()))
+  s === 'ringkasan' || (s === 'lokasi' ? LOKASI_FIELDS.every((f) => Boolean(a[f]?.trim())) : s === 'omzet' ? parseRp(a.omzet) > 0 : s === 'laba' ? !Number.isNaN(parseRp(a.laba)) && !masalahLaba(a) : s === 'modal' ? parseRp(a.modal) > 0 : Boolean(a[s]?.trim()))
 
 export function toProfile(a: Answers): BusinessProfile {
   const jenis = a.jenis as JenisUsaha
@@ -187,12 +192,17 @@ export function toProfile(a: Answers): BusinessProfile {
     metode_nilai_stok: jenis === 'jasa' ? '' : ((a.hpp as BusinessProfile['metode_nilai_stok']) || 'fifo'),
     omzet_tahunan: parseRp(a.omzet) || 0,
     laba_sebelum_pajak: parseRp(a.laba) || 0,
+    modal_awal: parseRp(a.modal) > 0 ? parseRp(a.modal) : 0,
   }
 }
 
+/** ROI = laba ÷ modal, 2 desimal gaya Indonesia ("15,00%"). */
+export const formatROI = (laba: number, modal: number) =>
+  modal > 0 ? ((laba / modal) * 100).toFixed(2).replace('.', ',') + '%' : '-'
+
 const PAJAK: Record<BentukUsaha, string> = {
   op: 'PPh Final 0,5% dari omzet. Omzet sampai Rp500 juta per tahun bebas pajak.',
-  pt_perorangan: 'PPh Final 0,5% dari seluruh omzet (berlaku untuk badan usaha, tanpa batas bebas Rp500 juta).',
+  pt_perorangan: 'PPh Final 0,5% badan (PTP / PT Perorangan) dari seluruh omzet, tanpa batas bebas Rp500 juta.',
   cv: 'PPh Badan dengan potongan tarif 50% (Pasal 31E) untuk omzet sampai Rp4,8 miliar per tahun.',
   pt: 'PPh Badan dengan potongan tarif 50% (Pasal 31E) untuk omzet sampai Rp4,8 miliar per tahun, ditambah pajak dividen saat laba dibagikan.',
 }
@@ -211,12 +221,15 @@ export function summary(p: BusinessProfile): { judul: string; isi: string }[] {
     ...(p.omzet_tahunan
       ? [{ judul: 'Omzet & laba per tahun', isi: `Omzet ${formatRp(p.omzet_tahunan)}, laba bersih ${formatRp(p.laba_sebelum_pajak ?? 0)}.` }]
       : []),
+    ...(p.modal_awal
+      ? [{ judul: 'Modal & ROI tahun pertama', isi: `Modal ${formatRp(p.modal_awal)}; ROI ${formatROI(p.laba_sebelum_pajak ?? 0, p.modal_awal)} (laba ÷ modal).` }]
+      : []),
     ...(p.metode_persediaan
       ? [{
           judul: 'Pencatatan stok',
           isi: p.metode_persediaan === 'perpetual'
-            ? 'Perpetual: modal barang tercatat setiap kali barang terjual.'
-            : 'Periodik: modal barang dihitung dari pembelian dan hitung stok di akhir periode.',
+            ? 'Perpetual: setiap barang masuk & keluar langsung dicatat; modal barang tercatat setiap kali barang terjual.'
+            : 'Periodik: stok dihitung di akhir periode; modal barang = stok awal + pembelian - stok akhir.',
         }]
       : []),
     ...(p.metode_nilai_stok

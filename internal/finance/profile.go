@@ -32,6 +32,8 @@ type BusinessProfile struct {
 	// selama belum ada data transaksi. Laba sebelum pajak boleh negatif (rugi).
 	OmzetTahunan     int64 `json:"omzet_tahunan,omitempty"`
 	LabaSebelumPajak int64 `json:"laba_sebelum_pajak,omitempty"`
+	// ModalAwal: modal yang ditanam pemilik; dasar ROI tahun pertama (laba / modal).
+	ModalAwal int64 `json:"modal_awal,omitempty"`
 
 	// Identitas penerbit faktur. Semuanya opsional saat onboarding supaya wizard tidak jadi
 	// panjang, tapi dicetak di invoice begitu diisi — faktur tanpa alamat & NPWP penerbit
@@ -142,6 +144,9 @@ func (p *BusinessProfile) Validate() error {
 	if p.OmzetTahunan < 0 {
 		return errors.New("omzet per tahun tidak boleh negatif")
 	}
+	if p.ModalAwal < 0 {
+		return errors.New("modal tidak boleh negatif")
+	}
 	switch {
 	case p.JenisUsaha == "jasa":
 		p.MetodePersediaan = ""
@@ -179,6 +184,6 @@ func (p BusinessProfile) JenisLabel() string {
 func (p BusinessProfile) CekAwal() tax.CekAwalResult {
 	return tax.CekAwal(tax.CekAwalInput{
 		BentukUsaha: p.BentukUsaha, PTKP: p.PTKP, KLU: p.KLU, PKP: p.PKP,
-		Omzet: p.OmzetTahunan, Laba: p.LabaSebelumPajak,
+		Omzet: p.OmzetTahunan, Laba: p.LabaSebelumPajak, Modal: p.ModalAwal,
 	})
 }
