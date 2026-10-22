@@ -2,6 +2,7 @@ package finance
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -122,6 +123,12 @@ func TestSusunBanding(t *testing.T) {
 		t.Fatalf("baris %q tidak ada", k)
 		return BarisBanding{}
 	}
+	if r := cari(lr, "hpp"); r.Huruf != "D" || r.Sifat != SifatPengurang {
+		t.Errorf("banding hpp tanpa huruf/sifat: %+v", r)
+	}
+	if r := cari(lr, "laba_kotor"); r.Rumus != "E = C - D" {
+		t.Errorf("banding rumus: %+v", r)
+	}
 	if r := cari(lr, "laba_bersih"); r.Nilai[0] != 36_000 || r.Nilai[1] != 29_000 || r.Total != 65_000 {
 		t.Errorf("laba bersih %+v", r)
 	}
@@ -173,11 +180,11 @@ func TestValidasiPeriodeBanding(t *testing.T) {
 func TestRenderLaporanPDF(t *testing.T) {
 	var buf bytes.Buffer
 	bag := []BagianLaporan{BagianLabaRugi(contohLabaRugi()), BagianNeraca(BalanceSheet{})}
-	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", bag, nil); err != nil {
+	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", "", bag, nil); err != nil {
 		t.Fatal(err)
 	}
 	s := buf.String()
-	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", "Laba bersih", "36.000", `\(10.000\)`} {
+	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", `Laba \(rugi\) bersih tahun berjalan`, "36.000", `\(10.000\)`} {
 		if !strings.Contains(s, mau) {
 			t.Errorf("PDF tidak memuat %q", mau)
 		}
@@ -194,7 +201,7 @@ func TestRenderLaporanPDFAsetDanHalamanPanjang(t *testing.T) {
 	}
 	aset.TotalHargaPerolehan = 80_000_000
 	var buf bytes.Buffer
-	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", nil, &aset); err != nil {
+	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", "", nil, &aset); err != nil {
 		t.Fatal(err)
 	}
 	s := buf.String()
@@ -228,5 +235,108 @@ func TestRenderBandingPDFLanskap(t *testing.T) {
 func TestLabelPeriode(t *testing.T) {
 	if LabelPeriode("2026-08") != "Agustus 2026" || labelPeriodePendek("2026-02") != "Feb 2026" || labelPeriodePendek("2026-05") != "Mei 2026" {
 		t.Errorf("%q %q %q", LabelPeriode("2026-08"), labelPeriodePendek("2026-02"), labelPeriodePendek("2026-05"))
+	}
+}
+
+// PDF laba rugi: baris berhuruf dengan rumus di baris jumlah; beban hitam tanpa kurung, akun
+// kontra (potongan) dalam kurung hitam; penyusutan & amortisasi = beban, tanpa kurung.
+func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
+	b := BagianLabaRugi(contohLabaRugi())
+	rumus := map[string]string{}
+	for _, r := range b.Baris {
+		rumus[r.Kunci] = r.Rumus
+	}
+	// amortisasi 0 tidak ditampilkan, jadi huruf sesudahnya bergeser dan rumus EBIT tanpa amortisasi
+	if rumus["penjualan_bersih"] != "C = A - B" || rumus["laba_kotor"] != "E = C - D" || rumus["ebit"] != "I = G - H" || rumus["laba_bersih"] != "K = I + J" {
+		t.Fatalf("rumus: %+v", rumus)
+	}
+	if _, ada := rumus["amortisasi"]; ada {
+		t.Error("akun bernilai 0 masih tampil")
+	}
+	var buf bytes.Buffer
+	if err := RenderLaporanPDF(&buf, "Kedai Senja", "Agustus 2026", "", []BagianLaporan{b}, nil); err != nil {
+		t.Fatal(err)
+	}
+	s := buf.String()
+	for _, mau := range []string{`Laba \(rugi\) kotor   \(E = C - D\)`, `\(10.000\)`, "5.000", "30.000", "15.000"} { // potongan: kontra; penyusutan: beban
+		if !strings.Contains(s, mau) {
+			t.Errorf("PDF tidak memuat %q", mau)
+		}
+	}
+	for _, tidak := range []string{`\(30.000\)`, `\(15.000\)`, `\(20.000\)`, `\(5.000\)`} { // HPP, beban, total beban, penyusutan: tanpa kurung
+		if strings.Contains(s, tidak) {
+			t.Errorf("beban tidak boleh dalam kurung: %q", tidak)
+		}
+	}
+}
+
+func TestAngkaSifat_BebanHitamTanpaMinus(t *testing.T) {
+	for _, c := range []struct {
+		v     int64
+		sifat string
+		teks  string
+		merah bool
+	}{
+		{-18_400, SifatPengurang, "18.400", false}, // beban & HPP: hitam, tanpa minus
+		{500, SifatPengurang, "(500)", false},      // beban yang menambah laba (koreksi): tetap hitam
+		{-625, SifatKontra, "(625)", false},        // potongan / akumulasi: kontra, kurung hitam
+		{-1_000, "", "(1.000)", true},              // rugi
+		{2_000, "", "2.000", false},
+	} {
+		if teks, merah := angkaSifat(c.v, c.sifat); teks != c.teks || merah != c.merah {
+			t.Errorf("angkaSifat(%d, %q) = %q %v, mau %q %v", c.v, c.sifat, teks, merah, c.teks, c.merah)
+		}
+	}
+}
+
+func TestTanggalAkhirPeriode(t *testing.T) {
+	for p, mau := range map[string]string{"2026-10": "31 Oktober 2026", "2028-02": "29 Februari 2028", "2026-04": "30 April 2026"} {
+		if got := TanggalAkhirPeriode(p); got != mau {
+			t.Errorf("%s = %q, mau %q", p, got, mau)
+		}
+	}
+	if got := tanggalAkhirPendek("2026-08"); got != "31 Agu 2026" {
+		t.Errorf("pendek = %q", got)
+	}
+}
+
+func TestPDFNeraca_PerTanggal(t *testing.T) {
+	var buf bytes.Buffer
+	b := BagianNeraca(BalanceSheet{})
+	if err := RenderLaporanPDF(&buf, "X", "Agustus 2026", TanggalAkhirPeriode("2026-08"), []BagianLaporan{b}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s := buf.String(); !strings.Contains(s, "Per 31 Agustus 2026") || strings.Contains(s, "akhir Agustus") {
+		t.Error("neraca tidak ditulis per tanggal")
+	}
+}
+
+// Akun bernilai 0 tidak ditampilkan; judul kelompok yang kosong ikut hilang; saldo kas awal tetap.
+func TestRapikan_AkunNolDisembunyikan(t *testing.T) {
+	is := contohLabaRugi()
+	is.ChannelFees, is.NetSales, is.Depreciation = 0, 100_000, 0
+	is.OpexLines = append(is.OpexLines, Line{"Iklan", 0})
+	b := BagianLabaRugi(is)
+	for _, r := range b.Baris {
+		switch r.Kunci {
+		case "potongan", "beban:Iklan", "penyusutan", "amortisasi", "judul_penutupan":
+			t.Errorf("%s masih tampil", r.Kunci)
+		case "penjualan_bersih":
+			if r.Huruf != "B" || r.Rumus != "B = A" {
+				t.Errorf("penjualan bersih %q %q", r.Huruf, r.Rumus)
+			}
+		case "ebit":
+			if r.Rumus != r.Huruf+" = F" {
+				t.Errorf("ebit %q", r.Rumus)
+			}
+		}
+	}
+	ak := BagianArusKas(CashFlow{}, false)
+	if !slices.ContainsFunc(ak.Baris, func(r BarisLaporan) bool { return r.Kunci == "saldo_awal" }) {
+		t.Error("saldo kas awal harus tetap tampil")
+	}
+	nr := BagianNeraca(BalanceSheet{Assets: BalanceSheetAssets{Cash: 5}})
+	if slices.ContainsFunc(nr.Baris, func(r BarisLaporan) bool { return r.Kunci == "piutang" || r.Kunci == "pinjaman" }) {
+		t.Error("akun neraca bernilai 0 masih tampil")
 	}
 }

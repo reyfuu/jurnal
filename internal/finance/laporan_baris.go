@@ -32,7 +32,28 @@ type BarisLaporan struct {
 	Nilai   int64  `json:"nilai"`
 	Gaya    string `json:"gaya"`
 	Agregat string `json:"agregat,omitempty"`
+	// Huruf & Rumus: penanda baris dan cara menghitung baris jumlah ("C = A - B") di laba rugi.
+	// Sifat: SifatPengurang (beban, ditulis hitam tanpa kurung) atau SifatKontra (akun kontra,
+	// merah dalam kurung). Nilai tetap bertanda seperti di layar.
+	Huruf string `json:"huruf,omitempty"`
+	Rumus string `json:"rumus,omitempty"`
+	Sifat string `json:"sifat,omitempty"`
+
+	berhuruf bool   // diberi huruf (baris utama laba rugi)
+	suku     []suku // rumus baris jumlah, disusun ulang setelah baris nol disembunyikan
+	wajib    bool   // tetap tampil walau 0
 }
+
+// suku: satu bagian rumus; kunci berawalan "*" = teks apa adanya ("jumlah beban").
+type suku struct {
+	kunci  string
+	kurang bool
+}
+
+const (
+	SifatPengurang = "pengurang"
+	SifatKontra    = "kontra"
+)
 
 type BagianLaporan struct {
 	Kode  string         `json:"kode"` // laba-rugi | neraca | arus-kas
@@ -53,28 +74,97 @@ func (s *susun) tambah(gaya, kunci, label string, nilai int64) {
 	s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: kunci, Label: label, Nilai: nilai, Gaya: gaya, Agregat: s.agregat})
 }
 
+// rapikan: akun bernilai 0 tidak ditampilkan (kecuali wajib), judul kelompok yang jadi kosong
+// ikut hilang, lalu huruf & rumus disusun ulang dari baris yang tersisa.
+func (b BagianLaporan) rapikan() BagianLaporan {
+	var out []BarisLaporan
+	for _, r := range b.Baris {
+		if (r.Gaya == GayaBaris || r.Gaya == GayaSub) && r.Nilai == 0 && !r.wajib {
+			continue
+		}
+		out = append(out, r)
+	}
+	// judul tanpa baris rinci di bawahnya (langsung total / judul lain / habis) disembunyikan
+	var akhir []BarisLaporan
+	for i, r := range out {
+		if r.Gaya == GayaJudul && (i+1 == len(out) || (out[i+1].Gaya != GayaBaris && out[i+1].Gaya != GayaSub)) {
+			continue
+		}
+		akhir = append(akhir, r)
+	}
+	b.Baris = akhir
+	huruf := map[string]string{}
+	h := 'A'
+	for i := range b.Baris {
+		if r := &b.Baris[i]; r.berhuruf {
+			r.Huruf = string(h)
+			huruf[r.Kunci] = r.Huruf
+			h++
+		}
+	}
+	for i := range b.Baris {
+		if r := &b.Baris[i]; len(r.suku) > 0 {
+			r.Rumus = susunRumus(r.Huruf, r.suku, huruf)
+		}
+	}
+	return b
+}
+
+// susunRumus: "E = C - D" dari suku yang barisnya masih tampil.
+func susunRumus(h string, ss []suku, huruf map[string]string) string {
+	var b strings.Builder
+	for _, x := range ss {
+		t := huruf[x.kunci]
+		if strings.HasPrefix(x.kunci, "*") {
+			t = x.kunci[1:]
+		}
+		if t == "" {
+			continue
+		}
+		switch {
+		case b.Len() == 0:
+		case x.kurang:
+			b.WriteString(" - ")
+		default:
+			b.WriteString(" + ")
+		}
+		b.WriteString(t)
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return h + " = " + b.String()
+}
+
+func tambah(k string) suku { return suku{kunci: k} }
+func kurang(k string) suku { return suku{kunci: k, kurang: true} }
+
 func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	s := susun{b: BagianLaporan{Kode: "laba-rugi", Judul: "Laporan Laba Rugi"}, agregat: AgregatJumlah}
-	s.tambah(GayaBaris, "omzet", "Omzet (penjualan kotor)", is.Omzet)
-	s.tambah(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees)
-	s.tambah(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales)
-	s.tambah(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS)
-	s.tambah(GayaTotal, "laba_kotor", "Laba kotor", is.GrossProfit)
+	// Baris utama diberi huruf berurutan; baris jumlah menulis rumusnya dengan huruf itu.
+	baris := func(gaya, kunci, label string, nilai int64, sifat string, ss ...suku) {
+		s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: kunci, Label: label, Nilai: nilai, Gaya: gaya, Agregat: s.agregat,
+			Sifat: sifat, berhuruf: true, suku: ss})
+	}
+	baris(GayaBaris, "omzet", "Omzet (penjualan kotor)", is.Omzet, "")
+	s.b.Baris[len(s.b.Baris)-1].wajib = true
+	baris(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees, SifatKontra)
+	baris(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales, "", tambah("omzet"), kurang("potongan"))
+	baris(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS, SifatPengurang)
+	baris(GayaTotal, "laba_kotor", "Laba (rugi) kotor", is.GrossProfit, "", tambah("penjualan_bersih"), kurang("hpp"))
 	s.judul("judul_beban", "Beban operasional")
 	for _, l := range is.OpexLines {
-		s.tambah(GayaBaris, "beban:"+l.Label, l.Label, -l.Amount)
+		s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: "beban:" + l.Label, Label: l.Label, Nilai: -l.Amount, Gaya: GayaBaris, Agregat: s.agregat, Sifat: SifatPengurang})
 	}
-	s.tambah(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex)
-	s.tambah(GayaTotal, "ebitda", "EBITDA (laba sebelum penyusutan & amortisasi)", is.EBITDA)
+	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, tambah("*jumlah beban"))
+	baris(GayaTotal, "ebitda", "EBITDA (laba (rugi) sebelum penyusutan & amortisasi)", is.EBITDA, "", tambah("laba_kotor"), kurang("total_beban"))
 	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
-	s.tambah(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation)
-	s.tambah(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization)
-	s.tambah(GayaTotal, "ebit", "Laba usaha (EBIT)", is.EBIT)
-	if is.OtherIncome != 0 {
-		s.tambah(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome)
-	}
-	s.tambah(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit)
-	return s.b
+	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatPengurang)
+	baris(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization, SifatPengurang)
+	baris(GayaTotal, "ebit", "Laba (rugi) usaha (EBIT)", is.EBIT, "", tambah("ebitda"), kurang("penyusutan"), kurang("amortisasi"))
+	baris(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome, "")
+	baris(GayaTotal, "laba_bersih", "Laba (rugi) bersih tahun berjalan", is.NetProfit, "", tambah("ebit"), tambah("pendapatan_lain"))
+	return s.b.rapikan()
 }
 
 func BagianNeraca(bs BalanceSheet) BagianLaporan {
@@ -83,13 +173,14 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.judul("judul_aset", "Aset (Aktiva)")
 	s.tambah(GayaBaris, "kas", "Saldo kas & bank", a.Cash)
 	s.tambah(GayaBaris, "piutang", "Piutang belum tertagih", a.Receivables)
-	s.tambah(GayaBaris, "persediaan", "Nilai persediaan stok", a.Inventory)
+	s.tambah(GayaBaris, "persediaan", "Nilai persediaan", a.Inventory)
 	if a.OtherAssets != 0 {
 		s.tambah(GayaBaris, "aset_lain", "Aset lancar lain (uang muka, dibayar di muka)", a.OtherAssets)
 	}
 	s.tambah(GayaBaris, "aset_tetap", "Aset tetap & tak berwujud (nilai buku)", a.FixedAssets)
 	s.tambah(GayaSub, "harga_perolehan", "Harga perolehan", a.FixedAssetsCost)
 	s.tambah(GayaSub, "akumulasi", "Akumulasi penyusutan & amortisasi", -a.AccumDepreciation)
+	s.b.Baris[len(s.b.Baris)-1].Sifat = SifatKontra
 	s.tambah(GayaTotal, "total_aset", "Total aset", a.Total)
 	s.judul("judul_kewajiban", "Kewajiban (Utang)")
 	s.tambah(GayaBaris, "utang_usaha", "Utang usaha / operasional", bs.Liabilities.Payables)
@@ -101,11 +192,11 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.judul("judul_modal", "Modal (Ekuitas)")
 	s.tambah(GayaBaris, "modal_awal", "Modal awal", bs.Equity.OpeningCapital)
 	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal - ambil pribadi", bs.Equity.AddedCapital)
-	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (saldo awal + bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
-	s.tambah(GayaBaris, "laba_berjalan", "Laba bersih periode berjalan", bs.Equity.CurrentProfit)
+	s.tambah(GayaBaris, "laba_ditahan", "Laba (rugi) ditahan", bs.Equity.RetainedEarnings)
+	s.tambah(GayaBaris, "laba_berjalan", "Laba (rugi) tahun berjalan", bs.Equity.CurrentProfit)
 	s.tambah(GayaTotal, "total_modal", "Total modal", bs.Equity.Total)
 	s.tambah(GayaTotal, "total_pasiva", "Total pasiva (utang + modal)", bs.Liabilities.Total+bs.Equity.Total)
-	return s.b
+	return s.b.rapikan()
 }
 
 // BagianArusKas menyajikan arus kas metode langsung, atau metode tidak langsung bila
@@ -135,9 +226,10 @@ func BagianArusKas(cf CashFlow, tidakLangsung bool) BagianLaporan {
 	s.tambah(GayaTotal, "kenaikan_kas", "Kenaikan kas bersih (A + B + C)", cf.NetCash)
 	s.agregat = AgregatAwal
 	s.tambah(GayaBaris, "saldo_awal", "Saldo kas awal periode", cf.OpeningBalance)
+	s.b.Baris[len(s.b.Baris)-1].wajib = true
 	s.agregat = AgregatAkhir
 	s.tambah(GayaTotal, "saldo_akhir", "Saldo kas akhir periode", cf.ClosingBalance)
-	return s.b
+	return s.b.rapikan()
 }
 
 // --- Perbandingan multi-periode ---
@@ -159,6 +251,13 @@ type BarisBanding struct {
 	Agregat string  `json:"agregat,omitempty"`
 	Nilai   []int64 `json:"nilai"` // satu per kolom
 	Total   int64   `json:"total"`
+	// sama dengan BarisLaporan: huruf, rumus, dan sifat (pengurang / kontra) untuk laba rugi
+	Huruf string `json:"huruf,omitempty"`
+	Rumus string `json:"rumus,omitempty"`
+	Sifat string `json:"sifat,omitempty"`
+
+	berhuruf bool
+	suku     []suku
 }
 
 type BagianBanding struct {
@@ -242,7 +341,8 @@ func SusunBanding(laporan []PeriodeLaporan) Banding {
 				if i < 0 {
 					i = sebelum + 1
 					bg.Baris = slices.Insert(bg.Baris, i, BarisBanding{
-						Kunci: r.Kunci, Label: r.Label, Gaya: r.Gaya, Agregat: r.Agregat, Nilai: make([]int64, n)})
+						Kunci: r.Kunci, Label: r.Label, Gaya: r.Gaya, Agregat: r.Agregat, Nilai: make([]int64, n),
+						Huruf: r.Huruf, Rumus: r.Rumus, Sifat: r.Sifat, berhuruf: r.berhuruf, suku: r.suku})
 				}
 				bg.Baris[i].Nilai[ki] = r.Nilai
 				sebelum = i
@@ -259,6 +359,22 @@ func SusunBanding(laporan []PeriodeLaporan) Banding {
 				r.Total = r.Nilai[0]
 			case AgregatAkhir:
 				r.Total = r.Nilai[n-1]
+			}
+		}
+		// huruf disusun ulang atas gabungan baris semua periode (baris yang 0 di satu bulan
+		// tapi ada di bulan lain tetap satu huruf)
+		huruf := map[string]string{}
+		h := 'A'
+		for i := range bg.Baris {
+			if r := &bg.Baris[i]; r.berhuruf {
+				r.Huruf = string(h)
+				huruf[r.Kunci] = r.Huruf
+				h++
+			}
+		}
+		for i := range bg.Baris {
+			if r := &bg.Baris[i]; len(r.suku) > 0 {
+				r.Rumus = susunRumus(r.Huruf, r.suku, huruf)
 			}
 		}
 		out.Bagian = append(out.Bagian, bg)

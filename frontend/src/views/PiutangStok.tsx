@@ -1,11 +1,16 @@
 import { Flag, ShoppingCart, Upload } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { IsiAIBanner } from '@/components/IsiAIBanner'
 import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MutasiStokPanel, RiwayatGerakPanel } from '@/views/KartuStok'
 import { StokOpnamePanel } from '@/views/StokOpname'
+import { TambahBarangBanyak } from '@/views/TambahBarang'
+import { ThUrut } from '@/components/ThUrut'
+import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
+import { useGulirKeForm } from '@/lib/gulir'
+import { buatSKU } from '@/lib/sku'
 import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
@@ -72,6 +77,8 @@ function Kpi({ label, value, color, meta }: { label: string; value: string; colo
 export function PiutangUtang() {
   const [data, setData] = useState<TagihanSummary | null>(null)
   const [form, setForm] = useState<TagihanInput | null>(null)
+  const formRefTagihan = useRef<HTMLFormElement>(null)
+  useGulirKeForm(formRefTagihan, !!form)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -169,7 +176,7 @@ export function PiutangUtang() {
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <form ref={formRefTagihan} className="card" style={{ padding: 20, marginBottom: 14, scrollMarginTop: 16 }} onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Tagihan' : 'Ubah Tagihan'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -263,8 +270,9 @@ export function PiutangUtang() {
 
 // --- Stok & Gudang ---
 
-const STOK_KOSONG: StokInput = {
-  sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0,
+const KOLOM_STOK: Pengurut<StokRow> = {
+  sku: (r) => r.sku, nama: (r) => r.nama, kategori: (r) => r.kategori, jumlah: (r) => r.jumlah_mili, min: (r) => r.stok_min,
+  hp: (r) => r.harga_pokok, hj: (r) => r.harga_jual, margin: (r) => r.margin_bps, nilai: (r) => r.nilai, status: (r) => r.status,
 }
 
 const STATUS_CLS: Record<StokRow['status'], string> = {
@@ -291,13 +299,23 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
   const [cari, setCari] = useState('')
   const [kategoriFilter, setKategoriFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [tambahBanyak, setTambahBanyak] = useState(false)
+  const urut = useKolomUrut()
+  const formRef = useRef<HTMLDivElement>(null)
+  useGulirKeForm(formRef, tambahBanyak || !!form)
 
   const muat = useCallback(() => { getStok().then(setData, (e: Error) => setError(e.message)) }, [])
   useEffect(muat, [muat])
-  const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null }, Partial<StokInput>>(isiAI, 'stok', {
-    ambil: () => ({ tab, form, editId }),
-    pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId) },
-    isi: (isian) => { setError(''); setTab('daftar'); setEditId(null); setForm({ ...STOK_KOSONG, ...isian }) },
+  const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null; tambahBanyak: boolean }, Partial<StokInput>>(isiAI, 'stok', {
+    ambil: () => ({ tab, form, editId, tambahBanyak }),
+    pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId); setTambahBanyak(s.tambahBanyak) },
+    isi: (isian) => {
+      setError(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
+      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, ...isian }
+      // SKU otomatis dari nama, sama seperti tabel Tambah barang
+      if (!b.sku) b.sku = buatSKU(b.nama, new Set((data?.items ?? []).map((x) => x.sku.toUpperCase()).filter(Boolean)))
+      setForm(b)
+    },
     terbuka: form !== null,
   })
 
@@ -345,6 +363,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
     if (q && !it.sku.toLowerCase().includes(q) && !it.nama.toLowerCase().includes(q)) return false
     return true
   })
+  const terurut = urutkan(tampil, urut.kunci ? KOLOM_STOK[urut.kunci] : undefined, urut.arah)
 
   return (
     <>
@@ -359,12 +378,6 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
           </>}
           <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
             <Upload size={15} aria-hidden /> Impor Excel
-          </button>
-          <button
-            className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }}
-            onClick={() => { setError(''); setEditId(null); setForm({ ...STOK_KOSONG }) }}
-          >
-            + Tambah Barang
           </button>
         </div>
       </PageHeader>
@@ -425,75 +438,91 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
         </div>
       </div>
 
-      {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
-          <div className="chart-title">{editId === null ? 'Tambah Barang' : 'Ubah Barang'}</div>
-          {isiAi.aktif !== null && <div style={{ marginTop: 12 }}><IsiAIBanner ai={isiAi} /></div>}
-          <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <label>
-              <span className="kpi-label">SKU</span>
-              <input className="input-field" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-            </label>
-            <label>
-              <span className="kpi-label">Nama Barang</span>
-              <input className="input-field" required value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
-            </label>
-            <label>
-              <span className="kpi-label">Kategori</span>
-              <input className="input-field" list="stok-kategori" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} />
-              <datalist id="stok-kategori">
-                {['Bahan Baku', 'Produk Jadi', 'Kemasan', 'Barang'].map((k) => <option key={k} value={k} />)}
-              </datalist>
-            </label>
-            <label title={editDilacak ? 'Jumlah mengikuti kartu stok; ubah lewat stok opname' : undefined}>
-              <span className="kpi-label">Jumlah{editDilacak ? ' (dari kartu stok)' : ''}</span>
-              <input
-                className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.jumlah, (n) => setForm({ ...form, jumlah: n }))}
-              />
-            </label>
-            <label>
-              <span className="kpi-label">Satuan</span>
-              <input className="input-field" value={form.satuan} onChange={(e) => setForm({ ...form, satuan: e.target.value })} />
-            </label>
-            <label>
-              <span className="kpi-label">Stok Minimum</span>
-              <input
-                className="input-field tabular" placeholder="0" {...angka(form.stok_min, (n) => setForm({ ...form, stok_min: n }))}
-              />
-            </label>
-            <label title={editDilacak ? 'Harga pokok dihitung dari kartu stok (pembelian & produksi)' : undefined}>
-              <span className="kpi-label">Harga Pokok / Satuan{editDilacak ? ' (dari kartu stok)' : ''}</span>
-              <input
-                className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
-              />
-            </label>
-            <label>
-              <span className="kpi-label">Harga Jual / Satuan</span>
-              <input
-                className="input-field tabular" placeholder="0" {...angka(form.harga_jual, (n) => setForm({ ...form, harga_jual: n }))}
-              />
-            </label>
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy}>
-              {busy ? 'Menyimpan…' : 'Simpan'}
-            </button>
-            <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
-          </div>
-        </form>
-      )}
 
-      <div className="card" style={{ padding: 20 }}>
-        <div className="chart-title">Daftar Stok</div>
-        <div className="chart-subtitle">{mulai ? 'Klik nama barang untuk melihat kartu stoknya (riwayat masuk & keluar).' : 'Bisa diisi sekaligus lewat tombol Impor Excel, atau lewat Pengaturan → Impor Data Awal'}</div>
+      <div className="card grid gap-3" style={{ padding: 20 }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="chart-title">Daftar Stok</div>
+            <div className="chart-subtitle">{mulai ? 'Klik nama barang untuk melihat kartu stoknya (riwayat masuk & keluar). Klik judul kolom untuk mengurutkan.' : 'Klik judul kolom untuk mengurutkan. Banyak barang sekaligus bisa lewat + Tambah barang atau Impor Excel.'}</div>
+          </div>
+          {bisaUbah && (
+            <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => { setError(''); setForm(null); setEditId(null); setTambahBanyak(true) }}>
+              + Tambah barang
+            </button>
+          )}
+        </div>
+        {/* Form tambah / ubah muncul di sini, tepat di atas tabel, dan halaman bergeser ke sini. */}
+        <div ref={formRef} style={{ scrollMarginTop: 16 }}>
+          {tambahBanyak && (
+            <TambahBarangBanyak skuTerpakai={list.map((x) => x.sku).filter(Boolean)} onBatal={() => setTambahBanyak(false)}
+              onSelesai={(n) => { setTambahBanyak(false); setPesan(`${n} barang ditambahkan.`); muat() }} />
+          )}
+        {form && (
+          <form className="grid gap-3" style={{ padding: 14, border: '2px solid var(--accent-orange)', borderRadius: 12, background: 'var(--accent-orange-soft)' }} onSubmit={simpan}>
+            <div className="chart-title">{editId === null ? 'Tambah Barang' : 'Ubah Barang'}</div>
+            {isiAi.aktif !== null && <IsiAIBanner ai={isiAi} />}
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              <label>
+                <span className="kpi-label">SKU</span>
+                <input className="input-field" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+              </label>
+              <label>
+                <span className="kpi-label">Nama Barang</span>
+                <input className="input-field" required value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
+              </label>
+              <label>
+                <span className="kpi-label">Kategori</span>
+                <input className="input-field" list="stok-kategori" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} />
+                <datalist id="stok-kategori">
+                  {['Bahan Baku', 'Produk Jadi', 'Kemasan', 'Barang'].map((k) => <option key={k} value={k} />)}
+                </datalist>
+              </label>
+              <label title={editDilacak ? 'Jumlah mengikuti kartu stok; ubah lewat stok opname' : undefined}>
+                <span className="kpi-label">Jumlah{editDilacak ? ' (dari kartu stok)' : ''}</span>
+                <input
+                  className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.jumlah, (n) => setForm({ ...form, jumlah: n }))}
+                />
+              </label>
+              <label>
+                <span className="kpi-label">Satuan</span>
+                <input className="input-field" value={form.satuan} onChange={(e) => setForm({ ...form, satuan: e.target.value })} />
+              </label>
+              <label>
+                <span className="kpi-label">Stok Minimum</span>
+                <input
+                  className="input-field tabular" placeholder="0" {...angka(form.stok_min, (n) => setForm({ ...form, stok_min: n }))}
+                />
+              </label>
+              <label title={editDilacak ? 'Harga pokok dihitung dari kartu stok (pembelian & produksi)' : undefined}>
+                <span className="kpi-label">Harga Pokok / Satuan{editDilacak ? ' (dari kartu stok)' : ''}</span>
+                <input
+                  className="input-field tabular" placeholder="0" disabled={editDilacak} {...angka(form.harga_pokok, (n) => setForm({ ...form, harga_pokok: n }))}
+                />
+              </label>
+              <label>
+                <span className="kpi-label">Harga Jual / Satuan</span>
+                <input
+                  className="input-field tabular" placeholder="0" {...angka(form.harga_jual, (n) => setForm({ ...form, harga_jual: n }))}
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy}>
+                {busy ? 'Menyimpan…' : 'Simpan'}
+              </button>
+              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
+            </div>
+          </form>
+        )}
+        </div>
         <div className="table-scroll">
           <table className="data-table tabular" style={{ minWidth: 940 }}>
             <thead>
               <tr>
-                <th>SKU</th><th>Nama Barang</th><th>Kategori</th>
-                <th style={{ textAlign: 'right' }}>Jumlah</th><th style={{ textAlign: 'right' }}>Min.</th>
-                <th style={{ textAlign: 'right' }}>Harga Pokok</th><th style={{ textAlign: 'right' }}>Harga Jual</th>
-                <th style={{ textAlign: 'right' }}>Margin</th><th style={{ textAlign: 'right' }}>Nilai</th><th>Status</th><th />
+                <ThUrut k="sku" urut={urut}>SKU</ThUrut><ThUrut k="nama" urut={urut}>Nama Barang</ThUrut><ThUrut k="kategori" urut={urut}>Kategori</ThUrut>
+                <ThUrut k="jumlah" urut={urut} kanan>Jumlah</ThUrut><ThUrut k="min" urut={urut} kanan>Min.</ThUrut>
+                <ThUrut k="hp" urut={urut} kanan>Harga Pokok</ThUrut><ThUrut k="hj" urut={urut} kanan>Harga Jual</ThUrut>
+                <ThUrut k="margin" urut={urut} kanan>Margin</ThUrut><ThUrut k="nilai" urut={urut} kanan>Nilai</ThUrut><ThUrut k="status" urut={urut}>Status</ThUrut><th />
               </tr>
             </thead>
             <tbody>
@@ -504,7 +533,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                   </td>
                 </tr>
               )}
-              {tampil.map((it) => (
+              {terurut.map((it) => (
                 <tr key={it.id}>
                   <td style={{ color: 'var(--text-muted)' }}>{it.sku || '—'}</td>
                   <td style={{ fontWeight: 600 }}>

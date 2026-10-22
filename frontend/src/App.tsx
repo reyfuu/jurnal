@@ -33,6 +33,7 @@ import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
 import { PeringatanSaldoMinus } from '@/components/PeringatanSaldoMinus'
+import { PeringatanDobel } from '@/components/PeringatanDobel'
 import { BukuBesar } from '@/views/BukuBesar'
 import { JurnalUmum } from '@/views/JurnalUmum'
 import { LaporanTransaksi } from '@/views/LaporanTransaksi'
@@ -125,7 +126,12 @@ export default function App() {
   }, [reload, fail])
 
   useEffect(() => {
-    getMe().then(signIn, () => setSession({ status: 'anon' }))
+    getMe().then(signIn, () => {
+      // Belum login: #/masuk atau #/daftar di URL (muat ulang, tautan) langsung membuka formnya.
+      const v = bacaRute(window.location.hash).view
+      if (v === 'masuk' || v === 'daftar') setAuth(v)
+      setSession({ status: 'anon' })
+    })
   }, [signIn])
 
   // Halaman & periode aktif selalu tercermin di URL; tombol Back / Forward berpindah halaman.
@@ -138,6 +144,9 @@ export default function App() {
   useEffect(() => {
     const kembali = () => {
       const r = bacaRute(window.location.hash)
+      // Halaman Masuk / Daftar punya alamat sendiri, jadi Back dari sana kembali ke landing page.
+      if (r.view === 'masuk' || r.view === 'daftar') return setAuth(r.view)
+      setAuth(null)
       if (r.view) setView(r.view as View)
     }
     window.addEventListener('popstate', kembali)
@@ -146,10 +155,19 @@ export default function App() {
 
   if (session.status === 'checking') return null
   if (!me) {
+    // Buka Masuk / Daftar sebagai langkah riwayat baru supaya tombol Back browser kembali ke landing.
+    const bukaAuth = (jenis: 'masuk' | 'daftar') => {
+      history.pushState({ auth: jenis }, '', `#/${jenis}`)
+      setAuth(jenis)
+    }
+    const keLanding = () => {
+      if ((history.state as { auth?: string } | null)?.auth) history.back()
+      else { history.replaceState(null, '', window.location.pathname); setAuth(null) }
+    }
     return auth
-      ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={() => setAuth(null)}
+      ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={keLanding}
           onLogin={(m) => { if (awal?.alat) setLayarBayar('alat'); signIn(m) }} />
-      : <Landing onMasuk={() => setAuth('masuk')} onDaftar={(a) => { setAwal(a); setAuth('daftar') }} />
+      : <Landing onMasuk={() => bukaAuth('masuk')} onDaftar={(a) => { setAwal(a); bukaAuth('daftar') }} />
   }
   async function onLogout() {
     await logout().catch(() => {})
@@ -262,13 +280,13 @@ export default function App() {
           {!me.lihat && !!me.jadwal?.length && <PengingatJadwalBanner jadwal={me.jadwal} />}
           {!!me.catatan_terbuka && !me.lihat && view !== 'catatan' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
-              <span><strong>{me.catatan_terbuka} catatan dari konsultan Master Pajak</strong> belum ditandai sudah diperbaiki.</span>
+              <span><strong>{me.catatan_terbuka} catatan dari konsultan MasterPajak AI</strong> belum ditandai sudah diperbaiki.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('catatan')}>Lihat catatan</Button>
             </div>
           )}
           {!!me.koreksi_menunggu && view !== 'usulan-koreksi' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
-              <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan Master Pajak menunggu keputusan Anda. Pembukuan belum berubah.</span>
+              <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan MasterPajak AI menunggu keputusan Anda. Pembukuan belum berubah.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('usulan-koreksi')}>Tinjau</Button>
             </div>
           )}
@@ -315,6 +333,7 @@ export default function App() {
           {data && !terkunci && ['dashboard', 'transaksi', 'stok-gudang', 'laporan-keuangan', 'buku-besar', 'jurnal-umum'].includes(view) && (
             <PeringatanSaldoMinus period={period} versi={data} />
           )}
+          {data && !terkunci && (view === 'transaksi' || view === 'dashboard') && <PeringatanDobel period={period} versi={data} />}
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>

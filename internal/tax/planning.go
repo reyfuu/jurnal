@@ -99,11 +99,19 @@ type BentukUsahaResult struct {
 // CompareBentukUsaha membandingkan 6 skema pajak setahun dan memilih yang termurah
 // (seri: urutan pertama menang, sama seperti XLOOKUP di template).
 func CompareBentukUsaha(omzet int64, netMarginBps int64, ptkpCode string) (BentukUsahaResult, error) {
-	return compareLaba(omzet, mulDiv(omzet, netMarginBps, 10_000), ptkpCode)
+	return compareLaba(omzet, mulDiv(omzet, netMarginBps, 10_000), ptkpCode, false)
+}
+
+// finalBoleh: PPh final UMKM boleh dipakai untuk omzet setahun ini. Di atas batas omzet, PPh
+// final tetap berlaku sampai akhir tahun pajak saat omzet pertama kali melewati batas
+// (tahunPertama); mulai tahun berikutnya tidak lagi.
+func finalBoleh(omzet int64, tahunPertama bool) bool {
+	return tahunPertama || omzet <= P().BatasOmzetUMKM
 }
 
 // compareLaba: CompareBentukUsaha dengan laba rupiah langsung (tanpa pembulatan lewat margin).
-func compareLaba(omzet, laba int64, ptkpCode string) (BentukUsahaResult, error) {
+// tahunPertama: perkiraan tahun pertama usaha (onboarding), lihat finalBoleh.
+func compareLaba(omzet, laba int64, ptkpCode string, tahunPertama bool) (BentukUsahaResult, error) {
 	ptkp, ok := PTKPOf(ptkpCode)
 	if !ok {
 		return BentukUsahaResult{}, fmt.Errorf("status PTKP %q tidak dikenal", ptkpCode)
@@ -112,14 +120,21 @@ func compareLaba(omzet, laba int64, ptkpCode string) (BentukUsahaResult, error) 
 	umkm, badan := persenBps(int(pr.UMKMTarifBps)), persenBps(int(pr.BadanTarifBps))
 	r := BentukUsahaResult{Omzet: omzet, Laba: laba, PTKP: ptkp, Skema: []Skema{
 		{SkemaPPOP, "PPh Final " + umkm + " Orang Pribadi", "Omzet di atas " + rp(pr.UMKMBebasOP) + " x " + umkm, ppFinalOP(omzet), 0},
-		{SkemaPPBadan, "PPh Final " + umkm + " Badan", "Seluruh omzet x " + umkm, omzet * pr.UMKMTarifBps / 10_000, 0},
+		{SkemaPPBadan, "PPh Final " + umkm + " Badan (PTP)", "Seluruh omzet x " + umkm + " (PTP = PT Perorangan)", omzet * pr.UMKMTarifBps / 10_000, 0},
 		{SkemaPasal17OP, "PPh Pasal 17 Orang Pribadi (pembukuan)", "Tarif progresif atas laba - PTKP", Pasal17(laba - ptkp), 0},
 		{SkemaPasal31E, "PPh Badan Pasal 31E", fmt.Sprintf("%s dengan fasilitas %s untuk omzet s.d. %s", badan, persenBps(int(pr.Fasilitas31EBps)), rp(pr.Batas31EPenuh)), Pasal31E(omzet, laba), 0},
 		{SkemaBadan22, "PPh Badan Tarif Umum " + badan, "Laba x " + badan, max(0, laba*pr.BadanTarifBps/10_000), 0},
 		{SkemaNPPN, "Norma (NPPN) Orang Pribadi", "Tarif progresif atas " + persenBps(int(pr.NormaPerbandinganBps)) + " omzet - PTKP", Pasal17(mulDiv(omzet, pr.NormaPerbandinganBps, 10_000) - ptkp), 0},
 	}}
-	if omzet > pr.BatasOmzetUMKM { // PPh final UMKM hanya sampai batas omzet
+	if !finalBoleh(omzet, tahunPertama) { // PPh final UMKM hanya sampai batas omzet
 		r.Skema = slices.DeleteFunc(r.Skema, func(s Skema) bool { return s.ID == SkemaPPOP || s.ID == SkemaPPBadan })
+	} else if omzet > pr.BatasOmzetUMKM {
+		for i := range r.Skema {
+			if s := &r.Skema[i]; s.ID == SkemaPPOP || s.ID == SkemaPPBadan {
+				s.Nama += " - tahun pertama"
+				s.Keterangan += "; hanya sampai akhir tahun omzet melewati " + rp(pr.BatasOmzetUMKM)
+			}
+		}
 	}
 	best := slices.MinFunc(r.Skema, func(a, b Skema) int { return cmp.Compare(a.Pajak, b.Pajak) })
 	r.Termurah = best.ID

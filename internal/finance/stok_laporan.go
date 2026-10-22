@@ -21,8 +21,10 @@ type StokPeriode struct {
 
 // Periode merekap kartu stok untuk satu bulan (YYYY-MM). Bulan yang memuat titik nol memakai
 // nilai titik nol sebagai persediaan awal.
-func (k KartuStok) Periode(period string) StokPeriode {
-	dari, sampai := period+"-01", period+"-31"
+func (k KartuStok) Periode(period string) StokPeriode { return k.Rentang(period+"-01", period+"-31") }
+
+// Rentang merekap kartu stok untuk rentang tanggal [dari, sampai] (YYYY-MM-DD).
+func (k KartuStok) Rentang(dari, sampai string) StokPeriode {
 	if k.Mulai == "" || k.Mulai > sampai {
 		return StokPeriode{}
 	}
@@ -98,5 +100,5 @@ func (cf *CashFlow) terapkanPersediaan(kenaikan int64) {
 		lines = append(lines, l)
 	}
 	s.Lines = lines
-	s.add("Kenaikan persediaan stok", -kenaikan)
+	s.add("Kenaikan persediaan", -kenaikan)
 }

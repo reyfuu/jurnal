@@ -33,7 +33,7 @@ export function UsulanKoreksi({ onChanged }: { onChanged: () => void }) {
   const riwayat = rows?.filter((k) => k.status !== 'menunggu') ?? []
   return (
     <>
-      <PageHeader title="Usulan Koreksi" subtitle="Dari konsultan Master Pajak yang menangani usaha Anda. Pembukuan tidak berubah sampai Anda menyetujui." />
+      <PageHeader title="Usulan Koreksi" subtitle="Dari konsultan MasterPajak AI yang menangani usaha Anda. Pembukuan tidak berubah sampai Anda menyetujui." />
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
       {rows && menunggu.length === 0 && <div className="card text-sm text-muted-foreground" style={{ padding: 20 }}>Tidak ada usulan yang menunggu keputusan Anda.</div>}
       {menunggu.map((k) => (

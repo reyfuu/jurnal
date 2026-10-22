@@ -57,7 +57,7 @@ export function Ringkasan({ onBuka }: { onBuka: (id: number) => void }) {
   useEffect(() => { getRingkasanMaster().then(setR, (e: Error) => setError(e.message)) }, [])
   return (
     <>
-      <PageHeader title="Ringkasan" subtitle="Kondisi klien Master Pajak hari ini. Angka keuangan klien tidak ditampilkan di Panel Master." />
+      <PageHeader title="Ringkasan" subtitle="Kondisi klien MasterPajak AI hari ini. Angka keuangan klien tidak ditampilkan di Panel Master." />
       <Gagal error={error} />
       {r && (
         <>

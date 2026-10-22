@@ -233,6 +233,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Kolom tambahan users (Okt 2026): nomor WA & persetujuan UU PDP saat daftar mandiri.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wa TEXT;
+ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS modal_awal BIGINT;
+ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS akun_tambahan JSONB;
 -- sumber dana aset tanpa transaksi (kas | utang | modal); kosong = belum dipilih
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS sumber_dana TEXT;
 -- akumulasi penyusutan yang sudah ada per tanggal saldo awal (template saldo awal / pembukuan lama)
@@ -485,3 +487,6 @@ CREATE TABLE IF NOT EXISTS primbon_catatan (
 -- transaksi pembayarannya (Transaction.Grup).
 ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS biaya BIGINT;
 ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
+
+-- Cegah transaksi dobel (Okt 2026): asal pencatatan (mutasi / foto).
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;

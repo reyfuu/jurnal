@@ -299,6 +299,16 @@ type openingResp struct {
 	// Persediaan: nilai yang seharusnya di saldo awal (daftar barang / hitung fisik pertama).
 	Persediaan      int64  `json:"persediaan"`
 	LabelPersediaan string `json:"label_persediaan"`
+	// Terkunci: alasan saldo awal tidak bisa diubah lagi (ada bulan yang sudah tutup buku).
+	Terkunci string `json:"terkunci,omitempty"`
+}
+
+// kunciSaldoAwalLocked: alasan saldo awal terkunci, "" bila masih bisa diubah. s.mu dipegang.
+func (s *tenant) kunciSaldoAwalLocked() string {
+	if s.tutupBuku == "" {
+		return ""
+	}
+	return "Saldo awal terkunci karena buku sampai " + finance.LabelPeriode(s.tutupBuku) + " sudah ditutup. Buka kembali di menu Tutup Buku bila memang perlu diubah."
 }
 
 // openingSummary: tanggal = tanggal pembanding nilai buku aset ("" = tanggal saldo awal).
@@ -307,7 +317,7 @@ func (s *tenant) openingSummary(tanggal string) openingResp {
 	peta := coa.PetaDari(all)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := openingResp{TransaksiPertama: s.transaksiPertamaLocked(), Kategori: finance.KategoriSaldoList, JumlahAset: len(s.assets)}
+	out := openingResp{TransaksiPertama: s.transaksiPertamaLocked(), Kategori: finance.KategoriSaldoList, JumlahAset: len(s.assets), Terkunci: s.kunciSaldoAwalLocked()}
 	out.AkunTemplate = coa.TemplateSaldoAwal(active, peta, finance.TemplateAkunSaldo())
 	if len(out.AkunTemplate) == 0 {
 		out.AkunTemplate = finance.TemplateAkunSaldo()
@@ -391,9 +401,9 @@ func (s *tenant) handlePutOpening(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if s.tutupBuku != "" {
+	if kunci := s.kunciSaldoAwalLocked(); kunci != "" {
 		s.mu.Unlock()
-		http.Error(w, "saldo awal tidak bisa diubah setelah ada bulan yang ditutup bukunya", http.StatusConflict)
+		http.Error(w, kunci, http.StatusConflict)
 		return
 	}
 	if err := s.akunHilangDipakaiLocked(o.Rincian, akun); err != nil {

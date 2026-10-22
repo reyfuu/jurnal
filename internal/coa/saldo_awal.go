@@ -368,3 +368,42 @@ func kodeSendiri(r finance.SaldoAkun, akun []Account) bool {
 	acc, ok := Find(akun, r.Kode)
 	return ok && r.Kode != "" && (acc.Catatan == CatatanSaldoAwal || strings.EqualFold(strings.TrimSpace(acc.Nama), strings.TrimSpace(r.Nama)))
 }
+
+// CatatanTambahan menandai akun yang ditambahkan klien di Daftar Akun.
+const CatatanTambahan = "Ditambahkan sendiri di Daftar Akun"
+
+// AkunTambahanKlien: daftar akun ditambah akun buatan klien (profil.AkunTambahan). Jenisnya
+// disalin dari akun induk, tanpa peran jurnal otomatis; all tidak diubah.
+func AkunTambahanKlien(list []finance.AkunTambahan, all []Account) []Account {
+	out := all
+	for _, t := range list {
+		induk, ok := Find(all, t.Induk)
+		if _, ada := Find(out, t.Kode); !ok || ada || len(t.Kode) != 4 {
+			continue
+		}
+		if len(out) == len(all) {
+			out = slices.Clone(all)
+		}
+		i := slices.IndexFunc(out, func(a Account) bool { return a.Kode > t.Kode })
+		if i < 0 {
+			i = len(out)
+		}
+		out = slices.Insert(out, i, Account{Kode: t.Kode, Nama: t.Nama, Subtype: induk.Subtype, Normal: induk.Normal,
+			Kelompok: induk.Kelompok, Kondisi: Selalu, Catatan: CatatanTambahan})
+	}
+	return out
+}
+
+// KodeTurunan: kode kosong pertama setelah induk dalam ratusan yang sama (6101 → 6102 … 6199).
+func KodeTurunan(induk string, all []Account) string {
+	n, err := strconv.Atoi(induk)
+	if err != nil || len(induk) != 4 {
+		return ""
+	}
+	for k := n + 1; k/100 == n/100; k++ {
+		if _, ada := Find(all, strconv.Itoa(k)); !ada {
+			return strconv.Itoa(k)
+		}
+	}
+	return ""
+}

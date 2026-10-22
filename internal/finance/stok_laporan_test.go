@@ -68,7 +68,7 @@ func TestLaporanDenganKartuStok(t *testing.T) {
 	}
 	ada := false
 	for _, l := range jan.CashFlow.OperasiTidakLangsung.Lines {
-		if l.Label == "Kenaikan persediaan stok" && l.Amount == -1_937_500 {
+		if l.Label == "Kenaikan persediaan" && l.Amount == -1_937_500 {
 			ada = true
 		}
 		if l.NonKas && l.Label == "Perubahan persediaan stok — belum dihitung per periode" {

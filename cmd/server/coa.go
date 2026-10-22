@@ -234,12 +234,12 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	if is.Metode == "periodik" {
 		lr = append(lr, []string{kodePersediaan, "Persediaan Akhir", rp(-is.PersediaanAkhir)})
 	}
-	lr = append(lr, []string{"", "Harga Pokok Penjualan", rp(is.HPP)}, []string{"", "Laba Kotor", rp(is.LabaKotor)})
+	lr = append(lr, []string{"", "Harga Pokok Penjualan", rp(is.HPP)}, []string{"", "Laba (Rugi) Kotor", rp(is.LabaKotor)})
 	add("Beban Operasional", is.BebanOperasional)
-	lr = append(lr, []string{"", "Laba Usaha", rp(is.LabaUsaha)})
+	lr = append(lr, []string{"", "Laba (Rugi) Usaha", rp(is.LabaUsaha)})
 	add("Pendapatan Lain-lain", is.PendapatanLain)
 	add("Beban Lain-lain", is.BebanLain)
-	lr = append(lr, []string{"", "Laba Bersih", rp(is.LabaBersih)})
+	lr = append(lr, []string{"", "Laba (Rugi) Bersih Tahun Berjalan", rp(is.LabaBersih)})
 
 	nr := [][]string{{"Kode", "Akun", "Jumlah (Rp)"}}
 	for _, sec := range append(append(bs.Aset, bs.Liabilitas...), bs.Ekuitas) {

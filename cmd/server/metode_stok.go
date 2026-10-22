@@ -13,7 +13,7 @@ import (
 // Bawaan FIFO. Usaha yang memulai kartu stok sebelum pilihan ini ada selama ini dihitung
 // rata-rata bergerak, jadi tercatat & terkunci di rata-rata supaya angka lamanya tidak berubah.
 
-const errMetodeStokTerkunci = "Metode nilai stok sudah dipilih dan dikunci. Perubahan metode memerlukan persetujuan DJP; hubungi tim Master Pajak."
+const errMetodeStokTerkunci = "Metode nilai stok sudah dipilih dan dikunci. Perubahan metode memerlukan persetujuan DJP; hubungi tim MasterPajak AI."
 
 // metodeStokLocked: metode yang berlaku dan apakah sudah terkunci. s.mu dipegang.
 func (s *tenant) metodeStokLocked() (metode string, terkunci bool) {
@@ -44,13 +44,22 @@ type metodeStokResp struct {
 	Metode   string           `json:"metode"`
 	Terkunci bool             `json:"terkunci"`
 	Pilihan  []finance.Option `json:"pilihan"`
+	// Pencatatan: periodik | perpetual (profil.MetodePersediaan), untuk keterangan hitung stok.
+	Pencatatan string `json:"pencatatan"`
+}
+
+func (s *tenant) pencatatanStokLocked() string {
+	if s.profile == nil || s.profile.MetodePersediaan == "" {
+		return "periodik"
+	}
+	return s.profile.MetodePersediaan
 }
 
 func (s *tenant) handleGetMetodeStok(w http.ResponseWriter, _ *http.Request) {
 	s.mu.RLock()
 	m, kunci := s.metodeStokLocked()
 	s.mu.RUnlock()
-	writeJSON(w, metodeStokResp{m, kunci, finance.MetodeNilaiStokOptions})
+	writeJSON(w, metodeStokResp{m, kunci, finance.MetodeNilaiStokOptions, s.pencatatanStokLocked()})
 }
 
 // handlePilihMetodeStok: Owner memilih metode nilai stok satu kali.
@@ -86,5 +95,5 @@ func (s *tenant) handlePilihMetodeStok(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.profile = &prof
-	writeJSON(w, metodeStokResp{prof.MetodeNilaiStok, true, finance.MetodeNilaiStokOptions})
+	writeJSON(w, metodeStokResp{prof.MetodeNilaiStok, true, finance.MetodeNilaiStokOptions, s.pencatatanStokLocked()})
 }

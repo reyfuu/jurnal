@@ -97,15 +97,54 @@ func labaBulan(txs []Transaction, assets []Asset, period string, sp StokPeriode)
 // BuildLaporanBerjalan: laporan satu bulan dengan saldo berjalan sejak saldo awal ob.
 // Bulan sebelum bulan saldo awal tidak dilaporkan berjalan (pakai bulan saldo awal).
 func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob OpeningBalance, kartu KartuStok) PeriodReport {
+	return buildBerjalan(txs, assets, period, period+"-31", ob, kartu)
+}
+
+// BuildNeracaPada: neraca per tanggal bebas (mis. 15 Agustus 2026). Transaksi, aset, dan kartu
+// stok sesudah tanggal itu tidak dihitung; penyusutan & amortisasi bulan itu belum masuk karena
+// dibukukan di akhir bulan.
+func BuildNeracaPada(txs []Transaction, assets []Asset, tanggal string, ob OpeningBalance, kartu KartuStok) BalanceSheet {
+	period := tanggal[:7]
+	if tanggal >= akhirBulan(period) {
+		return BuildLaporanBerjalan(txs, assets, period, ob, kartu).BalanceSheet
+	}
+	var sd []Transaction
+	for _, t := range txs {
+		if t.Tanggal <= tanggal {
+			sd = append(sd, t)
+		}
+	}
+	var as []Asset
+	for _, a := range assets {
+		if a.TanggalPerolehan <= tanggal {
+			as = append(as, a)
+		}
+	}
+	return buildBerjalan(sd, as, period, tanggal, ob, kartu).BalanceSheet
+}
+
+// buildBerjalan: laporan bulan period dengan posisi akhir pada tanggal sampai (period+"-31" =
+// sebulan penuh; tanggal lebih awal = sebagian bulan, tanpa penyusutan bulan itu).
+func buildBerjalan(txs []Transaction, assets []Asset, period, sampai string, ob OpeningBalance, kartu KartuStok) PeriodReport {
 	mulai := ob.Period()
 	if mulai == "" || period < mulai {
 		mulai = period
 	}
+	penuh := sampai >= period+"-31" || sampai >= akhirBulan(period)
 	sp := kartu.Periode(period)
+	if !penuh {
+		sp = kartu.Rentang(period+"-01", sampai)
+	}
 	is, as := labaBulan(txs, assets, period, sp)
+	var susutBulanIni int64
+	if !penuh { // penyusutan dibukukan di akhir bulan: belum ada pada tanggal ini
+		susutBulanIni = as.BebanPenyusutan + as.BebanAmortisasi
+		is.Depreciation, is.Amortization = 0, 0
+		is.turunan()
+	}
 
 	p0 := PosisiPada(ob, txs, period+"-00")
-	p1 := PosisiPada(ob, txs, period+"-31")
+	p1 := PosisiPada(ob, txs, sampai)
 
 	// Arus kas: transaksi yang uangnya bergerak bulan ini (tanggal pelunasan).
 	var kas []LedgerEntry
@@ -152,7 +191,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 
 	a := BalanceSheetAssets{
 		Cash: p1.Kas, Receivables: p1.Piutang, Inventory: persediaanAkhir,
-		FixedAssetsCost: as.TotalHargaPerolehan, AccumDepreciation: as.TotalAkumulasi, FixedAssets: as.TotalNilaiBuku,
+		FixedAssetsCost: as.TotalHargaPerolehan, AccumDepreciation: as.TotalAkumulasi - susutBulanIni, FixedAssets: as.TotalNilaiBuku + susutBulanIni,
 		OtherAssets: ob.AsetLain,
 	}
 	a.Total = a.Cash + a.Receivables + a.Inventory + a.FixedAssets + a.OtherAssets
@@ -171,7 +210,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 	cf.SetorModal, cf.Prive = p1.SetorModal-p0.SetorModal, p1.Prive-p0.Prive
 	return PeriodReport{
 		Period: period, Income: is, CashFlow: cf, Assets: as,
-		BalanceSheet: BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total},
+		BalanceSheet: BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total, Tanggal: min(sampai, akhirBulan(period))},
 	}
 }
 
