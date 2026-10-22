@@ -327,7 +327,7 @@ func BuildCashFlow(entries []LedgerEntry, is IncomeStatement, opening int64) Cas
 // perubahan modal kerja (NewReceivables/NewPayables harus sudah terisi).
 func (cf *CashFlow) susunTidakLangsung(is IncomeStatement) {
 	cf.OperasiTidakLangsung = CashFlowSection{}
-	cf.OperasiTidakLangsung.add("Laba bersih (dari laporan laba rugi)", is.NetProfit)
+	cf.OperasiTidakLangsung.add("Laba (rugi) bersih (dari laporan laba rugi)", is.NetProfit)
 	cf.OperasiTidakLangsung.add("Penyusutan aset tetap", is.Depreciation)
 	cf.OperasiTidakLangsung.add("Amortisasi harta tak berwujud", is.Amortization)
 	cf.OperasiTidakLangsung.add("Kenaikan piutang usaha", -cf.NewReceivables)

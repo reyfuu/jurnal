@@ -122,6 +122,12 @@ func TestSusunBanding(t *testing.T) {
 		t.Fatalf("baris %q tidak ada", k)
 		return BarisBanding{}
 	}
+	if r := cari(lr, "hpp"); r.Huruf != "D" || r.Sifat != SifatPengurang {
+		t.Errorf("banding hpp tanpa huruf/sifat: %+v", r)
+	}
+	if r := cari(lr, "laba_kotor"); r.Rumus != "E = C - D" {
+		t.Errorf("banding rumus: %+v", r)
+	}
 	if r := cari(lr, "laba_bersih"); r.Nilai[0] != 36_000 || r.Nilai[1] != 29_000 || r.Total != 65_000 {
 		t.Errorf("laba bersih %+v", r)
 	}
@@ -177,7 +183,7 @@ func TestRenderLaporanPDF(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := buf.String()
-	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", "Laba bersih", "36.000", `\(10.000\)`} {
+	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", `Laba \(rugi\) bersih tahun berjalan`, "36.000", `\(10.000\)`} {
 		if !strings.Contains(s, mau) {
 			t.Errorf("PDF tidak memuat %q", mau)
 		}
@@ -247,7 +253,7 @@ func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := buf.String()
-	for _, mau := range []string{`Laba kotor   \(E = C - D\)`, `\(10.000\)`, `\(5.000\)`, "30.000", "15.000"} { // potongan & penyusutan: kontra
+	for _, mau := range []string{`Laba \(rugi\) kotor   \(E = C - D\)`, `\(10.000\)`, `\(5.000\)`, "30.000", "15.000"} { // potongan & penyusutan: kontra
 		if !strings.Contains(s, mau) {
 			t.Errorf("PDF tidak memuat %q", mau)
 		}
@@ -255,6 +261,25 @@ func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
 	for _, tidak := range []string{`\(30.000\)`, `\(15.000\)`, `\(20.000\)`} { // HPP, beban, total beban: tanpa kurung
 		if strings.Contains(s, tidak) {
 			t.Errorf("beban tidak boleh dalam kurung: %q", tidak)
+		}
+	}
+}
+
+func TestAngkaSifat_BebanHitamTanpaMinus(t *testing.T) {
+	for _, c := range []struct {
+		v     int64
+		sifat string
+		teks  string
+		merah bool
+	}{
+		{-18_400, SifatPengurang, "18.400", false}, // beban & HPP: hitam, tanpa minus
+		{500, SifatPengurang, "(500)", true},       // beban yang menambah laba (koreksi)
+		{-625, SifatKontra, "(625)", true},         // penyusutan: kontra
+		{-1_000, "", "(1.000)", true},              // rugi
+		{2_000, "", "2.000", false},
+	} {
+		if teks, merah := angkaSifat(c.v, c.sifat); teks != c.teks || merah != c.merah {
+			t.Errorf("angkaSifat(%d, %q) = %q %v, mau %q %v", c.v, c.sifat, teks, merah, c.teks, c.merah)
 		}
 	}
 }

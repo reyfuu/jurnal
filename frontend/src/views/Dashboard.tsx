@@ -29,7 +29,7 @@ export function Dashboard({
   const k = d.kpis
   const trend = [
     { label: 'Omzet', kpi: k.omzet, color: 'var(--chart-1)', badge: 'badge-up' },
-    { label: 'Laba bersih', kpi: k.laba_bersih, color: 'var(--chart-3)', badge: 'badge-up' },
+    { label: 'Laba (rugi) bersih', kpi: k.laba_bersih, color: 'var(--chart-3)', badge: 'badge-up' },
     { label: 'Margin laba', kpi: k.margin_laba, color: 'var(--chart-1)', badge: 'pts-up' },
   ]
   const piutangLink = canSee('piutang-utang')
@@ -123,7 +123,7 @@ export function Dashboard({
             <div className="legend-row">
               <span className="legend-item"><Dot color="var(--chart-1)" />Omzet</span>
               <span className="legend-item"><Dot color="var(--chart-2)" />Total biaya</span>
-              <span className="legend-item"><Dot color="var(--chart-3)" />Laba bersih</span>
+              <span className="legend-item"><Dot color="var(--chart-3)" />Laba (rugi) bersih</span>
             </div>
           </div>
           <MainChart points={d.monthly_trend_11m} />

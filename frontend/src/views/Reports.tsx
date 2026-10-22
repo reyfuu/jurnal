@@ -9,6 +9,7 @@ import { ekspor } from '@/lib/garansi'
 import { daftarUrl, getLaporanRentang, laporanPdfUrl, type AssetSummary, type LaporanRentang, type BalanceSheet, type BagianPDF, type CashFlow, type CashFlowSection, type IncomeStatement, type PeriodOption } from '@/lib/api'
 import { formatRp, formatPct, formatSignedRp } from '@/lib/format'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
+import { angkaSifat, type Sifat } from '@/lib/angkaLaporan'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -153,6 +154,29 @@ export function LaporanKeuangan({ r, bs, cf, assets, period, periodLabel, period
   )
 }
 
+/** Satu baris laba rugi opsi B: huruf, label + rumus, angka sesuai sifatnya (lib/angkaLaporan). */
+function BarisLR({ h, label, rumus, v, sifat = '', tebal = false, style }: { h?: string; label: string; rumus?: string; v: number; sifat?: Sifat; tebal?: boolean; style?: React.CSSProperties }) {
+  const a = angkaSifat(v, sifat)
+  return (
+    <div className="list-row" style={style}>
+      <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <span style={{ width: 14, flex: 'none', fontWeight: 700, color: 'var(--text-muted)' }}>{h}</span>
+        <span>
+          {tebal ? <strong>{label}</strong> : label}
+          {rumus && <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{rumus}</span>}
+        </span>
+      </span>
+      <strong style={{ color: a.merah ? RED : 'var(--text-primary)' }}>{a.teks}</strong>
+    </div>
+  )
+}
+
+/** Rincian HPP; v bertanda seperti beban (negatif = menambah HPP), ditulis tanpa minus. */
+function SubLR({ label, v }: { label: string; v: number }) {
+  const a = angkaSifat(v, 'pengurang')
+  return <div className="list-row sub"><span style={{ paddingLeft: 22 }}>{label}</span><span className="tabular" style={{ color: a.merah ? RED : undefined }}>{a.teks}</span></div>
+}
+
 function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
   const nonKas = r.depreciation + r.amortization
   const selisih = r.net_profit - cf.net_cash
@@ -161,52 +185,58 @@ function LabaRugi({ r, cf }: { r: IncomeStatement; cf: CashFlow }) {
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Laporan Laba Rugi</div>
         <div className="chart-subtitle" style={{ marginBottom: 12 }}>
-          Margin laba bersih {formatPct(r.margin_bps)} · basis akrual
+          Margin laba (rugi) bersih {formatPct(r.margin_bps)} · basis akrual · dalam Rupiah
         </div>
         <div className="list-rows tabular">
-          <AmountRow label="Omzet (penjualan kotor)" value={formatRp(r.omzet)} color="var(--text-brand)" bold />
-          <AmountRow label="Potongan channel / aplikasi" value={formatRp(-r.channel_fees)} color={RED} />
-          <AmountRow label="Penjualan bersih" value={formatRp(r.net_sales)} bold />
-          <AmountRow label={r.hpp_stok ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)'} value={formatRp(-r.cogs)} color={RED} />
-          {r.hpp_stok && (() => {
-            const h = r.hpp_stok
-            const takDilacak = r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi
+          {(() => {
+            // Opsi B (sama dengan PDF): baris utama berhuruf, baris jumlah menulis rumusnya.
+            const ada = r.other_income !== 0
             return <>
-              <div className="list-row sub"><span>Modal barang terjual (kartu stok)</span><span className="tabular">{formatRp(-h.hpp_jual)}</span></div>
-              {h.selisih_opname !== 0 && <div className="list-row sub"><span>Selisih stok opname {h.selisih_opname < 0 ? '(hilang / rusak)' : '(lebih)'}</span><span className="tabular">{formatRp(h.selisih_opname)}</span></div>}
-              {h.koreksi !== 0 && <div className="list-row sub"><span>Koreksi nilai stok minus</span><span className="tabular">{formatRp(h.koreksi)}</span></div>}
-              {takDilacak !== 0 && <div className="list-row sub"><span>Belanja bahan tanpa barang di stok</span><span className="tabular">{formatRp(-takDilacak)}</span></div>}
+              <BarisLR h="A" label="Omzet (penjualan kotor)" v={r.omzet} />
+              <BarisLR h="B" label="Potongan channel / aplikasi" v={-r.channel_fees} sifat="kontra" />
+              <BarisLR h="C" label="Penjualan bersih" rumus="C = A - B" v={r.net_sales} tebal />
+              <BarisLR h="D" label={r.hpp_stok ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)'} v={-r.cogs} sifat="pengurang" />
+              {r.hpp_stok && (() => {
+                const h = r.hpp_stok
+                const takDilacak = r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi
+                return <>
+                  <SubLR label="Modal barang terjual (kartu stok)" v={-h.hpp_jual} />
+                  {h.selisih_opname !== 0 && <SubLR label={`Selisih stok opname ${h.selisih_opname < 0 ? '(hilang / rusak)' : '(lebih)'}`} v={h.selisih_opname} />}
+                  {h.koreksi !== 0 && <SubLR label="Koreksi nilai stok minus" v={h.koreksi} />}
+                  {takDilacak !== 0 && <SubLR label="Belanja bahan tanpa barang di stok" v={-takDilacak} />}
+                </>
+              })()}
+              <BarisLR h="E" label="Laba (rugi) kotor" rumus="E = C - D" v={r.gross_profit} tebal />
+              <div className="section-head">Beban operasional</div>
+              {(r.opex_lines ?? []).map((l, i) => <BarisLR key={i} label={l.label} v={-l.amount} sifat="pengurang" />)}
+              <BarisLR h="F" label="Total beban operasional (tunai)" rumus="F = jumlah beban" v={-r.opex} sifat="pengurang" tebal />
+              <BarisLR h="G" label="EBITDA (laba (rugi) sebelum penyusutan & amortisasi)" rumus="G = E - F" v={r.ebitda} tebal
+                style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }} />
+              <div className="list-row sub"><span>Kemampuan usaha menghasilkan kas dari operasi</span><span /></div>
+              <div className="section-head">Penutupan bulan: penyusutan & amortisasi</div>
+              <BarisLR h="H" label="Beban penyusutan aset tetap" v={-r.depreciation} sifat="kontra" />
+              <BarisLR h="I" label="Beban amortisasi harta tak berwujud" v={-r.amortization} sifat="kontra" />
+              <BarisLR h="J" label="Laba (rugi) usaha (EBIT)" rumus="J = G - H - I" v={r.ebit} tebal />
+              {ada && <BarisLR h="K" label="Pendapatan lain" v={r.other_income} />}
+              <BarisLR h={ada ? 'L' : 'K'} label="Laba (rugi) bersih tahun berjalan" rumus={ada ? 'L = J + K' : 'K = J'} v={r.net_profit} tebal
+                style={{ background: 'color-mix(in srgb, var(--accent-green) 9%, transparent)' }} />
             </>
           })()}
-          <AmountRow label="Laba kotor" value={formatRp(r.gross_profit)} bold />
-          <div className="section-head">Beban operasional</div>
-          {(r.opex_lines ?? []).map((l, i) => (
-            <AmountRow key={i} label={l.label} value={formatRp(-l.amount)} color={RED} />
-          ))}
-          <AmountRow label="Total beban operasional (tunai)" value={formatRp(-r.opex)} color={RED} bold />
-          <AmountRow label="EBITDA" value={formatRp(r.ebitda)} color={r.ebitda < 0 ? RED : 'var(--text-brand)'} bold
-            style={{ border: '1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)' }} />
-          <div className="list-row sub"><span>Laba sebelum penyusutan & amortisasi — kemampuan usaha menghasilkan kas dari operasi</span><span /></div>
-          <div className="section-head">Penutupan bulan: penyusutan & amortisasi</div>
-          <AmountRow label="Beban penyusutan aset tetap" value={formatRp(-r.depreciation)} color={RED} />
-          <AmountRow label="Beban amortisasi harta tak berwujud" value={formatRp(-r.amortization)} color={RED} />
-          <AmountRow label="Laba usaha (EBIT)" value={formatRp(r.ebit)} bold />
-          {r.other_income !== 0 && <AmountRow label="Pendapatan lain" value={formatRp(r.other_income)} color={GREEN} />}
-          <AmountRow label="Laba bersih" value={formatRp(r.net_profit)} color={r.net_profit < 0 ? RED : GREEN} bold />
         </div>
+        <p className="kpi-meta-row" style={{ marginTop: 10 }}>Beban & HPP ditulis apa adanya (mengurangi laba). Angka merah dalam kurung = akun kontra (potongan, penyusutan, amortisasi) atau rugi.</p>
       </div>
 
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Jembatan ke Tab Lain</div>
         <div className="chart-subtitle">Angka kunci yang dipakai Neraca, Arus Kas &amp; Aset</div>
         <div className="list-rows tabular">
-          <AmountRow label="Laba bersih → Modal di Neraca" value={formatRp(r.net_profit)} color={GREEN} bold />
+          <AmountRow label="Laba (rugi) tahun berjalan → Modal di Neraca" value={formatRp(r.net_profit)} color={r.net_profit < 0 ? RED : GREEN} bold />
           <AmountRow label="Kenaikan kas riil → tab Arus Kas" value={formatSignedRp(cf.net_cash)} color={BLUE} bold />
           <AmountRow label="Selisih laba vs kas" value={formatSignedRp(-selisih)} color={selisih === 0 ? GREEN : RED} />
         </div>
         {selisih !== 0 && (
           <div className="note-box">
-            <strong>Kenapa laba {formatRp(r.net_profit)} tapi kas bergerak {formatSignedRp(cf.net_cash)}?</strong>{' '}
+            <strong>Kenapa laba (rugi) {formatRp(r.net_profit)} tapi kas bergerak {formatSignedRp(cf.net_cash)}?</strong>{' '}
             {cf.new_receivables > 0 && <>{formatRp(cf.new_receivables)} masih tertahan di piutang. </>}
             {cf.new_payables > 0 && <>{formatRp(cf.new_payables)} biaya sudah dicatat tapi belum dibayar. </>}
             {nonKas > 0 && <>{formatRp(nonKas)} penyusutan &amp; amortisasi tidak mengeluarkan uang sama sekali. </>}
@@ -260,7 +290,7 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
             <AmountRow label="Tambahan Modal (setoran − ambil pribadi + aset & stok tanpa kas)" value={formatRp(bs.equity.added_capital)} />
           )}
           <AmountRow label="Laba Ditahan (saldo awal + laba bulan-bulan sebelumnya)" value={formatRp(bs.equity.retained_earnings)} color={bs.equity.retained_earnings < 0 ? RED : GREEN} />
-          <AmountRow label="Laba Bersih Periode Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : GREEN} />
+          <AmountRow label="Laba (Rugi) Tahun Berjalan" value={formatRp(bs.equity.current_profit)} color={bs.equity.current_profit < 0 ? RED : GREEN} />
 
           <AmountRow
             label="TOTAL PASIVA (Utang + Modal)"
@@ -290,7 +320,7 @@ function Neraca({ bs, kartuAktif }: { bs: BalanceSheet; kartuAktif: boolean }) {
           · Kas {formatRp(a.cash)} = saldo akhir di tab Arus Kas.<br />
           · Piutang &amp; utang = penyesuaian modal kerja di Arus Kas metode tidak langsung.<br />
           · Nilai buku aset {formatRp(a.fixed_assets)} = total tab Aset &amp; Penyusutan.<br />
-          · Laba {formatRp(bs.equity.current_profit)} = baris Laba Bersih di tab Laba Rugi.
+          · Laba (rugi) {formatRp(bs.equity.current_profit)} = baris Laba (rugi) bersih tahun berjalan di tab Laba Rugi.
         </div>
         {!kartuAktif && (
           <div className="note-box warn">
@@ -375,7 +405,7 @@ function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlo
           <div className="chart-subtitle">
             {metode === 'langsung'
               ? 'Menelusuri uang yang benar-benar masuk & keluar kas'
-              : 'Mulai dari laba bersih, lalu disesuaikan sampai ketemu kas'}
+              : 'Mulai dari laba (rugi) bersih, lalu disesuaikan sampai ketemu kas'}
           </div>
           <div className="list-rows tabular">
             <Section title="A. Aktivitas Operasi" section={operasi} total="Kas Bersih dari Aktivitas Operasi" />
@@ -413,7 +443,7 @@ function ArusKas({ cf, netProfit, metode, setMetode, kartuAktif }: { cf: CashFlo
           )}
           <div className="list-rows tabular" style={{ marginTop: 16 }}>
             <div className="section-head">Jembatan laba → kas</div>
-            <AmountRow label="Laba bersih" value={formatRp(netProfit)} color={GREEN} />
+            <AmountRow label="Laba (rugi) bersih tahun berjalan" value={formatRp(netProfit)} color={netProfit < 0 ? RED : GREEN} />
             <AmountRow label="Beban non-kas (penyusutan + amortisasi)" value={formatSignedRp(cf.depreciation + cf.amortization)} color={GREEN} />
             <AmountRow label="Tertahan di piutang" value={formatSignedRp(-cf.new_receivables)} color={RED} />
             <AmountRow label="Tertunda di utang" value={formatSignedRp(cf.new_payables)} color={GREEN} />

@@ -61,7 +61,7 @@ export function TutupBuku({ periods, period, bisaUbah, onBuka, onChanged }: {
 
       {d && <>
         <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginBottom: 16 }}>
-          {[['Laba bersih', d.laba], ['EBITDA', d.ebitda], ['Penyusutan & amortisasi', d.penyusutan], ['Kas akhir bulan', d.kas_akhir]].map(([l, v]) => (
+          {[['Laba (rugi) bersih', d.laba], ['EBITDA', d.ebitda], ['Penyusutan & amortisasi', d.penyusutan], ['Kas akhir bulan', d.kas_akhir]].map(([l, v]) => (
             <div className="card" key={l as string} style={{ padding: '14px 18px' }}>
               <div className="kpi-label">{l}</div>
               <div className="kpi-value tabular" style={{ fontSize: 20, color: (v as number) < 0 ? 'var(--text-danger)' : undefined }}>{formatRp(v as number)}</div>

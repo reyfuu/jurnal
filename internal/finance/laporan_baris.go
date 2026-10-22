@@ -83,22 +83,22 @@ func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	baris(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees, SifatKontra, "")
 	baris(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales, "", huruf["omzet"]+" - "+huruf["potongan"])
 	baris(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS, SifatPengurang, "")
-	baris(GayaTotal, "laba_kotor", "Laba kotor", is.GrossProfit, "", huruf["penjualan_bersih"]+" - "+huruf["hpp"])
+	baris(GayaTotal, "laba_kotor", "Laba (rugi) kotor", is.GrossProfit, "", huruf["penjualan_bersih"]+" - "+huruf["hpp"])
 	s.judul("judul_beban", "Beban operasional")
 	for _, l := range is.OpexLines {
 		s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: "beban:" + l.Label, Label: l.Label, Nilai: -l.Amount, Gaya: GayaBaris, Agregat: s.agregat, Sifat: SifatPengurang})
 	}
-	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, "jumlah beban di atas")
-	baris(GayaTotal, "ebitda", "EBITDA (laba sebelum penyusutan & amortisasi)", is.EBITDA, "", huruf["laba_kotor"]+" - "+huruf["total_beban"])
+	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, "jumlah beban")
+	baris(GayaTotal, "ebitda", "EBITDA (laba (rugi) sebelum penyusutan & amortisasi)", is.EBITDA, "", huruf["laba_kotor"]+" - "+huruf["total_beban"])
 	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
 	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatKontra, "")
 	baris(GayaBaris, "amortisasi", "Beban amortisasi harta tak berwujud", -is.Amortization, SifatKontra, "")
-	baris(GayaTotal, "ebit", "Laba usaha (EBIT)", is.EBIT, "", huruf["ebitda"]+" - "+huruf["penyusutan"]+" - "+huruf["amortisasi"])
+	baris(GayaTotal, "ebit", "Laba (rugi) usaha (EBIT)", is.EBIT, "", huruf["ebitda"]+" - "+huruf["penyusutan"]+" - "+huruf["amortisasi"])
 	if is.OtherIncome != 0 {
 		baris(GayaBaris, "pendapatan_lain", "Pendapatan lain", is.OtherIncome, "", "")
-		baris(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit, "", huruf["ebit"]+" + "+huruf["pendapatan_lain"])
+		baris(GayaTotal, "laba_bersih", "Laba (rugi) bersih tahun berjalan", is.NetProfit, "", huruf["ebit"]+" + "+huruf["pendapatan_lain"])
 	} else {
-		baris(GayaTotal, "laba_bersih", "Laba bersih", is.NetProfit, "", huruf["ebit"])
+		baris(GayaTotal, "laba_bersih", "Laba (rugi) bersih tahun berjalan", is.NetProfit, "", huruf["ebit"])
 	}
 	return s.b
 }
@@ -128,7 +128,7 @@ func BagianNeraca(bs BalanceSheet) BagianLaporan {
 	s.tambah(GayaBaris, "modal_awal", "Modal awal", bs.Equity.OpeningCapital)
 	s.tambah(GayaBaris, "tambahan_modal", "Tambahan modal - ambil pribadi", bs.Equity.AddedCapital)
 	s.tambah(GayaBaris, "laba_ditahan", "Laba ditahan (saldo awal + bulan-bulan sebelumnya)", bs.Equity.RetainedEarnings)
-	s.tambah(GayaBaris, "laba_berjalan", "Laba bersih periode berjalan", bs.Equity.CurrentProfit)
+	s.tambah(GayaBaris, "laba_berjalan", "Laba (rugi) tahun berjalan", bs.Equity.CurrentProfit)
 	s.tambah(GayaTotal, "total_modal", "Total modal", bs.Equity.Total)
 	s.tambah(GayaTotal, "total_pasiva", "Total pasiva (utang + modal)", bs.Liabilities.Total+bs.Equity.Total)
 	return s.b
@@ -185,6 +185,10 @@ type BarisBanding struct {
 	Agregat string  `json:"agregat,omitempty"`
 	Nilai   []int64 `json:"nilai"` // satu per kolom
 	Total   int64   `json:"total"`
+	// sama dengan BarisLaporan: huruf, rumus, dan sifat (pengurang / kontra) untuk laba rugi
+	Huruf string `json:"huruf,omitempty"`
+	Rumus string `json:"rumus,omitempty"`
+	Sifat string `json:"sifat,omitempty"`
 }
 
 type BagianBanding struct {
@@ -268,7 +272,8 @@ func SusunBanding(laporan []PeriodeLaporan) Banding {
 				if i < 0 {
 					i = sebelum + 1
 					bg.Baris = slices.Insert(bg.Baris, i, BarisBanding{
-						Kunci: r.Kunci, Label: r.Label, Gaya: r.Gaya, Agregat: r.Agregat, Nilai: make([]int64, n)})
+						Kunci: r.Kunci, Label: r.Label, Gaya: r.Gaya, Agregat: r.Agregat, Nilai: make([]int64, n),
+						Huruf: r.Huruf, Rumus: r.Rumus, Sifat: r.Sifat})
 				}
 				bg.Baris[i].Nilai[ki] = r.Nilai
 				sebelum = i
