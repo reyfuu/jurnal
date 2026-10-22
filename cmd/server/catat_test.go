@@ -59,3 +59,37 @@ func TestCatat_JurnalMultiAkun(t *testing.T) {
 		t.Fatalf("catatan terhapus harus hilang: %d", rec.Code)
 	}
 }
+
+// Checklist tester No 27: halaman Catat hanya punya satu keterangan (kepala). Membuka catatan
+// harus mengembalikan keterangan itu supaya simpan ulang tidak mengosongkannya; catatan lama
+// dengan keterangan per baris digabung jadi satu.
+func TestCatat_KeteranganKepalaBertahanSaatDiubah(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Kas","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	buatCatat := func(body string) string {
+		rec := do(srv, qa, http.MethodPost, "/api/v1/catat", body)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("catat: %d %s", rec.Code, rec.Body)
+		}
+		var c catatResp
+		_ = json.Unmarshal(rec.Body.Bytes(), &c)
+		return "/api/v1/catat/" + strconv.Itoa(c.Grup)
+	}
+	url := buatCatat(`{"tanggal":"2026-01-10","keterangan":"Belanja bahan","baris":[{"akun":"6106","debit":10000},{"akun":"6190","debit":5000},{"akun":"1101","kredit":15000}]}`)
+	if g := getJSON[catatResp](t, srv, qa, url); g.Keterangan != "Belanja bahan" {
+		t.Fatalf("keterangan kepala = %q", g.Keterangan)
+	}
+	// simpan ulang seperti klien baru: keterangan baris kosong, kepala dari GET
+	if rec := do(srv, qa, http.MethodPut, url, `{"tanggal":"2026-01-10","keterangan":"Belanja bahan","baris":[{"akun":"6106","debit":12000},{"akun":"6190","debit":5000},{"akun":"1101","kredit":17000}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("ubah: %d %s", rec.Code, rec.Body)
+	}
+	if g := getJSON[catatResp](t, srv, qa, url); g.Keterangan != "Belanja bahan" {
+		t.Fatalf("keterangan setelah diubah = %q", g.Keterangan)
+	}
+	lama := buatCatat(`{"tanggal":"2026-01-11","baris":[{"akun":"6106","keterangan":"Ongkir","debit":10000},{"akun":"6190","keterangan":"Lain-lain","debit":5000},{"akun":"1101","kredit":15000}]}`)
+	if g := getJSON[catatResp](t, srv, qa, lama); g.Keterangan != "Ongkir; Lain-lain" {
+		t.Fatalf("keterangan per baris lama digabung = %q", g.Keterangan)
+	}
+}

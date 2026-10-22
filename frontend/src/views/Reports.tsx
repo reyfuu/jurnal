@@ -241,7 +241,7 @@ function LabaRugi({ r, cf, nm }: { r: IncomeStatement; cf: CashFlow; nm: Nama })
               { kunci: 'laba_kotor', label: 'Laba (rugi) kotor', nilai: r.gross_profit, gaya: 'total', berhuruf: true, suku: ['penjualan_bersih', '-hpp'] },
               { kunci: 'judul_beban', label: 'Beban operasional', nilai: 0, gaya: 'judul' },
               ...(r.opex_lines ?? []).map((l, i) => ({ kunci: `beban:${i}`, label: nm(`beban:${l.label}`, l.label), nilai: -l.amount, gaya: 'baris' as const, sifat: 'pengurang' as const })),
-              { kunci: 'total_beban', label: 'Total beban operasional (tunai)', nilai: -r.opex, gaya: 'total', sifat: 'pengurang', berhuruf: true, suku: ['*jumlah beban'] },
+              { kunci: 'total_beban', label: 'Total beban operasional', nilai: -r.opex, gaya: 'total', sifat: 'pengurang', berhuruf: true, suku: ['*jumlah beban'] },
               { kunci: 'ebitda', label: 'EBITDA (laba (rugi) sebelum penyusutan & amortisasi)', nilai: r.ebitda, gaya: 'total', berhuruf: true, suku: ['laba_kotor', '-total_beban'] },
               { kunci: 'judul_penutupan', label: 'Penutupan bulan: penyusutan & amortisasi', nilai: 0, gaya: 'judul' },
               { kunci: 'penyusutan', label: nm('penyusutan', 'Beban penyusutan aset tetap'), nilai: -r.depreciation, gaya: 'baris', sifat: 'pengurang', berhuruf: true },

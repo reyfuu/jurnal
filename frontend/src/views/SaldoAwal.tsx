@@ -10,6 +10,7 @@ import {
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
+import { urutSaldo } from '@/lib/saldoAwal'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -100,6 +101,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const jumlah = (s: string) => tampil.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
   const harta = jumlah('harta'), kewajiban = jumlah('kewajiban'), modal = jumlah('modal')
   const selisih = harta - kewajiban - modal
+  // Laba ditahan minus = rugi tahun lalu, wajar; tidak ikut diperingatkan.
+  const minus = biasa.filter((b) => b.nominal < 0 && b.kategori !== 'laba_ditahan')
   const tanpaKategori = biasa.filter((b) => (b.nama.trim() || b.nominal) && !b.kategori)
   const totalPersediaan = biasa.filter((b) => b.kategori === 'persediaan').reduce((t, b) => t + (b.nominal || 0), 0)
   const nilaiBarang = info?.persediaan ?? 0
@@ -121,10 +124,10 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     const draft = bacaDraft<{ tanggal: string; baris: SaldoAkun[] }>(DRAFT_SALDO)
     if (draft?.baris?.length) {
       setTanggal(draft.tanggal)
-      setBaris(draft.baris.map((r) => jadiBaris(r)))
+      setBaris(urutSaldo(draft.baris.map((r) => jadiBaris(r)), kategori.map((k) => k.id)))
       setDipulihkan(true)
     } else {
-      setBaris(rows)
+      setBaris(urutSaldo(rows, kategori.map((k) => k.id)))
       setDipulihkan(false)
     }
     setError('')
@@ -170,7 +173,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setBusy(true)
     setError('')
     try {
-      const rincian = tampil.filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
+      // urutan simpan = urutan nomor akun, juga bila saran kategori datang setelah baris ditinggalkan
+      const rincian = urutSaldo(tampil, kategori.map((k) => k.id)).filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
       const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian }, selisih !== 0 && paksa)
       setPaksa(false)
       hapusDraft(DRAFT_SALDO)
@@ -343,7 +347,10 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                     const r = b as Baris
                     const s = r._saran
                     return (
-                      <tr key={r._k}>
+                      <tr key={r._k} onBlur={(e) => {
+                        // urutkan ulang setelah fokus meninggalkan baris, bukan saat mengetik, supaya baris tidak melompat
+                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setBaris((bs) => bs && urutSaldo(bs, kategori.map((k) => k.id)))
+                      }}>
                         <td><input className="input-field" aria-label="Kode akun" value={r.kode ?? ''} placeholder="otomatis" onChange={(e) => ubah(r._k, { kode: e.target.value, _kodeAuto: false })} /></td>
                         <td>
                           <input className="input-field" aria-label="Nama akun" value={r.nama} placeholder="mis. Bank BCA, Pinjaman koperasi"
@@ -432,10 +439,9 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                   </span>
                 </label>
               )}
-              {biasa.some((b) => b.nominal < 0) && (
+              {minus.length > 0 && (
                 <p className="text-sm" style={{ color: AMBER }}>
-                  Ada saldo minus: {biasa.filter((b) => b.nominal < 0).map((b) => `${b.nama} ${formatRp(b.nominal)}`).join(', ')}. Saldo minus berarti berlawanan dengan saldo normal akunnya
-                  (mis. laba ditahan minus = rugi tahun lalu); pastikan memang begitu.
+                  Ada saldo minus: {minus.map((b) => `${b.nama} ${formatRp(b.nominal)}`).join(', ')}. Saldo minus berarti berlawanan dengan saldo normal akunnya; pastikan memang begitu.
                 </p>
               )}
               {tanpaKategori.length > 0 && (

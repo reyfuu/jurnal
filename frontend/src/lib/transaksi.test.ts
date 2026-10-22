@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JenisInfo, Tx } from './api'
-import { filterTx, labelBulan, monthsOf, summarize } from './transaksi'
+import { bulanAwal, bulanWIB, filterTx, labelBulan, monthsOf, summarize } from './transaksi'
 
 const JENIS: JenisInfo[] = [
   { nama: 'Penjualan', arah: 'masuk', pos: 'omzet' },
@@ -55,5 +55,20 @@ describe('monthsOf', () => {
   it('bulan unik, terbaru dulu, dengan label Indonesia', () => {
     expect(monthsOf(txs)).toEqual(['2026-08', '2026-07'])
     expect(labelBulan('2026-08')).toBe('Agustus 2026')
+  })
+})
+
+describe('bulan awal daftar transaksi (checklist No 26)', () => {
+  it('bulan WIB, bukan UTC: 1 Nov 00.30 WIB masih 31 Okt UTC', () => {
+    expect(bulanWIB(new Date('2026-10-31T17:30:00Z'))).toBe('2026-11')
+  })
+  it('bawaan bulan berjalan; pilihan tersimpan menang, termasuk "semua bulan" (string kosong)', () => {
+    expect(bulanAwal(null, '2026-10')).toBe('2026-10')
+    expect(bulanAwal('2026-08', '2026-10')).toBe('2026-08')
+    expect(bulanAwal('', '2026-10')).toBe('')
+  })
+  it('daftar bulan memuat bulan berjalan walau belum ada transaksinya', () => {
+    expect(monthsOf([t(1, '2026-08-01', 'Penjualan', 1)], '2026-10')).toEqual(['2026-10', '2026-08'])
+    expect(monthsOf([t(1, '2026-10-01', 'Penjualan', 1)], '2026-10')).toEqual(['2026-10'])
   })
 })

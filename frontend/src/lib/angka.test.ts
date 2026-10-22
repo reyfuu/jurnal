@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { angka, bacaAngka, ribuan } from './angka'
+import { angka, bacaAngka, posisiKursor, ribuan } from './angka'
 
 describe('ribuan', () => {
   it('memberi titik pemisah ribuan', () => {
@@ -30,5 +30,19 @@ describe('angka', () => {
     expect(p).toMatchObject({ type: 'text', inputMode: 'numeric', value: '1.500.000' })
     p.onChange({ target: { value: '1.500.0007' } } as React.ChangeEvent<HTMLInputElement>)
     expect(nilai).toBe(15_000_007)
+  })
+})
+
+describe('posisiKursor (checklist No 28: kursor tidak melompat ke akhir)', () => {
+  it('kursor tetap setelah digit yang sama walau titik ribuan bergeser', () => {
+    // "1.250.000", hapus "2" (kursor setelah "1") → 150000 → "150.000", kursor setelah "1"
+    expect(posisiKursor('150.000', 1)).toBe(1)
+    // sisip "9" setelah "1.2" pada "1.250.000" → 1.925.0000? digit kiri = 3 → "19.250.000" posisi setelah "19.2"
+    expect(posisiKursor('19.250.000', 3)).toBe(4)
+  })
+  it('di ujung kiri dan kanan', () => {
+    expect(posisiKursor('1.000', 0)).toBe(0)
+    expect(posisiKursor('1.000', 4)).toBe(5)
+    expect(posisiKursor('', 0)).toBe(0)
   })
 })

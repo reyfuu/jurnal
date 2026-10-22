@@ -391,6 +391,7 @@ export default function App() {
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'transaksi':
         return <Transaksi key={bukaTab.n} aksiAwal={bukaTab.tab} isiAI={sinyalAI} onChanged={() => reload(me!, period)}
+          onJurnalUmum={canSee('jurnal-umum') ? () => navigate('jurnal-umum') : undefined}
           lihat={me!.lihat && { klienId: me!.lihat.klien_id, bolehUsul: !!me!.master?.izin.includes('usul_koreksi') }} />
       case 'stok-gudang':
         return <StokGudang key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />

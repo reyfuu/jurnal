@@ -21,12 +21,13 @@ import { formatQty, parseQty, qtyKeTeks } from '@/lib/qty'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
 import { MutasiDialog } from '@/views/MutasiDialog'
-import { channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, summarize } from '@/lib/transaksi'
+import { bulanAwal, bulanWIB, channelsOf, filterTx, formatTanggal, isMasuk, labelBulan, monthsOf, summarize } from '@/lib/transaksi'
 import { angka } from '@/lib/angka'
 
 const PAGE = 100
 const ALL = '__all__' // Radix Select tidak menerima value kosong
 const AUTO = '__auto__' // akun otomatis dari jenis
+const KUNCI_BULAN = 'mp:transaksi-bulan' // pilihan filter bulan, diingat selama tab terbuka
 // Tanggal hari ini menurut WIB; toISOString() memakai UTC sehingga sebelum pukul 07.00 jatuh ke kemarin.
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
 // Isian awal transaksi yang diisi Tanya AI (dialog transaksi).
@@ -39,13 +40,20 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
 /** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat).
- *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan). */
-export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI }) {
+ *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan).
+ *  onJurnalUmum: buka Jurnal Umum (hanya bila pengguna boleh melihatnya). */
+export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI; onJurnalUmum?: () => void }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
-  const [filter, setFilter] = useState({ bulan: '', jenis: '', cari: '', arah: '', channel: '' })
+  // Bawaan bulan berjalan supaya daftar tidak panjang; "Semua bulan" tetap bisa dipilih.
+  const bulanIni = bulanWIB()
+  const [filter, setFilter] = useState(() => {
+    let tersimpan: string | null = null
+    try { tersimpan = sessionStorage.getItem(KUNCI_BULAN) } catch { /* mode privat */ }
+    return { bulan: bulanAwal(tersimpan, bulanIni), jenis: '', cari: '', arah: '', channel: '' }
+  })
   const [limit, setLimit] = useState(PAGE)
   const [editing, setEditing] = useState<Editing>(null)
   // Catat baru & catatan jurnal multi-akun dibuka di halaman penuh (CatatJurnal), bukan dialog.
@@ -89,10 +97,15 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
   }
   const sum = useMemo(() => summarize(shown, jenis), [shown, jenis])
   const posOf = useMemo(() => Object.fromEntries(jenis.map((j) => [j.nama, j.pos])), [jenis])
-  const months = useMemo(() => monthsOf(txs), [txs])
+  // bulan terpilih ikut tampil walau transaksinya sudah tidak ada, supaya pilihan tidak kosong
+  const months = useMemo(() => monthsOf(txs, ...[bulanIni, filter.bulan].filter(Boolean)), [txs, bulanIni, filter.bulan])
   const channels = useMemo(() => channelsOf(txs), [txs])
 
-  const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
+  const setF = (patch: Partial<typeof filter>) => {
+    if (patch.bulan !== undefined) try { sessionStorage.setItem(KUNCI_BULAN, patch.bulan) } catch { /* mode privat */ }
+    setFilter((f) => ({ ...f, ...patch }))
+    setLimit(PAGE)
+  }
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
   const isiAi = useIsiAI<{ editing: Editing; qtyTeks: string }, Partial<TxInput>>(isiAI, 'transaksi', {
     ambil: () => ({ editing, qtyTeks }),
@@ -157,7 +170,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
         <PageHeader title="Catat transaksi" subtitle="Isi baris jurnal (akun, debit / kredit), atau isi dari foto nota." />
         <CatatJurnal key={`${halaman.jenis}|${halaman.grup ?? ''}`} jenisAwal={halaman.jenis} grup={halaman.grup}
           onKembali={() => setHalaman(null)}
-          onTersimpan={async (pesan) => { setTerkirim(pesan); await Promise.all([refresh(), onChanged()]) }} />
+          onTersimpan={async (pesan, tanggal) => {
+            setTerkirim(pesan)
+            // catatan bertanggal di bulan lain: pindah ke bulannya supaya tidak terlihat hilang
+            if (tanggal && filter.bulan && !tanggal.startsWith(filter.bulan)) setF({ bulan: tanggal.slice(0, 7) })
+            await Promise.all([refresh(), onChanged()])
+          }} />
       </>
     )
   }
@@ -223,6 +241,10 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
           </SelectContent>
         </Select>
       </div>
+      <p className="workspace-subtitle" style={{ margin: '-4px 0 0' }}>
+        {filter.bulan ? `Menampilkan ${labelBulan(filter.bulan)}` : 'Menampilkan semua bulan'}
+        {onJurnalUmum && <> · <button type="button" className="underline underline-offset-4" onClick={onJurnalUmum}>Lihat semua di Jurnal Umum</button></>}
+      </p>
 
       <CashWarningBanner warnings={warnings} />
       {error && !editing && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}

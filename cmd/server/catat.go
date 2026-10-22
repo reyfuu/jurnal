@@ -175,8 +175,15 @@ func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "catatan tidak ditemukan", http.StatusNotFound)
 		return
 	}
+	// Satu keterangan per catatan: gabungan keterangan berbeda (catatan lama punya per baris).
+	var ket []string
+	for _, t := range txs {
+		if k := strings.TrimSpace(t.Keterangan); k != "" && !slices.Contains(ket, k) {
+			ket = append(ket, k)
+		}
+	}
 	out := catatResp{Grup: grup, catatReq: catatReq{Tanggal: txs[0].Tanggal, Pihak: txs[0].Pihak, NoBukti: txs[0].NoBukti,
-		Baris: coa.SusunCatat(txs, p, coa.PetaDari(all))}}
+		Keterangan: strings.Join(ket, "; "), Baris: coa.SusunCatat(txs, p, coa.PetaDari(all))}}
 	for _, t := range txs {
 		out.Transaksi = append(out.Transaksi, t.ID)
 	}
