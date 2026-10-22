@@ -287,9 +287,23 @@ export interface Tx {
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
+  /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
+  grup?: number
+  no_bukti?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>
+
+// --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
+export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
+export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[] }
+export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
+export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
+export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
+export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number }>(`/catat/${grup}`)
+export const simpanCatatanJurnal = (c: CatatanJurnal, grup?: number) =>
+  api<CatatanJurnal & { grup: number; transaksi: number[] }>(grup ? `/catat/${grup}` : '/catat', { method: grup ? 'PUT' : 'POST', body: c })
+export const hapusCatatanJurnal = (grup: number) => api<void>(`/catat/${grup}`, { method: 'DELETE' })
 
 export interface BreakEven {
   price: number

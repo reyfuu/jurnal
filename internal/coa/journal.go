@@ -59,6 +59,8 @@ var marketplace = []string{"GoFood", "GrabFood", "ShopeeFood"}
 func CounterAccount(t finance.Transaction, peta Peta) string {
 	j, _ := finance.LookupJenis(t.Jenis)
 	switch {
+	case t.Lunas && t.Lawan != "":
+		return t.Lawan // catatan jurnal: rekening kas/bank yang dipilih pengguna
 	case !t.Lunas && j.Arah == "masuk":
 		return peta.Kode(PeranPiutang)
 	case !t.Lunas:
