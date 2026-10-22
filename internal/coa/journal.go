@@ -55,6 +55,18 @@ func AccountFor(t finance.Transaction, p finance.BusinessProfile, peta Peta) str
 
 var marketplace = []string{"GoFood", "GrabFood", "ShopeeFood"}
 
+// ChannelKhusus: channel yang uangnya selalu masuk ke akun tertentu (saldo marketplace / bank
+// B2B), jadi tidak diberi rekening bawaan.
+func ChannelKhusus(channel string) bool {
+	return slices.Contains(marketplace, channel) || channel == "BCA Bisnis" || channel == "B2B Tempo"
+}
+
+// AkunBayar: rekening tempat uang transaksi bergerak saat dibayar (Lawan pilihan pengguna,
+// rekening bawaan, atau aturan channel).
+func AkunBayar(t finance.Transaction, peta Peta) string {
+	return CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel, Lawan: t.Lawan}, peta)
+}
+
 // CounterAccount: sisi kas/bank/piutang/utang dari transaksi.
 func CounterAccount(t finance.Transaction, peta Peta) string {
 	j, _ := finance.LookupJenis(t.Jenis)
@@ -127,7 +139,7 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 		if bayar == "" {
 			bayar = t.Tanggal
 		}
-		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta)
+		kas := AkunBayar(t, peta)
 		switch {
 		case t.Tanggal[:7] == period:
 			lawan := kas
@@ -366,7 +378,7 @@ func SaldoBawaan(txs []finance.Transaction, sebelum string, p finance.BusinessPr
 			bayar = t.Tanggal
 		}
 		if t.Lunas && bayar < sebelum {
-			if k := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta); k != kas {
+			if k := AkunBayar(t, peta); k != kas {
 				out[k] += tanda * t.Nominal
 			}
 		}

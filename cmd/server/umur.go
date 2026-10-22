@@ -87,6 +87,7 @@ func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, in
 		}
 	}
 	t.Lunas = true
+	s.pakaiRekeningBawaanLocked(&t, "") // dilunasi lewat Bank kecuali rekeningnya sudah dipilih
 	if tanggal != t.Tanggal {
 		t.TanggalLunas = tanggal
 	}

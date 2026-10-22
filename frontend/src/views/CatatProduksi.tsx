@@ -47,7 +47,7 @@ export function CatatProduksi({ produkList, stok, stokMulai, awal, onKembali, on
     getOpsiCatat().then((o) => {
       const r = o.akun.filter((a) => a.lawan === 'rekening')
       setRekening(r)
-      setBayarDari((x) => x || o.bawaan.kas || r[0]?.kode || '')
+      setBayarDari((x) => x || o.bawaan.bank || o.bawaan.kas || r[0]?.kode || '')
     }, () => {})
   }, [])
 

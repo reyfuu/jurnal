@@ -111,10 +111,11 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 			continue
 		}
 		ket := cmp.Or(pa.Keterangan, "Pelunasan "+pa.Jenis+" saldo awal")
+		rek := cmp.Or(pa.Akun, kas) // rekening yang dipilih / bawaan Bank; pelunasan lama = Kas
 		if pa.Jenis == "piutang" {
-			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: kas, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: piutang, Kredit: pa.Nominal}, ket})
+			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: rek, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: piutang, Kredit: pa.Nominal}, ket})
 		} else {
-			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: utang, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: kas, Kredit: pa.Nominal}, ket})
+			j.entri = append(j.entri, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: utang, Debit: pa.Nominal}, ket}, entriJurnal{coa.Line{Tanggal: pa.Tanggal, Kode: rek, Kredit: pa.Nominal}, ket})
 		}
 	}
 	opening := s.openingFor(period)
@@ -124,6 +125,18 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	kasAwal := opening.Cash
 	for kode, v := range coa.KasAwalLain(s.bukuAwalLocked(), all, peta) {
 		saldoLain[kode] += v
+		kasAwal -= v
+	}
+	// pelunasan saldo awal bulan-bulan sebelumnya lewat rekening selain Kas dibawa per akun
+	for _, pa := range s.bukuAwalLocked().Pelunasan {
+		if pa.Akun == "" || pa.Akun == kas || pa.Tanggal >= period+"-01" {
+			continue
+		}
+		v := pa.Nominal
+		if pa.Jenis != "piutang" {
+			v = -v
+		}
+		saldoLain[pa.Akun] += v
 		kasAwal -= v
 	}
 	for kode, v := range coa.SaldoBawaan(s.txs, period+"-01", p, peta) {

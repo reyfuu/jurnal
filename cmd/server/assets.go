@@ -74,6 +74,11 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 	if err := s.cekTerbukaLocked(t.Tanggal); err != nil {
 		return err
 	}
+	lawanLama := ""
+	if i >= 0 {
+		lawanLama = s.txs[i].Lawan
+	}
+	s.pakaiRekeningBawaanLocked(&t, lawanLama)
 	if i >= 0 {
 		t.ID = s.txs[i].ID
 		s.txs[i] = t
