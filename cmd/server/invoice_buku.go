@@ -41,6 +41,16 @@ func (s *tenant) sinkronInvoiceLocked(inv *finance.Invoice) error {
 // Channel & akun koreksi pengguna dipertahankan; bulan yang sudah tutup buku ditolak.
 func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) error {
 	i := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return *id != 0 && x.ID == *id })
+	// Sudah dibayar lewat Pembayaran: nominal, tanggal, dan keberadaannya terkunci; cicilan ikut
+	// dibawa dan status lunas diturunkan darinya (bukan dari status invoice).
+	if i >= 0 && adaCicilan(s.txs[i]) {
+		lama := s.txs[i]
+		if !ada || t.Nominal != lama.Nominal || t.Tanggal != lama.Tanggal {
+			return finance.ErrBatalkanDulu
+		}
+		t.Cicilan = lama.Cicilan
+		finance.TurunkanLunas(&t)
+	}
 	if !ada {
 		if i >= 0 {
 			if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {

@@ -102,6 +102,9 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int,
 	}
 	for _, t := range s.txs {
 		if t.Grup == grup {
+			if adaCicilan(t) { // grup dibuat ulang dengan ID baru: cicilannya akan lepas
+				return nil, finance.ErrBatalkanDulu
+			}
 			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
 				return nil, err
 			}

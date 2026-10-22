@@ -1,13 +1,10 @@
 package finance
 
-import (
-	"strconv"
-	"time"
-)
+import "strconv"
 
 // TagihanDariBuku: piutang & utang belum lunas dari buku besar dalam bentuk Tagihan, supaya
 // dashboard (kartu piutang, daftar kewajiban) dan utang per supplier memakai angka yang sama
-// dengan Neraca. Jatuh tempo dianggap 30 hari setelah tanggal transaksi.
+// dengan Neraca. Tanpa jatuh tempo dianggap 30 hari setelah tanggal transaksi (HariTempoBawaan).
 func TagihanDariBuku(piutang, utang UmurSaldoResult) []Tagihan {
 	var out []Tagihan
 	for _, u := range []UmurSaldoResult{piutang, utang} {
@@ -16,10 +13,7 @@ func TagihanDariBuku(piutang, utang UmurSaldoResult) []Tagihan {
 			jenis = TagihanPiutang
 		}
 		for _, b := range u.Baris {
-			jt := b.JatuhTempo // invoice: jatuh tempo sebenarnya
-			if t, err := time.Parse(time.DateOnly, b.Tanggal); err == nil && jt == "" {
-				jt = t.AddDate(0, 0, 30).Format(time.DateOnly)
-			}
+			jt := b.JatuhTempo // diisi UmurSaldo: jatuh tempo sebenarnya, atau tanggal + 30 hari
 			nomor := "Saldo awal"
 			if b.TransaksiID > 0 {
 				nomor = "TRX-" + strconv.Itoa(b.TransaksiID)

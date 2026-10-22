@@ -111,16 +111,19 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 
 	for _, piutang := range []bool{true, false} {
 		um := finance.UmurSaldo(ob, s.txs, akhir, piutang)
-		lama := um.Kelompok[1].Nilai + um.Kelompok[2].Nilai + um.Kelompok[3].Nilai
-		c := cekTutup{Kode: "piutang", Judul: "Piutang lewat 30 hari ditindaklanjuti", View: "piutang-utang", Status: "ok",
+		var lama int64 // kelompok 0 = belum jatuh tempo; sisanya sudah lewat jatuh tempo
+		for _, k := range um.Kelompok[1:] {
+			lama += k.Nilai
+		}
+		c := cekTutup{Kode: "piutang", Judul: "Piutang lewat jatuh tempo ditindaklanjuti", View: "piutang-utang", Status: "ok",
 			Detail: fmt.Sprintf("Piutang belum lunas %s.", finance.FormatRupiahPenuh(um.Total))}
 		if !piutang {
-			c = cekTutup{Kode: "utang", Judul: "Utang lewat 30 hari dibayar / dijadwalkan", View: "piutang-utang", Status: "ok",
+			c = cekTutup{Kode: "utang", Judul: "Utang lewat jatuh tempo dibayar / dijadwalkan", View: "piutang-utang", Status: "ok",
 				Detail: fmt.Sprintf("Utang belum dibayar %s.", finance.FormatRupiahPenuh(um.Total))}
 		}
 		if lama > 0 {
 			c.Status = "peringatan"
-			c.Detail += fmt.Sprintf(" %s sudah lebih dari 30 hari — catat pelunasannya bila sudah dibayar.", finance.FormatRupiahPenuh(lama))
+			c.Detail += fmt.Sprintf(" %s sudah lewat jatuh tempo (tanpa jatuh tempo: 30 hari sejak transaksi) — catat pembayarannya bila sudah dibayar.", finance.FormatRupiahPenuh(lama))
 		}
 		out.Cek = append(out.Cek, c)
 	}

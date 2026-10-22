@@ -27,31 +27,33 @@ type state struct {
 	Assets       []finance.Asset       `json:"assets"`
 	NextAssetID  int                   `json:"next_asset_id"`
 	// Opening: neraca awal onboarding; nil = belum diisi.
-	Opening        *finance.OpeningBalance    `json:"opening"`
-	Karyawan       []finance.Karyawan         `json:"karyawan"`
-	NextKaryawanID int                        `json:"next_karyawan_id"`
-	Invoices       []finance.Invoice          `json:"invoices"`
-	NextInvoiceID  int                        `json:"next_invoice_id"`
-	Tagihan        []finance.Tagihan          `json:"tagihan"`
-	NextTagihanID  int                        `json:"next_tagihan_id"`
-	Stok           []finance.StokItem         `json:"stok"`
-	NextStokID     int                        `json:"next_stok_id"`
-	Produk         []finance.Produk           `json:"produk"`
-	NextProdukID   int                        `json:"next_produk_id"`
-	Supplier       []finance.Supplier         `json:"supplier"`
-	NextSupplierID int                        `json:"next_supplier_id"`
-	Koreksi        []finance.Koreksi          `json:"koreksi"`
-	NextKoreksiID  int                        `json:"next_koreksi_id"`
-	Catatan        []finance.CatatanKonsultan `json:"catatan"`
-	NextCatatanID  int                        `json:"next_catatan_id"`
-	Gerak          []finance.GerakStok        `json:"gerak_stok"`
-	NextGerakID    int                        `json:"next_gerak_id"`
-	TutupBuku      string                     `json:"tutup_buku,omitempty"`
-	CoaTemplate    int                        `json:"coa_template,omitempty"`
-	Arsip          time.Time                  `json:"arsip,omitzero"`
-	ArsipAlasan    string                     `json:"arsip_alasan,omitempty"`
-	Auth           auth.StoreSnapshot         `json:"auth"`
-	Langganan      *langganan                 `json:"langganan,omitempty"`
+	Opening          *finance.OpeningBalance    `json:"opening"`
+	Karyawan         []finance.Karyawan         `json:"karyawan"`
+	NextKaryawanID   int                        `json:"next_karyawan_id"`
+	Invoices         []finance.Invoice          `json:"invoices"`
+	NextInvoiceID    int                        `json:"next_invoice_id"`
+	Tagihan          []finance.Tagihan          `json:"tagihan"`
+	NextTagihanID    int                        `json:"next_tagihan_id"`
+	Stok             []finance.StokItem         `json:"stok"`
+	NextStokID       int                        `json:"next_stok_id"`
+	Produk           []finance.Produk           `json:"produk"`
+	NextProdukID     int                        `json:"next_produk_id"`
+	Supplier         []finance.Supplier         `json:"supplier"`
+	NextSupplierID   int                        `json:"next_supplier_id"`
+	Koreksi          []finance.Koreksi          `json:"koreksi"`
+	NextKoreksiID    int                        `json:"next_koreksi_id"`
+	Catatan          []finance.CatatanKonsultan `json:"catatan"`
+	NextCatatanID    int                        `json:"next_catatan_id"`
+	Gerak            []finance.GerakStok        `json:"gerak_stok"`
+	NextGerakID      int                        `json:"next_gerak_id"`
+	Pembayaran       []finance.Pembayaran       `json:"pembayaran"`
+	NextPembayaranID int                        `json:"next_pembayaran_id"`
+	TutupBuku        string                     `json:"tutup_buku,omitempty"`
+	CoaTemplate      int                        `json:"coa_template,omitempty"`
+	Arsip            time.Time                  `json:"arsip,omitzero"`
+	ArsipAlasan      string                     `json:"arsip_alasan,omitempty"`
+	Auth             auth.StoreSnapshot         `json:"auth"`
+	Langganan        *langganan                 `json:"langganan,omitempty"`
 }
 
 // dataPath: berkas di $DATA_DIR; kosong = mode in-memory (test, dev lokal).
@@ -144,6 +146,7 @@ func (t *tenant) snapshot() state {
 		Koreksi: slices.Clone(t.koreksi), NextKoreksiID: t.nextKoreksiID, CoaTemplate: t.coaTemplateID,
 		Catatan: slices.Clone(t.catatan), NextCatatanID: t.nextCatatanID,
 		Gerak: slices.Clone(t.gerak), NextGerakID: t.nextGerakID, TutupBuku: t.tutupBuku,
+		Pembayaran: slices.Clone(t.pembayaran), NextPembayaranID: t.nextPembayaranID,
 		Arsip: t.arsip, ArsipAlasan: t.arsipAlasan,
 	}
 }

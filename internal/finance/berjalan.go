@@ -22,6 +22,28 @@ func tanggalKas(t Transaction) string { return cmp.Or(t.TanggalLunas, t.Tanggal)
 
 func lunasPada(t Transaction, sampai string) bool { return t.Lunas && tanggalKas(t) <= sampai }
 
+// ledgerKas: entri arus kas dari uang yang bergerak pada tanggal yang lolos dalam — transaksi
+// lunas di tanggal lunasnya, transaksi bercicilan per cicilan di tanggal bayarnya.
+func ledgerKas(txs []Transaction, dalam func(tanggal string) bool) []LedgerEntry {
+	var kas []LedgerEntry
+	for _, t := range txs {
+		if len(t.Cicilan) == 0 {
+			if t.Lunas && dalam(tanggalKas(t)) {
+				kas = append(kas, ToLedger([]Transaction{t})...)
+			}
+			continue
+		}
+		for _, c := range t.Cicilan {
+			if dalam(c.Tanggal) {
+				x := t
+				x.Nominal, x.Lunas, x.TanggalLunas, x.Cicilan = c.Nominal, true, c.Tanggal, nil
+				kas = append(kas, ToLedger([]Transaction{x})...)
+			}
+		}
+	}
+	return kas
+}
+
 var posOperasi = map[string]bool{"omzet": true, "lain": true, "hpp": true, "potongan": true, "biaya": true, "ppn": true, "setor_ppn": true}
 
 // Posisi: saldo akun neraca (selain persediaan & aset tetap) pada akhir suatu tanggal.
@@ -49,20 +71,21 @@ func PosisiPada(ob OpeningBalance, txs []Transaction, sampai string) Posisi {
 			continue
 		}
 		masuk, n := j.Arah == "masuk", t.Nominal
-		switch {
-		case lunasPada(t, sampai) && masuk:
-			p.Kas += n
-		case lunasPada(t, sampai):
-			p.Kas -= n
-		case masuk:
-			p.Piutang += n
+		// Yang sudah dibayar sampai tanggal itu (lunas atau cicilan) jadi kas; sisanya
+		// piutang/utang.
+		bayar := t.Dibayar(sampai)
+		sisa := n - bayar
+		if masuk {
+			p.Kas += bayar
+			p.Piutang += sisa
 			if posOperasi[j.Pos] {
-				p.PiutangOps += n
+				p.PiutangOps += sisa
 			}
-		default:
-			p.Utang += n
+		} else {
+			p.Kas -= bayar
+			p.Utang += sisa
 			if posOperasi[j.Pos] {
-				p.UtangOps += n
+				p.UtangOps += sisa
 			}
 		}
 		switch j.Pos {
@@ -115,12 +138,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 	p1 := PosisiPada(ob, txs, period+"-31")
 
 	// Arus kas: transaksi yang uangnya bergerak bulan ini (tanggal pelunasan).
-	var kas []LedgerEntry
-	for _, t := range txs {
-		if d := tanggalKas(t); t.Lunas && d[:min(7, len(d))] == period {
-			kas = append(kas, ToLedger([]Transaction{t})...)
-		}
-	}
+	kas := ledgerKas(txs, func(d string) bool { return d[:min(7, len(d))] == period })
 	for _, pa := range ob.Pelunasan {
 		if len(pa.Tanggal) >= 7 && pa.Tanggal[:7] == period {
 			if pa.Jenis == "piutang" {
@@ -205,6 +223,8 @@ type BarisUmur struct {
 	Kelompok    int    `json:"kelompok"`
 	InvoiceID   int    `json:"invoice_id,omitempty"`
 	JatuhTempo  string `json:"jatuh_tempo,omitempty"`
+	// Dibayar: bagian yang sudah dibayar lewat Pembayaran (cicilan) sampai tanggal laporan.
+	Dibayar int64 `json:"dibayar,omitempty"`
 }
 
 type PihakUmur struct {
@@ -225,10 +245,14 @@ type UmurSaldoResult struct {
 var batasUmur = []struct {
 	label string
 	hari  int
-}{{"0–30 hari", 30}, {"31–60 hari", 60}, {"61–90 hari", 90}, {"> 90 hari", 1 << 30}}
+}{{"Belum jatuh tempo", 0}, {"1–30 hari", 30}, {"31–60 hari", 60}, {"61–90 hari", 90}, {"> 90 hari", 1 << 30}}
 
-// UmurSaldo: piutang (piutang=true) atau utang yang belum lunas per tanggal, dikelompokkan
-// menurut umur sejak tanggal transaksi. Totalnya sama dengan piutang/utang di neraca.
+// HariTempoBawaan: jatuh tempo tagihan tanpa tanggal jatuh tempo (sama dengan dasbor).
+const HariTempoBawaan = 30
+
+// UmurSaldo: sisa piutang (piutang=true) atau utang per tanggal, dikelompokkan menurut lama
+// lewat jatuh tempo (tanpa jatuh tempo: tanggal + 30 hari). Totalnya sama dengan piutang/utang
+// di neraca. Hari = hari lewat jatuh tempo (negatif = belum jatuh tempo).
 func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) UmurSaldoResult {
 	out := UmurSaldoResult{Per: per, Piutang: piutang, Baris: []BarisUmur{}, Pihak: []PihakUmur{}}
 	for _, b := range batasUmur {
@@ -239,8 +263,11 @@ func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) U
 		return out
 	}
 	tambah := func(b BarisUmur) {
-		if t, err := time.Parse(time.DateOnly, b.Tanggal); err == nil {
-			b.Hari = max(0, int(tPer.Sub(t).Hours()/24))
+		if t, err := time.Parse(time.DateOnly, b.Tanggal); err == nil && b.JatuhTempo == "" {
+			b.JatuhTempo = t.AddDate(0, 0, HariTempoBawaan).Format(time.DateOnly)
+		}
+		if jt, err := time.Parse(time.DateOnly, b.JatuhTempo); err == nil {
+			b.Hari = int(tPer.Sub(jt).Hours() / 24)
 		}
 		for i, x := range batasUmur {
 			if b.Hari <= x.hari {
@@ -261,18 +288,24 @@ func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) U
 	perInvoice := map[int]int{}
 	for _, t := range txs {
 		j, ok := jenisOf(t.Jenis)
-		if !ok || t.Tanggal > per || lunasPada(t, per) || (j.Arah == "masuk") != piutang {
+		if !ok || t.Tanggal > per || (j.Arah == "masuk") != piutang {
+			continue
+		}
+		dibayar := t.Dibayar(per)
+		sisa := t.Nominal - dibayar
+		if sisa <= 0 {
 			continue
 		}
 		if i, ada := perInvoice[t.InvoiceID]; ada && t.InvoiceID != 0 {
-			baris[i].Nilai += t.Nominal
+			baris[i].Nilai += sisa
+			baris[i].Dibayar += dibayar
 			continue
 		}
 		if t.InvoiceID != 0 {
 			perInvoice[t.InvoiceID] = len(baris)
 		}
 		baris = append(baris, BarisUmur{TransaksiID: t.ID, Tanggal: t.Tanggal, Pihak: cmp.Or(t.Pihak, "(tanpa nama)"), Keterangan: cmp.Or(t.Keterangan, t.Item),
-			Jenis: t.Jenis, Nilai: t.Nominal, InvoiceID: t.InvoiceID, JatuhTempo: t.JatuhTempo})
+			Jenis: t.Jenis, Nilai: sisa, Dibayar: dibayar, InvoiceID: t.InvoiceID, JatuhTempo: t.JatuhTempo})
 	}
 	for _, b := range baris {
 		tambah(b)

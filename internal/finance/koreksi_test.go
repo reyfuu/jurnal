@@ -2,6 +2,7 @@ package finance_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"pajak/internal/finance"
@@ -26,7 +27,7 @@ func TestSiapkanKoreksi_Ubah(t *testing.T) {
 	if err := finance.SiapkanKoreksi(&k, txs); err != nil {
 		t.Fatal(err)
 	}
-	if k.Sebelum != txs[1] || k.Status != finance.KoreksiMenunggu || k.Alasan != "Dipakai lebih dari setahun" || k.Usulan.ID != 2 {
+	if !reflect.DeepEqual(k.Sebelum, txs[1]) || k.Status != finance.KoreksiMenunggu || k.Alasan != "Dipakai lebih dari setahun" || k.Usulan.ID != 2 {
 		t.Fatalf("koreksi = %+v", k)
 	}
 }

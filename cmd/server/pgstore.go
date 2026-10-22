@@ -82,27 +82,28 @@ func one[T any](p *T) []*T {
 }
 
 type tenantRow struct {
-	ID             int       `json:"id"`
-	NextTxID       int       `json:"next_tx_id"`
-	NextAssetID    int       `json:"next_asset_id"`
-	NextKaryawanID int       `json:"next_karyawan_id"`
-	NextInvoiceID  int       `json:"next_invoice_id"`
-	NextTagihanID  int       `json:"next_tagihan_id"`
-	NextStokID     int       `json:"next_stok_id"`
-	NextProdukID   int       `json:"next_produk_id"`
-	NextSupplierID int       `json:"next_supplier_id"`
-	NextKoreksiID  int       `json:"next_koreksi_id"`
-	NextCatatanID  int       `json:"next_catatan_id"`
-	CoaTemplate    int       `json:"coa_template"`
-	TrialSampai    time.Time `json:"trial_sampai,omitzero"`
-	AktifSampai    time.Time `json:"aktif_sampai,omitzero"`
-	EksporPertama  time.Time `json:"ekspor_pertama,omitzero"`
-	GaransiDiklaim time.Time `json:"garansi_diklaim,omitzero"`
-	GaransiAlasan  string    `json:"garansi_alasan,omitempty"`
-	Arsip          time.Time `json:"arsip,omitzero"`
-	ArsipAlasan    string    `json:"arsip_alasan,omitempty"`
-	NextGerakID    int       `json:"next_gerak_id"`
-	TutupBuku      string    `json:"tutup_buku,omitempty"`
+	ID               int       `json:"id"`
+	NextTxID         int       `json:"next_tx_id"`
+	NextAssetID      int       `json:"next_asset_id"`
+	NextKaryawanID   int       `json:"next_karyawan_id"`
+	NextInvoiceID    int       `json:"next_invoice_id"`
+	NextTagihanID    int       `json:"next_tagihan_id"`
+	NextStokID       int       `json:"next_stok_id"`
+	NextProdukID     int       `json:"next_produk_id"`
+	NextSupplierID   int       `json:"next_supplier_id"`
+	NextKoreksiID    int       `json:"next_koreksi_id"`
+	NextCatatanID    int       `json:"next_catatan_id"`
+	CoaTemplate      int       `json:"coa_template"`
+	TrialSampai      time.Time `json:"trial_sampai,omitzero"`
+	AktifSampai      time.Time `json:"aktif_sampai,omitzero"`
+	EksporPertama    time.Time `json:"ekspor_pertama,omitzero"`
+	GaransiDiklaim   time.Time `json:"garansi_diklaim,omitzero"`
+	GaransiAlasan    string    `json:"garansi_alasan,omitempty"`
+	Arsip            time.Time `json:"arsip,omitzero"`
+	ArsipAlasan      string    `json:"arsip_alasan,omitempty"`
+	NextGerakID      int       `json:"next_gerak_id"`
+	TutupBuku        string    `json:"tutup_buku,omitempty"`
+	NextPembayaranID int       `json:"next_pembayaran_id"`
 }
 
 type invoiceItemRow struct {
@@ -149,7 +150,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 	}
 	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
 		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.NextCatatanID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
-		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan, st.Arsip, st.ArsipAlasan, st.NextGerakID, st.TutupBuku}
+		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan, st.Arsip, st.ArsipAlasan, st.NextGerakID, st.TutupBuku, st.NextPembayaranID}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
 	}
@@ -173,6 +174,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 		{"catatan_konsultan", st.Catatan},
 		{"gerak_stok", st.Gerak},
 		{"billing_orders", l.Orders},
+		{"pembayaran", st.Pembayaran},
 	} {
 		if err := insertRows(tx, r.table, t.id, r.rows); err != nil {
 			return err
@@ -434,7 +436,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
 		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
-		NextKoreksiID: row.NextKoreksiID, NextCatatanID: row.NextCatatanID, NextGerakID: row.NextGerakID, TutupBuku: row.TutupBuku, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
+		NextKoreksiID: row.NextKoreksiID, NextCatatanID: row.NextCatatanID, NextGerakID: row.NextGerakID, NextPembayaranID: row.NextPembayaranID, TutupBuku: row.TutupBuku, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai,
 			EksporPertama: row.EksporPertama, GaransiDiklaim: row.GaransiDiklaim, GaransiAlasan: row.GaransiAlasan}}
 	var items []invoiceItemRow
@@ -457,6 +459,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 		{&st.Catatan, rowsOf("catatan_konsultan", "id")},
 		{&st.Gerak, rowsOf("gerak_stok", "id")},
 		{&st.Langganan.Orders, rowsOf("billing_orders", "waktu, id")},
+		{&st.Pembayaran, rowsOf("pembayaran", "id")},
 	} {
 		if err := selectJSON(db, q.dst, q.query, t.id); err != nil {
 			return err

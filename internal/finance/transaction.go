@@ -91,6 +91,9 @@ type Transaction struct {
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
 	QtyStok int64 `json:"qty_stok,omitempty"`
+	// Cicilan: pembayaran (sebagian/penuh) lewat dokumen Pembayaran; hanya diatur server. Bila
+	// ada, Lunas & TanggalLunas diturunkan darinya (TurunkanLunas).
+	Cicilan []Cicilan `json:"cicilan,omitempty"`
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.

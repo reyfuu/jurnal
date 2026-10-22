@@ -149,6 +149,8 @@ type tenantData struct {
 	Gerak                                                []finance.GerakStok
 	NextGerakID                                          int
 	TutupBuku                                            string
+	Pembayaran                                           []finance.Pembayaran
+	NextPembayaranID                                     int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -158,7 +160,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID, tn.gerak, tn.nextGerakID, tn.tutupBuku}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID, tn.gerak, tn.nextGerakID, tn.tutupBuku, tn.pembayaran, tn.nextPembayaranID}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -209,6 +211,10 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.gerak = []finance.GerakStok{filled[finance.GerakStok](17)}
 	tn.gerak[0].ID = 1
 	tn.nextGerakID = 2
+	// Dokumen pembayaran: alokasi & batal JSONB; cicilan transaksi ikut terisi oleh filled.
+	tn.pembayaran = []finance.Pembayaran{filled[finance.Pembayaran](18)}
+	tn.pembayaran[0].ID = 1
+	tn.nextPembayaranID = 2
 	tn.tutupBuku = "2026-01"
 	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3

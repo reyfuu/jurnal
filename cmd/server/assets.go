@@ -52,6 +52,10 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 		a.SumberDana = ""
 	}
 	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return milikAset && t.ID == lama.TransaksiID })
+	// Utang aset yang sudah dicicil lewat Pembayaran: sumber dana, nilai, dan tanggalnya terkunci.
+	if i >= 0 && adaCicilan(s.txs[i]) && (lama.SumberDana != a.SumberDana || s.txs[i].Nominal != a.HargaPerolehan || s.txs[i].Tanggal != a.TanggalPerolehan) {
+		return finance.ErrBatalkanDulu
+	}
 	if !finance.SumberBerTransaksi(a.SumberDana) {
 		if i >= 0 {
 			s.txs = slices.Delete(s.txs, i, i+1)
@@ -63,7 +67,7 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 		Keterangan: "Aset: " + a.Nama, Lunas: a.SumberDana == finance.SumberKas}
 	if i >= 0 && lama.SumberDana == a.SumberDana {
 		// Status lunas tidak disentuh: utang aset bisa sudah dilunasi dari menu Piutang & Utang.
-		t.ID, t.Lunas, t.TanggalLunas, t.Channel, t.Pihak = s.txs[i].ID, s.txs[i].Lunas, s.txs[i].TanggalLunas, s.txs[i].Channel, s.txs[i].Pihak
+		t.ID, t.Lunas, t.TanggalLunas, t.Channel, t.Pihak, t.Cicilan = s.txs[i].ID, s.txs[i].Lunas, s.txs[i].TanggalLunas, s.txs[i].Channel, s.txs[i].Pihak, s.txs[i].Cicilan
 		if t.TanggalLunas != "" && t.TanggalLunas < t.Tanggal {
 			t.TanggalLunas = t.Tanggal
 		}

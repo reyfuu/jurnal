@@ -56,6 +56,9 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 		return errors.New("transaksi tidak ditemukan")
 	}
 	k.Sebelum = txs[i]
+	if len(k.Sebelum.Cicilan) > 0 {
+		return ErrBatalkanDulu
+	}
 	switch k.Jenis {
 	case KoreksiHapus:
 		k.Usulan = nil
@@ -68,7 +71,8 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 		if err := Validate(&u); err != nil {
 			return err
 		}
-		if u == k.Sebelum {
+		u.Cicilan = nil // cicilan hanya diatur lewat Pembayaran
+		if samaTx(u, k.Sebelum) {
 			return errors.New("usulan sama dengan transaksi sekarang")
 		}
 		k.Usulan = &u
@@ -82,7 +86,7 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 // TerapkanKoreksi mengembalikan daftar transaksi baru (txs tidak diubah).
 func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 	i := txIndex(txs, k.TransaksiID)
-	if i < 0 || txs[i] != k.Sebelum {
+	if i < 0 || !samaTx(txs[i], k.Sebelum) {
 		return nil, ErrKoreksiBasi
 	}
 	out := slices.Clone(txs)
