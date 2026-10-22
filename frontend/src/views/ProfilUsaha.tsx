@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CekAwalCard } from '@/components/CekAwalCard'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { getMetodeStok, getWilayah, saranKLU, saveBusiness, type MetodeNilaiStok, type MetodeStok, type Option, type SaranKLU, type Kota, type KLUOption, type BusinessInfo, type BusinessProfile, type JenisUsaha, type BentukUsaha } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { DEFAULT_ANSWERS, LOKASI_FIELDS, QUESTIONS, answered, masalahLaba, parseRp, steps, summary, toProfile, type Answers } from '@/lib/onboarding'
 import { cekLabaOmzet } from '@/lib/kalkulator'
 
@@ -421,8 +422,10 @@ const INPUT_LABEL = { nama: 'Nama usaha', omzet: 'Omzet per tahun', laba: 'Laba 
 
 // Wizard onboarding: satu pertanyaan bahasa awam per layar, ringkasan di akhir.
 function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessProfile) => void; provinsi: string[]; klu: KLUOption[] }) {
-  const [a, setA] = useState<Answers>(DEFAULT_ANSWERS)
-  const [i, setI] = useState(0)
+  // Jawaban yang sudah diisi disimpan sebagai draft: muat ulang / error tidak mengulang dari awal.
+  const [a, setA] = useState<Answers>(() => bacaDraft<{ a: Answers }>('onboarding')?.a ?? DEFAULT_ANSWERS)
+  const [i, setI] = useState(() => bacaDraft<{ i: number }>('onboarding')?.i ?? 0)
+  useSimpanDraft('onboarding', useMemo(() => ({ a, i }), [a, i]))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -451,7 +454,9 @@ function OnboardingWizard({ onSaved, provinsi, klu }: { onSaved: (p: BusinessPro
     setBusy(true)
     setError('')
     try {
-      onSaved(await saveBusiness(toProfile(a)))
+      const p = await saveBusiness(toProfile(a))
+      hapusDraft('onboarding')
+      onSaved(p)
     } catch (err) {
       setError((err as Error).message)
     } finally {
