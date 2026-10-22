@@ -53,6 +53,12 @@ func segarkanBawaan(st *katalog.State) bool {
 		if st.Template[i].Jenis == "manufaktur" {
 			adaManufaktur = true
 		}
+		// Template terbitan Panel Master: nama akun "Hutang …" → ejaan baku "Utang …".
+		for j, a := range st.Template[i].Akun {
+			if n := finance.EjaUtang(a.Nama); n != a.Nama {
+				st.Template[i].Akun[j].Nama, berubah = n, true
+			}
+		}
 	}
 	if !adaManufaktur {
 		st.Template = append(st.Template, katalog.TemplateManufakturBawaan(max(st.NextTemplateID, 2)))

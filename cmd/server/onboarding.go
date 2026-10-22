@@ -326,6 +326,7 @@ func (s *tenant) openingSummary(tanggal string) openingResp {
 	period := s.bukuAwalLocked().Period()
 	if s.opening != nil {
 		o := *s.opening
+		o.Rincian = coa.KodePeranSaldo(o.Rincian, peta) // saldo awal lama: kode ikut CoA usaha ini
 		nbv := finance.AssetsForPeriod(s.assets, s.txs, o.Period()).NilaiBukuAwal
 		out.Opening, out.ModalAwal, out.SelisihModal, out.Aktif, out.NilaiBukuAset = &o, o.ModalAwal(nbv), o.SelisihModal(nbv), true, nbv
 	}

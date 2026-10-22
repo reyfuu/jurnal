@@ -45,6 +45,9 @@ const (
 	PeranPerawatan        = "beban_perawatan"
 	PeranBiayaLain        = "beban_lain"
 	PeranPPNKeluaran      = "ppn_keluaran"
+	// PeranUtangDividen: opsional (PT), tidak wajib di template terbitan; tanpa akun ini
+	// dividen yang belum dibayar jatuh ke utang usaha.
+	PeranUtangDividen = "utang_dividen"
 )
 
 // PeranInfo: peran beserta kode bawaannya di CoA dagang (Master) dan penjelasannya untuk Panel Master.

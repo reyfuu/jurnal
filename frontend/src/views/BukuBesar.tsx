@@ -14,8 +14,9 @@ const RED = 'var(--text-danger)'
  * dan rincian tiap akun dengan saldo berjalan saat barisnya dibuka. Saldo mengikuti saldo normal
  * akun, jadi akun kredit (utang, modal, pendapatan) tampil positif seperti di neraca.
  */
-export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bisaEkspor: boolean; navigate?: (v: View) => void }) {
-  const [f, setF] = useState<FilterBukuBesar>(() => rentangBulan(period))
+export function BukuBesar({ period, bisaEkspor, navigate, akunAwal }: { period: string; bisaEkspor: boolean; navigate?: (v: View) => void; akunAwal?: string }) {
+  // akunAwal: dibuka dari tautan (mis. peringatan saldo minus) langsung ke satu akun.
+  const [f, setF] = useState<FilterBukuBesar>(() => ({ ...rentangBulan(period), ...(akunAwal ? { akun: akunAwal } : {}) }))
   const [data, setData] = useState<DataBukuBesar | null>(null)
   const [error, setError] = useState('')
   const [cari, setCari] = useState('')

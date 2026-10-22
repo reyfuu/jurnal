@@ -155,6 +155,11 @@ func (t *tenant) restore(st *state) {
 		t.assets, t.nextAssetID = st.Assets, st.NextAssetID
 	}
 	t.opening = st.Opening
+	if t.opening != nil { // nama akun lama "Hutang …" → ejaan baku "Utang …"
+		for i := range t.opening.Rincian {
+			t.opening.Rincian[i].Nama = finance.EjaUtang(t.opening.Rincian[i].Nama)
+		}
+	}
 	// state sebelum fitur langganan: masa coba dihitung sejak versi ini berjalan (nilai newTenant).
 	if st.Langganan != nil {
 		t.langganan = *st.Langganan
@@ -828,12 +833,14 @@ func (s *tenant) openingFor(period string) finance.ReportOpening {
 	if sp := s.kartuLocked().Periode(period); sp.Aktif {
 		inv = sp.PersediaanAwal
 	}
-	return finance.ReportOpening{Cash: p.Kas, Receivables: p.Piutang, Payables: p.Utang, Loans: p.Pinjaman, Inventory: inv}
+	return finance.ReportOpening{Cash: p.Kas, Receivables: p.Piutang, Payables: p.Utang, Loans: p.Pinjaman, Inventory: inv, DividendsPayable: p.UtangDividen}
 }
 
 // reportLocked: laporan berjalan satu periode; pemanggil memegang s.mu.
 func (s *tenant) reportLocked(period string) finance.PeriodReport {
-	return finance.BuildLaporanBerjalan(s.txs, s.assets, period, s.bukuAwalLocked(), s.kartuLocked())
+	rep := finance.BuildLaporanBerjalan(s.txs, s.assets, period, s.bukuAwalLocked(), s.kartuLocked())
+	rep.BalanceSheet.PT = s.ptLocked() // susunan neraca: PT memuat utang dividen & dividen, selain itu prive
+	return rep
 }
 
 // report menghitung seluruh laporan satu periode dari state saat ini. Semua endpoint laporan
@@ -1015,8 +1022,12 @@ type txListResp struct {
 func (s *tenant) handleListTransactions(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	txs := slices.Clone(s.txs)
+	jenis := finance.JenisList
+	if !s.ptLocked() { // Pembagian Dividen hanya untuk PT
+		jenis = slices.DeleteFunc(slices.Clone(jenis), func(j finance.Jenis) bool { return j.Nama == finance.JenisDividen })
+	}
 	s.mu.RUnlock()
-	writeJSON(w, txListResp{Transactions: nonNil(txs), Jenis: finance.JenisList, CanEdit: currentUser(r).Role.Can("transaksi-kelola") && !sedangLihat(r)})
+	writeJSON(w, txListResp{Transactions: nonNil(txs), Jenis: jenis, CanEdit: currentUser(r).Role.Can("transaksi-kelola") && !sedangLihat(r)})
 }
 
 // decodeTx membaca dan memvalidasi body; menulis 400 dan mengembalikan false bila gagal.

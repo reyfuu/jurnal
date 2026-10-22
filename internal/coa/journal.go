@@ -34,6 +34,8 @@ func AutoAccount(jenis string, p finance.BusinessProfile, peta Peta) string {
 			return peta.Kode(PeranPersediaan) // perpetual: pembelian langsung menambah persediaan
 		}
 		return peta.Kode(PeranPembelian)
+	case finance.JenisDividen:
+		return peta.Kode(PeranLabaDitahan) // dividen mengurangi laba ditahan
 	case "Ambil Uang Pribadi":
 		if isPT(p) {
 			return peta.Kode(PeranLabaDitahan) // PT: pengambilan pemilik = pembagian laba
@@ -64,13 +66,22 @@ func CounterAccount(t finance.Transaction, peta Peta) string {
 	case !t.Lunas && j.Arah == "masuk":
 		return peta.Kode(PeranPiutang)
 	case !t.Lunas:
-		return peta.Kode(PeranUtangUsaha)
+		return utangUntuk(t, peta)
 	case slices.Contains(marketplace, t.Channel):
 		return peta.Kode(PeranMarketplace)
 	case t.Channel == "BCA Bisnis" || t.Channel == "B2B Tempo":
 		return peta.Kode(PeranBank)
 	}
 	return peta.Kode(PeranKas)
+}
+
+// utangUntuk: akun utang transaksi keluar yang belum dibayar — utang dividen untuk dividen
+// (bila CoA punya akunnya), selain itu utang usaha.
+func utangUntuk(t finance.Transaction, peta Peta) string {
+	if k := peta.Kode(PeranUtangDividen); t.Jenis == finance.JenisDividen && k != "" {
+		return k
+	}
+	return peta.Kode(PeranUtangUsaha)
 }
 
 type Line struct {
@@ -114,7 +125,7 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []
 // transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
 // atau Dr Utang / Cr Kas) di tanggal bayar.
 func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta) []Line {
-	piutang, utang := peta.Kode(PeranPiutang), peta.Kode(PeranUtangUsaha)
+	piutang := peta.Kode(PeranPiutang)
 	akhir := period + "-31"
 	var out []Line
 	for _, t := range txs {
@@ -128,6 +139,7 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 			bayar = t.Tanggal
 		}
 		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta)
+		utang := utangUntuk(t, peta)
 		switch {
 		case t.Tanggal[:7] == period:
 			lawan := kas
@@ -303,7 +315,7 @@ func TrialBalanceFrom(template, active []Account, opening map[string]int64, line
 
 // SaldoAwalLain: akun aset lancar lain & kewajiban lain dari saldo awal (posisi debit positif).
 // Kode dari rincian dipakai bila ada di daftar akun; selain itu 1401 Biaya Dibayar Dimuka dan
-// 2105 Hutang Lain-lain menampung totalnya.
+// 2105 Utang Lain-lain menampung totalnya.
 func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[string]int64 {
 	out := map[string]int64{}
 	asetLain, kewLain := peta.Kode(PeranDibayarDimuka), peta.Kode(PeranUtangLain)

@@ -148,7 +148,13 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		j.entri = append(j.entri, entriJurnal{susut[i], ket}, entriJurnal{susut[i+1], ket})
 	}
-	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+	// Utang dividen (PT) dibawa di akunnya sendiri, bukan di utang usaha.
+	utangAwal := opening.Payables
+	if k := peta.Kode(coa.PeranUtangDividen); k != "" && opening.DividendsPayable != 0 {
+		saldoLain[k] -= opening.DividendsPayable
+		utangAwal -= opening.DividendsPayable
+	}
+	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, opening.Inventory, utangAwal, opening.Loans,
 		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
 	j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.

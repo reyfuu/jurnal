@@ -531,8 +531,8 @@ func neracaSheet() (ImportSheet, int) {
 	akun("", "Utang Pajak", "Liabilitas", "", "="+utJ("Utang Pajak"), sheetUtang)
 	akun("2104", "Beban Yang Masih Harus Dibayar", "Liabilitas", "", "="+utJ("Biaya Masih Harus Dibayar"), sheetUtang)
 	akun("", "Pendapatan Diterima di Muka", "Liabilitas", "", "="+utJ("Pendapatan Diterima di Muka"), sheetUtang)
-	akun("2105", "Hutang Lain-lain", "Liabilitas", "", "="+utJ("Utang Lain-lain"), sheetUtang)
-	akun("2102", "Hutang Bank", "Liabilitas", "", "="+utJ("Utang Bank / Pinjaman"), sheetUtang)
+	akun("2105", "Utang Lain-lain", "Liabilitas", "", "="+utJ("Utang Lain-lain"), sheetUtang)
+	akun("2102", "Utang Bank", "Liabilitas", "", "="+utJ("Utang Bank / Pinjaman"), sheetUtang)
 	akun("", "Utang jenis lain (akun tersendiri)", "Liabilitas", "",
 		lain(fmt.Sprintf("SUM(%s)-SUM(%s)", ut("H"), ut("I")), utJ, jenisUtangList), sheetUtang)
 	grup("EKUITAS")

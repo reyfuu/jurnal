@@ -26,17 +26,19 @@ const jadiBaris = (b: SaldoAkun, extra: Partial<Baris> = {}): Baris => ({ ...b, 
 const bersih = (b: SaldoAkun): SaldoAkun => ({ kode: b.kode, nama: b.nama, kategori: b.kategori, nominal: b.nominal, keterangan: b.keterangan })
 
 // Saldo awal lama (tanpa rincian): pos-posnya dijadikan baris supaya bisa diedit per akun.
-// Aset tetap tidak termasuk: barisnya selalu datang dari daftar aset.
-function dariPos(o: OpeningBalance, nbv: number): SaldoAkun[] {
+// Aset tetap tidak termasuk: barisnya selalu datang dari daftar aset. Kode ikut CoA usaha ini
+// (akun pertama berkategori sama di template), mis. pinjaman manufaktur = 2131, bukan 2102.
+function dariPos(o: OpeningBalance, nbv: number, template: SaldoAkun[]): SaldoAkun[] {
+  const kode = (kat: string, cadangan: string) => template.find((a) => a.kategori === kat)?.kode || cadangan
   const baris: SaldoAkun[] = [
-    { kode: '1101', nama: 'Kas & Bank', kategori: 'kas', nominal: o.kas },
-    { kode: '1201', nama: 'Piutang Usaha', kategori: 'piutang', nominal: o.piutang },
-    { kode: '1301', nama: 'Persediaan', kategori: 'persediaan', nominal: o.persediaan },
-    { kode: '2101', nama: 'Hutang Usaha', kategori: 'utang', nominal: o.utang },
-    { kode: '2102', nama: 'Hutang Bank', kategori: 'pinjaman', nominal: o.pinjaman },
+    { kode: kode('kas', '1101'), nama: 'Kas & Bank', kategori: 'kas', nominal: o.kas },
+    { kode: kode('piutang', '1201'), nama: 'Piutang Usaha', kategori: 'piutang', nominal: o.piutang },
+    { kode: kode('persediaan', '1301'), nama: 'Persediaan', kategori: 'persediaan', nominal: o.persediaan },
+    { kode: kode('utang', '2101'), nama: 'Utang Usaha', kategori: 'utang', nominal: o.utang },
+    { kode: kode('pinjaman', '2102'), nama: 'Utang Bank', kategori: 'pinjaman', nominal: o.pinjaman },
   ]
   const modal = o.kas + o.piutang + o.persediaan + nbv - o.utang - o.pinjaman
-  return [...baris, { kode: '3101', nama: 'Modal Pemilik', kategori: 'modal', nominal: modal }]
+  return [...baris, { kode: kode('modal', '3101'), nama: 'Modal Pemilik', kategori: 'modal', nominal: modal }]
 }
 
 const bulanIni = () => new Date().toISOString().slice(0, 7)
@@ -108,7 +110,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     if (!info) return
     setTanggal(o?.tanggal ?? info.transaksi_pertama ?? '')
     setAsetEdit(info.aset_tetap ?? [])
-    const awal = o?.rincian?.length ? o.rincian : o ? dariPos(o, info.nilai_buku_aset) : info.akun_template.map((a) => ({ ...a, nominal: 0 }))
+    const awal = o?.rincian?.length ? o.rincian : o ? dariPos(o, info.nilai_buku_aset, info.akun_template) : info.akun_template.map((a) => ({ ...a, nominal: 0 }))
     // Baris penyeimbang hasil simpan paksa tidak diedit: dihitung ulang server setiap simpan.
     const rows = awal.filter((r) => r.kategori !== 'aset_tetap' && r.keterangan !== KET_PAKSA).map((r) => jadiBaris({ ...r }))
     // Saldo awal baru: persediaan langsung diisi dari daftar barang, bukan diketik ulang.
@@ -185,7 +187,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   }
 
   const pertama = info?.transaksi_pertama
-  const tampilSimpan = o ? (o.rincian?.length ? o.rincian : [...dariPos(o, info!.nilai_buku_aset), ...(info?.aset_tetap ?? [])]) : []
+  const tampilSimpan = o ? (o.rincian?.length ? o.rincian : [...dariPos(o, info!.nilai_buku_aset, info!.akun_template), ...(info?.aset_tetap ?? [])]) : []
 
   return (
     <>

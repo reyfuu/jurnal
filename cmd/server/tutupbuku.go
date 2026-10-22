@@ -33,10 +33,18 @@ func (s *tenant) cekTerbukaLocked(tanggal ...string) error {
 // tanggal saldo awal yang diisi pengguna (posisinya sudah tercakup saldo awal; dicatat lagi =
 // terhitung dua kali). Tanpa saldo awal isian, tanggal mulai ikut transaksi paling awal.
 func (s *tenant) cekTxLocked(t finance.Transaction) error {
+	if t.Jenis == finance.JenisDividen && !s.ptLocked() {
+		return fmt.Errorf("Pembagian Dividen hanya untuk usaha berbentuk PT; untuk CV/perorangan catat sebagai Ambil Uang Pribadi")
+	}
 	if s.opening != nil && t.Tanggal < s.opening.Tanggal {
 		return fmt.Errorf("tanggal %s sebelum tanggal saldo awal (%s); posisi sebelum tanggal itu sudah tercakup di saldo awal. Bila memang mau mencatat transaksi lama, mundurkan tanggal saldo awal dulu di menu Saldo Awal", t.Tanggal, s.opening.Tanggal)
 	}
 	return s.cekTerbukaLocked(tanggalTx(t)...)
+}
+
+// ptLocked: usaha berbentuk PT / PT Perorangan. s.mu dipegang.
+func (s *tenant) ptLocked() bool {
+	return s.profile != nil && (s.profile.BentukUsaha == "pt" || s.profile.BentukUsaha == "pt_perorangan")
 }
 
 func tanggalTx(t finance.Transaction) []string {

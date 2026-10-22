@@ -73,6 +73,11 @@ func a(kode, nama, subtype string, n Normal, k Kelompok, kon Kondisi, catatan st
 	return Account{Kode: kode, Nama: nama, Subtype: subtype, Normal: n, Kelompok: k, Kondisi: kon, Catatan: catatan}
 }
 
+func berperan(acc Account, peran string) Account {
+	acc.Peran = peran
+	return acc
+}
+
 // Master: 72 akun "COA Baru" + 4 akun di luar file (lihat TambahanDiLuarFile).
 // Perubahan dari file: 2113 Utang Karyawan → 1407 Piutang Karyawan (keputusan user;
 // substansi kasusnya tagihan perusahaan ke karyawan).
@@ -101,10 +106,10 @@ var Master = []Account{
 	a("1507", "Harta Tak Berwujud", "intangible", Debit, AsetTidakLancar, JikaAda, "Software, lisensi, merek, goodwill; disusutkan sebagai amortisasi"),
 	a("1508", "Akumulasi Amortisasi", "contra_asset", Kredit, AsetTidakLancar, JikaAda, ""),
 	a("1601", "Aset Pajak Tangguhan", "deferred_tax_asset", Debit, AsetTidakLancar, Selalu, "Beda temporer PSAK vs ketentuan pajak yang menimbulkan manfaat pajak di masa depan"),
-	a("2101", "Hutang Usaha", "payable", Kredit, LiabilitasPendek, Selalu, ""),
-	a("2102", "Hutang Bank", "loan", Kredit, LiabilitasPendek, Selalu, ""),
+	a("2101", "Utang Usaha", "payable", Kredit, LiabilitasPendek, Selalu, ""),
+	a("2102", "Utang Bank", "loan", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2104", "Beban Yang Masih Harus Dibayar", "accrued", Kredit, LiabilitasPendek, Selalu, ""),
-	a("2105", "Hutang Lain-lain", "payable", Kredit, LiabilitasPendek, Selalu, ""),
+	a("2105", "Utang Lain-lain", "payable", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2106", "PPN Keluaran", "vat_out", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2107", "Utang PPh 21", "wht_payable_pph21", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2108", "Utang PPh 23", "wht_payable_pph23", Kredit, LiabilitasPendek, Selalu, ""),
@@ -112,8 +117,8 @@ var Master = []Account{
 	a("2110", "Utang PPh Final", "final_payable", Kredit, LiabilitasPendek, Selalu, ""),
 	a("2111", "PPN Kurang Bayar", "vat_underpaid", Kredit, LiabilitasPendek, Selalu, "PPN Keluaran > PPN Masukan yang belum disetor"),
 	a("2112", "Utang BPJS", "bpjs_payable", Kredit, LiabilitasPendek, Selalu, "Iuran BPJS (porsi perusahaan + potongan karyawan) yang belum disetor"),
-	a("2114", "Utang Pihak Berelasi", "related_party_payable", Kredit, LiabilitasPendek, Selalu, "Disajikan terpisah dari hutang usaha sesuai ketentuan pengungkapan pihak berelasi"),
-	a("2115", "Utang Dividen", "dividend_payable", Kredit, LiabilitasPendek, JikaPT, "Muncul otomatis bila bentuk badan usaha PT"),
+	a("2114", "Utang Pihak Berelasi", "related_party_payable", Kredit, LiabilitasPendek, Selalu, "Disajikan terpisah dari utang usaha sesuai ketentuan pengungkapan pihak berelasi"),
+	berperan(a("2115", "Utang Dividen", "dividend_payable", Kredit, LiabilitasPendek, JikaPT, "Muncul otomatis bila bentuk badan usaha PT"), PeranUtangDividen),
 	a("2201", "Liabilitas Pajak Tangguhan", "deferred_tax_liability", Kredit, LiabilitasJangka, Selalu, "Pasangan Aset Pajak Tangguhan"),
 	a("3101", "Modal Pemilik", "capital", Kredit, Ekuitas, Selalu, ""),
 	a("3102", "Prive / Pengambilan Pemilik", "drawing", Debit, Ekuitas, JikaNonPT, "Tidak muncul bila bentuk badan usaha PT"),

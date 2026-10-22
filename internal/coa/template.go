@@ -46,7 +46,7 @@ func ValidateTemplate(accs []Account) error {
 		if a.Peran == "" {
 			continue
 		}
-		if !slices.ContainsFunc(DaftarPeran, func(r PeranInfo) bool { return r.ID == a.Peran }) && a.Peran != "modal_pt" {
+		if !slices.ContainsFunc(DaftarPeran, func(r PeranInfo) bool { return r.ID == a.Peran }) && a.Peran != "modal_pt" && a.Peran != PeranUtangDividen {
 			return fmt.Errorf("%w: akun %s: peran %q tidak dikenal", ErrTemplate, a.Kode, a.Peran)
 		}
 		if lain, dobel := peranDipakai[a.Peran]; dobel {

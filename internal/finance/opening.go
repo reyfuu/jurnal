@@ -179,6 +179,8 @@ type ReportOpening struct {
 	Payables    int64 `json:"payables"`
 	Inventory   int64 `json:"inventory"`
 	Loans       int64 `json:"loans"`
+	// DividendsPayable: bagian Payables yang berupa utang dividen (PT).
+	DividendsPayable int64 `json:"dividends_payable,omitempty"`
 }
 
 // netCashBefore: kas bersih seluruh transaksi lunas sebelum period.
