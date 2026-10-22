@@ -22,7 +22,7 @@ func CashWarnings(txs []Transaction, openingCash int64) []CashWarning {
 	}
 	var moves []move
 	for _, t := range txs {
-		if t.Lunas {
+		if j, _ := jenisOf(t.Jenis); t.Lunas && j.Pos != PosPindah { // pindah dana: total kas tetap
 			moves = append(moves, move{cmp.Or(t.TanggalLunas, t.Tanggal), t})
 		}
 	}

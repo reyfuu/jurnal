@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
@@ -48,5 +49,49 @@ func TestNomorJurnal(t *testing.T) {
 	}
 	if len(cat.Transaksi) != 2 || n[cat.Transaksi[0]] != "JU-202611-0001" || n[cat.Transaksi[1]] != "JU-202611-0001" {
 		t.Fatalf("satu catatan satu nomor: %v %v", cat.Transaksi, n)
+	}
+	// Jurnal Umum: satu catatan multi-akun = satu bukti berisi semua barisnya
+	var ju struct {
+		Entri []struct {
+			Bukti string `json:"bukti"`
+			Baris []any  `json:"baris"`
+		} `json:"entri"`
+	}
+	_ = json.Unmarshal(do(srv, qa, http.MethodGet, "/api/v1/reports/jurnal?dari=2026-11-01&sampai=2026-11-30", "").Body.Bytes(), &ju)
+	jumlah := 0
+	for _, e := range ju.Entri {
+		if e.Bukti == "JU-202611-0001" {
+			jumlah++
+			if len(e.Baris) != 3 {
+				t.Fatalf("baris bukti catatan: %d, mau 3: %+v", len(e.Baris), ju.Entri)
+			}
+		}
+	}
+	if jumlah != 1 {
+		t.Fatalf("bukti JU-202611-0001 muncul %d kali, mau 1", jumlah)
+	}
+}
+
+// Migrasi saat data dimuat: transaksi lama tanpa nomor diberi nomor sesudah nomor tertinggi yang
+// sudah ada (walau penghitung hilang), unik, dan memuat ulang tidak mengubah apa pun.
+func TestNomorJurnal_MigrasiSaatMuat(t *testing.T) {
+	tn := newTenant(9)
+	st := &state{NextTxID: 5, Transactions: []finance.Transaction{
+		{ID: 1, Tanggal: "2026-10-01", Jenis: "Penjualan", Nominal: 1, Lunas: true, NoJurnal: "JU-202610-0005"},
+		{ID: 2, Tanggal: "2026-10-02", Jenis: "Penjualan", Nominal: 1, Lunas: true},
+		{ID: 3, Tanggal: "2026-09-30", Jenis: "Penjualan", Nominal: 1, Lunas: true, Grup: 4},
+		{ID: 4, Tanggal: "2026-09-30", Jenis: "Biaya Lain", Nominal: 1, Lunas: true, Grup: 4},
+	}}
+	tn.restore(st)
+	got := []string{tn.txs[0].NoJurnal, tn.txs[1].NoJurnal, tn.txs[2].NoJurnal, tn.txs[3].NoJurnal}
+	want := []string{"JU-202610-0005", "JU-202610-0006", "JU-202609-0001", "JU-202609-0001"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("nomor: %v, mau %v", got, want)
+	}
+	st.Transactions, st.NomorJurnal = tn.txs, tn.nomorJurnal
+	tn2 := newTenant(9)
+	tn2.restore(st)
+	if fmt.Sprint(tn2.txs) != fmt.Sprint(tn.txs) || tn2.nomorJurnal["202610"] != 6 {
+		t.Fatalf("muat ulang mengubah nomor: %v %v", tn2.txs, tn2.nomorJurnal)
 	}
 }

@@ -449,6 +449,9 @@ func petunjukSheet() (ImportSheet, [2]int, [2]int) {
 		[]string{"Jenis Harta", "Kelompok Fiskal", "Rujukan Lampiran PMK", "Status Pemetaan"}, jh)
 	var jt [][]string
 	for _, j := range JenisList {
+		if j.Pos == PosPindah { // hanya lewat Catat
+			continue
+		}
 		jt = append(jt, []string{j.Nama, j.Arah})
 	}
 	tabel("DAFTAR JENIS TRANSAKSI (sheet Transaksi)", []string{"Jenis", "Arah uang"}, jt)

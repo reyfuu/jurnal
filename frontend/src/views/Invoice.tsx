@@ -80,12 +80,19 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const [riwayat, setRiwayat] = useState<string | null>(null)
   const [pelanggan, setPelanggan] = useState<Pelanggan[]>([])
   useEffect(() => { getPelanggan().then(setPelanggan, () => {}) }, [])
-  // Pilih nama dari daftar pelanggan: alamat & NPWP yang masih kosong ikut terisi.
-  const pilihPelanggan = (nama: string) => setForm((f) => {
-    if (!f) return f
+  // Nama cocok dengan daftar pelanggan: alamat & NPWP diisi dari daftar. Nilai yang diisi otomatis
+  // diganti bila nama berpindah ke pelanggan lain (mis. "PT A" → "PT AB") dan dikosongkan bila
+  // tidak cocok lagi; isian yang diketik sendiri tidak disentuh.
+  const isiOtomatis = useRef<{ alamat: string; npwp: string }>({ alamat: '', npwp: '' })
+  const pilihPelanggan = (nama: string) => {
+    if (!form) return
     const p = pelanggan.find((x) => x.nama.toLowerCase() === nama.trim().toLowerCase())
-    return { ...f, pelanggan_nama: nama, pelanggan_alamat: f.pelanggan_alamat || p?.alamat || '', pelanggan_npwp: f.pelanggan_npwp || p?.npwp || '' }
-  })
+    const auto = isiOtomatis.current
+    const baru = { alamat: p?.alamat ?? '', npwp: p?.npwp ?? '' }
+    const ganti = (sekarang: string | undefined, lama: string, isi: string) => (!sekarang || sekarang === lama ? isi : sekarang)
+    isiOtomatis.current = baru
+    setForm({ ...form, pelanggan_nama: nama, pelanggan_alamat: ganti(form.pelanggan_alamat, auto.alamat, baru.alamat), pelanggan_npwp: ganti(form.pelanggan_npwp, auto.npwp, baru.npwp) })
+  }
   const urut = useKolomUrut()
   // Invoice baru yang belum tersimpan disimpan sebagai draft (error / muat ulang tidak menghapusnya).
   useSimpanDraft(form && editId === null ? DRAFT_INV : null, form)

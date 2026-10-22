@@ -317,6 +317,9 @@ func ApplyKPIs(snap *DashboardSnapshot, is IncomeStatement, cf CashFlow, periodT
 		if j.Arah == "masuk" {
 			item.Type, item.Net = KindIncome, t.Nominal
 		}
+		if j.Pos == PosPindah {
+			item.Net = 0 // antar rekening sendiri: bukan pengeluaran
+		}
 		snap.RecentTransactions = append(snap.RecentTransactions, item)
 	}
 }

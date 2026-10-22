@@ -58,9 +58,14 @@ func (s *tenant) handleCreatePelanggan(w http.ResponseWriter, r *http.Request) {
 func (s *tenant) handlePelangganDariData(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	ada := make(map[string]bool, len(s.pelanggan)) // sekali bangun: tidak kuadratik untuk data besar
+	for _, p := range s.pelanggan {
+		ada[finance.KunciNama(p.Nama)] = true
+	}
 	n := 0
 	for _, p := range finance.PelangganDariData(s.txs, s.invoices) {
-		if finance.CekUnik(s.pelanggan, finance.InfoPelanggan, 0, "", p.Nama, "pelanggan") == nil {
+		if k := finance.KunciNama(p.Nama); !ada[k] {
+			ada[k] = true
 			s.tambahPelangganLocked(p)
 			n++
 		}
