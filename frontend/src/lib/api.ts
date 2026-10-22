@@ -1490,6 +1490,27 @@ export const createSupplier = (s: SupplierInput) => api<Supplier>('/produksi/sup
 export const updateSupplier = (id: number, s: SupplierInput) => api<Supplier>(`/produksi/supplier/${id}`, { method: 'PUT', body: s })
 export const deleteSupplier = (id: number) => api<void>(`/produksi/supplier/${id}`, { method: 'DELETE' })
 
+/** Master pelanggan (Invoice → Daftar pelanggan); invoice tetap menyimpan nama sebagai teks. */
+export interface Pelanggan {
+  id: number
+  nama: string
+  kontak?: string
+  telepon?: string
+  email?: string
+  alamat?: string
+  npwp?: string
+  /** Termin pembayaran dalam hari; 0 = tunai. */
+  tempo_hari: number
+  catatan?: string
+}
+export type PelangganInput = Omit<Pelanggan, 'id'>
+export const getPelanggan = () => api<Pelanggan[]>('/pelanggan')
+export const createPelanggan = (p: PelangganInput) => api<Pelanggan>('/pelanggan', { method: 'POST', body: p })
+export const updatePelanggan = (id: number, p: PelangganInput) => api<Pelanggan>(`/pelanggan/${id}`, { method: 'PUT', body: p })
+export const deletePelanggan = (id: number) => api<void>(`/pelanggan/${id}`, { method: 'DELETE' })
+/** Tambahkan nama pelanggan dari transaksi penjualan & invoice yang belum ada di daftar. */
+export const pelangganDariData = () => api<{ ditambah: number }>('/pelanggan/dari-data', { method: 'POST' })
+
 // --- Invoice: faktur penjualan + cetak PDF ---
 
 export interface InvoiceItem {

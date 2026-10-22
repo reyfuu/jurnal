@@ -61,6 +61,9 @@ type tenant struct {
 	nextProdukID   int
 	supplier       []finance.Supplier
 	nextSupplierID int
+	// pelanggan: master pelanggan (Invoice → Daftar pelanggan).
+	pelanggan       []finance.Pelanggan
+	nextPelangganID int
 	// koreksi: usulan tim Master Pajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
@@ -183,6 +186,9 @@ func (t *tenant) restore(st *state) {
 	}
 	if st.NextSupplierID > 0 {
 		t.supplier, t.nextSupplierID = st.Supplier, st.NextSupplierID
+	}
+	if st.NextPelangganID > 0 {
+		t.pelanggan, t.nextPelangganID = st.Pelanggan, st.NextPelangganID
 	}
 	if st.NextKoreksiID > 0 {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
@@ -446,6 +452,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateProduk))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteProduk))))
 	s.mux.HandleFunc("POST /api/v1/produksi/produk/{id}/terapkan-hpp", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleTerapkanHPP))))
+	s.mux.HandleFunc("GET /api/v1/pelanggan", s.guard("invoice", s.on((*tenant).handleListPelanggan)))
+	s.mux.HandleFunc("POST /api/v1/pelanggan", s.persisting(s.guard("invoice", s.on((*tenant).handleCreatePelanggan))))
+	s.mux.HandleFunc("POST /api/v1/pelanggan/dari-data", s.persisting(s.guard("invoice", s.on((*tenant).handlePelangganDariData))))
+	s.mux.HandleFunc("PUT /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdatePelanggan))))
+	s.mux.HandleFunc("DELETE /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeletePelanggan))))
 	s.mux.HandleFunc("POST /api/v1/produksi/supplier", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleCreateSupplier))))
 	s.mux.HandleFunc("PUT /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateSupplier))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteSupplier))))

@@ -89,12 +89,12 @@ type Transaction struct {
 	// otomatis dari Lunas & Channel).
 	// Sumber: asal pencatatan bila bukan input manual — "mutasi" (impor mutasi bank) atau "foto"
 	// (dibaca AI dari foto nota); dipakai pengecekan transaksi dobel.
-	Sumber  string `json:"sumber,omitempty"`
+	Sumber string `json:"sumber,omitempty"`
 	// NoJurnal: nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server (cmd/server/nomor_jurnal.go).
 	NoJurnal string `json:"no_jurnal,omitempty"`
-	Grup    int    `json:"grup,omitempty"`
-	NoBukti string `json:"no_bukti,omitempty"`
-	Lawan   string `json:"lawan,omitempty"`
+	Grup     int    `json:"grup,omitempty"`
+	NoBukti  string `json:"no_bukti,omitempty"`
+	Lawan    string `json:"lawan,omitempty"`
 	// StokID & QtyStok: barang yang dibeli (Beli Bahan / Stok) atau dijual (Penjualan) dan
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
