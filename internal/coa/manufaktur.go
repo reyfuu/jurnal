@@ -34,6 +34,7 @@ var kondisiManufaktur = map[string]Kondisi{
 	"1506": JikaAda, "1507": JikaAda, "1551": JikaAda, "1553": JikaAda, "1554": JikaAda, "1555": JikaAda,
 	"1601": JikaAda, "1602": JikaAda, "1603": JikaAda, "1651": JikaAda, "2141": JikaAda, "2502": JikaAda,
 	"4104": JikaAda, "5191": JikaAda, "5192": JikaAda, "5193": JikaAda, "5194": JikaAda, "3301": JikaAda,
+	"3299": JikaAda,
 }
 
 func susunManufaktur() []Account {
@@ -121,6 +122,7 @@ func susunManufaktur() []Account {
 		m("3202", "Saldo Laba - Telah Ditentukan Penggunaannya", "retained_earnings", Kredit, Ekuitas, "Cadangan wajib/ditetapkan RUPS"),
 		m("3203", "Laba/Rugi Tahun Berjalan", "current_earnings", Kredit, Ekuitas, "Akun sistem; ditutup ke 3201 saat tutup buku"),
 		m("3204", "Dividen / Prive", "equity_contra", Debit, Ekuitas, "Akun kontra ekuitas"),
+		m("3299", "Saldo Laba - Selisih Saldo Awal", "retained_earnings", Kredit, Ekuitas, "Selisih saldo awal yang disimpan walau belum seimbang; periksa dan pindahkan ke akun yang benar"),
 		m("3301", "Selisih Revaluasi Aset Tetap", "equity", Kredit, Ekuitas, "Hanya bila memakai model revaluasi"),
 		m("3901", "Ekuitas Saldo Awal (Opening Balance)", "equity", Kredit, Ekuitas, "Akun penyeimbang saat migrasi saldo awal"),
 		m("4101", "Penjualan Produk", "revenue", Kredit, PendapatanUsaha, ""),

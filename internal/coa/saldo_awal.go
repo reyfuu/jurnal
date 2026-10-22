@@ -12,6 +12,20 @@ import (
 // Layar Saldo Awal memakai CoA usaha itu sendiri (dagang / manufaktur), bukan daftar tetap:
 // kode & nama akun ikut CoA-nya, kategori neraca diturunkan dari kelompok, subtype, dan peran.
 
+// KodeSelisihSaldoAwal: akun laba ditahan penampung selisih saldo awal yang disimpan walau belum
+// seimbang (Harta ≠ Utang + Modal). Tidak diketik pengguna; diisi server saat simpan paksa.
+const KodeSelisihSaldoAwal = "3299"
+
+// AkunSelisihSaldoAwal: akun penampung di CoA usaha ini; template tanpa akun itu memakai akun
+// Laba Ditahan biasa.
+func AkunSelisihSaldoAwal(all []Account, peta Peta) Account {
+	if a, ok := Find(all, KodeSelisihSaldoAwal); ok {
+		return a
+	}
+	a, _ := Find(all, peta.Kode(PeranLabaDitahan))
+	return a
+}
+
 // subtypeTanpaSaldoAwal: akun pengurang & penampung sistem — tidak diisi pengguna di saldo awal.
 var subtypeTanpaSaldoAwal = []string{"contra_asset", "accum_depr", "accum_amort", "inventory_contra",
 	"current_earnings", "drawing", "equity_contra"}
@@ -74,7 +88,7 @@ func TemplateSaldoAwal(active []Account, peta Peta, petunjuk []finance.SaldoAkun
 	var out []finance.SaldoAkun
 	for _, a := range active {
 		kat := KategoriSaldoAkun(a, peta)
-		if kat == "" || kat == finance.KatAsetTetap {
+		if kat == "" || kat == finance.KatAsetTetap || a.Kode == KodeSelisihSaldoAwal {
 			continue
 		}
 		b := finance.SaldoAkun{Kode: a.Kode, Nama: a.Nama, Kategori: kat}

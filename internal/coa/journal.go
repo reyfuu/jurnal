@@ -321,6 +321,16 @@ func SaldoAwalLain(ob finance.OpeningBalance, akun []Account, peta Peta) map[str
 			kode = asetLain
 		case finance.KatKewajibanLain:
 			kode, tanda = kewLain, -1
+		case finance.KatLabaDitahan:
+			// Selisih saldo awal yang disimpan paksa: tetap di akun penampungnya, bukan di Laba
+			// Ditahan biasa. Pos laba ditahan (OpeningBerjalan) sudah memuatnya, jadi dikembalikan.
+			if r.Kode == KodeSelisihSaldoAwal && r.Kode != peta.Kode(PeranLabaDitahan) {
+				if _, ok := Find(akun, r.Kode); ok {
+					out[r.Kode] -= r.Nominal
+					out[peta.Kode(PeranLabaDitahan)] += r.Nominal
+				}
+			}
+			continue
 		default:
 			continue
 		}

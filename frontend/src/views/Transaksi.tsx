@@ -1,6 +1,7 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -27,7 +28,9 @@ const EMPTY: TxInput = {
   tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
 }
 
-type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
+// dipulihkan: isian transaksi baru diambil dari draft (form sebelumnya belum tersimpan).
+type Editing = { id: number | null; input: TxInput; confirmDelete: boolean; dipulihkan?: boolean } | null
+const DRAFT_TX = 'transaksi-baru'
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
@@ -78,13 +81,15 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
   const channels = useMemo(() => channelsOf(txs), [txs])
 
   const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
+  useSimpanDraft(editing?.id === null && !usulMode ? DRAFT_TX : null, editing?.input ?? null)
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
 
   function openNew() {
     setError('')
     setQtyTeks('')
     getPilihanBarang().then(setBarang, () => {})
-    setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false })
+    const draft = bacaDraft<TxInput>(DRAFT_TX)
+    setEditing({ id: null, input: draft ?? { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false, dipulihkan: !!draft })
   }
   function openEdit(t: Tx) {
     if (!bisaBuka) return
@@ -106,6 +111,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
       const res = await fn()
       if (usulMode) setTerkirim(`${(res as { nomor: string }).nomor} terkirim ke pemilik usaha. Pembukuan belum berubah sampai disetujui.`)
       else setWarnings((res as SavedTx | undefined)?.warnings)
+      if (editing?.id === null) hapusDraft(DRAFT_TX)
       setEditing(null)
       await Promise.all([refresh(), onChanged()])
     } catch (err) {
@@ -293,6 +299,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                   ? 'Ubah isian yang perlu dikoreksi. Pembukuan klien tidak berubah sampai pemilik usaha menyetujui.'
                   : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
+              {editing.dipulihkan && (
+                <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginTop: -6 }}>
+                  Isian sebelumnya yang belum tersimpan dipulihkan.{' '}
+                  <button type="button" className="underline underline-offset-4" onClick={() => { hapusDraft(DRAFT_TX); setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: EMPTY.jenis }, confirmDelete: false }) }}>Mulai kosong</button>
+                </p>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field id="tx-tanggal" label="Tanggal">
@@ -432,7 +444,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                   )
                 ) : <span />}
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setEditing(null)}>Batal</Button>
+                  <Button type="button" variant="outline" onClick={() => { if (editing.id === null) hapusDraft(DRAFT_TX); setEditing(null) }}>Batal</Button>
                   <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
                 </div>
               </DialogFooter>

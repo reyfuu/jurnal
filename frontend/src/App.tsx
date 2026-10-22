@@ -33,6 +33,7 @@ import { AlatGratis, KartuAlatGratis, type TabAlat } from '@/views/AlatGratis'
 import { Onboarding, OnboardingShell, ProfilUsaha } from '@/views/ProfilUsaha'
 import { ImporDataAwal } from '@/views/ImporDataAwal'
 import { SaldoAwal } from '@/views/SaldoAwal'
+import { PeringatanSaldoMinus } from '@/components/PeringatanSaldoMinus'
 import { BukuBesar } from '@/views/BukuBesar'
 import { JurnalUmum } from '@/views/JurnalUmum'
 import { LaporanTransaksi } from '@/views/LaporanTransaksi'
@@ -299,6 +300,9 @@ export default function App() {
                 {memuat && <span role="status" style={{ fontSize: 11, color: 'var(--text-muted)' }}>memuat…</span>}
               </div>
             </div>
+          )}
+          {data && !terkunci && ['dashboard', 'transaksi', 'stok-gudang', 'laporan-keuangan', 'buku-besar', 'jurnal-umum'].includes(view) && (
+            <PeringatanSaldoMinus period={period} versi={data} />
           )}
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
