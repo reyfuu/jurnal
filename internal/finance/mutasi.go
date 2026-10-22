@@ -36,9 +36,14 @@ type MutasiRow struct {
 	Jenis      string `json:"jenis"` // tebakan; kosong = harus dipilih sendiri
 	Alasan     string `json:"alasan"`
 	Keyakinan  string `json:"keyakinan"`
-	// Duplikat: sudah ada transaksi dengan tanggal & nominal sama. Tidak selalu benar
-	// (dua penjualan bisa sama nominal di hari yang sama), karena itu hanya ditandai.
-	Duplikat bool `json:"duplikat"`
+	// Duplikat: kemungkinan sudah tercatat (lihat CariMirip): arah & nominal sama, tanggal
+	// berdekatan. Tidak selalu benar (dua penjualan bisa sama nominal), karena itu hanya
+	// ditandai & tidak dicentang; Mirip menunjuk transaksi yang cocok.
+	Duplikat bool   `json:"duplikat"`
+	Mirip    *Mirip `json:"mirip,omitempty"`
+	// Lunasi: baris ini dicatat sebagai pelunasan transaksi belum lunas (Mirip.BelumLunas),
+	// bukan transaksi baru. Diisi ID transaksinya.
+	Lunasi int `json:"lunasi,omitempty"`
 	// Pilih dipakai saat commit: baris yang tidak dipilih tidak dibukukan.
 	Pilih bool `json:"pilih"`
 }
@@ -228,12 +233,8 @@ func ParseMutasi(rows [][]string, tahunDefault int, existing []Transaction) Muta
 	if tahunDefault == 0 {
 		tahunDefault = time.Now().Year()
 	}
-	// Kunci duplikat: tanggal + nominal. Keterangan tidak ikut karena tulisan bank hampir
-	// pasti berbeda dari keterangan yang diketik manual untuk transaksi yang sama.
-	sudahAda := map[string]bool{}
-	for _, t := range existing {
-		sudahAda[t.Tanggal+"|"+strconv.FormatInt(t.Nominal, 10)] = true
-	}
+	// Kemungkinan sudah tercatat dicari dengan CariMirip (arah, nominal, tanggal berdekatan).
+	// Keterangan tidak ikut karena tulisan bank hampir pasti berbeda dari keterangan manual.
 
 	get := func(row []string, key string) string {
 		c, ok := cols[key]
@@ -284,11 +285,15 @@ func ParseMutasi(rows [][]string, tahunDefault int, existing []Transaction) Muta
 		r := MutasiRow{
 			Baris: noBaris, Tanggal: tgl, Keterangan: ket, Nominal: nominal, Arah: arah,
 			Jenis: jenis, Keyakinan: yakin, Alasan: alasan, Pilih: true,
-			Duplikat: sudahAda[tgl+"|"+strconv.FormatInt(nominal, 10)],
 		}
-		if r.Duplikat {
+		if m := CariMirip(existing, tgl, nominal, arah, nil); len(m) > 0 {
+			r.Duplikat, r.Mirip = true, &m[0]
 			h.Duplikat++
-			r.Pilih = false // dugaan duplikat tidak dicentang; pengguna yang memutuskan
+			if m[0].BelumLunas {
+				r.Lunasi = m[0].ID // tagihan yang sudah dicatat: mutasi ini pelunasannya
+			} else {
+				r.Pilih = false // dugaan dobel tidak dicentang; pengguna yang memutuskan
+			}
 		}
 		if yakin == KeyakinanRendah {
 			h.PerluDiperiksa++
@@ -503,12 +508,12 @@ func MutasiKeTransaksi(rows []MutasiRow) ([]Transaction, []ImportError) {
 	var out []Transaction
 	var errs []ImportError
 	for _, r := range rows {
-		if !r.Pilih {
-			continue
+		if !r.Pilih || r.Lunasi != 0 {
+			continue // pelunasan transaksi lama dicatat terpisah (lihat Lunasi)
 		}
 		t := Transaction{
 			Tanggal: r.Tanggal, Jenis: r.Jenis, Nominal: r.Nominal,
-			Keterangan: r.Keterangan, Lunas: true, Channel: "Mutasi Bank",
+			Keterangan: r.Keterangan, Lunas: true, Channel: "Mutasi Bank", Sumber: "mutasi",
 		}
 		if err := Validate(&t); err != nil {
 			errs = append(errs, ImportError{Baris: r.Baris, Pesan: err.Error()})

@@ -94,6 +94,13 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 	}
 	out.Cek = append(out.Cek, c)
 
+	// Transaksi yang kemungkinan tercatat dua kali (mis. dari foto nota lalu ikut impor mutasi).
+	c = cekTutup{Kode: "dobel", Judul: "Tidak ada transaksi dobel", View: "transaksi", Status: "ok", Detail: "Tidak ada pasangan transaksi dengan arah, nominal, dan tanggal yang sama."}
+	if p := finance.PasanganMirip(s.txs, period); len(p) > 0 {
+		c.Status, c.Detail = "peringatan", fmt.Sprintf("%d pasang transaksi mirip (arah & nominal sama, tanggal berdekatan) — cek di Transaksi apakah ada yang tercatat dua kali.", len(p))
+	}
+	out.Cek = append(out.Cek, c)
+
 	for _, piutang := range []bool{true, false} {
 		um := finance.UmurSaldo(ob, s.txs, akhir, piutang)
 		lama := um.Kelompok[1].Nilai + um.Kelompok[2].Nilai + um.Kelompok[3].Nilai

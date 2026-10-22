@@ -378,6 +378,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/transactions", s.guard("transaksi", s.on((*tenant).handleListTransactions)))
 	s.mux.HandleFunc("POST /api/v1/transactions", s.persisting(s.guard("transaksi", s.on((*tenant).handleCreateTransaction))))
 	s.mux.HandleFunc("GET /api/v1/transactions/template", s.guard("transaksi", s.handleTransactionsTemplate))
+	s.mux.HandleFunc("GET /api/v1/transactions/mirip", s.guard("transaksi", s.on((*tenant).handleCariMirip)))
+	s.mux.HandleFunc("GET /api/v1/transactions/dobel", s.guard("transaksi", s.on((*tenant).handleDobel)))
 	s.mux.HandleFunc("POST /api/v1/transactions/foto", s.guard("transaksi", s.handleBacaNota))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
@@ -1022,7 +1024,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan = 0, 0, "" // tautan invoice & catatan jurnal hanya diatur server
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false

@@ -290,13 +290,15 @@ export interface Tx {
   /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
   grup?: number
   no_bukti?: string
+  /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
+  sumber?: 'mutasi' | 'foto'
 }
 
 export type TxInput = Omit<Tx, 'id'>
 
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
-export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[] }
+export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto' }
 export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
 export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
 export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
@@ -1272,10 +1274,23 @@ export interface MutasiRow {
   jenis: string
   alasan: string
   keyakinan: Keyakinan
-  /** Sudah ada transaksi dengan tanggal & nominal sama — dugaan, bukan kepastian. */
+  /** Kemungkinan sudah tercatat (arah & nominal sama, tanggal berdekatan) — dugaan, bukan kepastian. */
   duplikat: boolean
+  /** Transaksi yang cocok; belum_lunas = mutasi ini bisa dicatat sebagai pelunasannya. */
+  mirip?: Mirip
+  /** Diisi ID transaksi: baris dicatat sebagai pelunasan transaksi itu, bukan transaksi baru. */
+  lunasi?: number
   pilih: boolean
 }
+
+/** Transaksi yang kemungkinan sama dengan uang masuk/keluar tertentu (cegah jurnal dobel). */
+export interface Mirip {
+  id: number; invoice_id?: number; tanggal: string; jenis: string; keterangan?: string; pihak?: string
+  nominal: number; sumber?: 'mutasi' | 'foto'; belum_lunas: boolean
+}
+export const cariMirip = (tanggal: string, nominal: number, arah: 'masuk' | 'keluar', kecualiGrup?: number) =>
+  api<Mirip[]>(`/transactions/mirip?tanggal=${tanggal}&nominal=${nominal}&arah=${arah}${kecualiGrup ? `&kecuali_grup=${kecualiGrup}` : ''}`)
+export const getDobel = (period: string) => api<[Tx, Tx][]>(`/transactions/dobel?period=${encodeURIComponent(period)}`)
 
 export interface MutasiGrup {
   jenis: string
