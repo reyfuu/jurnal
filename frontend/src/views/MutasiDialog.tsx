@@ -1,18 +1,23 @@
 import { FileSpreadsheet, Landmark } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { commitMutasi, previewMutasi, type JenisInfo, type Keyakinan, type MutasiHasil, type MutasiRow } from '@/lib/api'
+import { commitMutasi, previewMutasi, type JenisInfo, type Keyakinan, type Mirip, type MutasiHasil, type MutasiRow } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 
 const WARNA: Record<Keyakinan, string> = { tinggi: 'pill-green', sedang: 'pill-amber', rendah: 'pill-red', ai: 'pill-brand' }
 const LABEL: Record<Keyakinan, string> = { tinggi: 'Yakin', sedang: 'Perkiraan', rendah: 'Periksa', ai: 'Saran AI' }
+const ASAL: Record<string, string> = { foto: 'dari foto nota', mutasi: 'dari impor mutasi' }
+
+/** "12 Sep · Beli Bahan / Stok · CV Maju (dari foto nota)" */
+const ketMirip = (m: Mirip) =>
+  [m.tanggal, m.invoice_id ? `invoice #${m.invoice_id}` : m.jenis, m.pihak || m.keterangan].filter(Boolean).join(' · ') + (m.sumber ? ` (${ASAL[m.sumber] ?? m.sumber})` : '')
 
 /** Ringkasan per jenis dihitung ulang di sini supaya ikut berubah saat jenisnya dikoreksi. */
 function rekap(rows: MutasiRow[]) {
   const per = new Map<string, { jenis: string; arah: string; jumlah: number; total: number }>()
   for (const r of rows) {
-    if (!r.pilih) continue
+    if (!r.pilih || r.lunasi) continue // pelunasan transaksi lama bukan transaksi baru
     const g = per.get(r.jenis) ?? { jenis: r.jenis, arah: r.arah, jumlah: 0, total: 0 }
     g.jumlah++
     g.total += r.nominal
@@ -96,7 +101,11 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   }
 
   const ubah = (i: number, patch: Partial<MutasiRow>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
-  const terpilih = rows.filter((r) => r.pilih)
+  const terpilih = rows.filter((r) => r.pilih && !r.lunasi)
+  const dilunasi = rows.filter((r) => r.pilih && r.lunasi).length
+  // Baris yang kemungkinan sudah tercatat dikelompokkan di bawah, supaya mudah diperiksa.
+  const urutan = [...rows.keys()].sort((a, b) => Number(rows[a].duplikat) - Number(rows[b].duplikat))
+  const pertamaDobel = urutan.find((i) => rows[i].duplikat)
   const perluDiperiksa = terpilih.filter((r) => r.keyakinan === 'rendah').length
   const grup = rekap(rows)
   const errors = hasil?.errors ?? []
@@ -211,7 +220,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                         <input
                           type="checkbox" aria-label="Pilih semua baris"
                           checked={rows.length > 0 && rows.every((r) => r.pilih)}
-                          onChange={(e) => setRows(rows.map((r) => ({ ...r, pilih: e.target.checked })))}
+                          onChange={(e) => setRows(rows.map((r) => ({ ...r, pilih: e.target.checked, lunasi: e.target.checked ? r.lunasi : 0 })))}
                         />
                       </th>
                       <th>Tanggal</th><th>Keterangan dari bank</th>
@@ -223,10 +232,18 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                     {rows.length === 0 && (
                       <tr><td colSpan={7} style={{ color: 'var(--text-muted)' }}>Tidak ada baris mutasi yang terbaca.</td></tr>
                     )}
-                    {rows.map((r, i) => {
+                    {urutan.map((i) => {
+                      const r = rows[i]
                       const pilihan = jenis.filter((j) => j.arah === r.arah)
+                      const aksi = !r.pilih ? 'lewati' : r.lunasi ? 'lunasi' : 'baru'
                       return (
-                        <tr key={`${r.baris}-${i}`} style={{ opacity: r.pilih ? 1 : 0.45 }}>
+                        <Fragment key={`${r.baris}-${i}`}>
+                        {i === pertamaDobel && (
+                          <tr><td colSpan={7} className="section-head" style={{ background: 'var(--accent-orange-soft)' }}>
+                            Kemungkinan sudah tercatat ({rows.filter((x) => x.duplikat).length}) — cek apakah sama dengan transaksi yang sudah ada
+                          </td></tr>
+                        )}
+                        <tr style={{ opacity: r.pilih ? 1 : 0.45 }}>
                           <td>
                             <input
                               type="checkbox" checked={r.pilih} aria-label={`Bukukan baris ${r.baris}`}
@@ -236,15 +253,28 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                           <td style={{ whiteSpace: 'nowrap' }}>{r.tanggal}</td>
                           <td style={{ maxWidth: 300 }}>
                             {r.keterangan || <span style={{ color: 'var(--text-muted)' }}>(tanpa keterangan)</span>}
-                            {r.duplikat && (
-                              <span className="pill-status pill-amber" style={{ fontSize: 10, marginLeft: 6 }}>sudah pernah dicatat?</span>
+                            {r.duplikat && r.mirip && (
+                              <div className="grid gap-1" style={{ marginTop: 4 }}>
+                                <span className="text-xs" style={{ color: 'var(--text-warn)' }}>
+                                  {r.mirip.belum_lunas ? 'Cocok dengan tagihan belum lunas: ' : 'Sudah tercatat? Cocok dengan: '}{ketMirip(r.mirip)}
+                                </span>
+                                <select className="input-field" style={{ fontSize: 12, padding: '4px 8px', maxWidth: 280 }} aria-label={`Tindakan baris ${r.baris}`} value={aksi}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    ubah(i, v === 'lewati' ? { pilih: false, lunasi: 0 } : v === 'lunasi' ? { pilih: true, lunasi: r.mirip!.id } : { pilih: true, lunasi: 0 })
+                                  }}>
+                                  <option value="lewati">Lewati — sudah tercatat</option>
+                                  {r.mirip.belum_lunas && <option value="lunasi">Catat sebagai pelunasannya</option>}
+                                  <option value="baru">Tetap catat sebagai transaksi baru</option>
+                                </select>
+                              </div>
                             )}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatRp(r.nominal)}</td>
                           <td style={{ color: r.arah === 'masuk' ? 'var(--text-profit)' : 'var(--text-danger)' }}>{r.arah}</td>
                           <td>
                             <select
-                              className="input-field" value={r.jenis} aria-label={`Jenis untuk baris ${r.baris}`}
+                              className="input-field" value={r.jenis} aria-label={`Jenis untuk baris ${r.baris}`} disabled={!!r.lunasi}
                               onChange={(e) => ubah(i, { jenis: e.target.value, keyakinan: 'tinggi', alasan: 'dipilih sendiri' })}
                             >
                               {pilihan.map((j) => <option key={j.nama} value={j.nama}>{j.nama}</option>)}
@@ -257,6 +287,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                             <div style={{ fontSize: 10.5, color: 'var(--text-muted)', maxWidth: 220 }}>{r.alasan}</div>
                           </td>
                         </tr>
+                        </Fragment>
                       )
                     })}
                   </tbody>
@@ -281,8 +312,8 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
 
         <DialogFooter className="sticky -bottom-5 z-10 bg-popover">
           <Button type="button" variant="outline" onClick={() => reset(false)}>Batal</Button>
-          <Button type="button" disabled={busy || terpilih.length === 0} onClick={() => void simpan()}>
-            {busy && hasil ? 'Menyimpan…' : `Bukukan ${terpilih.length} transaksi`}
+          <Button type="button" disabled={busy || terpilih.length + dilunasi === 0} onClick={() => void simpan()}>
+            {busy && hasil ? 'Menyimpan…' : `Bukukan ${terpilih.length} transaksi${dilunasi ? ` · lunasi ${dilunasi}` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>

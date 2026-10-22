@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
@@ -40,40 +41,11 @@ func (s *tenant) handleLunasi(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
-	if i < 0 {
-		http.Error(w, "transaksi tidak ditemukan", http.StatusNotFound)
+	t, kode, err := s.lunasiTxLocked(id, b.Tanggal)
+	if err != nil {
+		http.Error(w, err.Error(), kode)
 		return
 	}
-	t := s.txs[i]
-	if err := s.cekTerbukaLocked(b.Tanggal); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
-	}
-	if t.Lunas {
-		http.Error(w, "transaksi ini sudah lunas", http.StatusConflict)
-		return
-	}
-	if b.Tanggal < t.Tanggal {
-		http.Error(w, "tanggal pelunasan tidak boleh sebelum tanggal transaksi", http.StatusBadRequest)
-		return
-	}
-	if t.InvoiceID != 0 {
-		// Piutang dari invoice: invoice ikut lunas, transaksi DPP & PPN-nya lunas bersama.
-		if err := s.lunasiInvoiceLocked(t.InvoiceID, b.Tanggal); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		if j := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return x.ID == id }); j >= 0 {
-			writeJSON(w, s.withWarnings(s.txs[j]))
-			return
-		}
-	}
-	t.Lunas = true
-	if b.Tanggal != t.Tanggal {
-		t.TanggalLunas = b.Tanggal
-	}
-	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
 }
 
@@ -86,4 +58,38 @@ func (s *tenant) tagihanBukuLocked(per string) []finance.Tagihan {
 func (s *Server) umurRoutes() {
 	s.mux.HandleFunc("GET /api/v1/reports/umur", s.guard("umur-piutang", s.on((*tenant).handleUmurSaldo)))
 	s.mux.HandleFunc("POST /api/v1/transactions/{id}/lunas", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleLunasi))))
+}
+
+// lunasiTxLocked menandai transaksi belum lunas sebagai lunas pada tanggal; transaksi invoice
+// melunasi invoice-nya (DPP & PPN bersama). kode = status HTTP bila gagal. s.mu dipegang.
+func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, int, error) {
+	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
+	if i < 0 {
+		return finance.Transaction{}, http.StatusNotFound, errors.New("transaksi tidak ditemukan")
+	}
+	t := s.txs[i]
+	if err := s.cekTerbukaLocked(tanggal); err != nil {
+		return t, http.StatusConflict, err
+	}
+	if t.Lunas {
+		return t, http.StatusConflict, errors.New("transaksi ini sudah lunas")
+	}
+	if tanggal < t.Tanggal {
+		return t, http.StatusBadRequest, errors.New("tanggal pelunasan tidak boleh sebelum tanggal transaksi")
+	}
+	if t.InvoiceID != 0 {
+		// Piutang dari invoice: invoice ikut lunas, transaksi DPP & PPN-nya lunas bersama.
+		if err := s.lunasiInvoiceLocked(t.InvoiceID, tanggal); err != nil {
+			return t, http.StatusConflict, err
+		}
+		if j := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return x.ID == id }); j >= 0 {
+			return s.txs[j], 0, nil
+		}
+	}
+	t.Lunas = true
+	if tanggal != t.Tanggal {
+		t.TanggalLunas = tanggal
+	}
+	s.txs[i] = t
+	return t, 0, nil
 }

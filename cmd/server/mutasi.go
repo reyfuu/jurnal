@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -191,7 +192,9 @@ type mutasiCommitReq struct {
 }
 
 type mutasiCommitResp struct {
-	Disimpan int                   `json:"disimpan"`
+	Disimpan int `json:"disimpan"`
+	// Dilunasi: baris yang dicatat sebagai pelunasan transaksi belum lunas yang sudah ada.
+	Dilunasi int                   `json:"dilunasi"`
 	Errors   []finance.ImportError `json:"errors"`
 	Contoh   []finance.Transaction `json:"contoh"`
 }
@@ -203,7 +206,13 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txs, errs := finance.MutasiKeTransaksi(req.Rows)
-	if len(txs) == 0 {
+	var lunasi []finance.MutasiRow
+	for _, r := range req.Rows {
+		if r.Pilih && r.Lunasi != 0 {
+			lunasi = append(lunasi, r)
+		}
+	}
+	if len(txs) == 0 && len(lunasi) == 0 {
 		// Tidak ada yang bisa dibukukan: laporkan kenapa, jangan balas "berhasil 0".
 		http.Error(w, pesanGagalMutasi(errs), http.StatusBadRequest)
 		return
@@ -216,13 +225,28 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Baris yang cocok dengan transaksi belum lunas: dicatat sebagai pelunasannya, bukan
+	// transaksi baru, supaya penjualan/pembelian yang sama tidak terbukukan dua kali.
+	dilunasi := 0
+	for _, r := range lunasi {
+		m := finance.CariMirip(s.txs, r.Tanggal, r.Nominal, r.Arah, nil)
+		if !slices.ContainsFunc(m, func(x finance.Mirip) bool { return x.ID == r.Lunasi && x.BelumLunas }) {
+			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: "transaksi #" + strconv.Itoa(r.Lunasi) + " tidak cocok lagi untuk dilunasi (nominal/arah beda atau sudah lunas); baris ini dilewati"})
+			continue
+		}
+		if _, _, err := s.lunasiTxLocked(r.Lunasi, r.Tanggal); err != nil {
+			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: err.Error()})
+			continue
+		}
+		dilunasi++
+	}
 	for i := range txs {
 		txs[i].ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, txs[i])
 	}
 	s.mu.Unlock()
-	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Errors: errs, Contoh: txs[:min(5, len(txs))]})
+	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
 }
 
 func pesanGagalMutasi(errs []finance.ImportError) string {

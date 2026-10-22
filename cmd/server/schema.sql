@@ -485,3 +485,6 @@ CREATE TABLE IF NOT EXISTS primbon_catatan (
 -- transaksi pembayarannya (Transaction.Grup).
 ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS biaya BIGINT;
 ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
+
+-- Cegah transaksi dobel (Okt 2026): asal pencatatan (mutasi / foto).
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;

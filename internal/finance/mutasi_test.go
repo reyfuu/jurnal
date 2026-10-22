@@ -160,7 +160,7 @@ func TestParseMutasi_TandaMinusSebagaiArah(t *testing.T) {
 }
 
 func TestParseMutasi_DuplikatTidakDicentang(t *testing.T) {
-	existing := []finance.Transaction{{Tanggal: "2026-09-03", Jenis: "Biaya Lain", Nominal: 15_000}}
+	existing := []finance.Transaction{{Tanggal: "2026-09-03", Jenis: "Biaya Lain", Nominal: 15_000, Lunas: true}}
 	h := finance.ParseMutasi(mutasiBCA(), 2026, existing)
 	if h.Duplikat != 1 {
 		t.Fatalf("1 dugaan duplikat, got %d", h.Duplikat)
