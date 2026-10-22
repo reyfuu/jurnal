@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -207,10 +208,20 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	g, err := s.gerakProduksiLocked(b)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.simpanGerak(w, r, g)
+}
+
+// gerakProduksiLocked: dokumen produksi (bahan keluar, barang jadi masuk) dari resep produk dan
+// pemakaian aktual; belum disimpan. Barang jadi dibuat di Stok & Gudang bila belum ada. s.mu dipegang.
+func (s *tenant) gerakProduksiLocked(b gerakBody) (finance.GerakStok, error) {
 	pi := slices.IndexFunc(s.produk, func(p finance.Produk) bool { return p.ID == b.ProdukID })
 	if pi < 0 {
-		http.Error(w, "produk tidak ditemukan", http.StatusNotFound)
-		return
+		return finance.GerakStok{}, errors.New("produk tidak ditemukan")
 	}
 	p := s.produk[pi]
 	standar := map[int]int64{}
@@ -220,8 +231,7 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 			continue // bahan manual tidak dilacak per gudang
 		}
 		if _, ok := s.stokByID(bh.StokID); !ok {
-			http.Error(w, "bahan "+bh.Nama+" sudah tidak ada di Stok & Gudang; perbarui resepnya", http.StatusBadRequest)
-			return
+			return finance.GerakStok{}, errors.New("bahan " + bh.Nama + " sudah tidak ada di Stok & Gudang; perbarui resepnya")
 		}
 		if _, ada := standar[bh.StokID]; !ada {
 			urut = append(urut, bh.StokID)
@@ -235,16 +245,13 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 		for _, x := range b.Bahan {
 			it, ok := s.stokByID(x.StokID)
 			if !ok {
-				http.Error(w, fmt.Sprintf("bahan #%d tidak ada di Stok & Gudang", x.StokID), http.StatusBadRequest)
-				return
+				return finance.GerakStok{}, fmt.Errorf("bahan #%d tidak ada di Stok & Gudang", x.StokID)
 			}
 			if x.Qty < 0 {
-				http.Error(w, "jumlah bahan "+it.Nama+" tidak boleh negatif", http.StatusBadRequest)
-				return
+				return finance.GerakStok{}, errors.New("jumlah bahan " + it.Nama + " tidak boleh negatif")
 			}
 			if _, ada := pakai[x.StokID]; ada {
-				http.Error(w, it.Nama+" diisi dua kali", http.StatusBadRequest)
-				return
+				return finance.GerakStok{}, errors.New(it.Nama + " diisi dua kali")
 			}
 			pakai[x.StokID] = x.Qty
 			if _, ada := standar[x.StokID]; !ada {
@@ -276,12 +283,11 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 	hasilStandar := p.HasilPerBatch * b.Batch * finance.TakaranSkala
 	hasil := cmp.Or(b.Hasil, hasilStandar)
 	if hasil < 0 {
-		http.Error(w, "hasil produksi tidak boleh negatif", http.StatusBadRequest)
-		return
+		return finance.GerakStok{}, errors.New("hasil produksi tidak boleh negatif")
 	}
 	baris = append(baris, finance.BarisGerak{StokID: s.stok[jadi].ID, Qty: hasil, Standar: hasilStandar})
 	ket := cmp.Or(b.Keterangan, fmt.Sprintf("Produksi %s × %d batch", p.Nama, b.Batch))
-	s.simpanGerak(w, r, finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakProduksi, Baris: baris, ProdukID: p.ID, Batch: b.Batch, Keterangan: ket})
+	return finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakProduksi, Baris: baris, ProdukID: p.ID, Batch: b.Batch, Keterangan: ket}, nil
 }
 
 func (s *tenant) handleListGerak(w http.ResponseWriter, _ *http.Request) {
@@ -310,6 +316,18 @@ func (s *tenant) handleDeleteGerak(w http.ResponseWriter, r *http.Request) {
 	if s.gerak[i].Jenis == finance.GerakAwal && len(s.gerak) > 1 {
 		http.Error(w, "hapus dulu stok opname & produksi sebelum menghapus stok awal", http.StatusConflict)
 		return
+	}
+	// Biaya lain produksi (transaksi satu grup) ikut terhapus bersama dokumennya.
+	if g := s.gerak[i].Grup; g > 0 {
+		for _, t := range s.txs {
+			if t.Grup == g {
+				if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+					http.Error(w, err.Error(), http.StatusConflict)
+					return
+				}
+			}
+		}
+		s.txs = slices.DeleteFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == g })
 	}
 	s.gerak = slices.Delete(s.gerak, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
@@ -556,6 +574,7 @@ func (s *Server) kartuStokRoutes() {
 	m.HandleFunc("POST /api/v1/stok/awal", s.persisting(g(s.on((*tenant).handleStokAwal))))
 	m.HandleFunc("POST /api/v1/stok/opname", s.persisting(g(s.on((*tenant).handleStokOpname))))
 	m.HandleFunc("POST /api/v1/stok/produksi", s.persisting(g(s.on((*tenant).handleStokProduksi))))
+	m.HandleFunc("POST /api/v1/stok/produksi/catat", s.persisting(g(s.on((*tenant).handleCatatProduksi))))
 	m.HandleFunc("GET /api/v1/stok/gerak", g(s.on((*tenant).handleListGerak)))
 	m.HandleFunc("DELETE /api/v1/stok/gerak/{id}", s.persisting(g(s.on((*tenant).handleDeleteGerak))))
 	m.HandleFunc("GET /api/v1/stok/kartu/{id}", g(s.on((*tenant).handleKartuBarang)))
