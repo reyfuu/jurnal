@@ -54,6 +54,11 @@ function SaranCard({ s }: { s: SaranBentuk }) {
       <div>
         <div className="text-xs font-semibold" style={{ color: warna }}>Kesimpulan: bentuk usaha & skema pajak</div>
         <h3 id="saran-bentuk-title" className="mt-1 text-base font-bold">{s.judul}</h3>
+        {s.asumsi && (
+          <p className="mt-2 rounded-md px-2.5 py-1.5 text-xs leading-relaxed" style={{ color: 'var(--accent-blue)', background: 'color-mix(in srgb, var(--accent-blue) 10%, transparent)' }}>
+            <TebalAngka teks={s.asumsi} />
+          </p>
+        )}
       </div>
       {!sama && (
         <div className="grid gap-3 sm:grid-cols-2">

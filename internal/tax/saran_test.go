@@ -36,6 +36,9 @@ func TestSaranBentukUsaha_SudahPalingHemat(t *testing.T) {
 	if !strings.Contains(strings.Join(s.Alasan, " "), "Rp500.000.000") {
 		t.Errorf("alasan: %v", s.Alasan)
 	}
+	if !strings.Contains(s.Asumsi, "tahun pertama") || strings.Contains(s.Asumsi, "Rp4.800.000.000") {
+		t.Errorf("asumsi: %q", s.Asumsi)
+	}
 	// dasar hukum berhenti di "jo. PP 20/2026", tanpa rincian 7/4/3 tahun
 	if g := strings.Join(s.Alasan, " "); !strings.Contains(g, "batas waktu pemakaian (PP 55/2022 jo. PP 20/2026).") || strings.Contains(g, "7 tahun") {
 		t.Errorf("dasar PPh final: %s", g)
@@ -56,6 +59,9 @@ func TestSaranBentukUsaha_BadanDanTanpaOmzet(t *testing.T) {
 		if (k.ID == SkemaPPOP || k.ID == SkemaPPBadan) && !strings.Contains(k.Nama, "tahun pertama") {
 			t.Fatalf("PPh final di atas batas tanpa tanda tahun pertama: %q", k.Nama)
 		}
+	}
+	if !strings.Contains(s.Asumsi, "tahun pertama") || !strings.Contains(s.Asumsi, "Rp4.800.000.000") {
+		t.Errorf("asumsi omzet di atas batas: %q", s.Asumsi)
 	}
 	if !strings.Contains(strings.Join(s.Catatan, " "), "TK/0") {
 		t.Errorf("asumsi PTKP badan tidak disebut: %v", s.Catatan)
