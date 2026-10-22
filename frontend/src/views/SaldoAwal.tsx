@@ -10,6 +10,7 @@ import {
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
+import { urutSaldo } from '@/lib/saldoAwal'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -121,10 +122,10 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     const draft = bacaDraft<{ tanggal: string; baris: SaldoAkun[] }>(DRAFT_SALDO)
     if (draft?.baris?.length) {
       setTanggal(draft.tanggal)
-      setBaris(draft.baris.map((r) => jadiBaris(r)))
+      setBaris(urutSaldo(draft.baris.map((r) => jadiBaris(r)), kategori.map((k) => k.id)))
       setDipulihkan(true)
     } else {
-      setBaris(rows)
+      setBaris(urutSaldo(rows, kategori.map((k) => k.id)))
       setDipulihkan(false)
     }
     setError('')
@@ -343,7 +344,10 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                     const r = b as Baris
                     const s = r._saran
                     return (
-                      <tr key={r._k}>
+                      <tr key={r._k} onBlur={(e) => {
+                        // urutkan ulang setelah fokus meninggalkan baris, bukan saat mengetik, supaya baris tidak melompat
+                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setBaris((bs) => bs && urutSaldo(bs, kategori.map((k) => k.id)))
+                      }}>
                         <td><input className="input-field" aria-label="Kode akun" value={r.kode ?? ''} placeholder="otomatis" onChange={(e) => ubah(r._k, { kode: e.target.value, _kodeAuto: false })} /></td>
                         <td>
                           <input className="input-field" aria-label="Nama akun" value={r.nama} placeholder="mis. Bank BCA, Pinjaman koperasi"
