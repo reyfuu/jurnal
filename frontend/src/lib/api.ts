@@ -551,9 +551,19 @@ export interface AIChatResponse {
   action_suggestions: string[]
   /** Tombol ke halaman terkait (panduan menu), sudah disaring sesuai hak akses. */
   tautan?: { view: View; label: string; tab?: string }[]
+  /** Usulan isian form ("catat penjualan 2 juta"); diisi di layar, disimpan oleh pengguna. */
+  aksi?: AIIsiForm
 }
 
-export const askAIChat = (query: string, period = '2026-08') =>
+export type AIForm = 'transaksi' | 'invoice' | 'stok' | 'pemasok'
+/** Kunci isian sama dengan input form tujuannya; hanya kolom yang disebut pengguna. */
+export type AIIsiForm =
+  | { form: 'transaksi'; view: View; isian: Partial<TxInput>; catatan?: string[] }
+  | { form: 'invoice'; view: View; isian: Partial<InvoiceInput>; catatan?: string[] }
+  | { form: 'stok'; view: View; isian: Partial<StokInput>; catatan?: string[] }
+  | { form: 'pemasok'; view: View; isian: Partial<SupplierInput>; catatan?: string[] }
+
+export const askAIChat =(query: string, period = '2026-08') =>
   api<AIChatResponse>('/ai/chat', { method: 'POST', body: { query, period } })
 
 

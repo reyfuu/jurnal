@@ -996,6 +996,11 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "query required", http.StatusBadRequest)
 		return
 	}
+	// Perintah mengisi form ("catat penjualan 2 juta") dijawab usulan isian, bukan panduan.
+	if form := ai.DeteksiIsiForm(req.Query); form != "" {
+		writeJSON(w, s.jawabIsiForm(r.Context(), currentUser(r), form, req.Query))
+		return
+	}
 	period := req.Period
 	if !finance.PeriodeSah(period) {
 		period = finance.BulanBerjalan()

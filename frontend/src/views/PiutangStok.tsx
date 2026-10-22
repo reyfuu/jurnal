@@ -1,6 +1,8 @@
 import { Flag, ShoppingCart, Upload } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MutasiStokPanel, RiwayatGerakPanel } from '@/views/KartuStok'
 import { StokOpnamePanel } from '@/views/StokOpname'
@@ -8,6 +10,7 @@ import { TambahBarangBanyak } from '@/views/TambahBarang'
 import { ThUrut } from '@/components/ThUrut'
 import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
 import { useGulirKeForm } from '@/lib/gulir'
+import { buatSKU } from '@/lib/sku'
 import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
@@ -280,7 +283,8 @@ const STATUS_CLS: Record<StokRow['status'], string> = {
 }
 
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
-export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
+/** isiAI: isian dari Tanya AI untuk barang baru (bisa diurungkan). */
+export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolean; aksi?: string; isiAI?: SinyalAI }) {
   const [data, setData] = useState<StokSummary | null>(null)
   // aksi dari tombol + Catat / Langkah memulai: stok awal & opname langsung ke tab Stok opname.
   const [tab, setTab] = useState<'daftar' | 'opname' | 'mutasi' | 'riwayat'>(() => (aksi === 'mulai' || aksi === 'opname' ? 'opname' : 'daftar'))
@@ -302,6 +306,18 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
 
   const muat = useCallback(() => { getStok().then(setData, (e: Error) => setError(e.message)) }, [])
   useEffect(muat, [muat])
+  const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null; tambahBanyak: boolean }, Partial<StokInput>>(isiAI, 'stok', {
+    ambil: () => ({ tab, form, editId, tambahBanyak }),
+    pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId); setTambahBanyak(s.tambahBanyak) },
+    isi: (isian) => {
+      setError(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
+      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, ...isian }
+      // SKU otomatis dari nama, sama seperti tabel Tambah barang
+      if (!b.sku) b.sku = buatSKU(b.nama, new Set((data?.items ?? []).map((x) => x.sku.toUpperCase()).filter(Boolean)))
+      setForm(b)
+    },
+    terbuka: form !== null,
+  })
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
@@ -444,6 +460,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
         {form && (
           <form className="grid gap-3" style={{ padding: 14, border: '2px solid var(--accent-orange)', borderRadius: 12, background: 'var(--accent-orange-soft)' }} onSubmit={simpan}>
             <div className="chart-title">{editId === null ? 'Tambah Barang' : 'Ubah Barang'}</div>
+            {isiAi.aktif !== null && <IsiAIBanner ai={isiAi} />}
             <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <label>
                 <span className="kpi-label">SKU</span>

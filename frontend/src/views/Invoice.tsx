@@ -6,6 +6,8 @@ import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 
 const DRAFT_INV = 'invoice-baru'
 import { PageHeader } from '@/components/PageHeader'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import {
   bukukanInvoice, createInvoice, deleteInvoice, getInvoices, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
@@ -62,7 +64,8 @@ function hitung(f: InvoiceInput) {
   return { subtotal, diskon, dpp, ppn, total: dpp + ppn }
 }
 
-export function InvoiceView() {
+/** isiAI: isian dari Tanya AI untuk invoice baru (bisa diurungkan). */
+export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const [info, setInfo] = useState<InvoiceInfo | null>(null)
   const [form, setForm] = useState<InvoiceInput | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -77,6 +80,13 @@ export function InvoiceView() {
 
   const muat = () => getInvoices().then(setInfo, (e) => setError((e as Error).message))
   useEffect(() => { void muat() }, [])
+  const isiAi = useIsiAI<{ form: InvoiceInput | null; editId: number | null }, Partial<InvoiceInput>>(isiAI, 'invoice', {
+    ambil: () => ({ form, editId }),
+    pasang: (s) => { setForm(s.form); setEditId(s.editId) },
+    isi: (isian) => { setError(''); setEditId(null); setForm({ ...kosong(info!.nomor_berikutnya, info!.ppn_bps), ...isian }) },
+    terbuka: form !== null,
+    siap: info !== null, // nomor & PPN invoice baru datang dari info
+  })
 
   if (!info) return <p className="workspace-subtitle">{error || 'Memuat faktur…'}</p>
 
@@ -221,6 +231,7 @@ export function InvoiceView() {
       {form && (
         <form ref={formRef} style={{ scrollMarginTop: 16, padding: 20, marginBottom: 14 }} className="card" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Buat Invoice' : `Ubah ${form.nomor}`}</div>
+          {isiAi.aktif !== null && <div style={{ marginTop: 12 }}><IsiAIBanner ai={isiAi} /></div>}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginTop: 14 }}>
             <Field label="No. Invoice">

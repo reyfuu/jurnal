@@ -1,6 +1,8 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
 import { ThUrut } from '@/components/ThUrut'
 import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
@@ -25,13 +27,20 @@ import { angka } from '@/lib/angka'
 const PAGE = 100
 const ALL = '__all__' // Radix Select tidak menerima value kosong
 const AUTO = '__auto__' // akun otomatis dari jenis
+// Tanggal hari ini menurut WIB; toISOString() memakai UTC sehingga sebelum pukul 07.00 jatuh ke kemarin.
+const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' })
+// Isian awal transaksi yang diisi Tanya AI (dialog transaksi).
+const EMPTY: TxInput = {
+  tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
+}
 
 type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
-/** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat). */
-export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string }) {
+/** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat).
+ *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan). */
+export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
@@ -85,6 +94,17 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
 
   const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
+  const isiAi = useIsiAI<{ editing: Editing; qtyTeks: string }, Partial<TxInput>>(isiAI, 'transaksi', {
+    ambil: () => ({ editing, qtyTeks }),
+    pasang: (s) => { setEditing(s.editing); setQtyTeks(s.qtyTeks) },
+    isi: (isian) => {
+      setError('')
+      setQtyTeks('')
+      getPilihanBarang().then(setBarang, () => {})
+      setEditing({ id: null, input: { ...EMPTY, tanggal: today(), ...isian }, confirmDelete: false })
+    },
+    terbuka: editing !== null,
+  })
 
   function openNew() {
     setHalaman({ jenis: filter.jenis && JENIS_CATAT.some((j) => j.id === filter.jenis) ? filter.jenis : 'Penjualan' })
@@ -312,6 +332,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                   ? 'Ubah isian yang perlu dikoreksi. Pembukuan klien tidak berubah sampai pemilik usaha menyetujui.'
                   : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
+              <IsiAIBanner ai={isiAi} />
               <div className="grid gap-4">
 
               <div className="grid gap-3 sm:grid-cols-2">

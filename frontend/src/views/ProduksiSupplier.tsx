@@ -2,6 +2,8 @@ import { Factory, Plus, Trash2 } from 'lucide-react'
 import { useGulirKeForm } from '@/lib/gulir'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import {
   createProduk, createSupplier, deleteProduk, deleteSupplier, getProduksi, getStok, terapkanHPP,
   updateProduk, updateSupplier, TAKARAN_SKALA,
@@ -199,7 +201,8 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
 }
 
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
-export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
+/** isiAI: isian dari Tanya AI untuk pemasok baru (bisa diurungkan). */
+export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolean; aksi?: string; isiAI?: SinyalAI }) {
   const [tab, setTab] = useState<'produksi' | 'produk' | 'supplier'>('produksi')
   const [muatUlang, setMuatUlang] = useState(0)
   const [data, setData] = useState<ProduksiSummary | null>(null)
@@ -225,6 +228,12 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
     getStok().then((s) => { setStok(s.items ?? []); setStokMulai(s.mulai) }, () => {})
   }, [])
   useEffect(muat, [muat])
+  const isiAi = useIsiAI<{ tab: typeof tab; supForm: SupplierInput | null; supEditId: number | null }, Partial<SupplierInput>>(isiAI, 'pemasok', {
+    ambil: () => ({ tab, supForm, supEditId }),
+    pasang: (s) => { setTab(s.tab); setSupForm(s.supForm); setSupEditId(s.supEditId) },
+    isi: (isian) => { setError(''); setTab('supplier'); setSupEditId(null); setSupForm({ ...SUPPLIER_KOSONG, ...isian }) },
+    terbuka: supForm !== null,
+  })
 
   async function simpanProduk(e: React.FormEvent) {
     e.preventDefault()
@@ -534,6 +543,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
       {tab === 'supplier' && (
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Supplier</div>
+        {isiAi.aktif !== null && <div style={{ marginTop: 12 }}><IsiAIBanner ai={isiAi} /></div>}
 
         {supForm && (
           <form ref={supFormRef} className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12, scrollMarginTop: 16 }} onSubmit={simpanSupplier}>

@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ArrowRight, Bot, Sparkles, X, Send, RefreshCw, MessageSquareQuote } from 'lucide-react'
-import { askAIChat, type AIChatResponse, type View } from '../lib/api'
+import { askAIChat, type AIChatResponse, type AIIsiForm, type View } from '../lib/api'
 import { Monogram } from '@/components/Logo'
 import { useGeser } from '@/lib/geser'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { JUDUL_FORM, pratinjau, rencana } from '@/lib/aiForm'
 
 interface Message {
   id: string
@@ -10,27 +13,47 @@ interface Message {
   text: string
   suggestions?: string[]
   tautan?: AIChatResponse['tautan']
+  /** Usulan isian form; status: menunggu Jalankan (mode rencana), sudah diisi, diurungkan, batal. */
+  aksi?: AIIsiForm
+  status?: 'rencana' | 'diisi' | 'diurungkan' | 'batal'
+  isiId?: number
 }
+
+// Mode rencana: AI menampilkan langkah & pratinjau lalu menunggu Jalankan. Disimpan per browser.
+const KUNCI_MODE = 'ai-mode-rencana'
+const bacaMode = () => { try { return localStorage.getItem(KUNCI_MODE) !== '0' } catch { return true } }
 
 const INITIAL_SUGGESTIONS = [
   'Di mana saya bisa mengisi laporan keuangan?',
   'Ringkas laporan bulan ini',
+  'Catat penjualan kopi Rp2.000.000 tunai hari ini',
   'Bagaimana aturan pajak UMKM PP 55/2022?',
   'Bagaimana kondisi arus kas dan piutang saya?',
   'Bagaimana cara hitung simulasi harga komisi GoFood?',
 ]
 
-export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?: string) => void }> = ({ period = '2026-08', onBuka }) => {
+/** onIsiForm: buka & isi form tujuan, mengembalikan id isian; onUrungkan: kembalikan form seperti sebelum diisi. */
+export const AIAgentBubble: React.FC<{
+  period?: string
+  onBuka?: (v: View, tab?: string) => void
+  onIsiForm?: (a: AIIsiForm) => number
+  onUrungkan?: (id: number, a: AIIsiForm) => void
+}> = ({ period = '2026-08', onBuka, onIsiForm, onUrungkan }) => {
   const [isOpen, setIsOpen] = useState(false)
   // tombol bisa digeser supaya tidak menutupi laporan; posisi diingat
   const geser = useGeser('mp:posisi-tanya-ai')
+  const [modeRencana, setModeRencana] = useState(bacaMode)
+  const gantiMode = (v: boolean) => {
+    setModeRencana(v)
+    try { localStorage.setItem(KUNCI_MODE, v ? '1' : '0') } catch { /* mode tetap berlaku sampai halaman dimuat ulang */ }
+  }
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *MasterPajak AI*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
+      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *MasterPajak AI*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.\n\nSaya juga bisa **mengisi form** (transaksi, invoice, barang, pemasok), mis. *catat penjualan kopi 2 juta tunai hari ini*. Anda melihat pratinjaunya dulu, dan tetap Anda yang menekan Simpan.',
       suggestions: INITIAL_SUGGESTIONS,
     },
   ])
@@ -66,6 +89,12 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
         suggestions: res.action_suggestions,
         tautan: res.tautan,
       }
+      if (res.aksi && onIsiForm) {
+        // Mode rencana menunggu Jalankan; mode langsung mengisi sekarang, pratinjau tetap tampil.
+        assistantMsg.aksi = res.aksi
+        if (modeRencana) assistantMsg.status = 'rencana'
+        else Object.assign(assistantMsg, { status: 'diisi', isiId: onIsiForm(res.aksi) })
+      }
       setMessages((prev) => [...prev, assistantMsg])
     } catch (err: any) {
       const errorMsg: Message = {
@@ -77,6 +106,61 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
     } finally {
       setLoading(false)
     }
+  }
+
+  const ubahPesan = (id: string, patch: Partial<Message>) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+  const jalankan = (m: Message) => m.aksi && onIsiForm && ubahPesan(m.id, { status: 'diisi', isiId: onIsiForm(m.aksi) })
+  const urungkan = (m: Message) => {
+    if (!m.aksi || m.isiId === undefined) return
+    onUrungkan?.(m.isiId, m.aksi)
+    ubahPesan(m.id, { status: 'diurungkan' })
+  }
+
+  const renderAksi = (m: Message) => {
+    const a = m.aksi!
+    return (
+      <div className="mt-2 w-[92%] rounded-xl border border-[var(--border-subtle)] bg-card p-3 text-xs">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="font-semibold text-foreground text-[13px]">Isi form {JUDUL_FORM[a.form]}</span>
+          <span className="pill-status pill-brand">Saran AI</span>
+        </div>
+        <table className="w-full">
+          <tbody>
+            {pratinjau(a).map((r) => (
+              <tr key={r.label}>
+                <td className="text-muted-foreground pr-3 py-0.5 align-top whitespace-nowrap">{r.label}</td>
+                <td className="text-foreground font-medium py-0.5">{r.nilai}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!!a.catatan?.length && (
+          <ul className="mt-2 space-y-0.5 text-muted-foreground">
+            {a.catatan.map((c) => <li key={c}>• {c}</li>)}
+          </ul>
+        )}
+        {m.status === 'rencana' && (
+          <>
+            <p className="mt-2.5 font-semibold text-foreground">Rencana</p>
+            <ol className="mt-1 list-decimal pl-4 space-y-0.5 text-foreground">
+              {rencana(a).map((l) => <li key={l}>{l}</li>)}
+            </ol>
+            <div className="mt-2.5 flex gap-1.5">
+              <Button size="sm" onClick={() => jalankan(m)}>Jalankan</Button>
+              <Button size="sm" variant="ghost" onClick={() => ubahPesan(m.id, { status: 'batal' })}>Batal</Button>
+            </div>
+          </>
+        )}
+        {m.status === 'diisi' && (
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Form sudah diisi. Periksa lalu klik Simpan.</span>
+            <Button size="sm" variant="outline" onClick={() => urungkan(m)}>Urungkan</Button>
+          </div>
+        )}
+        {m.status === 'diurungkan' && <p className="mt-2.5 text-muted-foreground">Isian diurungkan; form kembali seperti sebelumnya.</p>}
+        {m.status === 'batal' && <p className="mt-2.5 text-muted-foreground">Dibatalkan, form tidak diisi.</p>}
+      </div>
+    )
   }
 
   // Helper untuk merender formatting teks sederhana (bold, list, headings)
@@ -134,6 +218,12 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {onIsiForm && (
+                <label className="flex items-center gap-1.5 mr-1.5 text-[11px] text-muted-foreground cursor-pointer whitespace-nowrap" title="Saat mengisi form, AI menampilkan rencana dan menunggu Anda klik Jalankan">
+                  <Switch size="sm" checked={modeRencana} onCheckedChange={gantiMode} aria-label="Mode rencana" />
+                  Mode rencana
+                </label>
+              )}
               <button
                 onClick={() => setMessages([{
                   id: 'reset',
@@ -176,6 +266,8 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
                     renderFormattedText(m.text)
                   )}
                 </div>
+
+                {m.aksi && renderAksi(m)}
 
                 {/* Tautan ke halaman aplikasi (panduan menu) */}
                 {m.tautan && m.tautan.length > 0 && onBuka && (

@@ -852,6 +852,23 @@ https://claude.ai/artifact/DJrwkmmPtka6oDozJBjUHq (tahap 2–4 di sana belum dib
   `tar -C docs/peraturan -cz . | ssh -o IdentitiesOnly=yes -i ~/.ssh/aipreneur_vps root@31.97.66.119 'tar -xz -C /var/www/peraturan'`.
   `deploy.sh` memasang `PERATURAN_DIR` (bawaan `/var/www/peraturan`) read-only ke `/peraturan`.
 
+## Tanya AI: mode rencana & isi form dengan pratinjau + Urungkan (22 Okt 2026)
+
+- Perintah "catat / buat / tambah …" (`ai.DeteksiIsiForm`: kata kerja lalu kata benda form; kata benda
+  PERTAMA sesudah kata kerja yang menentukan; pertanyaan "di mana / cara / bagaimana" tetap panduan)
+  dijawab `QueryResponse.Aksi` = usulan isian form **transaksi, invoice, barang, pemasok**
+  (`internal/ai/isiform.go`, `cmd/server/ai_isiform.go`). Model hanya membaca kalimat; server
+  menormalkan (jenis harus dari `finance.JenisList`, rupiah bulat ≥ 0, tanggal kosong = hari ini WIB,
+  jatuh tempo invoice dihitung server dari `tempo_hari`). **Server tidak menyimpan apa pun.**
+- Hak akses: form yang view-nya tidak boleh dibuka peran → penjelasan tanpa memanggil model. AI mati /
+  kuota (`isiform|uid`, 60/24 jam) habis / model gagal → tautan ke form untuk diisi sendiri.
+- Frontend: sakelar **Mode rencana** di kepala bubble (localStorage `ai-mode-rencana`, default nyala):
+  nyala = pratinjau + langkah + Jalankan/Batal; mati = langsung diisi, pratinjau tetap tampil.
+  `App.isiFormAI` mengirim `SinyalAI` ke halaman; `lib/useIsiAI.ts` memotret state form lalu mengisi,
+  dan Urungkan memulihkan potretnya (termasuk isian yang sedang diketik). Banner `IsiAIBanner` di
+  dalam form membawa tombol Urungkan sendiri karena dialog modal Transaksi memblokir klik ke bubble.
+  Pratinjau & langkah: `lib/aiForm.ts` (diuji vitest).
+
 ## Kartu stok: beli, produksi, jual, opname, laporan mutasi (21 Okt 2026) — PR A, operasional
 
 - **Titik nol**: Stok & Gudang → "Mulai kartu stok" = hitung fisik pertama + harga pokok (`GerakStok` jenis `awal`, satu per usaha). Sebelum titik nol perilaku lama tetap (jumlah diketik).
