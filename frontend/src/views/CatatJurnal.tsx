@@ -118,7 +118,9 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
       const n = await bacaNota(await kecilkan(file))
       setNota(n)
       if (n.jenis && JENIS_CATAT.some((j) => j.id === n.jenis)) setJenis(n.jenis)
-      setKepala((k) => ({ ...k, tanggal: n.tanggal || k.tanggal, pihak: n.pihak ?? k.pihak, keterangan: n.keterangan ?? k.keterangan }))
+      // satu keterangan per catatan: tanpa keterangan dari AI, pakai daftar barang di nota
+      const barang = (n.item ?? []).map((i) => i.nama + (i.qty ? ` × ${i.qty}` : '')).join(', ')
+      setKepala((k) => ({ ...k, tanggal: n.tanggal || k.tanggal, pihak: n.pihak ?? k.pihak, keterangan: n.keterangan || barang || k.keterangan }))
       setBaris(barisDariNota(n, opsi))
     } catch (err) {
       setError((err as Error).message)
@@ -150,7 +152,8 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
           return
         }
       }
-      const isi = baris.filter((b) => b.debit || b.kredit).map(({ akun, keterangan, debit, kredit, jatuh_tempo }) => ({ akun, keterangan, debit, kredit, jatuh_tempo }))
+      // Satu keterangan per catatan (kepala); server memakainya untuk setiap baris.
+      const isi = baris.filter((b) => b.debit || b.kredit).map(({ akun, debit, kredit, jatuh_tempo }) => ({ akun, keterangan: '', debit, kredit, jatuh_tempo }))
       // dari foto: tandai sumbernya (cek dobel); catatan baru juga menyimpan fotonya sebagai bukti
       await simpanCatatanJurnal({ ...kepala, baris: isi, ...(nota ? { sumber: 'foto' as const } : {}), ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
       setMirip(null)
@@ -276,9 +279,9 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
               </div>
             </div>
             <div className="table-scroll">
-              <table className="data-table tabular" style={{ minWidth: 760 }}>
+              <table className="data-table tabular" style={{ minWidth: 560 }}>
                 <thead>
-                  <tr><th style={{ width: '34%' }}>Akun CoA</th><th>Keterangan</th><th style={{ textAlign: 'right', width: 140 }}>Debit</th><th style={{ textAlign: 'right', width: 140 }}>Kredit</th><th style={{ width: 44 }} /><th style={{ width: 70 }} /></tr>
+                  <tr><th>Akun CoA</th><th style={{ textAlign: 'right', width: 140 }}>Debit</th><th style={{ textAlign: 'right', width: 140 }}>Kredit</th><th style={{ width: 44 }} /><th style={{ width: 70 }} /></tr>
                 </thead>
                 <tbody>
                   {baris.map((b) => {
@@ -294,7 +297,6 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
                             </label>
                           )}
                         </td>
-                        <td><input className="input-field" aria-label="Keterangan baris" value={b.keterangan ?? ''} onChange={(e) => ubah(b._k, { keterangan: e.target.value })} /></td>
                         <td><input className="input-field tabular" style={{ textAlign: 'right' }} aria-label="Debit" {...angka(b.debit, (n) => ubah(b._k, { debit: n, ...(n ? { kredit: 0 } : {}) }))} /></td>
                         <td><input className="input-field tabular" style={{ textAlign: 'right' }} aria-label="Kredit" {...angka(b.kredit, (n) => ubah(b._k, { kredit: n, ...(n ? { debit: 0 } : {}) }))} /></td>
                         <td><Button type="button" variant="outline" size="icon-sm" title="Tukar debit/kredit baris ini" aria-label="Balik debit kredit" onClick={() => setBaris((bs) => bs.map((x) => (x._k === b._k ? balik(x) : x)))}><ArrowLeftRight /></Button></td>
