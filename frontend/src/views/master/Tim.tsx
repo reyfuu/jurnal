@@ -59,7 +59,7 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
 
   return (
     <>
-      <PageHeader title="Tim & Akses" subtitle="Akun tim Master Pajak, role beserta izinnya, dan klien yang ditugaskan ke tiap anggota.">
+      <PageHeader title="Tim & Akses" subtitle="Akun tim MasterPajak AI, role beserta izinnya, dan klien yang ditugaskan ke tiap anggota.">
         {tab === 'anggota'
           ? <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => { setError(''); setForm({ id: null, nama: '', email: '', password: '', role: 'konsultan', klien: [], aktif: true }) }}><Plus size={16} /> Tambah anggota</button>
           : <button className="btn-cta inline-flex items-center gap-1.5" onClick={() => { setError(''); setRoleBaru({ nama: '', izin: ['klien_lihat'] }) }}><Plus size={16} /> Role baru</button>}

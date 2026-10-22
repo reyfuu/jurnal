@@ -500,7 +500,7 @@ func (s *Server) guard(view string, h http.HandlerFunc) http.HandlerFunc {
 		if u.Role == auth.MP && view != "panel-master" && r.URL.Path != "/api/v1/auth/me" {
 			g, ok := s.lihatUntuk(u.ID, time.Now())
 			if !ok {
-				http.Error(w, "akun tim Master Pajak hanya membuka Panel Master", http.StatusForbidden)
+				http.Error(w, "akun tim MasterPajak AI hanya membuka Panel Master", http.StatusForbidden)
 				return
 			}
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -1212,7 +1212,7 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("<h1>Master Pajak API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
+	_, _ = w.Write([]byte("<h1>MasterPajak AI API Ready</h1><p>Frontend belum di-build: jalankan <code>cd frontend &amp;&amp; npm run build</code>.</p>"))
 }
 
 func main() {
@@ -1221,7 +1221,7 @@ func main() {
 		port = "8080"
 	}
 	srv := NewServer()
-	log.Printf("Master Pajak listening on http://localhost:%s", port)
+	log.Printf("MasterPajak AI listening on http://localhost:%s", port)
 	hs := &http.Server{
 		Addr: ":" + port, Handler: srv,
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute,

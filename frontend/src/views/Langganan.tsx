@@ -30,7 +30,7 @@ const tanggal = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('id-ID
 export function statusText(l: LanggananStatus) {
   if (l.status === 'aktif') return l.sampai ? `Langganan aktif sampai ${tanggal(l.sampai)}.` : 'Langganan aktif.'
   if (l.status === 'trial') return `Masa coba gratis sampai ${tanggal(l.sampai)}.`
-  return 'Langganan belum aktif. Pilih paket untuk mulai memakai Master Pajak.'
+  return 'Langganan belum aktif. Pilih paket untuk mulai memakai MasterPajak AI.'
 }
 
 export const SYARAT_GARANSI =
@@ -137,7 +137,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
   const habis = b.langganan.status === 'habis'
   return (
     <>
-      <PageHeader title="Langganan" subtitle="Kelola paket Master Pajak untuk usaha Anda" />
+      <PageHeader title="Langganan" subtitle="Kelola paket MasterPajak AI untuk usaha Anda" />
       <div className="card" style={{ padding: 22, maxWidth: 880, marginBottom: 16, borderColor: habis ? 'var(--accent-red)' : undefined }}>
         <div className="text-sm font-semibold">Status: {b.langganan.status === 'trial' ? 'Masa coba' : b.langganan.status === 'aktif' ? 'Aktif' : 'Belum aktif'}</div>
         <p className="mt-1 text-sm text-muted-foreground">{statusText(b.langganan)}</p>
@@ -145,7 +145,7 @@ export function Langganan({ onPaid }: { onPaid: () => void }) {
 
       <GaransiCard g={b.garansi} onDiklaim={onPaid} />
 
-      {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi Master Pajak untuk aktivasi.</p>}
+      {!b.aktif && <p className="mb-4 text-sm text-muted-foreground">Pembayaran online belum diaktifkan oleh admin. Hubungi MasterPajak AI untuk aktivasi.</p>}
       <div style={{ maxWidth: 1000 }}>
         <PaketHarga paket={b.paket} pilihan={pilihan} disabled={!b.aktif} busy={busy}
           label={(p) => `Bayar ${formatRp(p.harga)}`} onPilih={(p) => void bayar(p.id)} />

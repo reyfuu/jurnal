@@ -27,7 +27,7 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *Master Pajak*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
+      text: 'Halo! Saya **AI Konsultan Bisnis & Pajak** dari *MasterPajak AI*.\n\nSaya siap membantu Anda **meringkas laporan keuangan**, menganalisis arus kas & piutang, serta menjelaskan **aturan perpajakan UMKM (PP 55/2022)** secara akurat.\n\nBingung menu? Tanyakan saja, mis. *di mana saya mengisi laporan keuangan?* — saya beri tombol langsung ke halamannya.',
       suggestions: INITIAL_SUGGESTIONS,
     },
   ])
@@ -127,7 +127,7 @@ export const AIAgentBubble: React.FC<{ period?: string; onBuka?: (v: View, tab?:
               </div>
               <div>
                 <h3 className="font-heading font-bold text-sm">AI Konsultan Pajak & Bisnis</h3>
-                <p className="text-[11px] text-muted-foreground">Master Pajak</p>
+                <p className="text-[11px] text-muted-foreground">MasterPajak AI</p>
               </div>
             </div>
             <div className="flex items-center gap-1">

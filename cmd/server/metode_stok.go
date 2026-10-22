@@ -13,7 +13,7 @@ import (
 // Bawaan FIFO. Usaha yang memulai kartu stok sebelum pilihan ini ada selama ini dihitung
 // rata-rata bergerak, jadi tercatat & terkunci di rata-rata supaya angka lamanya tidak berubah.
 
-const errMetodeStokTerkunci = "Metode nilai stok sudah dipilih dan dikunci. Perubahan metode memerlukan persetujuan DJP; hubungi tim Master Pajak."
+const errMetodeStokTerkunci = "Metode nilai stok sudah dipilih dan dikunci. Perubahan metode memerlukan persetujuan DJP; hubungi tim MasterPajak AI."
 
 // metodeStokLocked: metode yang berlaku dan apakah sudah terkunci. s.mu dipegang.
 func (s *tenant) metodeStokLocked() (metode string, terkunci bool) {

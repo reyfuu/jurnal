@@ -250,13 +250,13 @@ export default function App() {
           {!me.lihat && !!me.jadwal?.length && <PengingatJadwalBanner jadwal={me.jadwal} />}
           {!!me.catatan_terbuka && !me.lihat && view !== 'catatan' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
-              <span><strong>{me.catatan_terbuka} catatan dari konsultan Master Pajak</strong> belum ditandai sudah diperbaiki.</span>
+              <span><strong>{me.catatan_terbuka} catatan dari konsultan MasterPajak AI</strong> belum ditandai sudah diperbaiki.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('catatan')}>Lihat catatan</Button>
             </div>
           )}
           {!!me.koreksi_menunggu && view !== 'usulan-koreksi' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'var(--accent-amber)' }} role="status">
-              <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan Master Pajak menunggu keputusan Anda. Pembukuan belum berubah.</span>
+              <span><strong>{me.koreksi_menunggu} usulan koreksi</strong> dari konsultan MasterPajak AI menunggu keputusan Anda. Pembukuan belum berubah.</span>
               <Button size="sm" className="rounded-full font-bold" onClick={() => navigate('usulan-koreksi')}>Tinjau</Button>
             </div>
           )}

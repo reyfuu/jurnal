@@ -67,7 +67,7 @@ func (c *cetak) kop(judul string) {
 	c.d.Text(c.kiri, 48, pdf.Truncate(c.usaha, pdf.Bold, 13, c.kanan-c.kiri-160), pdf.Bold, 13, pdf.Black, pdf.Left)
 	c.d.Text(c.kiri, 66, judul, pdf.Bold, 11, pdf.Black, pdf.Left)
 	c.d.Text(c.kiri, 80, c.sub, pdf.Regular, 8.5, pdf.Gray, pdf.Left)
-	c.d.Text(c.kanan, 48, "Master Pajak", pdf.Bold, 9, pdf.Gray, pdf.Right)
+	c.d.Text(c.kanan, 48, "MasterPajak AI", pdf.Bold, 9, pdf.Gray, pdf.Right)
 	c.d.Text(c.kanan, 60, "Dicetak "+c.dicetak, pdf.Regular, 8, pdf.Gray, pdf.Right)
 	c.d.HLine(c.kiri, c.kanan, 90, 1, pdf.Black)
 	c.y = 108
@@ -75,7 +75,7 @@ func (c *cetak) kop(judul string) {
 
 func (c *cetak) kaki() {
 	y := c.d.Height() - 30
-	c.d.Text(c.kiri, y, "Disusun dari data yang dicatat pengguna di aplikasi Master Pajak.", pdf.Regular, 7.5, pdf.Gray, pdf.Left)
+	c.d.Text(c.kiri, y, "Disusun dari data yang dicatat pengguna di aplikasi MasterPajak AI.", pdf.Regular, 7.5, pdf.Gray, pdf.Left)
 	c.d.Text(c.kanan, y, fmt.Sprintf("Halaman %d", c.d.PageCount()), pdf.Regular, 7.5, pdf.Gray, pdf.Right)
 }
 

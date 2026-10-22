@@ -48,7 +48,7 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Brand Guideline Master Pajak v1.0 (docs/brand/). :root = tema terang (default, lihat lib/theme.ts);
+/* Brand Guideline MasterPajak AI v1.0 (docs/brand/). :root = tema terang (default, lihat lib/theme.ts);
    .dark = tema gelap turunan palet. Sidebar dan panel brand login/onboarding selalu memakai .dark
    sebagai "pulau gelap" navy. Skala mentah hanya di :root; komponen memakai variabel semantik. */
 :root {
@@ -360,7 +360,7 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0 10px 18px;
+    padding: 0 6px 18px; /* logo horizontal 24 px ±188 px lebarnya; sidebar 232 px */
   }
 
   .nav-group {

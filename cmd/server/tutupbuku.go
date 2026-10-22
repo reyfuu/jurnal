@@ -153,7 +153,7 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 
 	c = cekTutup{Kode: "neraca", Judul: "Neraca seimbang", View: "laporan-keuangan", Status: "ok", Detail: "Aktiva = Pasiva."}
 	if !rep.BalanceSheet.IsBalanced {
-		c.Status, c.Detail = "peringatan", "Aktiva ≠ Pasiva — hubungi tim Master Pajak."
+		c.Status, c.Detail = "peringatan", "Aktiva ≠ Pasiva — hubungi tim MasterPajak AI."
 	}
 	out.Cek = append(out.Cek, c)
 	return out
