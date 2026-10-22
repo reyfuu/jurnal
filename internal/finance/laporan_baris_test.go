@@ -273,7 +273,7 @@ func TestAngkaSifat_BebanHitamTanpaMinus(t *testing.T) {
 		merah bool
 	}{
 		{-18_400, SifatPengurang, "18.400", false}, // beban & HPP: hitam, tanpa minus
-		{500, SifatPengurang, "(500)", true},       // beban yang menambah laba (koreksi)
+		{500, SifatPengurang, "(500)", false},      // beban yang menambah laba (koreksi): tetap hitam
 		{-625, SifatKontra, "(625)", true},         // penyusutan: kontra
 		{-1_000, "", "(1.000)", true},              // rugi
 		{2_000, "", "2.000", false},

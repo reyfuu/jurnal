@@ -159,14 +159,14 @@ func (c *cetak) selesai(w io.Writer) error {
 // mengurangi; akun kontra merah dalam kurung; selain itu angka minus (mis. rugi) merah dalam kurung.
 func angkaBaris(r BarisLaporan) (string, bool) { return angkaSifat(r.Nilai, r.Sifat) }
 
-// angkaSifat: beban (pengurang) ditulis hitam tanpa tanda; akun kontra merah dalam kurung;
+// angkaSifat: beban & HPP (pengurang) selalu hitam tanpa tanda; akun kontra merah dalam kurung;
 // lainnya minus = merah dalam kurung. Beban yang justru menambah laba (nilai positif, mis.
-// koreksi) tetap ditulis dalam kurung supaya arahnya terlihat.
+// koreksi) ditulis dalam kurung, tetap hitam.
 func angkaSifat(v int64, sifat string) (string, bool) {
 	switch sifat {
 	case SifatPengurang:
-		if v > 0 {
-			return "(" + rupiah(v) + ")", true
+		if v > 0 { // beban yang menambah laba (koreksi): kurung, tetap hitam
+			return "(" + rupiah(v) + ")", false
 		}
 		return rupiah(-v), false
 	case SifatKontra:
