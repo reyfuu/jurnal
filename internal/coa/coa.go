@@ -73,7 +73,7 @@ func a(kode, nama, subtype string, n Normal, k Kelompok, kon Kondisi, catatan st
 	return Account{Kode: kode, Nama: nama, Subtype: subtype, Normal: n, Kelompok: k, Kondisi: kon, Catatan: catatan}
 }
 
-// Master: 72 akun "COA Baru" + 3 akun di luar file (lihat TambahanDiLuarFile).
+// Master: 72 akun "COA Baru" + 4 akun di luar file (lihat TambahanDiLuarFile).
 // Perubahan dari file: 2113 Utang Karyawan → 1407 Piutang Karyawan (keputusan user;
 // substansi kasusnya tagihan perusahaan ke karyawan).
 var Master = []Account{
@@ -118,6 +118,7 @@ var Master = []Account{
 	a("3101", "Modal Pemilik", "capital", Kredit, Ekuitas, Selalu, ""),
 	a("3102", "Prive / Pengambilan Pemilik", "drawing", Debit, Ekuitas, JikaNonPT, "Tidak muncul bila bentuk badan usaha PT"),
 	a("3201", "Laba Ditahan", "retained", Kredit, Ekuitas, Selalu, ""),
+	a("3299", "Laba Ditahan - Selisih Saldo Awal", "retained", Kredit, Ekuitas, JikaAda, "Selisih saldo awal yang disimpan walau belum seimbang; periksa dan pindahkan ke akun yang benar"),
 	a("4101", "Penjualan", "sales", Kredit, PendapatanUsaha, Selalu, ""),
 	a("4102", "Pendapatan Jasa", "service", Kredit, PendapatanUsaha, Selalu, ""),
 	a("4103", "Diskon Penjualan", "contra_revenue", Debit, PendapatanUsaha, Selalu, ""),
@@ -158,7 +159,8 @@ var Master = []Account{
 // aset bisa dijurnal ke CoA. Tanpa ini laporan per akun tidak mengenal penyusutan, sehingga
 // laba bersihnya berbeda dengan laba rugi ringkas. Semuanya JikaAda, jadi usaha yang tidak
 // punya harta tak berwujud tidak melihatnya. Hapus dari sini bila kelak masuk ke file resmi.
-var TambahanDiLuarFile = []string{"1507", "1508", "6118"}
+// 3299 menampung selisih saldo awal yang disimpan walau belum seimbang.
+var TambahanDiLuarFile = []string{"1507", "1508", "6118", "3299"}
 
 // Supported: CoA baru tersedia untuk perdagangan; jasa & manufaktur menunggu file dari tim.
 func Supported(p finance.BusinessProfile) bool { return p.JenisUsaha == "perdagangan" }

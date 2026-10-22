@@ -97,7 +97,8 @@ func TestManufaktur_TemplateSah(t *testing.T) {
 			t.Errorf("peran %s menunjuk akun %s yang tidak ada", peran, kode)
 		}
 	}
-	if len(Manufaktur) != 155 {
-		t.Errorf("jumlah akun %d, file 155", len(Manufaktur))
+	// 155 akun dari "Daftar COA Manufaktur.xlsx" + 3299 penampung selisih saldo awal.
+	if len(Manufaktur) != 156 {
+		t.Errorf("jumlah akun %d, file 155 + 3299", len(Manufaktur))
 	}
 }

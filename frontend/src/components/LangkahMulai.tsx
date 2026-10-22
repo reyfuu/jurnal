@@ -23,10 +23,13 @@ export function LangkahMulaiCard({ onBuka }: { onBuka: (v: View, aksi?: string) 
   if (selesai === langkah.length && !adaPeringatan) return null
   const berikut = langkah.find((l) => !l.selesai)
   return (
-    <div className="card" style={{ padding: 20, marginBottom: 18, borderColor: 'var(--accent-blue)' }}>
+    <div className="card langkah-mulai" style={{ padding: 20, marginBottom: 18 }}>
       <div className="flex items-start gap-3">
         <div style={{ flex: 1 }}>
-          <div className="chart-title">Langkah memulai</div>
+          <div className="flex items-center gap-2">
+            <span className="langkah-mulai-badge">Mulai di sini</span>
+            <div className="chart-title">Langkah memulai</div>
+          </div>
           <div className="chart-subtitle">{selesai} dari {langkah.length} selesai. Ikuti urutannya supaya laporan & pajak langsung akurat.</div>
         </div>
         <Button variant="ghost" size="icon-sm" aria-label="Tutup panduan" onClick={() => { try { localStorage.setItem(KUNCI, '1') } catch { /* abaikan */ } setTutup(true) }}><X /></Button>
@@ -36,7 +39,7 @@ export function LangkahMulaiCard({ onBuka }: { onBuka: (v: View, aksi?: string) 
       </div>
       <ol className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
         {langkah.map((l, i) => (
-          <li key={l.kode} className="flex items-start gap-3 rounded-lg border px-3 py-2.5" style={{ borderColor: l === berikut ? 'var(--accent-blue)' : 'var(--border-shell)', opacity: l.selesai ? 0.7 : 1 }}>
+          <li key={l.kode} className="flex items-start gap-3 rounded-lg border px-3 py-2.5" style={{ borderColor: l === berikut ? 'var(--accent-orange)' : 'var(--border-shell)', borderWidth: l === berikut ? 2 : 1, background: l === berikut ? 'var(--accent-orange-soft)' : undefined, opacity: l.selesai ? 0.7 : 1 }}>
             {l.selesai ? <CheckCircle2 size={20} style={{ color: 'var(--accent-green)', flexShrink: 0 }} aria-label="selesai" /> : <Circle size={20} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="belum" />}
             <div style={{ flex: 1 }}>
               <div className="text-sm font-semibold">{i + 1}. {l.judul}</div>

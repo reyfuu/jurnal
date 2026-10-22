@@ -551,6 +551,21 @@ export async function importTransactions(file: File, commit: boolean): Promise<I
   return res.json()
 }
 
+/** Hasil AI membaca foto nota/struk: pratinjau isian transaksi, belum tersimpan. */
+export interface SaranNota {
+  tanggal: string; jenis: string; nominal: number; pihak?: string; keterangan?: string; lunas: boolean
+  item?: { nama: string; qty?: string; harga?: number }[]
+  alasan?: string; yakin: 'tinggi' | 'sedang' | 'rendah'; catatan: string[]; model?: string
+}
+
+export async function bacaNota(foto: Blob): Promise<SaranNota> {
+  const form = new FormData()
+  form.append('foto', foto, 'nota.jpg')
+  const res = await fetch('/api/v1/transactions/foto', { method: 'POST', body: form })
+  if (!res.ok) throw new ApiError(res.status, (await res.text()).trim() || res.statusText)
+  return res.json()
+}
+
 export const TEMPLATE_URL = '/api/v1/transactions/template'
 
 export type Granularity = 'day' | 'week' | 'month'
@@ -1070,7 +1085,12 @@ export const laporanTransaksiXlsxUrl = (f: FilterTransaksi) => `/api/v1/reports/
 
 /** tanggal: tanggal pembanding nilai buku aset (saat tanggal mulai di form diganti). */
 export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (tanggal ? `?tanggal=${encodeURIComponent(tanggal)}` : ''))
-export const saveOpening = (o: OpeningBalance) => api<OpeningInfo>('/opening', { method: 'PUT', body: o })
+/** paksa: simpan walau belum seimbang; selisihnya masuk akun Laba Ditahan - Selisih Saldo Awal. */
+export const saveOpening = (o: OpeningBalance, paksa = false) => api<OpeningInfo>('/opening' + (paksa ? '?paksa=1' : ''), { method: 'PUT', body: o })
+
+/** Saldo akun yang berlawanan dengan saldo normalnya (PSAK) dan stok minus, per periode. */
+export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string }
+export const getSaldoMinus = (period: string) => api<SaldoMinus[]>(`/saldo-minus?period=${encodeURIComponent(period)}`)
 
 export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
 export const createKaryawan = (k: KaryawanInput) => api<Karyawan>('/karyawan', { method: 'POST', body: k })

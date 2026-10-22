@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { AlertTriangle, CheckCircle2, Info, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Aset } from '@/views/Aset'
@@ -12,6 +13,9 @@ import { angka } from '@/lib/angka'
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
 const AMBER = 'var(--accent-amber)'
+// Sama dengan ketSelisihSaldoAwal di server.
+const DRAFT_SALDO = 'saldo-awal'
+const KET_PAKSA = 'selisih saldo awal yang disimpan walau belum seimbang'
 
 // Baris layar: _k kunci baris; _baru = ditambah pengguna (dapat saran kategori & kode);
 // _katManual / _kodeAuto menjaga pilihan pengguna tidak tertimpa saran.
@@ -47,6 +51,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const [asetEdit, setAsetEdit] = useState<SaldoAkun[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [paksa, setPaksa] = useState(false)
+  const [dipulihkan, setDipulihkan] = useState(false)
   const [cek, setCek] = useState<CekKecocokan[]>([])
   const [bukaAset, setBukaAset] = useState(false)
   const [asetData, setAsetData] = useState<AssetSummary | null>(null)
@@ -102,16 +108,28 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setTanggal(o?.tanggal ?? info.transaksi_pertama ?? '')
     setAsetEdit(info.aset_tetap ?? [])
     const awal = o?.rincian?.length ? o.rincian : o ? dariPos(o, info.nilai_buku_aset) : info.akun_template.map((a) => ({ ...a, nominal: 0 }))
-    const rows = awal.filter((r) => r.kategori !== 'aset_tetap').map((r) => jadiBaris({ ...r }))
+    // Baris penyeimbang hasil simpan paksa tidak diedit: dihitung ulang server setiap simpan.
+    const rows = awal.filter((r) => r.kategori !== 'aset_tetap' && r.keterangan !== KET_PAKSA).map((r) => jadiBaris({ ...r }))
     // Saldo awal baru: persediaan langsung diisi dari daftar barang, bukan diketik ulang.
     const p = rows.find((r) => r.kategori === 'persediaan')
     if (!o && p && nilaiBarang > 0) {
       p.nominal = nilaiBarang
       p.keterangan = info.label_persediaan
     }
-    setBaris(rows)
+    // Isian yang belum tersimpan (error, muat ulang) dipulihkan dari draft.
+    const draft = bacaDraft<{ tanggal: string; baris: SaldoAkun[] }>(DRAFT_SALDO)
+    if (draft?.baris?.length) {
+      setTanggal(draft.tanggal)
+      setBaris(draft.baris.map((r) => jadiBaris(r)))
+      setDipulihkan(true)
+    } else {
+      setBaris(rows)
+      setDipulihkan(false)
+    }
     setError('')
   }
+
+  useSimpanDraft(baris ? DRAFT_SALDO : null, useMemo(() => (baris ? { tanggal, baris: baris.map(bersih) } : null), [tanggal, baris]))
 
   const ubah = (k: number, patch: Partial<Baris>) => setBaris((bs) => bs && bs.map((b) => (b._k === k ? { ...b, ...patch } : b)))
 
@@ -145,12 +163,14 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
-    if (!baris || selisih !== 0 || tanpaKategori.length) return
+    if (!baris || (selisih !== 0 && !paksa) || tanpaKategori.length) return
     setBusy(true)
     setError('')
     try {
       const rincian = tampil.filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
-      const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian })
+      const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian }, selisih !== 0 && paksa)
+      setPaksa(false)
+      hapusDraft(DRAFT_SALDO)
       setInfo(res)
       setBaris(null)
       onChanged()
@@ -256,6 +276,12 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
 
         {baris && (
           <form onSubmit={simpan} style={{ marginTop: 14 }}>
+            {dipulihkan && (
+              <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginBottom: 10 }}>
+                Isian sebelumnya yang belum tersimpan dipulihkan.{' '}
+                <button type="button" className="underline underline-offset-4" onClick={() => { hapusDraft(DRAFT_SALDO); setBaris(null); setTimeout(mulaiUbah) }}>Mulai dari awal</button>
+              </p>
+            )}
             <label style={{ display: 'grid', gap: 4, maxWidth: 320, marginBottom: 12 }}>
               <span className="kpi-label">Tanggal mulai pembukuan</span>
               <input className="input-field" type="date" required value={tanggal} max={pertama || undefined} onChange={(e) => setTanggal(e.target.value)} />
@@ -348,11 +374,11 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
 
             <div className="list-rows tabular" style={{ marginTop: 16 }} aria-live="polite">
               <div className="list-row"><span>Total Harta</span><span>{formatRp(harta)}</span></div>
-              <div className="list-row"><span>Total Kewajiban</span><span>{formatRp(kewajiban)}</span></div>
+              <div className="list-row"><span>Total Utang (Kewajiban)</span><span>{formatRp(kewajiban)}</span></div>
               <div className="list-row"><span>Total Modal</span><span>{formatRp(modal)}</span></div>
               <div className="list-row" style={{ border: `1px solid ${selisih === 0 ? GREEN : RED}` }}>
-                <strong>Harta − (Kewajiban + Modal)</strong>
-                <strong style={{ color: selisih === 0 ? GREEN : RED }}>{selisih === 0 ? 'Seimbang' : formatRp(selisih)}</strong>
+                <strong>Harta = Utang + Modal</strong>
+                <strong style={{ color: selisih === 0 ? GREEN : RED }}>{selisih === 0 ? 'Seimbang' : `Belum seimbang · selisih ${formatRp(selisih)}`}</strong>
               </div>
               {selisih !== 0 && (
                 <p className="text-sm" style={{ color: RED }}>
@@ -370,16 +396,31 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                   )}
                 </p>
               )}
+              {selisih !== 0 && (
+                <label className="note-box warn" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: 0 }}>
+                  <input type="checkbox" checked={paksa} onChange={(e) => setPaksa(e.target.checked)} />
+                  <span>
+                    <strong>Saya sudah memeriksa dan tetap ingin menyimpan.</strong> Selisih {formatRp(selisih)} akan dicatat di akun
+                    <strong> Laba Ditahan – Selisih Saldo Awal</strong> supaya neraca tetap seimbang, dan terus diperingatkan sampai angka per akunnya dibereskan.
+                  </span>
+                </label>
+              )}
+              {biasa.some((b) => b.nominal < 0) && (
+                <p className="text-sm" style={{ color: AMBER }}>
+                  Ada saldo minus: {biasa.filter((b) => b.nominal < 0).map((b) => `${b.nama} ${formatRp(b.nominal)}`).join(', ')}. Saldo minus berarti berlawanan dengan saldo normal akunnya
+                  (mis. laba ditahan minus = rugi tahun lalu); pastikan memang begitu.
+                </p>
+              )}
               {tanpaKategori.length > 0 && (
                 <p className="text-sm" style={{ color: RED }}>Pilih kategori untuk: {tanpaKategori.map((b) => b.nama || 'baris tanpa nama').join(', ')}.</p>
               )}
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy || selisih !== 0 || tanpaKategori.length > 0}>
-                {busy ? 'Menyimpan…' : 'Simpan saldo awal'}
+              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy || (selisih !== 0 && !paksa) || tanpaKategori.length > 0}>
+                {busy ? 'Menyimpan…' : selisih !== 0 && paksa ? 'Simpan dengan selisih' : 'Simpan saldo awal'}
               </button>
-              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setBaris(null)}>Batal</button>
+              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => { hapusDraft(DRAFT_SALDO); setBaris(null) }}>Batal</button>
             </div>
           </form>
         )}

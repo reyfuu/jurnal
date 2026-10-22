@@ -3,9 +3,11 @@ import { IsiAIBanner } from '@/components/IsiAIBanner'
 import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { BacaFotoNota } from '@/components/BacaFotoNota'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -29,7 +31,9 @@ const EMPTY: TxInput = {
   tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
 }
 
-type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
+// dipulihkan: isian transaksi baru diambil dari draft (form sebelumnya belum tersimpan).
+type Editing = { id: number | null; input: TxInput; confirmDelete: boolean; dipulihkan?: boolean } | null
+const DRAFT_TX = 'transaksi-baru'
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
@@ -51,6 +55,14 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
   const [coa, setCoa] = useState<CoAInfo | null>(null)
   const [alasan, setAlasan] = useState('')
   const [terkirim, setTerkirim] = useState('')
+  // Catat dari foto: AI membaca nota jadi pratinjau, lalu mengisi form manual untuk diperiksa.
+  const [modeIsi, setModeIsi] = useState<'manual' | 'foto'>('manual')
+  const [dariFoto, setDariFoto] = useState(false)
+  // Dialog ditutup: transaksi berikutnya mulai dari isi manual lagi.
+  const dialogTertutup = editing === null
+  useEffect(() => {
+    if (dialogTertutup) { setModeIsi('manual'); setDariFoto(false) }
+  }, [dialogTertutup])
   const usulMode = !!lihat?.bolehUsul
   const bisaBuka = canEdit || usulMode
 
@@ -81,6 +93,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
   const channels = useMemo(() => channelsOf(txs), [txs])
 
   const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
+  useSimpanDraft(editing?.id === null && !usulMode ? DRAFT_TX : null, editing?.input ?? null)
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
   const isiAi = useIsiAI<{ editing: Editing; qtyTeks: string }, Partial<TxInput>>(isiAI, 'transaksi', {
     ambil: () => ({ editing, qtyTeks }),
@@ -98,7 +111,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
     setError('')
     setQtyTeks('')
     getPilihanBarang().then(setBarang, () => {})
-    setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false })
+    const draft = bacaDraft<TxInput>(DRAFT_TX)
+    setEditing({ id: null, input: draft ?? { ...EMPTY, tanggal: today(), jenis: filter.jenis || EMPTY.jenis }, confirmDelete: false, dipulihkan: !!draft })
   }
   function openEdit(t: Tx) {
     if (!bisaBuka) return
@@ -120,6 +134,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
       const res = await fn()
       if (usulMode) setTerkirim(`${(res as { nomor: string }).nomor} terkirim ke pemilik usaha. Pembukuan belum berubah sampai disetujui.`)
       else setWarnings((res as SavedTx | undefined)?.warnings)
+      if (editing?.id === null) hapusDraft(DRAFT_TX)
       setEditing(null)
       await Promise.all([refresh(), onChanged()])
     } catch (err) {
@@ -308,6 +323,33 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
                   : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
               <IsiAIBanner ai={isiAi} />
+              {editing.dipulihkan && (
+                <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginTop: -6 }}>
+                  Isian sebelumnya yang belum tersimpan dipulihkan.{' '}
+                  <button type="button" className="underline underline-offset-4" onClick={() => { hapusDraft(DRAFT_TX); setEditing({ id: null, input: { ...EMPTY, tanggal: today(), jenis: EMPTY.jenis }, confirmDelete: false }) }}>Mulai kosong</button>
+                </p>
+              )}
+
+              {editing.id === null && !usulMode && (
+                <div className="tabbar" role="tablist" aria-label="Cara mencatat" style={{ marginTop: -4 }}>
+                  <button type="button" role="tab" className="tab-btn" aria-selected={modeIsi === 'manual'} onClick={() => setModeIsi('manual')}>Isi manual</button>
+                  <button type="button" role="tab" className="tab-btn" aria-selected={modeIsi === 'foto'} onClick={() => setModeIsi('foto')}>Dari foto nota</button>
+                </div>
+              )}
+              {editing.id === null && !usulMode && modeIsi === 'foto' && (
+                <BacaFotoNota onPakai={(n) => {
+                  set({ tanggal: n.tanggal, nominal: n.nominal, pihak: n.pihak ?? '', keterangan: n.keterangan ?? '', lunas: n.lunas, tanggal_lunas: '',
+                    ...(n.jenis ? { jenis: n.jenis, ...(n.jenis === 'Penjualan' || n.jenis === 'Beli Bahan / Stok' ? {} : { stok_id: undefined, qty_stok: undefined }) } : {}) })
+                  setDariFoto(true)
+                  setModeIsi('manual')
+                }} />
+              )}
+              {dariFoto && modeIsi === 'manual' && (
+                <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginTop: -6 }}>
+                  Diisi dari foto nota oleh AI. Periksa setiap isian (terutama jenis dan nominal), lalu tekan Simpan.
+                </p>
+              )}
+              <div className={modeIsi === 'foto' && editing.id === null && !usulMode ? 'hidden' : 'grid gap-4'}>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field id="tx-tanggal" label="Tanggal">
@@ -424,6 +466,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
                 </Field>
               )}
 
+              </div>
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
               <DialogFooter className="sm:justify-between">
@@ -447,8 +490,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: ()
                   )
                 ) : <span />}
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setEditing(null)}>Batal</Button>
-                  <Button type="submit" disabled={busy}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
+                  <Button type="button" variant="outline" onClick={() => { if (editing.id === null) hapusDraft(DRAFT_TX); setEditing(null) }}>Batal</Button>
+                  <Button type="submit" disabled={busy || (modeIsi === 'foto' && editing.id === null && !usulMode)}>{busy ? 'Menyimpan…' : usulMode ? 'Kirim usulan' : 'Simpan'}</Button>
                 </div>
               </DialogFooter>
             </form>

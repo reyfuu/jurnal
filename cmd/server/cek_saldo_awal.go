@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	"pajak/internal/finance"
 )
@@ -61,6 +62,14 @@ func (s *tenant) cekSaldoAwalLocked() []cekKecocokan {
 			rp(ob.AsetTetap), finance.FormatTanggalID(ob.Tanggal), rp(nbv), rp(c.Selisih), saranSelisihAset(c.Selisih))
 	}
 	out = append(out, c)
+
+	// Saldo awal yang disimpan paksa walau belum seimbang: selisihnya di akun penampung.
+	if i := slices.IndexFunc(ob.Rincian, barisSelisihSaldoAwal); i >= 0 {
+		r := ob.Rincian[i]
+		out = append(out, cekKecocokan{Kode: "paksa", Judul: "Selisih saldo awal belum dibereskan", Status: "selisih", SaldoAwal: r.Nominal,
+			LabelBanding: r.Kode + " " + r.Nama, Selisih: r.Nominal, View: "saldo-awal", Langkah: "saldo",
+			Pesan: fmt.Sprintf("Saldo awal disimpan walau belum seimbang; selisih %s ditampung di akun %s %s. Periksa lagi angka per akun lalu simpan ulang sampai seimbang.", rp(r.Nominal), r.Kode, r.Nama)})
+	}
 
 	// Persediaan: dengan kartu stok dibandingkan dengan hitung fisik pertama (titik nol),
 	// tanpa kartu stok dengan nilai daftar barang di Stok & Gudang.

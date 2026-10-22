@@ -304,6 +304,7 @@ func (s *Server) alurKerjaRoutes() {
 	m.HandleFunc("DELETE /api/v1/tutup-buku", s.persisting(s.guard("tutup-buku", s.on((*tenant).handleBukaBulan))))
 	m.HandleFunc("POST /api/v1/opening/pelunasan", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handlePelunasanAwal))))
 	m.HandleFunc("GET /api/v1/mulai", s.guard("", s.on((*tenant).handleLangkahMulai)))
+	m.HandleFunc("GET /api/v1/saldo-minus", s.guard("", s.on((*tenant).handleSaldoMinus)))
 	m.HandleFunc("GET /api/v1/saldo-awal/cek", s.guard("", s.on((*tenant).handleCekSaldoAwal)))
 	m.HandleFunc("POST /api/v1/saldo-awal/saran", s.guard("saldo-awal", s.handleSaranSaldo))
 }
