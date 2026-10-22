@@ -80,12 +80,7 @@ func BuildLaporanRentang(txs []Transaction, assets []Asset, dari, sampai string,
 
 	p0 := PosisiPada(ob, txs, hariSebelum(dari))
 	p1 := PosisiPada(ob, txs, sampai)
-	var kas []LedgerEntry
-	for _, t := range txs {
-		if d := tanggalKas(t); t.Lunas && d >= dari && d <= sampai {
-			kas = append(kas, ToLedger([]Transaction{t})...)
-		}
-	}
+	kas := ledgerKas(txs, func(d string) bool { return d >= dari && d <= sampai })
 	for _, pa := range ob.Pelunasan {
 		if pa.Tanggal < dari || pa.Tanggal > sampai {
 			continue

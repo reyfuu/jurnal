@@ -195,6 +195,8 @@ type InvoiceRow struct {
 	Invoice
 	Totals        InvoiceTotals `json:"totals"`
 	HariTerlambat int           `json:"hari_terlambat"`
+	// Dibayar: yang sudah dibayar lewat dokumen Pembayaran (cicilan); 0 < Dibayar < total = sebagian.
+	Dibayar int64 `json:"dibayar,omitempty"`
 }
 
 func SummarizeInvoices(list []Invoice, acuan time.Time) InvoiceSummary {

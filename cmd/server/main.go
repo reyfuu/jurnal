@@ -71,6 +71,10 @@ type tenant struct {
 	// & jual berasal dari transaksi bertanda barang; kartu dihitung ulang dari keduanya.
 	gerak       []finance.GerakStok
 	nextGerakID int
+	// pembayaran: dokumen pembayaran piutang/utang (bisa sebagian, ke beberapa transaksi);
+	// alokasinya tersimpan sebagai Transaction.Cicilan.
+	pembayaran       []finance.Pembayaran
+	nextPembayaranID int
 	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
 	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
 	tutupBuku string
@@ -123,7 +127,7 @@ type Server struct {
 func newTenant(id int) *tenant {
 	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{},
 		nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1, nextTagihanID: 1, nextStokID: 1,
-		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1}
+		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1, nextPembayaranID: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -135,7 +139,7 @@ func demoTenant() *tenant {
 	t := &tenant{id: 1, demo: true, txs: finance.SeedTransactions(), assets: finance.SeedAssets(),
 		invoices: finance.SeedInvoices(), tagihan: finance.SeedTagihan(), stok: finance.SeedStok(),
 		produk: finance.SeedProduk(), supplier: finance.SeedSupplier(),
-		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1}
+		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1, nextPembayaranID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
 	t.nextInvoiceID = len(t.invoices) + 1
 	t.nextTagihanID, t.nextStokID = len(t.tagihan)+1, len(t.stok)+1
@@ -192,6 +196,9 @@ func (t *tenant) restore(st *state) {
 	}
 	if st.NextGerakID > 0 {
 		t.gerak, t.nextGerakID = st.Gerak, st.NextGerakID
+	}
+	if st.NextPembayaranID > 0 {
+		t.pembayaran, t.nextPembayaranID = st.Pembayaran, st.NextPembayaranID
 	}
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
@@ -1047,7 +1054,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber, t.Cicilan = 0, 0, "", "", nil // tautan invoice, catatan jurnal, asal & cicilan hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1117,6 +1124,10 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, errTxGrup.Error(), http.StatusConflict)
 		return
 	}
+	if adaCicilan(s.txs[i]) {
+		http.Error(w, finance.ErrBatalkanDulu.Error(), http.StatusConflict)
+		return
+	}
 	if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1148,6 +1159,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	}
 	if s.txs[i].Grup != 0 {
 		http.Error(w, errTxGrup.Error(), http.StatusConflict)
+		return
+	}
+	if adaCicilan(s.txs[i]) {
+		http.Error(w, finance.ErrBatalkanDulu.Error(), http.StatusConflict)
 		return
 	}
 	// Transaksi yang menjadi pembayaran aset terdaftar: menghapusnya membuat aset di neraca

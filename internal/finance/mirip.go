@@ -54,14 +54,27 @@ func CariMirip(txs []Transaction, tanggal string, nominal int64, arah string, ke
 		if !ok || j.Arah != arah || kecuali[t.ID] {
 			continue
 		}
+		// Cicilan yang sudah dicatat: mutasi sebesar cicilan di sekitar tanggalnya = dobel.
+		for _, c := range t.Cicilan {
+			if c.Nominal == nominal && selisihHari(c.Tanggal, tanggal) <= ToleransiHariMirip {
+				out = append(out, Mirip{ID: t.ID, InvoiceID: t.InvoiceID, Tanggal: c.Tanggal, Jenis: t.Jenis, Keterangan: t.Keterangan, Pihak: t.Pihak, Nominal: c.Nominal, Sumber: t.Sumber})
+			}
+		}
 		if t.InvoiceID != 0 && !t.Lunas {
-			// Invoice belum lunas: transfernya sebesar DPP + PPN, jadi dijumlah per invoice.
+			// Invoice belum lunas: transfernya sebesar sisa DPP + PPN, jadi dijumlah per invoice.
 			m := invoice[t.InvoiceID]
 			if m == nil {
 				m = &Mirip{ID: t.ID, InvoiceID: t.InvoiceID, Tanggal: t.Tanggal, Jenis: t.Jenis, Keterangan: t.Keterangan, Pihak: t.Pihak, Sumber: t.Sumber, BelumLunas: true}
 				invoice[t.InvoiceID] = m
 			}
-			m.Nominal += t.Nominal
+			m.Nominal += t.Sisa()
+			continue
+		}
+		if len(t.Cicilan) > 0 {
+			// Belum lunas: dicocokkan dengan sisanya (pelunasan); lunas lewat cicilan: sudah di atas.
+			if !t.Lunas && t.Sisa() == nominal && t.Tanggal <= tanggal && selisihHari(t.Tanggal, tanggal) <= maksHariTagihan {
+				out = append(out, Mirip{ID: t.ID, Tanggal: t.Tanggal, Jenis: t.Jenis, Keterangan: t.Keterangan, Pihak: t.Pihak, Nominal: t.Sisa(), Sumber: t.Sumber, BelumLunas: true})
+			}
 			continue
 		}
 		if t.Nominal != nominal {
@@ -90,7 +103,8 @@ func CariMirip(txs []Transaction, tanggal string, nominal int64, arah string, ke
 func PasanganMirip(txs []Transaction, period string) [][2]Transaction {
 	var calon []Transaction
 	for _, t := range txs {
-		if t.Lunas && len(tanggalKas(t)) >= 7 && tanggalKas(t)[:7] == period {
+		// ponytail: transaksi bercicilan tidak dipasangkan (tiap cicilan sudah dicek saat impor mutasi).
+		if t.Lunas && len(t.Cicilan) == 0 && len(tanggalKas(t)) >= 7 && tanggalKas(t)[:7] == period {
 			calon = append(calon, t)
 		}
 	}

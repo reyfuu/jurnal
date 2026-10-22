@@ -77,6 +77,31 @@ func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, in
 	if tanggal < t.Tanggal {
 		return t, http.StatusBadRequest, errors.New("tanggal pelunasan tidak boleh sebelum tanggal transaksi")
 	}
+	// Sudah dicicil (transaksi ini atau saudara invoice-nya): sisanya dibayar lewat dokumen
+	// Pembayaran, supaya cicilan lama tetap dan kas bergerak sebesar sisa saja.
+	grup := []finance.Transaction{t}
+	if t.InvoiceID != 0 {
+		grup = slices.DeleteFunc(slices.Clone(s.txs), func(x finance.Transaction) bool { return x.InvoiceID != t.InvoiceID })
+	}
+	if adaCicilan(grup...) {
+		jenis := finance.BayarUtang
+		if j, _ := finance.LookupJenis(t.Jenis); j.Arah == "masuk" {
+			jenis = finance.BayarPiutang
+		}
+		p := finance.Pembayaran{Tanggal: tanggal, Jenis: jenis, Keterangan: "Pelunasan sisa"}
+		for _, x := range grup {
+			if x.Sisa() > 0 {
+				p.Alokasi = append(p.Alokasi, finance.Alokasi{TransaksiID: x.ID, Nominal: x.Sisa()})
+			}
+		}
+		if err := finance.ValidatePembayaran(&p); err != nil {
+			return t, http.StatusConflict, err
+		}
+		if _, kode, err := s.catatPembayaranLocked(p); err != nil {
+			return t, kode, err
+		}
+		return s.txs[slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return x.ID == id })], 0, nil
+	}
 	if t.InvoiceID != 0 {
 		// Piutang dari invoice: invoice ikut lunas, transaksi DPP & PPN-nya lunas bersama.
 		if err := s.lunasiInvoiceLocked(t.InvoiceID, tanggal); err != nil {

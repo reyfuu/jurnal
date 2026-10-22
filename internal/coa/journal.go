@@ -120,13 +120,23 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []
 	return out
 }
 
-// JournalBerjalan: jurnal satu periode untuk buku berjalan. Transaksi bulan ini dijurnal ke
-// kas bila sudah lunas sampai akhir bulan, selain itu ke piutang (1201) / utang (2101);
-// transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
-// atau Dr Utang / Cr Kas) di tanggal bayar.
+// kasUntuk: rekening kas/bank satu gerak kas — pilihan pengguna (lawan) bila ada, selain itu
+// otomatis dari channel.
+func kasUntuk(t finance.Transaction, lawan string, peta Peta) string {
+	return CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel, Lawan: lawan}, peta)
+}
+
+// tunai: dibayar penuh sekali di tanggal transaksi — dijurnal langsung ke kas/bank.
+func tunai(t finance.Transaction) bool {
+	return len(t.Cicilan) == 0 && t.Lunas && (t.TanggalLunas == "" || t.TanggalLunas == t.Tanggal)
+}
+
+// JournalBerjalan: jurnal satu periode untuk buku berjalan. Transaksi tunai bulan ini dijurnal
+// langsung ke kas/bank; selebihnya ke piutang (1201) / utang (2101) di tanggal transaksi, lalu
+// tiap pembayaran (pelunasan atau cicilan) bulan ini mendapat jurnal Dr Kas / Cr Piutang, atau
+// Dr Utang / Cr Kas, di tanggal bayarnya — walau masih di bulan yang sama dengan transaksinya.
 func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta) []Line {
 	piutang := peta.Kode(PeranPiutang)
-	akhir := period + "-31"
 	var out []Line
 	for _, t := range txs {
 		if len(t.Tanggal) < 7 {
@@ -134,16 +144,10 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 		}
 		j, _ := finance.LookupJenis(t.Jenis)
 		masuk := j.Arah == "masuk"
-		bayar := t.TanggalLunas
-		if bayar == "" {
-			bayar = t.Tanggal
-		}
-		kas := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta)
-		utang := utangUntuk(t, peta)
-		switch {
-		case t.Tanggal[:7] == period:
-			lawan := kas
-			if !t.Lunas || bayar > akhir {
+		utang := utangUntuk(t, peta) // utang dividen untuk dividen PT, selain itu utang usaha
+		if t.Tanggal[:7] == period {
+			lawan := kasUntuk(t, t.Lawan, peta)
+			if !tunai(t) {
 				lawan = utang
 				if masuk {
 					lawan = piutang
@@ -155,11 +159,19 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 			} else {
 				out = append(out, Line{t.ID, t.Tanggal, akun, t.Nominal, 0}, Line{t.ID, t.Tanggal, lawan, 0, t.Nominal})
 			}
-		case t.Tanggal[:7] < period && t.Lunas && len(bayar) >= 7 && bayar[:7] == period:
+		}
+		if tunai(t) {
+			continue
+		}
+		for _, g := range t.GerakKas() {
+			if len(g.Tanggal) < 7 || g.Tanggal[:7] != period {
+				continue
+			}
+			kas := kasUntuk(t, g.Lawan, peta)
 			if masuk {
-				out = append(out, Line{t.ID, bayar, kas, t.Nominal, 0}, Line{t.ID, bayar, piutang, 0, t.Nominal})
+				out = append(out, Line{t.ID, g.Tanggal, kas, g.Nominal, 0}, Line{t.ID, g.Tanggal, piutang, 0, g.Nominal})
 			} else {
-				out = append(out, Line{t.ID, bayar, utang, t.Nominal, 0}, Line{t.ID, bayar, kas, 0, t.Nominal})
+				out = append(out, Line{t.ID, g.Tanggal, utang, g.Nominal, 0}, Line{t.ID, g.Tanggal, kas, 0, g.Nominal})
 			}
 		}
 	}
@@ -373,13 +385,13 @@ func SaldoBawaan(txs []finance.Transaction, sebelum string, p finance.BusinessPr
 		if j.Arah != "masuk" {
 			tanda = -1
 		}
-		bayar := t.TanggalLunas
-		if bayar == "" {
-			bayar = t.Tanggal
-		}
-		if t.Lunas && bayar < sebelum {
-			if k := CounterAccount(finance.Transaction{Jenis: t.Jenis, Lunas: true, Channel: t.Channel}, peta); k != kas {
-				out[k] += tanda * t.Nominal
+		// Sama dengan JournalBerjalan: tiap gerak kas di rekening pilihannya (Lawan).
+		for _, g := range t.GerakKas() {
+			if g.Tanggal >= sebelum {
+				continue
+			}
+			if k := kasUntuk(t, g.Lawan, peta); k != kas {
+				out[k] += tanda * g.Nominal
 			}
 		}
 		if t.Tanggal < sebelum && !isPT(p) && AccountFor(t, p, peta) == prive {

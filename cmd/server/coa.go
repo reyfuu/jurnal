@@ -83,11 +83,9 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	// Buku berjalan: saldo awal akun = posisi akhir bulan lalu; transaksi bulan ini dan
 	// pelunasan transaksi bulan lalu dijurnal di bulan ini.
 	s.mu.RLock()
-	ketTx, bulanTx := map[int]string{}, map[int]string{}
+	ketTx, tanggalTx := map[int]string{}, map[int]string{}
 	for _, t := range s.txs {
-		if len(t.Tanggal) >= 7 {
-			bulanTx[t.ID] = t.Tanggal[:7]
-		}
+		tanggalTx[t.ID] = t.Tanggal
 		ket := t.Jenis
 		if k := strings.TrimSpace(cmp.Or(t.Keterangan, t.Item)); k != "" {
 			ket += " — " + k
@@ -99,8 +97,8 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	}
 	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta) {
 		ket := ketTx[l.TxID]
-		if bulanTx[l.TxID] < period {
-			ket = "Pelunasan: " + ket // transaksi bulan lalu yang dibayar bulan ini
+		if l.Tanggal != tanggalTx[l.TxID] {
+			ket = "Pelunasan: " + ket // pembayaran sesudah tanggal transaksi (pelunasan / cicilan)
 		}
 		j.entri = append(j.entri, entriJurnal{l, ket})
 	}

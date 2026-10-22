@@ -97,8 +97,9 @@ func TestUmurPiutang(t *testing.T) {
 	ob, txs, _, _, _ := skenarioBerjalan()
 	txs[2].Pihak = "Toko Maju"
 	u := UmurSaldo(ob, txs, "2026-03-31", true)
-	// Belum lunas per 31 Mar: saldo awal 1 jt (sejak 1 Jan, 89 hari) + 0,8 jt dari 21 Jan (69 hari) → 61–90 hari.
-	if u.Total != 1_800_000 || u.Kelompok[2].Nilai != 1_800_000 || u.Kelompok[3].Nilai != 0 {
+	// Belum lunas per 31 Mar, umur dari jatuh tempo (tanggal + 30 hari): saldo awal 1 jt (jatuh
+	// tempo 31 Jan, lewat 59 hari) + 0,8 jt dari 21 Jan (jatuh tempo 20 Feb, lewat 39 hari) → 31–60 hari.
+	if u.Total != 1_800_000 || u.Kelompok[2].Label != "31–60 hari" || u.Kelompok[2].Nilai != 1_800_000 || u.Kelompok[3].Nilai != 0 {
 		t.Errorf("umur piutang %+v", u)
 	}
 	if len(u.Pihak) == 0 || u.Pihak[0].Nama == "" {

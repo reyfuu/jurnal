@@ -380,6 +380,9 @@ export function InvoiceView() {
                     <span className={'pill-status ' + (r.status === 'lunas' ? 'pill-green' : r.hari_terlambat > 0 ? 'pill-red' : 'pill-amber')}>
                       {r.hari_terlambat > 0 && r.status !== 'lunas' ? 'Lewat Tempo' : STATUS_LABEL[r.status] ?? r.status}
                     </span>
+                    {!!r.dibayar && r.status !== 'lunas' && (
+                      <div style={{ fontSize: 11, marginTop: 3 }}>dibayar sebagian {formatRp(r.dibayar)} · sisa {formatRp(r.totals.total - r.dibayar)}</div>
+                    )}
                     {r.status === 'draft' && <div style={{ fontSize: 11, marginTop: 3, color: 'var(--text-muted)' }}>belum jadi piutang</div>}
                     {r.status !== 'draft' && (
                       <div style={{ fontSize: 11, marginTop: 3, color: r.dibukukan ? 'var(--text-muted)' : AMBER }}>

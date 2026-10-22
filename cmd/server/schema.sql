@@ -496,3 +496,25 @@ ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS kunci TEXT;
 ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS token TEXT;
 ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS redirect_url TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS billing_orders_kunci ON billing_orders (tenant_id, kunci);
+
+-- Pembayaran sebagian (Okt 2026, Accurate M1): dokumen pembayaran piutang/utang. Alokasinya ke
+-- transaksi tersimpan di transactions.cicilan (sumber perhitungan); alokasi di sini = isi dokumen.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_pembayaran_id INT NOT NULL DEFAULT 1;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cicilan JSONB;
+CREATE TABLE IF NOT EXISTS pembayaran (
+	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
+	id         INT NOT NULL,
+	tanggal    DATE NOT NULL,
+	jenis      TEXT NOT NULL,
+	pihak      TEXT,
+	lawan      TEXT,
+	keterangan TEXT,
+	alokasi    JSONB NOT NULL,
+	total      BIGINT NOT NULL,
+	kunci      TEXT,
+	oleh       TEXT,
+	dibuat     TIMESTAMPTZ,
+	batal      JSONB,
+	PRIMARY KEY (tenant_id, id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS pembayaran_kunci ON pembayaran (tenant_id, kunci);

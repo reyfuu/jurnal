@@ -409,5 +409,6 @@ func (s *Server) kelolaRoutes() {
 	s.jadwalRoutes()
 	s.kartuStokRoutes()
 	s.umurRoutes()
+	s.pembayaranRoutes()
 	s.alurKerjaRoutes()
 }

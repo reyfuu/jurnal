@@ -1,7 +1,6 @@
 package finance
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 )
@@ -14,7 +13,7 @@ type CashWarning struct {
 	Penyebab []int  `json:"penyebab"` // ID pengeluaran lunas di hari itu
 }
 
-// CashWarnings menelusuri saldo kas harian dari transaksi lunas (pada TanggalLunas bila ada).
+// CashWarnings menelusuri saldo kas harian dari uang yang bergerak (tanggal lunas / cicilan).
 func CashWarnings(txs []Transaction, openingCash int64) []CashWarning {
 	type move struct {
 		date string
@@ -22,8 +21,10 @@ func CashWarnings(txs []Transaction, openingCash int64) []CashWarning {
 	}
 	var moves []move
 	for _, t := range txs {
-		if t.Lunas {
-			moves = append(moves, move{cmp.Or(t.TanggalLunas, t.Tanggal), t})
+		for _, g := range t.GerakKas() { // lunas: sekali di tanggal lunas; bercicilan: per cicilan
+			x := t
+			x.Nominal = g.Nominal
+			moves = append(moves, move{g.Tanggal, x})
 		}
 	}
 	slices.SortStableFunc(moves, func(a, b move) int { return strings.Compare(a.date, b.date) })

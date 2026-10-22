@@ -1521,6 +1521,8 @@ export interface Invoice extends InvoiceInput {
 export interface InvoiceRow extends Invoice {
   totals: InvoiceTotals
   hari_terlambat: number
+  /** Sudah dibayar lewat Pembayaran; 0 < dibayar < total = sebagian. */
+  dibayar?: number
 }
 
 export interface InvoiceSummary {
@@ -1931,11 +1933,24 @@ export interface UmurSaldo {
   per: string; piutang: boolean
   kelompok: { label: string; nilai: number; jumlah: number }[]
   pihak: { nama: string; nilai: number[]; total: number }[]
-  baris: { transaksi_id?: number; tanggal: string; pihak: string; keterangan: string; jenis: string; nilai: number; hari: number; kelompok: number }[]
+  /** nilai = sisa per tanggal; hari = hari lewat jatuh tempo (negatif = belum jatuh tempo); dibayar = cicilan sampai tanggal itu. */
+  baris: { transaksi_id?: number; tanggal: string; pihak: string; keterangan: string; jenis: string; nilai: number; hari: number; kelompok: number; invoice_id?: number; jatuh_tempo?: string; dibayar?: number }[]
   total: number
 }
 export const getUmurSaldo = (jenis: 'piutang' | 'utang', per: string) => api<UmurSaldo>(`/reports/umur?jenis=${jenis}&per=${per}`)
 export const lunasiTransaksi = (id: number, tanggal: string) => api<SavedTx>(`/transactions/${id}/lunas`, { method: 'POST', body: { tanggal } })
+
+// --- Pembayaran piutang/utang (bisa sebagian, ke beberapa tagihan) ---
+export interface Alokasi { transaksi_id: number; nominal: number }
+export interface Pembayaran {
+  id: number; tanggal: string; jenis: 'piutang' | 'utang'; pihak?: string; lawan?: string; keterangan?: string
+  alokasi: Alokasi[]; total: number; oleh?: string; dibuat?: string
+  batal?: { alasan: string; oleh?: string; pada: string }
+}
+export type PembayaranInput = { tanggal: string; jenis: 'piutang' | 'utang'; lawan?: string; keterangan?: string; alokasi: Alokasi[] }
+export const getPembayaran = (jenis?: 'piutang' | 'utang') => api<Pembayaran[]>(`/pembayaran${jenis ? `?jenis=${jenis}` : ''}`)
+export const buatPembayaran = (body: PembayaranInput, kunci: string) => api<Pembayaran>('/pembayaran', { method: 'POST', body, kunci })
+export const batalPembayaran = (id: number, alasan: string) => api<Pembayaran>(`/pembayaran/${id}/batal`, { method: 'POST', body: { alasan } })
 
 // --- Alur kerja: tutup buku, langkah memulai, pelunasan saldo awal ---
 export interface CekTutup { kode: string; judul: string; status: 'ok' | 'peringatan' | 'info'; detail: string; view?: View }

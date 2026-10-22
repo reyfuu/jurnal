@@ -18,8 +18,19 @@ import (
 func (s *tenant) handleListInvoice(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	list := slices.Clone(s.invoices)
+	dibayar := map[int]int64{} // invoice → jumlah cicilan transaksinya
+	for _, t := range s.txs {
+		if t.InvoiceID != 0 {
+			for _, c := range t.Cicilan {
+				dibayar[t.InvoiceID] += c.Nominal
+			}
+		}
+	}
 	s.mu.RUnlock()
 	sum := finance.SummarizeInvoices(list, time.Now())
+	for i := range sum.Invoices {
+		sum.Invoices[i].Dibayar = dibayar[sum.Invoices[i].ID]
+	}
 	writeJSON(w, map[string]any{
 		"summary": sum,
 		"status":  finance.StatusInvoice,
@@ -180,7 +191,9 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.invoices[i] = inv
-	writeJSON(w, inv)
+	// Invoice yang sudah dibayar lewat Pembayaran: statusnya mengikuti transaksinya.
+	s.segarkanInvoiceLocked([]finance.Alokasi{{TransaksiID: inv.TransaksiID}})
+	writeJSON(w, s.invoices[i])
 }
 
 func (s *tenant) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
