@@ -302,6 +302,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                   ? 'Ubah isian yang perlu dikoreksi. Pembukuan klien tidak berubah sampai pemilik usaha menyetujui.'
                   : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
+
               {editing.id === null && !usulMode && (
                 <div className="tabbar" role="tablist" aria-label="Cara mencatat" style={{ marginTop: -4 }}>
                   <button type="button" role="tab" className="tab-btn" aria-selected={modeIsi === 'manual'} onClick={() => setModeIsi('manual')}>Isi manual</button>
