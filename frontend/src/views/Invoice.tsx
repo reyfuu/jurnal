@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FormPopup } from '@/components/FormPopup'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 
 const DRAFT_INV = 'invoice-baru'
@@ -208,7 +209,8 @@ export function InvoiceView() {
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 16 }} onSubmit={simpan}>
+        <FormPopup judul={editId === null ? 'Buat invoice' : 'Ubah invoice'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-5xl">
+        <form className="grid gap-3" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Buat Invoice' : `Ubah ${form.nomor}`}</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginTop: 14 }}>
@@ -331,6 +333,7 @@ export function InvoiceView() {
               onClick={() => { if (editId === null) hapusDraft(DRAFT_INV); setForm(null); setEditId(null) }}>Batal</button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>

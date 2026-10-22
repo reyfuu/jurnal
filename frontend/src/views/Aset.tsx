@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FormPopup } from '@/components/FormPopup'
 import { createAsset, deleteAsset, pilihMetodePenyusutan, updateAsset, type Asset, type AssetInput, type SumberDanaAset, type AssetSummary, type MetodePenyusutan } from '@/lib/api'
 import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -199,7 +200,8 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
       )}
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <FormPopup judul={editId === null ? 'Tambah aset' : 'Ubah aset'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-3xl">
+        <form className="grid gap-3" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Aset' : 'Ubah Aset'}</div>
           <div className="chart-subtitle">Pilih jenis harta, kelompok &amp; tarif terisi otomatis dari PMK</div>
 
@@ -325,6 +327,7 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
             </button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>

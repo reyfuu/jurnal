@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FormPopup } from '@/components/FormPopup'
 import { PageHeader } from '@/components/PageHeader'
 import {
   createKaryawan, deleteKaryawan, getKaryawan, updateKaryawan,
@@ -94,7 +95,8 @@ export function KaryawanView() {
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <FormPopup judul={'Data karyawan'} onClose={() => setForm(null)} lebar="sm:max-w-3xl">
+        <form className="grid gap-3" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Karyawan' : 'Ubah Karyawan'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -155,6 +157,7 @@ export function KaryawanView() {
             </button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>

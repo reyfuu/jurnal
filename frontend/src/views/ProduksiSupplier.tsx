@@ -1,4 +1,5 @@
 import { Factory, Plus, Trash2 } from 'lucide-react'
+import { FormPopup } from '@/components/FormPopup'
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import {
@@ -386,7 +387,8 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
 
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpanProduk}>
+        <FormPopup judul={editId === null ? 'Tambah produk' : 'Ubah produk'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-5xl">
+        <form className="grid gap-3" onSubmit={simpanProduk}>
           <div className="chart-title">{editId === null ? 'Tambah Produk & Resep' : 'Ubah Produk & Resep'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -449,6 +451,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
             <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>
@@ -531,6 +534,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
         <div className="chart-title">Supplier</div>
 
         {supForm && (
+          <FormPopup judul={supEditId === null ? 'Tambah supplier' : 'Ubah supplier'} onClose={() => { setSupForm(null); setSupEditId(null) }} lebar="sm:max-w-3xl">
           <form className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: 12 }} onSubmit={simpanSupplier}>
             <label>
               <span className="kpi-label">Nama Supplier</span>
@@ -570,6 +574,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi }: { bisaUbah?: boolean
               <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setSupForm(null)}>Batal</button>
             </div>
           </form>
+          </FormPopup>
         )}
 
         <div className="table-scroll">

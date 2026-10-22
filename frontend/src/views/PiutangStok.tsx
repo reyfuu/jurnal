@@ -1,4 +1,5 @@
 import { Flag, ShoppingCart, Upload } from 'lucide-react'
+import { FormPopup } from '@/components/FormPopup'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
@@ -167,7 +168,8 @@ export function PiutangUtang() {
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <FormPopup judul={editId === null ? 'Tambah tagihan' : 'Ubah tagihan'} onClose={() => { setForm(null); setEditId(null) }} lebar="sm:max-w-3xl">
+        <form className="grid gap-3" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Tagihan' : 'Ubah Tagihan'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -214,6 +216,7 @@ export function PiutangUtang() {
             <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>
@@ -417,7 +420,8 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
       </div>
 
       {form && (
-        <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
+        <FormPopup judul={editId === null ? 'Tambah barang' : 'Ubah barang'} onClose={() => { setForm(null); setEditId(null) }}>
+        <form className="grid gap-3" onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Barang' : 'Ubah Barang'}</div>
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
@@ -471,6 +475,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
             <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => setForm(null)}>Batal</button>
           </div>
         </form>
+        </FormPopup>
       )}
 
       <div className="card" style={{ padding: 20 }}>

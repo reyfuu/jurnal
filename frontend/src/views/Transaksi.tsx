@@ -156,6 +156,9 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
             </Button>
           </>
         )}
+      </div>
+      {/* Baris kedua: cari & filter, supaya tombol aksi tidak berdesakan dengan filter. */}
+      <div className="card filter-bar">
         <Input
           className="tx-search"
           aria-label="Cari transaksi"
