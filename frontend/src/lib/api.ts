@@ -515,7 +515,7 @@ export interface AssetSummary {
 
 export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
 /** Register aset per tanggal bebas (YYYY-MM-DD), sama dengan Neraca per tanggal itu. */
-export const getAssetsPada = (pada: string) => api<AssetSummary>(`/assets?pada=${pada}`)
+export const getAssetsPada = (pada: string) => api<AssetSummary>(`/assets?pada=${encodeURIComponent(pada)}`)
 export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
 export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
 export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
@@ -1266,7 +1266,7 @@ export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tag
 export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
 
 /** pada (YYYY-MM-DD): jumlah & nilai per tanggal itu dari kartu stok; kosong = sekarang. */
-export const getStok = (pada = '') => api<StokSummary>(pada ? `/stok?pada=${pada}` : '/stok')
+export const getStok = (pada = '') => api<StokSummary>(pada ? `/stok?pada=${encodeURIComponent(pada)}` : '/stok')
 export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'POST', body: s })
 export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
 export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })

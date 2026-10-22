@@ -219,7 +219,11 @@ func NewServer() *Server {
 		bugHook:   newBugHook(),
 		lihat:     map[int]lihatGrant{},
 	}
-	s.kirimSurel = surel.ConfigFromEnv().Kirim
+	smtpCfg := surel.ConfigFromEnv()
+	s.kirimSurel = smtpCfg.Kirim
+	if os.Getenv("APP_URL") != "" && !smtpCfg.Aktif() {
+		log.Printf("PERINGATAN: APP_URL diisi tetapi SMTP_HOST/SMTP_FROM kosong: email 'Lupa password' tidak akan terkirim")
+	}
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		var err error

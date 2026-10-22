@@ -23,7 +23,7 @@ type asetListResp struct {
 }
 
 func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
-	out := asetListResp{AssetSummary: s.report(periodOrDefault(r)).Assets}
+	var out asetListResp
 	if pada := r.URL.Query().Get("pada"); pada != "" { // per tanggal bebas (checklist No 22)
 		if _, err := time.Parse(time.DateOnly, pada); err != nil {
 			http.Error(w, "pada harus YYYY-MM-DD", http.StatusBadRequest)
@@ -32,6 +32,8 @@ func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
 		s.mu.RLock()
 		out.AssetSummary = finance.AssetsPada(s.assets, s.txs, pada)
 		s.mu.RUnlock()
+	} else {
+		out.AssetSummary = s.report(periodOrDefault(r)).Assets
 	}
 	s.mu.RLock()
 	out.TanggalSaldoAwal = s.bukuAwalLocked().Tanggal

@@ -73,6 +73,10 @@ export default function App() {
   const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
 
   const me = session.status === 'in' ? session.me : null
+  // Token dari tautan email (#/atur-password?token=…) dibaca sekali saat dimuat: sinkronisasi
+  // rute di bawah bisa menimpa hash bila browser masih masuk.
+  const [tokenReset, setTokenReset] = useState<string | null>(() =>
+    window.location.hash.startsWith('#/atur-password') ? new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('token') ?? '' : null)
 
   const fail = useCallback((e: unknown) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -156,6 +160,11 @@ export default function App() {
   }, [])
 
   if (session.status === 'checking') return null
+  // Tautan atur ulang password dari email: #/atur-password?token=… (juga bila browser masih
+  // masuk; setelah diganti semua sesi berakhir, jadi kembali ke halaman Masuk).
+  if (tokenReset !== null) {
+    return <AturPassword token={tokenReset} onSelesai={() => { history.replaceState(null, '', '#/masuk'); setTokenReset(null); setSession({ status: 'anon' }); setAuth('masuk') }} />
+  }
   if (!me) {
     // Buka Masuk / Daftar sebagai langkah riwayat baru supaya tombol Back browser kembali ke landing.
     const bukaAuth = (jenis: 'masuk' | 'daftar') => {
@@ -165,11 +174,6 @@ export default function App() {
     const keLanding = () => {
       if ((history.state as { auth?: string } | null)?.auth) history.back()
       else { history.replaceState(null, '', window.location.pathname); setAuth(null) }
-    }
-    // Tautan atur ulang password dari email: #/atur-password?token=…
-    if (window.location.hash.startsWith('#/atur-password')) {
-      const token = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('token') ?? ''
-      return <AturPassword token={token} onSelesai={() => { history.replaceState(null, '', '#/masuk'); setAuth('masuk') }} />
     }
     return auth
       ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={keLanding}

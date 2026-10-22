@@ -505,12 +505,23 @@ func AssetsForPeriod(assets []Asset, txs []Transaction, period string) AssetSumm
 // BuildNeracaPada: aset yang diperoleh sampai tanggal itu; di tengah bulan penyusutan bulan itu
 // belum dibukukan (dibukukan di akhir bulan).
 func AssetsPada(assets []Asset, txs []Transaction, tanggal string) AssetSummary {
+	if len(tanggal) < 10 {
+		return AssetSummary{}
+	}
 	var sd []Asset
 	for _, a := range assets {
 		if a.TanggalPerolehan <= tanggal {
 			sd = append(sd, a)
 		}
 	}
+	// transaksi "Beli Alat / Aset" sesudah tanggal itu juga tidak ikut (draf aset), sama dengan BuildNeracaPada
+	var st []Transaction
+	for _, t := range txs {
+		if t.Tanggal <= tanggal {
+			st = append(st, t)
+		}
+	}
+	txs = st
 	period := tanggal[:7]
 	as := AssetsForPeriod(sd, txs, period)
 	if tanggal >= akhirBulan(period) {

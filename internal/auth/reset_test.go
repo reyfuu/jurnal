@@ -42,3 +42,28 @@ func TestResetLewatToken(t *testing.T) {
 		t.Fatal("token kedaluwarsa harus ditolak")
 	}
 }
+
+// Akun dinonaktifkan atau berganti email setelah tautan dikirim: tautannya gugur.
+func TestResetGugurSaatAkunBerubah(t *testing.T) {
+	s := NewStore()
+	var id int
+	for _, r := range s.users {
+		if r.Email == "admin@kedaikopisenja.id" {
+			id = r.ID
+		}
+	}
+	token, u, ok := s.MintaReset("admin@kedaikopisenja.id")
+	if !ok {
+		t.Fatal("minta reset")
+	}
+	in := Input{Name: u.Name, Email: u.Email, Role: u.Role, Active: false}
+	if _, err := s.Update(u.TenantID, id, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResetDenganToken(token, "rahasia-baru-1"); err == nil {
+		t.Fatal("akun nonaktif tidak boleh reset")
+	}
+	if _, _, ok := s.MintaReset("admin@kedaikopisenja.id"); ok {
+		t.Fatal("akun nonaktif tidak boleh mendapat token")
+	}
+}

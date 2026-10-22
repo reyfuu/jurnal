@@ -247,6 +247,9 @@ func (s *Store) Update(tenantID, id int, in Input) (User, error) {
 	if !in.Active || in.Role != r.Role {
 		s.revoke(id) // sesi lama tidak boleh hidup lagi setelah diaktifkan ulang / ganti role
 	}
+	if in.Email != r.Email || !in.Active || in.Password != "" {
+		s.batalkanResetLocked(id) // tautan lupa password ke email lama / sebelum ganti password gugur
+	}
 	r.Name, r.Email, r.Role, r.Active = in.Name, in.Email, in.Role, in.Active
 	if in.Password != "" {
 		r.hash = hashPassword(in.Password, r.salt)
@@ -471,6 +474,7 @@ func (s *Store) ResetPassword(id int) (string, error) {
 	pw := strings.ToLower(rand.Text()[:12])
 	r.hash = hashPassword(pw, r.salt)
 	s.revoke(id)
+	s.batalkanResetLocked(id)
 	return pw, nil
 }
 

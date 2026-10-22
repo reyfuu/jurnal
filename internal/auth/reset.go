@@ -36,16 +36,23 @@ func (s *Store) MintaReset(email string) (token string, u User, ok bool) {
 		if s.reset == nil {
 			s.reset = map[string]tokenReset{}
 		}
-		for h, tr := range s.reset {
-			if tr.userID == r.ID {
-				delete(s.reset, h)
-			}
-		}
+		s.batalkanResetLocked(r.ID)
 		token = rand.Text()
 		s.reset[hashToken(token)] = tokenReset{r.ID, s.Now().Add(umurTokenReset)}
 		return token, r.User, true
 	}
 	return "", User{}, false
+}
+
+// batalkanResetLocked: token lupa password milik user ini (dan yang sudah kedaluwarsa) gugur.
+// s.mu dipegang.
+func (s *Store) batalkanResetLocked(userID int) {
+	kini := s.Now()
+	for h, tr := range s.reset {
+		if tr.userID == userID || kini.After(tr.sampai) {
+			delete(s.reset, h)
+		}
+	}
 }
 
 // ResetDenganToken mengganti password lewat token yang masih berlaku, lalu mengakhiri semua sesi.

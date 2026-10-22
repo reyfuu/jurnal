@@ -81,6 +81,10 @@ func (s *tenant) handleListStok(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "pada harus YYYY-MM-DD", http.StatusBadRequest)
 			return
 		}
+		if k.Mulai == "" || pada < k.Mulai {
+			http.Error(w, "stok per tanggal hanya bisa sejak kartu stok dimulai", http.StatusBadRequest)
+			return
+		}
 		k = k.Pada(pada)
 	}
 	writeJSON(w, finance.RingkasStok(list, k))

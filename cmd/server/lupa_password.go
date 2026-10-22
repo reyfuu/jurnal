@@ -20,26 +20,42 @@ const pesanLupa = "Bila email itu terdaftar, tautan atur ulang password sudah di
 
 func (s *Server) handleLupaPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct{ Email string }
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !strings.Contains(req.Email, "@") {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !strings.Contains(req.Email, "@") || len(req.Email) > 254 {
 		http.Error(w, "isi email yang valid", http.StatusBadRequest)
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	if !s.reserveAttempt("lupa|"+clientIP(r)) || !s.reserveAttempt("lupa|"+email) {
+	if !s.reserveAttempt("lupa|" + clientIP(r)) {
 		http.Error(w, "terlalu banyak permintaan, coba lagi dalam 15 menit", http.StatusTooManyRequests)
 		return
 	}
-	if token, u, ok := s.users.MintaReset(email); ok {
-		tautan := strings.TrimRight(os.Getenv("APP_URL"), "/") + "/#/atur-password?token=" + url.QueryEscape(token)
-		isi := "Halo " + u.Name + ",\n\nKami menerima permintaan atur ulang password akun MasterPajak AI Anda.\n" +
-			"Buka tautan berikut (berlaku 30 menit, sekali pakai):\n\n" + tautan +
-			"\n\nBila Anda tidak meminta ini, abaikan email ini; password Anda tidak berubah.\n"
-		if err := s.kirimSurel(u.Email, "Atur ulang password MasterPajak AI", isi); err != nil {
-			log.Printf("lupa password %s: email tidak terkirim (%v); tautan: %s", u.Email, err, tautan)
+	// Batas per email tidak memberi 429 (supaya tidak bisa dipakai mengunci reset orang lain atau
+	// menebak akun): melewati batas = balasan sama, email tidak dikirim.
+	if s.reserveAttempt("lupa|" + email) {
+		if token, u, ok := s.users.MintaReset(email); ok {
+			go s.kirimTautanReset(u, token) // dikirim di belakang: waktu balasan sama untuk email terdaftar atau tidak
 		}
 	}
 	w.WriteHeader(http.StatusAccepted)
 	writeJSON(w, map[string]string{"pesan": pesanLupa})
+}
+
+// kirimTautanReset: tautan lengkap hanya dicatat ke log di pengembangan lokal (APP_URL kosong /
+// localhost); di produksi kegagalan dicatat tanpa token.
+func (s *Server) kirimTautanReset(u auth.User, token string) {
+	appURL := strings.TrimRight(os.Getenv("APP_URL"), "/")
+	tautan := appURL + "/#/atur-password?token=" + url.QueryEscape(token)
+	isi := "Halo " + u.Name + ",\n\nKami menerima permintaan atur ulang password akun MasterPajak AI Anda.\n" +
+		"Buka tautan berikut (berlaku 30 menit, sekali pakai):\n\n" + tautan +
+		"\n\nBila Anda tidak meminta ini, abaikan email ini; password Anda tidak berubah.\n"
+	err := s.kirimSurel(u.Email, "Atur ulang password MasterPajak AI", isi)
+	switch {
+	case err == nil:
+	case appURL == "" || strings.Contains(appURL, "localhost") || strings.Contains(appURL, "127.0.0.1"):
+		log.Printf("lupa password %s (pengembangan, email tidak terkirim: %v): %s", u.Email, err, tautan)
+	default:
+		log.Printf("PERINGATAN: email atur ulang password ke %s gagal: %v", u.Email, err)
+	}
 }
 
 func (s *Server) handleAturPassword(w http.ResponseWriter, r *http.Request) {
