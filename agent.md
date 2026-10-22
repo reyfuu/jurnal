@@ -102,6 +102,21 @@ Setiap sesi kerja **WAJIB** mengaktifkan dan mematuhi daftar *skills*, *mental m
     - Analisis berjalan lokal; analisis statis JS/.NET tidak menjalankan target. Penangkapan runtime menjalankan target dengan izin user, jadi **minta persetujuan user dulu**.
     - Terpasang untuk Claude Code lewat `npx rea-agents@6.7.0 setup --client claude_code --yes` (MCP di `~/.claude.json`, cadangan `~/.claude.json.rea.backup`; skill di `~/.claude/skills/reverse-engineer-anything`). Analisis biner native butuh Ghidra/Hopper/IDA, yang belum terpasang; Hopper hanya dipasang dengan persetujuan user. Perbarui dengan `npx rea-agents@latest setup --client claude_code`.
 
+### E. Pustaka Skill Siklus Pengembangan
+17. **`agent-skills` ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) — plugin Claude Code, v0.6.13, MIT)**
+    - 25 skill untuk seluruh siklus: spec → plan → build → verify → review → ship (mis. `spec-driven-development`, `planning-and-task-breakdown`, `incremental-implementation`, `test-driven-development`, `code-review-and-quality`, `security-and-hardening`, `performance-optimization`, `shipping-and-launch`). Skill aktif otomatis sesuai jenis tugas.
+    - Command plugin: `/spec`, `/plan`, `/build`, `/test`, `/agent-skills:review`, `/code-simplify`, `/ship`, `/webperf`, `/constraints`. Pakai bentuk ber-namespace `/agent-skills:<nama>` bila bentrok dengan command bawaan atau gstack (`/review`, `/ship`, `/spec`).
+    - **Wajib dipakai untuk lima tahap ini** (selalu dengan nama ber-namespace, karena `/review`, `/ship`, dan `/test` juga ada di gstack/bawaan):
+      | Tahap | Command | Catatan proyek |
+      |---|---|---|
+      | Test | `/agent-skills:test` | TDD: test gagal dulu, lalu implementasi. Bug → pola Prove-It (test reproduksi wajib gagal sebelum fix). |
+      | Build | `/agent-skills:build` | Satu task per jalan: RED → GREEN → `go test ./...` + `npm run build` → commit. `/agent-skills:build auto` hanya dengan persetujuan user dan butuh `SPEC.md`. |
+      | Constraints | `/agent-skills:constraints` | Menulis `CONSTRAINTS.md`; `check` sebelum review, `guard` untuk memastikan ambang tidak diturunkan. Benchmark `smokinggun` (§1.B) masuk sebagai constraint performa. |
+      | Review | `/agent-skills:review` | Lima sumbu (correctness, readability, architecture, security, performance). Jalankan bersama `ponytail-review`. |
+      | Ship | `/agent-skills:ship` | Hanya keputusan GO/NO-GO + rencana rollback (3 subagent paralel); tidak push atau deploy. Deploy tetap lewat runbook VPS dan persetujuan user. |
+    - **Aturan proyek tetap menang**: bila skill ini bertentangan dengan `agent.md` (mis. `smokinggun` wajib benchmark, `ponytail` solusi minimal, larangan trailer `Co-authored-by`), ikuti `agent.md`. `/build auto` hanya dengan persetujuan user.
+    - Terpasang (22 Okt 2026) lewat: `claude plugin marketplace add https://github.com/addyosmani/agent-skills.git` lalu `claude plugin install agent-skills@addy-agent-skills`. Plugin tidak mendaftarkan hook. Perbarui dengan `claude plugin marketplace update addy-agent-skills`.
+
 ---
 
 ## 2. Domain Architecture Map (Laporan Bisnis)
@@ -153,6 +168,7 @@ Sesuai referensi desain produk **Master Pajak**, sistem terdiri dari 5 grup navi
 - [ ] Apakah semua perubahan sudah mengikuti `ponytail` (kode paling simpel, tanpa abstraksi spekulatif)?
 - [ ] Apakah logika finansial & pajak sudah memiliki unit test (`tdd`) yang lulus 100%?
 - [ ] Bila menyentuh jalur Transaksi → Jurnal → Laporan atau Panel Master: apakah `go test ./... -run '^$' -bench .` masih di kisaran angka yang tercatat di `§1.B` (`smokinggun`)?
+- [ ] Apakah `/agent-skills:constraints check`, `/agent-skills:review`, dan `/agent-skills:ship` (GO + rencana rollback) sudah dijalankan sebelum PR/deploy (§1.E)?
 - [ ] Apakah dokumen (`BRD.md`, `FRD.md`, `TRD.md`, `PRD.md`) dan `graphify` tetap sinkron?
 - [ ] Apakah UI sudah bebas dari *AI slop* (`antislop`, `taste`, `impeccable`) dan terverifikasi lewat `agent browser`?
 - [ ] Apakah siklus `harness2` (Propose → Probe → Compose) sudah dijalankan dan hasilnya dicatat di `handoff`?
