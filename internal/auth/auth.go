@@ -116,7 +116,8 @@ type Store struct {
 	users    map[int]*record
 	nextID   int
 	sessions map[string]session
-	Now      func() time.Time // bisa diganti di test
+	reset    map[string]tokenReset // hash token lupa password (reset.go)
+	Now      func() time.Time      // bisa diganti di test
 }
 
 func NewStore() *Store { return NewStoreWithPassword(DemoPassword) }

@@ -14,6 +14,7 @@ import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login, type AwalDaftar } from '@/views/Login'
+import { AturPassword } from '@/views/LupaPassword'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
@@ -163,6 +164,11 @@ export default function App() {
     const keLanding = () => {
       if ((history.state as { auth?: string } | null)?.auth) history.back()
       else { history.replaceState(null, '', window.location.pathname); setAuth(null) }
+    }
+    // Tautan atur ulang password dari email: #/atur-password?token=…
+    if (window.location.hash.startsWith('#/atur-password')) {
+      const token = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('token') ?? ''
+      return <AturPassword token={token} onSelesai={() => { history.replaceState(null, '', '#/masuk'); setAuth('masuk') }} />
     }
     return auth
       ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={keLanding}

@@ -397,6 +397,10 @@ export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
 export interface DaftarInput { name: string; email: string; password: string; wa: string; setuju_pdp: boolean }
 export const register = (body: DaftarInput) => api<Me>('/auth/register', { method: 'POST', body })
+/** Lupa password: balasan selalu sama (keberadaan akun tidak bocor). */
+export const lupaPassword = (email: string) => api<{ pesan: string }>('/auth/lupa-password', { method: 'POST', body: { email } })
+/** Atur password baru dari tautan email (token sekali pakai, 30 menit). */
+export const aturPassword = (token: string, password: string) => api<void>('/auth/atur-password', { method: 'POST', body: { token, password } })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */

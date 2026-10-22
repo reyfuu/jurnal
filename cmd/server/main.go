@@ -29,6 +29,7 @@ import (
 	"pajak/internal/master"
 	"pajak/internal/pengetahuan"
 	"pajak/internal/primbon"
+	"pajak/internal/surel"
 	"pajak/internal/xlsx"
 )
 
@@ -99,8 +100,10 @@ type Server struct {
 	saveMu    sync.Mutex // serialisasi penulisan state
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
-	aiEngine  *ai.Engine
-	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
+	// kirimSurel: pengirim email (lupa password); diganti di test.
+	kirimSurel func(ke, subjek, isi string) error
+	aiEngine   *ai.Engine
+	llm        *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
 	// llmGambar: model pembaca foto nota (LLM_VISION_*; kosong = ikut LLM_*).
 	llmGambar *llm.Client
 	mux       *http.ServeMux
@@ -216,6 +219,7 @@ func NewServer() *Server {
 		bugHook:   newBugHook(),
 		lihat:     map[int]lihatGrant{},
 	}
+	s.kirimSurel = surel.ConfigFromEnv().Kirim
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		var err error
@@ -363,6 +367,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.persisting(s.handleLogin))
 	s.mux.HandleFunc("POST /api/v1/auth/register", s.persisting(s.handleRegister))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.persisting(s.handleLogout))
+	s.mux.HandleFunc("POST /api/v1/auth/lupa-password", s.handleLupaPassword)
+	s.mux.HandleFunc("POST /api/v1/auth/atur-password", s.handleAturPassword)
 	s.mux.HandleFunc("GET /api/v1/auth/me", s.guard("", s.handleMe))
 	s.mux.HandleFunc("GET /api/v1/periods", s.guard("", s.handlePeriods))
 
