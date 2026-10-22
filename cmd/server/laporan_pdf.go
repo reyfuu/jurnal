@@ -85,6 +85,7 @@ func (t *tenant) handleLaporanPDF(w http.ResponseWriter, r *http.Request) {
 			berkas = tgl
 		}
 	}
+	bagian = finance.BeriNamaSemua(bagian, t.namaAkunLaporan())
 	var ringkasAset *finance.AssetSummary
 	if aset {
 		ringkasAset = &rep.Assets
@@ -113,10 +114,11 @@ func (t *tenant) banding(w http.ResponseWriter, r *http.Request) (finance.Bandin
 		return finance.Banding{}, false
 	}
 	laporan := make([]finance.PeriodeLaporan, 0, len(periode))
+	nama := t.namaAkunLaporan()
 	for _, p := range periode {
 		rep := t.report(p)
-		laporan = append(laporan, finance.PeriodeLaporan{Periode: p, Bagian: []finance.BagianLaporan{
-			finance.BagianLabaRugi(rep.Income), finance.BagianNeraca(rep.BalanceSheet), finance.BagianArusKas(rep.CashFlow, false)}})
+		laporan = append(laporan, finance.PeriodeLaporan{Periode: p, Bagian: finance.BeriNamaSemua([]finance.BagianLaporan{
+			finance.BagianLabaRugi(rep.Income), finance.BagianNeraca(rep.BalanceSheet), finance.BagianArusKas(rep.CashFlow, false)}, nama)})
 	}
 	return finance.SusunBanding(laporan), true
 }

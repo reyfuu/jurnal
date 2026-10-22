@@ -380,6 +380,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/jurnal", s.guard("jurnal-umum", s.on((*tenant).handleJurnalUmum)))
 	s.mux.HandleFunc("GET /api/v1/reports/jurnal.xlsx", s.guard("jurnal-umum", s.exporting(s.on((*tenant).handleJurnalUmumXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/sales", s.guard("laporan-penjualan", s.on((*tenant).handleSalesReport)))
+	s.mux.HandleFunc("GET /api/v1/reports/nama-akun", s.guard("laporan-keuangan", s.on((*tenant).handleNamaAkunLaporan)))
 	s.mux.HandleFunc("GET /api/v1/reports/balance-sheet", s.guard("laporan-keuangan", s.on((*tenant).handleBalanceSheet)))
 	s.mux.HandleFunc("GET /api/v1/reports/rentang", s.guard("laporan-keuangan", s.on((*tenant).handleLaporanRentang)))
 	s.mux.HandleFunc("GET /api/v1/reports/pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleLaporanPDF))))
