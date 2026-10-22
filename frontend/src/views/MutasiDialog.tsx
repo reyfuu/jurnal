@@ -107,7 +107,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
         <DialogHeader>
           <DialogTitle className="inline-flex items-center gap-2"><Landmark size={18} aria-hidden /> Impor dari mutasi bank</DialogTitle>
           <DialogDescription>
-            Unggah mutasi rekening: <strong>PDF e-statement / rekening koran</strong>, atau .xlsx / .csv dari m-banking. Jenis transaksi ditebak dari keterangan bank —
+            Unggah mutasi rekening: <strong>PDF e-statement / rekening koran</strong> (hasil scan juga bisa), foto halaman mutasi, atau .xlsx / .csv dari m-banking. Jenis transaksi ditebak dari keterangan bank —
             periksa dan betulkan dulu di bawah, karena salah kelompok ikut mengubah omzet dan pajaknya.
           </DialogDescription>
         </DialogHeader>
@@ -118,7 +118,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
               <FileSpreadsheet size={16} aria-hidden /> {nama ? 'Ganti berkas' : 'Pilih berkas mutasi'}
               <input
                 type="file" className="sr-only"
-                accept=".pdf,application/pdf,.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".pdf,application/pdf,.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp"
                 onChange={(e) => { void pilihBerkas(e.target.files?.[0]); e.target.value = '' }}
               />
             </label>
@@ -152,7 +152,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
             {nama && <span className="text-sm text-muted-foreground" style={{ paddingBottom: 2 }}>{nama}</span>}
           </div>
 
-          {busy && !hasil && <p className="text-sm text-muted-foreground">Membaca mutasi…</p>}
+          {busy && !hasil && <p className="text-sm text-muted-foreground" role="status">Membaca mutasi… (hasil scan atau foto dibaca AI, bisa sampai 1 menit)</p>}
           {error && (mintaSandi
             ? <div className="note-box" role="status">{error}</div>
             : <p className="text-sm text-destructive" role="alert">{error}</p>)}
