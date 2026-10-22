@@ -123,7 +123,12 @@ export default function App() {
   }, [reload, fail])
 
   useEffect(() => {
-    getMe().then(signIn, () => setSession({ status: 'anon' }))
+    getMe().then(signIn, () => {
+      // Belum login: #/masuk atau #/daftar di URL (muat ulang, tautan) langsung membuka formnya.
+      const v = bacaRute(window.location.hash).view
+      if (v === 'masuk' || v === 'daftar') setAuth(v)
+      setSession({ status: 'anon' })
+    })
   }, [signIn])
 
   // Halaman & periode aktif selalu tercermin di URL; tombol Back / Forward berpindah halaman.
@@ -136,6 +141,9 @@ export default function App() {
   useEffect(() => {
     const kembali = () => {
       const r = bacaRute(window.location.hash)
+      // Halaman Masuk / Daftar punya alamat sendiri, jadi Back dari sana kembali ke landing page.
+      if (r.view === 'masuk' || r.view === 'daftar') return setAuth(r.view)
+      setAuth(null)
       if (r.view) setView(r.view as View)
     }
     window.addEventListener('popstate', kembali)
@@ -144,10 +152,19 @@ export default function App() {
 
   if (session.status === 'checking') return null
   if (!me) {
+    // Buka Masuk / Daftar sebagai langkah riwayat baru supaya tombol Back browser kembali ke landing.
+    const bukaAuth = (jenis: 'masuk' | 'daftar') => {
+      history.pushState({ auth: jenis }, '', `#/${jenis}`)
+      setAuth(jenis)
+    }
+    const keLanding = () => {
+      if ((history.state as { auth?: string } | null)?.auth) history.back()
+      else { history.replaceState(null, '', window.location.pathname); setAuth(null) }
+    }
     return auth
-      ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={() => setAuth(null)}
+      ? <Login key={auth} initialDaftar={auth === 'daftar'} awal={awal} onBack={keLanding}
           onLogin={(m) => { if (awal?.alat) setLayarBayar('alat'); signIn(m) }} />
-      : <Landing onMasuk={() => setAuth('masuk')} onDaftar={(a) => { setAwal(a); setAuth('daftar') }} />
+      : <Landing onMasuk={() => bukaAuth('masuk')} onDaftar={(a) => { setAwal(a); bukaAuth('daftar') }} />
   }
   async function onLogout() {
     await logout().catch(() => {})
