@@ -13,11 +13,23 @@ let urut = 0
 const kosong = (): Baris => ({ _k: ++urut, sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0 })
 const KATEGORI = ['Bahan Baku', 'Bahan Penolong', 'Produk Jadi', 'Kemasan', 'Barang']
 
-export function TambahBarangBanyak({ skuTerpakai, onBatal, onSelesai }: { skuTerpakai: string[]; onBatal: () => void; onSelesai: (jumlah: number) => void }) {
+export function TambahBarangBanyak({ skuTerpakai, namaTerpakai = [], onBatal, onSelesai }: { skuTerpakai: string[]; namaTerpakai?: string[]; onBatal: () => void; onSelesai: (jumlah: number) => void }) {
   const [baris, setBaris] = useState<Baris[]>(() => [kosong(), kosong(), kosong()])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const terisi = baris.filter((b) => b.nama.trim())
+  // SKU & nama tidak boleh sama dengan barang lain (server juga menolak)
+  const kunci = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
+  const kembar = (() => {
+    const sku = new Set(skuTerpakai.map(kunci)), nama = new Set(namaTerpakai.map(kunci))
+    for (const b of terisi) {
+      if (b.sku && sku.has(kunci(b.sku))) return `SKU ${b.sku} sudah dipakai barang lain.`
+      if (nama.has(kunci(b.nama))) return `Barang bernama "${b.nama.trim()}" sudah ada.`
+      if (b.sku) sku.add(kunci(b.sku))
+      nama.add(kunci(b.nama))
+    }
+    return ''
+  })()
 
   // SKU otomatis unik terhadap barang yang sudah ada dan baris lain di tabel ini.
   function skuOtomatis(bs: Baris[], k: number, nama: string) {
@@ -88,8 +100,9 @@ export function TambahBarangBanyak({ skuTerpakai, onBatal, onSelesai }: { skuTer
         </table>
       </div>
       {error && <div className="pill-status pill-red" role="alert" style={{ whiteSpace: 'normal', alignSelf: 'flex-start' }}>{error}</div>}
+      {kembar && <div className="pill-status pill-red" role="alert" style={{ whiteSpace: 'normal', alignSelf: 'flex-start' }}>{kembar} SKU dan nama barang tidak boleh sama.</div>}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" disabled={busy || terisi.length === 0} onClick={() => void simpan()}>{busy ? 'Menyimpan…' : `Simpan ${terisi.length} barang`}</Button>
+        <Button type="button" disabled={busy || terisi.length === 0 || !!kembar} onClick={() => void simpan()}>{busy ? 'Menyimpan…' : `Simpan ${terisi.length} barang`}</Button>
         <Button type="button" variant="outline" onClick={onBatal}>Batal</Button>
         <span className="text-xs text-muted-foreground">Baris tanpa nama dilewati. Banyak barang dari Excel? Pakai tombol Impor Excel.</span>
       </div>

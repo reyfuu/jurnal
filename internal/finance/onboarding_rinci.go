@@ -971,6 +971,10 @@ func rinciPersediaan(rows [][]string) ([]SaldoAkun, []StokItem, []ImportError) {
 			errs.add(i, "%s", err)
 			continue
 		}
+		if err := CekUnik(stok, InfoStok, 0, s.SKU, s.Nama, "barang"); err != nil {
+			errs.add(i, "%s (baris kembar di berkas)", err)
+			continue
+		}
 		stok = append(stok, s)
 		kat := cmp.Or(b.get(i, "kategori"), "Barang")
 		if per[kat] == nil {

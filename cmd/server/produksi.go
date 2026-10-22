@@ -48,6 +48,11 @@ func (s *tenant) handleCreateProduk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if err := finance.CekUnik(s.produk, finance.InfoProduk, 0, p.SKU, p.Nama, "produk"); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if s.nextProdukID == 0 {
 		s.nextProdukID = 1
 	}
@@ -75,6 +80,10 @@ func (s *tenant) handleUpdateProduk(w http.ResponseWriter, r *http.Request) {
 	i := s.produkIndex(r)
 	if i < 0 {
 		http.Error(w, "produk tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := finance.CekUnik(s.produk, finance.InfoProduk, s.produk[i].ID, p.SKU, p.Nama, "produk"); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	p.ID = s.produk[i].ID
@@ -143,6 +152,11 @@ func (s *tenant) handleCreateSupplier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if err := finance.CekUnik(s.supplier, finance.InfoSupplier, 0, "", sp.Nama, "supplier"); err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if s.nextSupplierID == 0 {
 		s.nextSupplierID = 1
 	}
@@ -169,6 +183,10 @@ func (s *tenant) handleUpdateSupplier(w http.ResponseWriter, r *http.Request) {
 	i := s.supplierIndex(r)
 	if i < 0 {
 		http.Error(w, "supplier tidak ditemukan", http.StatusNotFound)
+		return
+	}
+	if err := finance.CekUnik(s.supplier, finance.InfoSupplier, s.supplier[i].ID, "", sp.Nama, "supplier"); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	sp.ID = s.supplier[i].ID

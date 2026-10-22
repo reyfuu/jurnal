@@ -68,3 +68,24 @@ func TestAkunTambahan(t *testing.T) {
 		t.Error("akun yang dihapus masih ada")
 	}
 }
+
+// Data master tidak boleh kembar: SKU atau nama barang / produk, nama supplier.
+func TestMasterTidakKembar(t *testing.T) {
+	t.Setenv("DATA_DIR", t.TempDir())
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/stok", `{"sku":"ZZ-1","nama":"Barang Uji","satuan":"pcs","jumlah":1}`); rec.Code != http.StatusCreated {
+		t.Fatalf("barang pertama: %d %s", rec.Code, rec.Body)
+	}
+	for _, body := range []string{`{"sku":"zz-1","nama":"Lain","satuan":"pcs","jumlah":1}`, `{"sku":"ZZ-2","nama":"barang  uji","satuan":"pcs","jumlah":1}`} {
+		if rec := do(srv, owner, http.MethodPost, "/api/v1/stok", body); rec.Code != http.StatusConflict {
+			t.Errorf("barang kembar %s: %d", body, rec.Code)
+		}
+	}
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/produksi/supplier", `{"nama":"Supplier Uji"}`); rec.Code != http.StatusCreated {
+		t.Fatalf("supplier: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/produksi/supplier", `{"nama":"supplier uji"}`); rec.Code != http.StatusConflict {
+		t.Errorf("supplier kembar: %d", rec.Code)
+	}
+}
