@@ -8,8 +8,11 @@ APP_PORT="${1:-8085}"
 # Password akun seed produksi; simpan di .env (tidak di-commit) atau export sebelum deploy.
 # MIDTRANS_SERVER_KEY / MIDTRANS_CLIENT_KEY (opsional, di .env): pembayaran langganan;
 # MIDTRANS_PRODUCTION=true untuk akun produksi (default sandbox).
-# LLM_API_KEY (+ LLM_BASE_URL & LLM_MODEL bila bukan OpenAI, opsional, di .env): mengaktifkan
+# LLM_API_KEY (+ LLM_BASE_URL & LLM_MODEL bila bukan OpenAI, opsional): mengaktifkan
 # Laporan AI, chat AI, analisa klien, dan saran bidang usaha. Kosong = fitur AI mati.
+# Di produksi diambil dari LLM_ENV_FILE (default /var/www/jurnal/.env, 9Router di host lewat
+# http://172.16.4.1:20128/v1; ufw membuka 20128 untuk 172.16.4.0/24). LLM_MODEL boleh daftar
+# berurutan "utama,cadangan". Baris LLM_* di .env repo ini menimpanya bila diisi.
 # MASTER_EMAIL + MASTER_PASSWORD (opsional, di .env): membuat akun Master pertama Panel Master
 # sekali saja; setelah itu tim dikelola dari Panel Master.
 # PG_PASSWORD: password user Postgres aplikasi; PG_RO_PASSWORD (opsional): user baca-saja
@@ -17,6 +20,9 @@ APP_PORT="${1:-8085}"
 # PERATURAN_DIR (opsional): katalog Primbon Pajak (index.csv + naskah, ±2,5 GB) di host, di luar
 # repo supaya git pull tidak menyentuhnya; diisi lewat rsync (lihat HANDOFF.md). Kosong = menu
 # Primbon menampilkan "katalog belum tersedia".
+# Hanya baris LLM_*: berkas itu milik aplikasi lain dan punya DB_PORT dll. yang bentrok di sini.
+LLM_ENV_FILE="${LLM_ENV_FILE:-/var/www/jurnal/.env}"
+[ -f "$LLM_ENV_FILE" ] && . <(grep -E '^LLM_[A-Z_]+=' "$LLM_ENV_FILE")
 [ -f .env ] && . ./.env
 : "${SEED_PASSWORD:?SEED_PASSWORD wajib di-set (export atau .env) sebelum deploy}"
 : "${PG_PASSWORD:?PG_PASSWORD wajib di-set (.env) sebelum deploy}"
