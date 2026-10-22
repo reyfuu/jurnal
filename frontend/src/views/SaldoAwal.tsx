@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { AlertTriangle, CheckCircle2, Info, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Aset } from '@/views/Aset'
 import {
   getAssets, getCekSaldoAwal, getOpening, saranSaldo, saveOpening,
@@ -151,9 +152,11 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     }, pilihKategori ? 0 : 600)
   }
 
+  // Dari dalam jendela saldo awal: tutup dulu (isian tetap tersimpan sebagai draf), lalu buka daftar aset.
   function lihatAset() {
+    setBaris(null)
     setBukaAset(true)
-    kartuAset.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => kartuAset.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
   function asetBerubah() {
@@ -194,7 +197,12 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
         Saldo awal baru bisa disimpan bila <strong>Harta = Kewajiban + Modal</strong>. Banyak akun sekaligus bisa diisi lewat template Excel di <strong>Impor Data Awal</strong>.
       </div>
 
-      {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12, whiteSpace: 'normal' }}>{error}</div>}
+      {error && !baris && (
+        <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', marginBottom: 12, whiteSpace: 'normal', display: 'flex', gap: 10, alignItems: 'center' }}>
+          {error}
+          {!info && <button type="button" className="underline underline-offset-4" onClick={() => { setError(''); setVersiAset((v) => v + 1) }}>Muat ulang</button>}
+        </div>
+      )}
 
       <div ref={kartuAset} className="card" style={{ padding: 20, marginBottom: 14, scrollMarginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
@@ -239,18 +247,28 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
           <div>
             <div className="chart-title">3. Neraca pembukaan</div>
             <div className="chart-subtitle">
-              {info?.aktif && o ? `Mulai ${formatTanggal(o.tanggal)}.` : 'Belum diisi. Laporan dimulai dari nol di bulan transaksi pertama.'}
+              {!info ? (error ? 'Saldo awal belum bisa dimuat.' : 'Memuat…')
+                : info.aktif && o ? `Mulai ${formatTanggal(o.tanggal)}.` : 'Belum diisi. Laporan dimulai dari nol di bulan transaksi pertama.'}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className={'pill-status ' + (info?.aktif ? 'pill-green' : 'pill-amber')}>{info?.aktif ? 'Sudah diisi' : 'Belum diisi'}</span>
-            {bisaUbah && !baris && info && (
-              <button className="btn-cta" style={{ padding: '8px 16px', fontSize: 13 }} onClick={mulaiUbah}>
-                {info.aktif ? 'Ubah saldo awal' : 'Isi saldo awal'}
-              </button>
-            )}
-          </div>
+          {info && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span className={'pill-status ' + (info.aktif ? 'pill-green' : 'pill-amber')}>{info.aktif ? 'Sudah diisi' : 'Belum diisi'}</span>
+              {info.terkunci && <span className="pill-status pill-amber">Terkunci</span>}
+              {bisaUbah && !baris && !info.terkunci && (
+                <button className="btn-cta" style={{ padding: '8px 16px', fontSize: 13 }} onClick={mulaiUbah}>
+                  {info.aktif ? 'Ubah saldo awal' : 'Isi saldo awal'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
+        {info?.terkunci && (
+          <div className="note-box warn" style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 220 }}>{info.terkunci}</span>
+            <button type="button" className="nav-item" style={{ width: 'auto', padding: '7px 14px', fontSize: 13 }} onClick={() => navigate('tutup-buku')}>Buka Tutup Buku</button>
+          </div>
+        )}
 
         {!baris && info?.aktif && o && (
           <div className="table-scroll" style={{ marginTop: 14 }}>
@@ -274,8 +292,17 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
           </div>
         )}
 
-        {baris && (
-          <form onSubmit={simpan} style={{ marginTop: 14 }}>
+        <Dialog open={baris !== null}>
+          <DialogContent className="sm:max-w-5xl" showCloseButton={false}
+            onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>{info?.aktif ? 'Ubah saldo awal' : 'Isi saldo awal'}</DialogTitle>
+              <DialogDescription>
+                Neraca pembukaan per akun. Tekan <strong>Simpan saldo awal</strong> untuk menyimpan, atau <strong>Batal</strong> untuk menutup tanpa menyimpan.
+              </DialogDescription>
+            </DialogHeader>
+            {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', whiteSpace: 'normal' }}>{error}</div>}
+          {baris && <form id="form-saldo-awal" onSubmit={simpan}>
             {dipulihkan && (
               <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', marginBottom: 10 }}>
                 Isian sebelumnya yang belum tersimpan dipulihkan.{' '}
@@ -416,14 +443,15 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" disabled={busy || (selisih !== 0 && !paksa) || tanpaKategori.length > 0}>
+          </form>}
+            <DialogFooter className="sticky -bottom-5 z-10 bg-popover" style={{ paddingTop: 10, paddingBottom: 10 }}>
+              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => { hapusDraft(DRAFT_SALDO); setBaris(null); setError('') }}>Batal</button>
+              <button className="btn-cta" style={{ padding: '9px 20px', fontSize: 13 }} type="submit" form="form-saldo-awal" disabled={busy || (selisih !== 0 && !paksa) || tanpaKategori.length > 0}>
                 {busy ? 'Menyimpan…' : selisih !== 0 && paksa ? 'Simpan dengan selisih' : 'Simpan saldo awal'}
               </button>
-              <button type="button" className="nav-item" style={{ width: 'auto', padding: '9px 16px' }} onClick={() => { hapusDraft(DRAFT_SALDO); setBaris(null) }}>Batal</button>
-            </div>
-          </form>
-        )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="note-box warn">
           Isi sekali di awal, bukan tiap bulan. Piutang dan utang awal yang dibayar kemudian dicatat di <strong>Piutang &amp; Utang</strong>.
