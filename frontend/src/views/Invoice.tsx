@@ -13,8 +13,6 @@ import {
   bukukanInvoice, createInvoice, deleteInvoice, getInvoices, getPelanggan, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
   type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow, type Pelanggan,
 } from '@/lib/api'
-import { DaftarPelanggan } from '@/views/Pelanggan'
-import { RiwayatPihakDialog } from '@/views/RiwayatPihak'
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -76,8 +74,6 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [impor, setImpor] = useState(false)
-  const [lihatPelanggan, setLihatPelanggan] = useState(false)
-  const [riwayat, setRiwayat] = useState<string | null>(null)
   const [pelanggan, setPelanggan] = useState<Pelanggan[]>([])
   useEffect(() => { getPelanggan().then(setPelanggan, () => {}) }, [])
   // Nama cocok dengan daftar pelanggan: alamat & NPWP diisi dari daftar. Nilai yang diisi otomatis
@@ -170,9 +166,6 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   return (
     <>
       <PageHeader title="Invoice" subtitle="Terbitkan tagihan ke pelanggan dan unduh PDF. Invoice yang dikirim otomatis tercatat sebagai penjualan dan muncul di Piutang & Utang untuk dipantau & ditagih.">
-        <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={() => setLihatPelanggan((v) => !v)} aria-expanded={lihatPelanggan}>
-          Daftar pelanggan
-        </button>
         <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={() => setImpor(true)}>
           Impor Excel
         </button>
@@ -181,8 +174,6 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
         </button>
       </PageHeader>
 
-      {lihatPelanggan && <DaftarPelanggan onBerubah={setPelanggan} onRiwayat={(p) => setRiwayat(p.nama)} />}
-      <RiwayatPihakDialog nama={riwayat} onTutup={() => setRiwayat(null)} />
 
       <MenuImportDialog
         open={impor} onOpenChange={setImpor} onImported={() => void muat()}

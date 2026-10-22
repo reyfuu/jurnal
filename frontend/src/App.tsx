@@ -15,6 +15,7 @@ import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login, type AwalDaftar } from '@/views/Login'
 import { AturPassword } from '@/views/LupaPassword'
+import { TagihanTabs } from '@/views/Tagihan'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
@@ -390,7 +391,7 @@ export default function App() {
         )
       case 'umur-piutang':
       case 'piutang-utang':
-        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} />
+        return <TagihanTabs view="piutang-utang" boleh={canSee} onPilih={navigate}><UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} /></TagihanTabs>
       case 'tutup-buku':
         return <TutupBuku periods={periods} period={period} bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onBuka={navigate} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
@@ -404,7 +405,7 @@ export default function App() {
       case 'produksi-supplier':
         return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'invoice':
-        return <InvoiceView isiAI={sinyalAI} />
+        return <TagihanTabs view="invoice" boleh={canSee} onPilih={navigate}><InvoiceView isiAI={sinyalAI} /></TagihanTabs>
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':
