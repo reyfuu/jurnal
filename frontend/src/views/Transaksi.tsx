@@ -97,7 +97,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
   }
   const sum = useMemo(() => summarize(shown, jenis), [shown, jenis])
   const posOf = useMemo(() => Object.fromEntries(jenis.map((j) => [j.nama, j.pos])), [jenis])
-  const months = useMemo(() => monthsOf(txs, bulanIni), [txs, bulanIni])
+  // bulan terpilih ikut tampil walau transaksinya sudah tidak ada, supaya pilihan tidak kosong
+  const months = useMemo(() => monthsOf(txs, ...[bulanIni, filter.bulan].filter(Boolean)), [txs, bulanIni, filter.bulan])
   const channels = useMemo(() => channelsOf(txs), [txs])
 
   const setF = (patch: Partial<typeof filter>) => {
@@ -169,7 +170,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
         <PageHeader title="Catat transaksi" subtitle="Isi baris jurnal (akun, debit / kredit), atau isi dari foto nota." />
         <CatatJurnal key={`${halaman.jenis}|${halaman.grup ?? ''}`} jenisAwal={halaman.jenis} grup={halaman.grup}
           onKembali={() => setHalaman(null)}
-          onTersimpan={async (pesan) => { setTerkirim(pesan); await Promise.all([refresh(), onChanged()]) }} />
+          onTersimpan={async (pesan, tanggal) => {
+            setTerkirim(pesan)
+            // catatan bertanggal di bulan lain: pindah ke bulannya supaya tidak terlihat hilang
+            if (tanggal && filter.bulan && !tanggal.startsWith(filter.bulan)) setF({ bulan: tanggal.slice(0, 7) })
+            await Promise.all([refresh(), onChanged()])
+          }} />
       </>
     )
   }

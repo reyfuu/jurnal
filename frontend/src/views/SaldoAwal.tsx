@@ -173,7 +173,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setBusy(true)
     setError('')
     try {
-      const rincian = tampil.filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
+      // urutan simpan = urutan nomor akun, juga bila saran kategori datang setelah baris ditinggalkan
+      const rincian = urutSaldo(tampil, kategori.map((k) => k.id)).filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
       const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian }, selisih !== 0 && paksa)
       setPaksa(false)
       hapusDraft(DRAFT_SALDO)

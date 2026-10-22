@@ -43,15 +43,15 @@ export function barisDariNota(n: SaranNota, o: OpsiCatat): Baris[] {
   const lawan = n.lunas ? rekeningBawaan(o) : masuk ? o.bawaan.piutang : o.bawaan.utang
   const item = (n.item ?? []).filter((i) => (i.harga ?? 0) > 0)
   const rinci = item.length > 1 && item.reduce((t, i) => t + (i.harga ?? 0), 0) === n.nominal
-    ? item.map((i) => ({ ket: i.nama + (i.qty ? ` × ${i.qty}` : ''), n: i.harga! }))
-    : [{ ket: n.keterangan ?? '', n: n.nominal }]
-  const sisiPokok = rinci.map((r) => baru(masuk ? { akun: pokok, keterangan: r.ket, kredit: r.n } : { akun: pokok, keterangan: r.ket, debit: r.n }, true))
+    ? item.map((i) => i.harga!)
+    : [n.nominal]
+  const sisiPokok = rinci.map((x) => baru(masuk ? { akun: pokok, kredit: x } : { akun: pokok, debit: x }, true))
   const sisiLawan = baru(masuk ? { akun: lawan, debit: n.nominal } : { akun: lawan, kredit: n.nominal }, true)
   return masuk ? [sisiLawan, ...sisiPokok] : [...sisiPokok, sisiLawan]
 }
 
 export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
-  jenisAwal: string; grup?: number; onKembali: () => void; onTersimpan: (pesan: string) => Promise<void> | void
+  jenisAwal: string; grup?: number; onKembali: () => void; onTersimpan: (pesan: string, tanggal?: string) => Promise<void> | void
 }) {
   const draftKey = grup ? null : `catat:${jenisAwal}`
   const [opsi, setOpsi] = useState<OpsiCatat | null>(null)
@@ -159,7 +159,7 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
       setMirip(null)
       setYakinBeda(false)
       if (draftKey) hapusDraft(draftKey)
-      await onTersimpan(grup ? 'Catatan diperbarui.' : 'Catatan tersimpan.')
+      await onTersimpan(grup ? 'Catatan diperbarui.' : 'Catatan tersimpan.', kepala.tanggal)
       if (lagi && opsi) {
         setKepala({ ...KEPALA_KOSONG(), tanggal: kepala.tanggal })
         setBaris(barisAwal(jenis, opsi))
