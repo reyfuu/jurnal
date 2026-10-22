@@ -45,5 +45,13 @@ export function summarize(txs: Tx[], jenis: JenisInfo[]) {
   }
 }
 
-export const monthsOf = (txs: Tx[]) => [...new Set(txs.map((t) => t.tanggal.slice(0, 7)))].sort().reverse()
+// sekarang: bulan berjalan ikut tampil di pilihan walau belum ada transaksinya (bawaan filter).
+export const monthsOf = (txs: Tx[], sekarang?: string) =>
+  [...new Set([...txs.map((t) => t.tanggal.slice(0, 7)), ...(sekarang ? [sekarang] : [])])].sort().reverse()
+
+/** Bulan YYYY-MM menurut WIB (toISOString memakai UTC, sehingga awal bulan jatuh ke bulan lalu). */
+export const bulanWIB = (d = new Date()) => d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' }).slice(0, 7)
+
+/** Filter bulan saat daftar dibuka: pilihan tersimpan ('' = semua bulan) atau bulan berjalan. */
+export const bulanAwal = (tersimpan: string | null, sekarang: string) => tersimpan ?? sekarang
 export const channelsOf = (txs: Tx[]) => [...new Set(txs.map((t) => t.channel).filter(Boolean))].sort()
