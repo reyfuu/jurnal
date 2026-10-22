@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, Lock, LogOut, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { BEBAS_TERKUNCI, NAV, NAV_COBA } from '@/lib/nav'
+import { BEBAS_TERKUNCI, NAV, NAV_CATAT, NAV_COBA } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
 
 interface Props {
@@ -13,16 +13,19 @@ interface Props {
   onLogout: () => void
   /** Belum berlangganan: menu Coba gratis di atas, menu lain tampil bergembok. */
   terkunci?: boolean
+  /** Catat cepat di grup Catat Harian (kosong = tidak boleh mencatat, mis. lihat-sebagai). */
+  onCatat?: (v: View, aksi: string) => void
 }
 
 const KUNCI_GRUP = 'nav-grup-terbuka'
 const grupAktif = (v: View) => [NAV_COBA, ...NAV].find((g) => g.items.some((i) => i.view === v))?.group
 
+// Belum pernah diatur: Catat Harian terbuka, supaya Catat cepat langsung terlihat.
 function bacaGrup(): string[] {
-  try { return JSON.parse(localStorage.getItem(KUNCI_GRUP) ?? '[]') } catch { return [] }
+  try { return JSON.parse(localStorage.getItem(KUNCI_GRUP) ?? '["Catat Harian"]') } catch { return ['Catat Harian'] }
 }
 
-export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Props) {
+export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci, onCatat }: Props) {
   // Grup menu bisa dibuka-tutup (submenu); grup halaman yang sedang dibuka selalu terbuka.
   const [terbuka, setTerbuka] = useState<string[]>(() => [...new Set([...bacaGrup(), grupAktif(view) ?? ''])])
   useEffect(() => {
@@ -69,6 +72,20 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci }: Pr
                   </button>
                 )
               })}
+              {g.group === 'Catat Harian' && onCatat && (() => {
+                const catat = NAV_CATAT.filter((c) => me.views.includes(c.view))
+                return catat.length > 0 && (
+                  <>
+                    <div className="nav-sub-label">Catat cepat</div>
+                    {catat.map(({ label, ket, view: v, aksi, icon: Icon }) => (
+                      <button key={label} type="button" className="nav-item nav-catat" title={ket} onClick={() => onCatat(v, aksi)}>
+                        <Icon className="nav-icon" strokeWidth={2} />
+                        {label}
+                      </button>
+                    ))}
+                  </>
+                )
+              })()}
               </div>
             </div>
           )
