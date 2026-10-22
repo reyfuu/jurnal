@@ -42,6 +42,10 @@ func TestBagianLabaRugi(t *testing.T) {
 	if r := barisDengan(t, b, "laba_bersih"); r.Gaya != GayaTotal {
 		t.Errorf("laba bersih gaya %q", r.Gaya)
 	}
+	// checklist tester No 19b: laporan akrual, jadi tanpa kata "(tunai)"
+	if r := barisDengan(t, b, "total_beban"); r.Label != "Total beban operasional" {
+		t.Errorf("label total beban = %q", r.Label)
+	}
 }
 
 func TestBagianNeracaPosisiAkhir(t *testing.T) {

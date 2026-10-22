@@ -156,7 +156,7 @@ func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	for _, l := range is.OpexLines {
 		s.b.Baris = append(s.b.Baris, BarisLaporan{Kunci: "beban:" + l.Label, Label: l.Label, Nilai: -l.Amount, Gaya: GayaBaris, Agregat: s.agregat, Sifat: SifatPengurang})
 	}
-	baris(GayaTotal, "total_beban", "Total beban operasional (tunai)", -is.Opex, SifatPengurang, tambah("*jumlah beban"))
+	baris(GayaTotal, "total_beban", "Total beban operasional", -is.Opex, SifatPengurang, tambah("*jumlah beban"))
 	baris(GayaTotal, "ebitda", "EBITDA (laba (rugi) sebelum penyusutan & amortisasi)", is.EBITDA, "", tambah("laba_kotor"), kurang("total_beban"))
 	s.judul("judul_penutupan", "Penyusutan & amortisasi (jurnal penutupan bulan)")
 	baris(GayaBaris, "penyusutan", "Beban penyusutan aset tetap", -is.Depreciation, SifatPengurang)
