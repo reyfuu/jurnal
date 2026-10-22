@@ -64,9 +64,13 @@ export function StokOpnamePanel({ items, mulai, bisaUbah, onDone }: { items: Sto
         hapusDraft(DRAFT)
         onDone(`Saldo awal stok per ${formatTanggal(isi.tanggal)} tersimpan. Mulai sekarang stok bergerak otomatis dari beli, jual, dan produksi.`)
       } else {
-        await stokOpname({ tanggal: isi.tanggal, keterangan: ket, baris: berubah.map((b) => ({ stok_id: b.it.id, fisik: b.fisik })) })
+        // Tanpa selisih tetap disimpan (semua barang) supaya opname akhir bulan tercatat.
+        const kirim = berubah.length > 0 ? berubah : baris
+        await stokOpname({ tanggal: isi.tanggal, keterangan: ket, baris: kirim.map((b) => ({ stok_id: b.it.id, fisik: b.fisik })) })
         hapusDraft(DRAFT)
-        onDone(`Stok opname ${formatTanggal(isi.tanggal)} tersimpan: ${berubah.length} barang disesuaikan.`)
+        onDone(berubah.length > 0
+          ? `Stok opname ${formatTanggal(isi.tanggal)} tersimpan: ${berubah.length} barang disesuaikan.`
+          : `Stok opname ${formatTanggal(isi.tanggal)} tersimpan: semua hitungan fisik sama, tidak ada selisih.`)
       }
     } catch (err) {
       setError((err as Error).message)
@@ -169,7 +173,7 @@ export function StokOpnamePanel({ items, mulai, bisaUbah, onDone }: { items: Sto
       {error && <div className="pill-status pill-red" role="alert" style={{ whiteSpace: 'normal', alignSelf: 'flex-start' }}>{error}</div>}
       {bisaUbah && (
         <div className="flex flex-wrap items-center gap-3">
-          <button className="btn-cta accent" style={{ padding: '10px 22px', fontSize: 14 }} type="submit" disabled={busy || (!pertama && berubah.length === 0)}>
+          <button className="btn-cta accent" style={{ padding: '10px 22px', fontSize: 14 }} type="submit" disabled={busy}>
             {busy ? 'Menyimpan…' : pertama ? 'Simpan saldo awal stok' : 'Simpan opname'}
           </button>
           <span className="text-sm">

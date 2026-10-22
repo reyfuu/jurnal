@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -271,6 +272,17 @@ func (s *Server) loadFiles() bool {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Panic di handler dibalas 500 teks polos; tanpa ini koneksi terputus dan proxy
+	// (Cloudflare/nginx) menampilkan halaman 5xx HTML ke pengguna.
+	defer func() {
+		if v := recover(); v != nil {
+			if v == http.ErrAbortHandler {
+				panic(v)
+			}
+			log.Printf("panic %s %s: %v\n%s", r.Method, r.URL.Path, v, debug.Stack())
+			http.Error(w, "terjadi kesalahan di server; coba lagi sebentar lagi", http.StatusInternalServerError)
+		}
+	}()
 	// ponytail: CSP belum dipasang; perlu audit inline style/script SPA dulu.
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")

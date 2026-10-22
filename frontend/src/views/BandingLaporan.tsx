@@ -4,6 +4,7 @@ import { tanggalAkhirPeriode } from '@/lib/rentang'
 import { Check, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { bandingPdfUrl, getBanding, MAKS_BANDING, type Banding, type BagianBanding, type PeriodOption } from '@/lib/api'
+import { bulanRentang, tahunBerjalan } from '@/lib/banding'
 import { ekspor } from '@/lib/garansi'
 
 // Perbandingan Laporan Keuangan untuk bulan-bulan pilihan pengguna (bukan hanya dua), diakhiri
@@ -38,6 +39,10 @@ export function BandingLaporan({ periods, period, bisaEkspor }: { periods: Perio
 
   const toggle = (id: string) => setPilih((s) => s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAKS_BANDING ? s : [...s, id])
   const terakhir = (n: number) => setPilih(urut.slice(-n).map((p) => p.id))
+  const ids = urut.map((p) => p.id)
+  const terurut = [...pilih].sort()
+  const dari = terurut[0] ?? '', sampai = terurut.at(-1) ?? ''
+  const label = (id: string) => urut.find((p) => p.id === id)?.label ?? id
 
   return (
     <>
@@ -65,14 +70,36 @@ export function BandingLaporan({ periods, period, bisaEkspor }: { periods: Perio
         </div>
         <div className="flex flex-wrap gap-2 text-sm" style={{ marginTop: 10 }}>
           <span className="text-muted-foreground">Cepat:</span>
+          <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setPilih(tahunBerjalan(ids, period))}>Tahun berjalan</Button>
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => terakhir(3)}>3 bulan terakhir</Button>
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => terakhir(6)}>6 bulan terakhir</Button>
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => terakhir(Math.min(urut.length, MAKS_BANDING))}>Semua bulan</Button>
           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setPilih([])}>Kosongkan</Button>
         </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm" style={{ marginTop: 10 }}>
+          <span className="text-muted-foreground">Rentang bulan:</span>
+          <select className="input-field" aria-label="Dari bulan" style={{ width: 'auto' }} value={dari}
+            onChange={(e) => setPilih(bulanRentang(ids, e.target.value, sampai || e.target.value))}>
+            {!dari && <option value="">Pilih bulan</option>}
+            {urut.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <span className="text-muted-foreground">sampai</span>
+          <select className="input-field" aria-label="Sampai bulan" style={{ width: 'auto' }} value={sampai}
+            onChange={(e) => setPilih(bulanRentang(ids, dari || e.target.value, e.target.value))}>
+            {!sampai && <option value="">Pilih bulan</option>}
+            {urut.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">Lebih dari {MAKS_BANDING} bulan diambil {MAKS_BANDING} bulan terakhir.</span>
+        </div>
       </div>
 
-      {pilih.length < 2 && <div className="note-box">Pilih minimal 2 bulan untuk dibandingkan.</div>}
+      {pilih.length < 2 && (
+        <div className="note-box">
+          {pilih.length === 1
+            ? <>Baru 1 bulan yang dipilih ({label(pilih[0])}), misalnya karena tahun berjalan baru dimulai. Tambahkan bulan lain untuk dibandingkan.</>
+            : 'Pilih minimal 2 bulan untuk dibandingkan.'}
+        </div>
+      )}
       {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', whiteSpace: 'normal' }}>{error}</div>}
       {pilih.length >= 2 && data && (
         <div style={{ opacity: memuat ? 0.6 : 1, display: 'grid', gap: 16 }}>
