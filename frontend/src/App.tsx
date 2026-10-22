@@ -10,7 +10,7 @@ import { LaporanAI } from '@/views/LaporanAI'
 import { LaporBug } from '@/views/LaporBug'
 import { Landing } from '@/views/Landing'
 import { Langganan, statusText } from '@/views/Langganan'
-import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
+import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat, type AIIsiForm, type AppData, type BusinessInfo, type Me, type PeriodOption, type View } from '@/lib/api'
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login, type AwalDaftar } from '@/views/Login'
@@ -38,6 +38,7 @@ import { JurnalUmum } from '@/views/JurnalUmum'
 import { LaporanTransaksi } from '@/views/LaporanTransaksi'
 import { KaryawanView } from '@/views/Karyawan'
 import { AIAgentBubble } from '@/components/AIAgentBubble'
+import type { SinyalAI } from '@/lib/useIsiAI'
 import { PanelMaster } from '@/views/master/PanelMaster'
 import { UsulanKoreksi } from '@/views/UsulanKoreksi'
 import { Pustaka } from '@/views/Pustaka'
@@ -52,6 +53,7 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [bugFrom, setBugFrom] = useState<View>('dashboard') // halaman asal saat membuka Lapor Bug
   const [bukaTab, setBukaTab] = useState<{ tab?: string; n: number }>({ n: 0 })
+  const [sinyalAI, setSinyalAI] = useState<SinyalAI>() // isian form dari Tanya AI, atau urungkan isian itu
   const [auth, setAuth] = useState<'masuk' | 'daftar' | null>(null) // null = landing page
   const [awal, setAwal] = useState<AwalDaftar>() // isian form Kalkulator gratis di landing
   const [period, setPeriod] = useState<string>('2026-08')
@@ -173,6 +175,16 @@ export default function App() {
     if (v !== view) history.pushState(null, '', tulisRute(v, period))
     setView(v)
   }
+
+  // Tanya AI mengisi form: halaman form dibuka (tidak di-remount bila sudah terbuka, supaya isi
+  // form yang sedang diketik bisa dipulihkan lewat Urungkan) lalu diisi oleh halaman itu sendiri.
+  const isiFormAI = (aksi: AIIsiForm) => {
+    const id = Date.now()
+    setSinyalAI({ id, form: aksi.form, isian: aksi.isian })
+    if (aksi.view !== view) navigate(aksi.view)
+    return id
+  }
+  const urungkanAI = (id: number, aksi: AIIsiForm) => setSinyalAI({ id, form: aksi.form, urungkan: true })
 
   const changePeriod = (newP: string) => {
     setPeriod(newP)
@@ -300,7 +312,7 @@ export default function App() {
           {data ? renderView() : !error && <p className="workspace-subtitle">Memuat data…</p>}
         </section>
       </div>
-      {!me.lihat && !terkunci && <AIAgentBubble period={period} onBuka={navigate} />}
+      {!me.lihat && !terkunci && <AIAgentBubble period={period} onBuka={navigate} onIsiForm={isiFormAI} onUrungkan={urungkanAI} />}
       {me.lihat && me.master?.izin.includes('catatan') && <TulisCatatanTombol klienId={me.lihat.klien_id} halaman={view} periode={period} />}
       {!me.lihat && !!me.catatan_ingat && <PengingatCatatan onLihat={() => navigate('catatan')} />}
     </main>
@@ -353,14 +365,14 @@ export default function App() {
       case 'laporan-penjualan':
         return <LaporanPenjualan period={period} periodLabel={d.period_label} />
       case 'transaksi':
-        return <Transaksi key={bukaTab.n} aksiAwal={bukaTab.tab} onChanged={() => reload(me!, period)}
+        return <Transaksi key={bukaTab.n} aksiAwal={bukaTab.tab} isiAI={sinyalAI} onChanged={() => reload(me!, period)}
           lihat={me!.lihat && { klienId: me!.lihat.klien_id, bolehUsul: !!me!.master?.izin.includes('usul_koreksi') }} />
       case 'stok-gudang':
-        return <StokGudang key={bukaTab.n} aksi={bukaTab.tab} bisaUbah={!me!.lihat} />
+        return <StokGudang key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'produksi-supplier':
-        return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} bisaUbah={!me!.lihat} />
+        return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'invoice':
-        return <InvoiceView />
+        return <InvoiceView isiAI={sinyalAI} />
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':

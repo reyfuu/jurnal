@@ -1,4 +1,6 @@
 import { CashWarningBanner } from '@/components/CashWarningBanner'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
@@ -31,8 +33,9 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
-/** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat). */
-export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string }) {
+/** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat).
+ *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan). */
+export function Transaksi({ onChanged, lihat, aksiAwal, isiAI }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
@@ -79,6 +82,17 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
 
   const setF = (patch: Partial<typeof filter>) => { setFilter((f) => ({ ...f, ...patch })); setLimit(PAGE) }
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
+  const isiAi = useIsiAI<{ editing: Editing; qtyTeks: string }, Partial<TxInput>>(isiAI, 'transaksi', {
+    ambil: () => ({ editing, qtyTeks }),
+    pasang: (s) => { setEditing(s.editing); setQtyTeks(s.qtyTeks) },
+    isi: (isian) => {
+      setError('')
+      setQtyTeks('')
+      getPilihanBarang().then(setBarang, () => {})
+      setEditing({ id: null, input: { ...EMPTY, tanggal: today(), ...isian }, confirmDelete: false })
+    },
+    terbuka: editing !== null,
+  })
 
   function openNew() {
     setError('')
@@ -293,6 +307,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal }: { onChanged: () => Pro
                   ? 'Ubah isian yang perlu dikoreksi. Pembukuan klien tidak berubah sampai pemilik usaha menyetujui.'
                   : 'Wajib: tanggal, jenis, nominal. Sisanya opsional tapi bikin laporan makin lengkap.'}</DialogDescription>
               </DialogHeader>
+              <IsiAIBanner ai={isiAi} />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field id="tx-tanggal" label="Tanggal">

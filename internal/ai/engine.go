@@ -19,6 +19,8 @@ type QueryResponse struct {
 	ActionSuggestions []string `json:"action_suggestions"`
 	// Tautan: tombol ke halaman aplikasi yang relevan (panduan menu), sudah disaring hak akses.
 	Tautan []Tautan `json:"tautan,omitempty"`
+	// Aksi: usulan isian form ("catat penjualan …"); diisi di layar, disimpan oleh pengguna.
+	Aksi *IsiFormHasil `json:"aksi,omitempty"`
 }
 
 type Engine struct{}

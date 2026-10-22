@@ -1,6 +1,8 @@
 import { ClipboardCheck, Flag, ShoppingCart, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MulaiKartuDialog, MutasiStokPanel, OpnameDialog, RiwayatGerakPanel } from '@/views/KartuStok'
 import { formatQty } from '@/lib/qty'
@@ -272,7 +274,8 @@ const STATUS_CLS: Record<StokRow['status'], string> = {
 }
 
 /** bisaUbah: false di mode lihat-sebagai (hanya baca). */
-export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi?: string }) {
+/** isiAI: isian dari Tanya AI untuk barang baru (bisa diurungkan). */
+export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolean; aksi?: string; isiAI?: SinyalAI }) {
   const [data, setData] = useState<StokSummary | null>(null)
   const [tab, setTab] = useState<'daftar' | 'mutasi' | 'riwayat'>('daftar')
   // aksi dari tombol + Catat / Langkah memulai: buka dialognya langsung.
@@ -290,6 +293,12 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
 
   const muat = useCallback(() => { getStok().then(setData, (e: Error) => setError(e.message)) }, [])
   useEffect(muat, [muat])
+  const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null }, Partial<StokInput>>(isiAI, 'stok', {
+    ambil: () => ({ tab, form, editId }),
+    pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId) },
+    isi: (isian) => { setError(''); setTab('daftar'); setEditId(null); setForm({ ...STOK_KOSONG, ...isian }) },
+    terbuka: form !== null,
+  })
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
@@ -419,6 +428,7 @@ export function StokGudang({ bisaUbah = true, aksi }: { bisaUbah?: boolean; aksi
       {form && (
         <form className="card" style={{ padding: 20, marginBottom: 14 }} onSubmit={simpan}>
           <div className="chart-title">{editId === null ? 'Tambah Barang' : 'Ubah Barang'}</div>
+          {isiAi.aktif !== null && <div style={{ marginTop: 12 }}><IsiAIBanner ai={isiAi} /></div>}
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <label>
               <span className="kpi-label">SKU</span>
