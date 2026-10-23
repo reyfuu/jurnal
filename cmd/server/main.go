@@ -411,6 +411,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.xlsx", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarPDF))))
 	s.mux.HandleFunc("GET /api/v1/reports/banding", s.guard("laporan-keuangan", s.on((*tenant).handleBanding)))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi", s.guard("pajak-umkm", s.pro(s.on((*tenant).handleRekonsiliasi))))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi.xlsx", s.guard("pajak-umkm", s.pro(s.exporting(s.on((*tenant).handleRekonsiliasiXlsx)))))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi.pdf", s.guard("pajak-umkm", s.pro(s.exporting(s.on((*tenant).handleRekonsiliasiPDF)))))
 	s.mux.HandleFunc("GET /api/v1/reports/banding.pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleBandingPDF))))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
 	s.mux.HandleFunc("POST /api/v1/simulasi", s.guard("simulasi-harga", s.on((*tenant).handleSimulasi)))
@@ -616,7 +619,7 @@ func (s *Server) newMe(u auth.User) meResp {
 		me.Master = s.masterInfoFor(u)
 		if me.Lihat = s.lihatInfoFor(u); me.Lihat != nil {
 			// Menu klien versi baca; layar bayar tidak relevan untuk tim.
-			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif"}
+			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif", Pro: true}
 		}
 		return me
 	}

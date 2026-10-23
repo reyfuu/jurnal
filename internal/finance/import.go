@@ -54,6 +54,7 @@ var jenisAlias = map[string][]string{
 	"Iklan & Promosi":          {"iklan", "promosi", "ads", "marketing"},
 	"Perawatan & Perlengkapan": {"perawatan", "servis", "perlengkapan", "atk"},
 	"Pajak & Izin":             {"pajak", "izin", "retribusi"},
+	JenisSetorPPhFinal:         {"pph final umkm", "setor pph final"},
 	"Biaya Lain":               {"lain lain", "lainnya"},
 	"Beli Alat / Aset":         {"beli alat", "aset", "peralatan"},
 	"Bayar Cicilan":            {"cicilan", "angsuran", "bayar utang"},

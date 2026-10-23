@@ -28,14 +28,15 @@ func (s *tenant) periodeLocked() []finance.PilihanPeriode {
 // snapshotLocked: kerangka dashboard periode itu; periode tanpa kerangka (di luar data contoh)
 // memakai kerangka kosong — angka diisi dari transaksi oleh ApplyKPIs, bukan dari periode lain.
 func (s *tenant) snapshotLocked(period string) finance.DashboardSnapshot {
-	if snap, ok := s.snapshots[period]; ok {
-		return snap
+	snap, ok := s.snapshots[period]
+	if !ok {
+		snap = finance.EmptySnapshot(period)
+		for _, x := range s.snapshots {
+			snap.Tenant = x.Tenant // nama usaha sama untuk semua periode
+			break
+		}
 	}
-	snap := finance.EmptySnapshot(period)
-	for _, x := range s.snapshots {
-		snap.Tenant = x.Tenant // nama usaha sama untuk semua periode
-		break
-	}
+	snap.TaxReport = s.pajakUMKMLocked(period) // dari pembukuan, bukan angka contoh
 	return snap
 }
 

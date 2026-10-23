@@ -99,6 +99,7 @@ type aturan struct {
 var aturanMutasi = []aturan{
 	// Keluar — penanda khas bank
 	{[]string{"pajak bunga", "pjk bunga", "pph bunga"}, "Pajak & Izin", "keluar", KeyakinanTinggi, "pajak atas bunga bank"},
+	{[]string{"411128 420", "pp 55", "pp55", "pp 23", "pp23"}, JenisSetorPPhFinal, "keluar", KeyakinanTinggi, "setoran PPh Final 0,5% (kode billing 411128)"},
 	{[]string{"biaya adm", "biaya admin", "adm", "administrasi", "biaya transfer", "biaya rtgs", "biaya sms", "biaya notifikasi", "materai", "biaya kartu", "biaya buku"}, "Biaya Lain", "keluar", KeyakinanTinggi, "biaya administrasi bank"},
 	{[]string{"pajak", "pph", "ppn", "djp", "e billing", "ebilling", "mpn", "bea", "retribusi", "perizinan", "izin", "oss"}, "Pajak & Izin", "keluar", KeyakinanTinggi, "pembayaran pajak atau perizinan"},
 	{[]string{"gaji", "payroll", "upah", "thr", "bonus karyawan", "bpjs"}, "Gaji & Upah", "keluar", KeyakinanTinggi, "pembayaran gaji atau tunjangan"},

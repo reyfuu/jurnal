@@ -406,6 +406,11 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                     {...angka(editing.input.nominal, (n) => set({ nominal: n }))}
                   />
                 </Field>
+                {(editing.input.jenis === 'Setor PPh Final' || editing.input.jenis === 'Setor PPN') && (
+                  <Field id="tx-masa" label="Masa pajak" hint="Bulan yang dibayar pajaknya. Kosong = bulan sebelum tanggal setor.">
+                    <Input id="tx-masa" type="month" max={editing.input.tanggal.slice(0, 7)} value={editing.input.masa_pajak ?? ''} onChange={(e) => set({ masa_pajak: e.target.value })} />
+                  </Field>
+                )}
                 <Field id="tx-ket" label="Keterangan">
                   <Input id="tx-ket" placeholder="Misal: rekap kasir, belanja susu" value={editing.input.keterangan} onChange={(e) => set({ keterangan: e.target.value })} />
                 </Field>
