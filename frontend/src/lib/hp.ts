@@ -52,3 +52,14 @@ export function labelSel(header: { teks: string; span: number }[], sel: number[]
     return label
   })
 }
+
+/**
+ * Sel tabel yang isinya hanya tombol (Ubah, Hapus, ikon …) = deret aksi di kartu HP. Tombol di
+ * tengah kalimat (mis. tautan saran) tidak membuat sel itu jadi sel aksi.
+ */
+export function selAksi(teksSel: string, teksTombol: string[]): boolean {
+  if (teksTombol.length === 0) return false
+  let sisa = teksSel
+  for (const t of teksTombol) if (t) sisa = sisa.replace(t, '')
+  return sisa.trim() === ''
+}

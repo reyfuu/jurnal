@@ -19,7 +19,8 @@ export function KepalaHP({ judul, cari, onCari, placeholderCari = 'Cari…', jum
   /** tombol ikon tambahan di kanan (mis. ekspor) */
   aksi?: ReactNode
 }) {
-  const [bukaCari, setBukaCari] = useState(!!cari)
+  const [bukaManual, setBukaCari] = useState(false)
+  const bukaCari = bukaManual || !!cari // ada kata kunci (mis. diisi dari luar) = kotak cari tetap tampil
   const tutupCari = () => { onCari?.(''); setBukaCari(false) }
   return (
     <div className="kepala-hp">

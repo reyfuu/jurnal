@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { kolomHeader, labelSel, useHP } from '@/lib/hp'
+import { kolomHeader, labelSel, selAksi, useHP } from '@/lib/hp'
 
 const KELAS = 'kartu-otomatis'
 
@@ -14,8 +14,16 @@ function labeli(tabel: HTMLTableElement) {
     for (const tr of body.rows) {
       const sel = [...tr.cells]
       const label = labelSel(header, sel.map((c) => c.colSpan || 1))
-      sel.forEach((c, i) => { if (c.dataset.label !== label[i]) c.dataset.label = label[i] })
-      tr.classList.toggle('kartu-judul-kelompok', sel.length === 1 && label[0] === '')
+      sel.forEach((c, i) => {
+        if (c.dataset.label !== label[i]) c.dataset.label = label[i]
+        // pilihan (Select / combobox) bukan tombol aksi
+        const tombol = [...c.querySelectorAll('button, a.btn, [role="button"]')].filter((b) => b.getAttribute('role') !== 'combobox')
+        c.classList.toggle('sel-aksi', i > 0 && selAksi(c.textContent ?? '', tombol.map((b) => b.textContent ?? '')))
+      })
+      // Baris satu sel selebar tabel: judul kelompok (section-head) atau pesan (mis. "Belum ada barang.")
+      const penuh = sel.length === 1 && label[0] === ''
+      tr.classList.toggle('kartu-judul-kelompok', penuh && sel[0].classList.contains('section-head'))
+      tr.classList.toggle('kartu-baris-pesan', penuh && !sel[0].classList.contains('section-head'))
     }
   }
   tabel.classList.add(KELAS)
