@@ -144,8 +144,10 @@ export default function App() {
   const masukUsaha = !!business && !!me && !me.views.includes('panel-master')
   useEffect(() => {
     if (!masukUsaha) return
-    const h = tulisRute(view, period)
-    if (window.location.hash !== h) history.replaceState(null, '', h)
+    // Sub-alamat & parameter milik halaman (mis. detail peraturan) dibiarkan; hanya halaman /
+    // periode yang berbeda ditulis ulang.
+    const r = bacaRute(window.location.hash)
+    if (r.view !== view || r.periode !== period) history.replaceState(null, '', tulisRute(view, period))
   }, [masukUsaha, view, period])
   useEffect(() => {
     const kembali = () => {

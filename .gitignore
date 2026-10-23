@@ -16,3 +16,5 @@ data/
 docs/peraturan/*/
 docs/peraturan/rekap_download.xlsx
 __pycache__/
+.installation-logs/
+.playwright-cli/

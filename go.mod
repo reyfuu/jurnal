@@ -7,6 +7,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
 	github.com/pdfcpu/pdfcpu v0.10.2
 	golang.org/x/image v0.26.0
+	golang.org/x/net v0.39.0
 )
 
 require (

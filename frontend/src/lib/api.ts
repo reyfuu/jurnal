@@ -1851,6 +1851,11 @@ export interface Peraturan {
   kategori: string[]
   kategori_label: string[]
   status?: string
+  tag?: string[]
+  perubahan?: string
+  status_pada?: string
+  diverifikasi_pada?: string
+  sumber_verifikasi?: string
   tahun?: number
   ditetapkan?: string
   diundangkan?: string
@@ -1870,13 +1875,20 @@ export interface Peraturan {
 
 export interface OpsiPrimbon { kode: string; label: string; jumlah: number }
 
+export interface FacetPrimbon { kategori: OpsiPrimbon[]; jenis: OpsiPrimbon[]; status: OpsiPrimbon[]; tahun_min: number; tahun_max: number }
+
 export interface HasilPrimbon {
   items: Peraturan[]
   total: number
   halaman: number
   total_halaman: number
-  facet: { kategori: OpsiPrimbon[]; jenis: OpsiPrimbon[]; status: OpsiPrimbon[]; tahun_min: number; tahun_max: number }
+  /** Jumlah tiap pilihan mengikuti filter aktif (grup itu sendiri tidak ikut menyaring). */
+  facet: FacetPrimbon
+  /** Jumlah seluruh katalog. */
+  facet_total: FacetPrimbon
 }
+
+export type UrutPrimbon = 'relevan' | 'terbaru' | 'terlama' | 'abjad'
 
 export interface FilterPrimbon {
   q: string
@@ -1885,11 +1897,15 @@ export interface FilterPrimbon {
   status: string[]
   dari: string
   sampai: string
-  urut: 'terbaru' | 'terlama' | 'abjad'
+  /** '' = otomatis: paling relevan bila ada kata kunci, selain itu terbaru. */
+  urut: UrutPrimbon | ''
   hal: number
 }
 
-export const FILTER_PRIMBON_AWAL: FilterPrimbon = { q: '', kategori: [], jenis: [], status: [], dari: '', sampai: '', urut: 'terbaru', hal: 1 }
+export const FILTER_PRIMBON_AWAL: FilterPrimbon = { q: '', kategori: [], jenis: [], status: [], dari: '', sampai: '', urut: '', hal: 1 }
+
+/** Urutan yang benar-benar dipakai (urut kosong = otomatis). */
+export const urutPrimbon = (f: FilterPrimbon): UrutPrimbon => f.urut || (f.q.trim() ? 'relevan' : 'terbaru')
 
 export function cariPrimbon(f: FilterPrimbon) {
   const p = new URLSearchParams()
@@ -1897,7 +1913,7 @@ export function cariPrimbon(f: FilterPrimbon) {
   for (const k of ['kategori', 'jenis', 'status'] as const) f[k].forEach((v) => p.append(k, v))
   if (f.dari) p.set('dari', f.dari)
   if (f.sampai) p.set('sampai', f.sampai)
-  if (f.urut !== 'terbaru') p.set('urut', f.urut)
+  if (urutPrimbon(f) !== 'terbaru') p.set('urut', urutPrimbon(f))
   if (f.hal > 1) p.set('hal', String(f.hal))
   return api<HasilPrimbon>('/primbon/peraturan?' + p)
 }

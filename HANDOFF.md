@@ -960,6 +960,8 @@ sumbu grafik Dashboard masih skala tetap (6 jt / 100 jt) — tidak menyesuaikan 
 
 ## Langkah Berikutnya (Pengembangan Lanjutan)
 
+Tag Primbon (23 Oktober 2026, lokal): kartu dan detail menampilkan tag, status, perubahan, tanggal berlaku dan tanggal acuan. Overlay opsional `metadata.json` berdasarkan UUID memperbarui katalog tanpa menyalin naskah VPS; metadata rusak mempertahankan snapshot terakhir. Tag juga masuk pencarian RAG setelah worker dijalankan ulang. Panduan operator: [docs/PRIMBON-METADATA.md](docs/PRIMBON-METADATA.md). Belum deploy VPS; uji visual browser tertunda karena Chrome yang berjalan tidak menyediakan koneksi debug.
+
 
 0. **Prioritas**: CoA jasa & manufaktur (menunggu file tim) → stok opname / kartu stok (persediaan akhir & HPP perpetual) → Fase D (role Client + upload terkompres) → Fase E (XML Coretax) → multi-tenant (database). Sign-up publik dan multi-tenant cukup memakai ulang `OnboardingWizard` setelah register.
 1. Melengkapi fitur cetak / ekspor laporan ke format PDF dan Excel (.xlsx) langsung dari UI.
@@ -975,6 +977,17 @@ sumbu grafik Dashboard masih skala tetap (6 jt / 100 jt) — tidak menyesuaikan 
    Pengetahuan (pakai slot OCR poin 5), dan AI chat klien yang ikut merujuk Basis Pengetahuan.
 3. ~~Migrasi persistensi PostgreSQL~~ selesai 20 Okt 2026 (lihat "Penyimpanan PostgreSQL"). Berikutnya: hapus jalur JSON setelah produksi stabil.
 4. Refresh token sesi & CSP.
+
+## Infrastruktur RAG regulasi — 23 Oktober 2026 (lokal, belum deploy)
+
+- `internal/rag`: tabel `rag_document`/`rag_chunk`, indeks GIN, fingerprint isi+metadata, potongan per halaman, impor atomik dan retry dokumen hilang/error/perlu OCR. Corpus tidak dimuat ke state tenant atau dibaca ulang setiap pertanyaan.
+- `cmd/rag` + `Dockerfile.rag`: dry-run bawaan; `--apply` untuk impor. Worker sekuensial, source mount read-only, kompresi ke folder terpisah. Memakai PDF reader/pdfcpu yang sudah ada, bukan dependency CLI baru. PDF asli utuh; turunan hanya disimpan jika lebih kecil dan validasi halaman/teks lulus. Scan tetap dikompresi walau indeksnya `needs_ocr`.
+- API `/api/v1/primbon/rag/{status,cari,tanya}` mengikuti role/langganan Primbon. Pertanyaan dijawab lewat konfigurasi LLM yang sudah ada, hanya bila ada sumber; referensi model disaring ke potongan yang dikirim. Tanpa LLM, kutipan tetap tersedia. Metadata berlaku bukan validasi hukum terkini.
+- `savePengetahuanDB` kini menyimpan delta per baris, tidak lagi menghapus/menulis ulang seluruh tabel artikel+sumber. Tes PostgreSQL memeriksa row tuple sumber yang tidak berubah tetap sama.
+- Validasi: seluruh `TestPostgres*` lulus pada PostgreSQL 17 portabel disposable; tes RAG termasuk rollback, impor ulang, halaman, kompresi dan akses lulus. Build Linux amd64 server+worker lulus. Suite Go lain lulus dengan pengecualian tepat dua tes lama yang mengandalkan chmod Unix (`TestStateSurvivesRestart`, `TestSimpanGagalBukanSukses`); kegagalan sama direproduksi pada HEAD sebelum perubahan di Windows.
+- Dry-run index.csv: 1.512 missing, 0 failed, tanpa menulis DB/PDF. Naskah ada sebagian di VPS dan akan dilengkapi pengguna. Belum mengakses atau deploy ke VPS, belum menguji Docker image, belum mengukur mutu/latensi/rasio kompresi koleksi nyata.
+- Berikutnya: ikuti [docs/RAG.md](docs/RAG.md), uji sampel 20 dokumen di VPS sebelum impor lengkap. Embedding/pgvector, OCR otomatis, pemakaian PDF turunan di viewer, dan penghubung bubble AI belum diaktifkan; butuh keputusan model/biaya dan review sampel.
+- Harness2: tidak ada aturan global baru; pelajaran lingkungan Windows dan batas resource worker dicatat dalam runbook. Review menemukan early-return OCR yang melewati kompresi; sudah direproduksi, diperbaiki, dan dikonfirmasi reviewer.
 
 
 

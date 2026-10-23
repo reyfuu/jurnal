@@ -1224,7 +1224,8 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   .seg-btn:hover {
     color: var(--text-primary);
   }
-  .seg-btn[aria-selected='true'] {
+  .seg-btn[aria-selected='true'],
+  .seg-btn[aria-pressed='true'] {
     background: var(--primary);
     color: var(--primary-foreground);
   }
