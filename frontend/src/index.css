@@ -1189,7 +1189,7 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     }
     .kartu-otomatis td:empty { display: none; }
     /* sel berisi tombol aksi: satu deret tombol kecil di bawah kartu */
-    .kartu-otomatis td:not(:first-child):has(button, a.btn, [role='button']) {
+    .kartu-otomatis td.sel-aksi {
       grid-column: 1 / -1;
       flex-direction: row;
       justify-content: flex-end;
@@ -1198,7 +1198,10 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
       padding-top: 8px !important;
       border-top: 1px dashed var(--border-subtle) !important;
     }
-    .kartu-otomatis td:not(:first-child):has(button, a.btn, [role='button'])::before { content: none; }
+    .kartu-otomatis td.sel-aksi::before { content: none; }
+    /* baris pesan selebar tabel (mis. "Belum ada barang."): teks biasa, bukan judul kelompok */
+    .kartu-otomatis tr.kartu-baris-pesan { display: block; background: none; border: 1px dashed var(--border-subtle); }
+    .kartu-otomatis tr.kartu-baris-pesan td { font-size: 13px; font-weight: 400; color: var(--text-muted); text-align: center !important; align-items: center; }
     .kartu-otomatis tr.kartu-judul-kelompok {
       background: none;
       border: 0;
@@ -1213,8 +1216,8 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
       color: var(--text-muted);
     }
     /* bingkai kartu pembungkus tabel tidak perlu lagi: kartunya sudah per baris */
-    .card:has(> .table-scroll > .kartu-otomatis),
-    .card:has(> .kartu-otomatis) {
+    .card:has(> .table-scroll > .kartu-otomatis):not(:has(> :not(.table-scroll))),
+    .card:has(> .kartu-otomatis):not(:has(> :not(.kartu-otomatis))) {
       background: transparent;
       border: 0;
       box-shadow: none;

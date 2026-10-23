@@ -27,8 +27,12 @@ export function useLaci() {
   }
 
   useEffect(() => {
+    // Mendarat di entri laci yang sudah tidak terbuka (reload saat laci terbuka, atau Forward):
+    // lewati entri itu supaya Back berikutnya tidak tampak diam.
+    const lewatiEntriLaci = () => { if (!lewatRiwayat.current && (history.state as { laci?: boolean } | null)?.laci) history.back() }
+    lewatiEntriLaci()
     const kembali = () => {
-      if (!lewatRiwayat.current) return
+      if (!lewatRiwayat.current) return lewatiEntriLaci()
       lewatRiwayat.current = false
       setBukaState(false)
     }

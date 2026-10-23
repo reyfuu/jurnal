@@ -1,7 +1,13 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { KUERI_HP } from '@/lib/hp'
 
-/** Panel yang muncul dari bawah layar (HP): pilihan aksi atau filter. Ketuk latar / Escape menutup. */
+const FOKUS = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Panel yang muncul dari bawah layar (HP): pilihan aksi atau filter. Ketuk latar / Escape menutup;
+ * Tab berputar di dalam panel; layar yang melebar (HP diputar) juga menutup panel.
+ */
 export function LembarBawah({ buka, judul, onTutup, children }: { buka: boolean; judul: ReactNode; onTutup: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null)
   // onTutup lewat ref: pemanggil mengirim fungsi baru tiap render, dan effect di bawah tidak boleh
@@ -11,14 +17,27 @@ export function LembarBawah({ buka, judul, onTutup, children }: { buka: boolean;
   useEffect(() => {
     if (!buka) return
     const kembaliKe = document.activeElement as HTMLElement | null
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup.current() }
-    window.addEventListener('keydown', esc)
+    const tombol = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return tutup.current()
+      if (e.key !== 'Tab' || !panel.current) return
+      const bisa = [...panel.current.querySelectorAll<HTMLElement>(FOKUS)]
+      if (bisa.length === 0) { e.preventDefault(); return }
+      const [awal, akhir] = [bisa[0], bisa[bisa.length - 1]]
+      const di = document.activeElement
+      if (e.shiftKey && (di === awal || di === panel.current)) { e.preventDefault(); akhir.focus() }
+      else if (!e.shiftKey && (di === akhir || !panel.current.contains(di))) { e.preventDefault(); awal.focus() }
+    }
+    window.addEventListener('keydown', tombol)
+    const mq = window.matchMedia?.(KUERI_HP)
+    const lebar = () => { if (mq && !mq.matches) tutup.current() }
+    mq?.addEventListener('change', lebar)
     const lama = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.body.classList.add('lembar-terbuka')
     panel.current?.focus()
     return () => {
-      window.removeEventListener('keydown', esc)
+      window.removeEventListener('keydown', tombol)
+      mq?.removeEventListener('change', lebar)
       document.body.style.overflow = lama
       document.body.classList.remove('lembar-terbuka')
       if (kembaliKe?.isConnected) kembaliKe.focus() // fokus kembali ke tombol pembuka (⋯ / filter)

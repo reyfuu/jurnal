@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { kolomHeader, labelSel } from './hp'
+import { kolomHeader, labelSel, selAksi } from './hp'
+
+describe('selAksi', () => {
+  it('isi hanya tombol = sel aksi', () => expect(selAksi(' Ubah  Hapus ', ['Ubah', 'Hapus'])).toBe(true))
+  it('tombol ikon tanpa teks = sel aksi', () => expect(selAksi('', [''])).toBe(true))
+  it('tombol di tengah kalimat bukan sel aksi', () => expect(selAksi('Ini aset tetap: daftarkan di langkah 1 (daftar aset) supaya', ['langkah 1 (daftar aset)'])).toBe(false))
+  it('tanpa tombol bukan sel aksi', () => expect(selAksi('Rp1.000', [])).toBe(false))
+})
 
 // Header Mutasi stok (KartuStok): dua baris, rowSpan & colSpan.
 const MUTASI = [
