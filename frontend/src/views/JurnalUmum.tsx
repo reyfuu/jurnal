@@ -6,6 +6,9 @@ import { getJurnalUmum, jurnalUmumXlsxUrl, type FilterJurnalUmum, type JurnalUmu
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { FilterRentangAkun } from '@/components/hp/FilterRentangAkun'
 
 const PER_HALAMAN = 300
 
@@ -34,9 +37,58 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
     return () => { hidup = false }
   }, [f])
   const ubah = (patch: Partial<FilterJurnalUmum>) => setF((x) => ({ ...x, ...patch }))
+  const hp = useHP()
+  const [bukaFilter, setBukaFilter] = useState(false)
 
   if (!data) return error ? <p className="pill-status pill-red" role="alert">{error}</p> : <p className="workspace-subtitle">Memuat jurnal umum…</p>
   const tampil = data.entri.slice(0, batas)
+  const lebihBanyak = data.entri.length > tampil.length && (
+    <div style={{ marginTop: 10 }}>
+      <Button variant="outline" size="sm" onClick={() => setBatas((b) => b + PER_HALAMAN)}>
+        Tampilkan {Math.min(PER_HALAMAN, data.entri.length - tampil.length)} bukti lagi (dari {data.entri.length - tampil.length} tersisa)
+      </Button>
+    </div>
+  )
+
+  if (hp && data.supported) {
+    // HP: satu kartu per bukti; filter di lembar bawah, cari lewat ikon di kepala halaman.
+    const bulanIni = rentangBulan(period)
+    const rentangLain = f.dari !== bulanIni.dari || f.sampai !== bulanIni.sampai
+    const akun = data.pilihan.find((a) => a.kode === f.akun)
+    return (
+      <>
+        <KepalaHP judul="Jurnal Umum" cari={ketik} onCari={setKetik} placeholderCari="Keterangan, no. bukti, akun"
+          jumlahFilter={(rentangLain ? 1 : 0) + (f.akun ? 1 : 0)} onFilter={() => setBukaFilter(true)}
+          aksi={bisaEkspor && <button type="button" className="kepala-hp-ikon" aria-label="Ekspor Excel" onClick={() => void ekspor(jurnalUmumXlsxUrl(f))}><FileSpreadsheet size={16} aria-hidden="true" /></button>}
+          chips={[
+            ...(rentangLain ? [{ label: data.period_label, onHapus: () => ubah(bulanIni) }] : []),
+            ...(akun ? [{ label: `${akun.kode} ${akun.nama}`, onHapus: () => ubah({ akun: undefined }) }] : []),
+          ]} />
+        <div className="hp-ringkas tabular">
+          <span>{data.period_label} · {data.entri.length} bukti</span>
+          <span className={'pill-status ' + (data.seimbang ? 'pill-green' : 'pill-red')}>{data.seimbang ? 'Seimbang' : 'Debit ≠ Kredit'}</span>
+          <span>Debit {formatRp(data.total_debit)} · Kredit {formatRp(data.total_kredit)}</span>
+        </div>
+        {error && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10 }}>{error}</p>}
+        {tampil.length === 0 && <p className="text-sm text-muted-foreground">{f.akun || f.q ? 'Tidak ada bukti jurnal yang cocok.' : `Belum ada jurnal di ${data.period_label}.`}</p>}
+        <div>{tampil.map((e) => (
+          <div className="kartu-hp tabular" key={`${e.bukti}|${e.tx_id ?? ''}|${e.tanggal}|${e.keterangan}`}>
+            <div className="kartu-hp-judul"><span>{e.bukti}</span><span className="text-xs text-muted-foreground" style={{ fontWeight: 400 }}>{formatTanggal(e.tanggal)}</span></div>
+            <div className="kartu-hp-sub" style={{ marginBottom: 6 }}>{e.keterangan}</div>
+            {e.baris.map((b, i) => (
+              // akun kredit menjorok, sesuai kebiasaan penulisan jurnal
+              <div key={i} className={'jurnal-hp-baris' + (b.kredit ? ' kredit' : '')}>
+                <span>{b.kode} {b.nama}</span><span>{formatRp(b.debit || b.kredit)}</span>
+              </div>
+            ))}
+          </div>
+        ))}</div>
+        {lebihBanyak}
+        <FilterRentangAkun buka={bukaFilter} onTutup={() => setBukaFilter(false)} nilai={f} period={period} pilihan={data.pilihan}
+          onTerapkan={(n) => ubah({ dari: n.dari, sampai: n.sampai, akun: n.akun })} />
+      </>
+    )
+  }
 
   return (
     <>
@@ -132,15 +184,9 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
               </table>
             </div>
           </div>
-          {data.entri.length > tampil.length && (
-            <div style={{ marginTop: 10 }}>
-              <Button variant="outline" size="sm" onClick={() => setBatas((b) => b + PER_HALAMAN)}>
-                Tampilkan {Math.min(PER_HALAMAN, data.entri.length - tampil.length)} bukti lagi (dari {data.entri.length - tampil.length} tersisa)
-              </Button>
-            </div>
-          )}
+          {lebihBanyak}
           <p className="text-xs text-muted-foreground" style={{ marginTop: 10 }}>
-            No. bukti: SA = saldo awal pembukuan, TRX = transaksi, BYR = pelunasan transaksi bulan sebelumnya, JU = entri otomatis (penyusutan, penyesuaian persediaan, pelunasan saldo awal).
+            No. bukti: SA = saldo awal pembukuan, JU = transaksi, BYR = pelunasan transaksi bulan sebelumnya, SIS = entri otomatis sistem (penyusutan, penyesuaian persediaan, tutup buku).
             Ubah jurnal lewat transaksinya di menu Transaksi, atau ajukan koreksi akun.
           </p>
         </>

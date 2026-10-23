@@ -1,0 +1,63 @@
+<style>
+  .phones { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 290px; height: 600px; border: 10px solid #111; border-radius: 34px; overflow: hidden; position: relative; background: #f3f5f9; font-family: system-ui, sans-serif; color: #1b2340; box-shadow: 0 10px 30px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+  .bar { background: #222c5c; color: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex: none; }
+  .logo { font-weight: 800; font-size: 14px; } .logo b { color: #f6c445; }
+  .burger { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+  .per { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.14); padding: 5px 9px; border-radius: 999px; }
+  .hrow { display: flex; align-items: center; gap: 6px; padding: 10px 10px 6px 14px; flex: none; }
+  .hrow .h { font-weight: 800; font-size: 18px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ib { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #d6dbe8; background: #fff; display: grid; place-items: center; font-size: 13px; position: relative; flex: none; }
+  .ib i { position: absolute; top: -5px; right: -5px; font-style: normal; background: #222c5c; color: #fff; border-radius: 999px; font-size: 9px; min-width: 15px; height: 15px; display: grid; place-items: center; }
+  .sfield { flex: 1; display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #222c5c; border-radius: 9px; padding: 0 8px; height: 32px; font-size: 12px; }
+  .sfield span { flex: 1; } .sfield b { color: #667; font-weight: 400; }
+  .chips { display: flex; gap: 6px; padding: 0 10px 8px; flex: none; overflow: hidden; }
+  .chip { font-size: 11px; background: #e6e9f4; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .list { overflow: auto; flex: 1; padding: 0 10px 10px; }
+  .acc { background: #fff; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .t { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .g { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 7px; color: #556; font-size: 11px; }
+  .g b { color: #1b2340; float: right; }
+  .pill { background: #fde4e4; color: #c62828; font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+  .neg { color: #c62828 !important; }
+  .cap { text-align: center; font-size: 12px; color: #667; margin-top: 8px; max-width: 290px; }
+</style>
+
+<h2>Search jadi ikon kecil di samping judul</h2>
+<p class="subtitle">Tidak ada lagi baris khusus untuk kotak search: judul, 🔍, dan Filter berbagi satu baris. Kotak search baru muncul saat ikon diketuk.</p>
+
+<div class="phones" style="margin-top: 14px">
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="hrow"><div class="h">Buku Besar</div><div class="ib">🔍</div><div class="ib">⚙<i>2</i></div></div>
+      <div class="chips"><span class="chip">1–31 Agu ✕</span><span class="chip">Kas Besar ✕</span></div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>1102 Kas Besar</span><span class="pill">saldo minus</span></div>
+          <div class="g"><span>Saldo awal <b class="neg">(57.200.000)</b></span><span>Debit <b>41.000.000</b></span><span>Kredit <b>59.400.000</b></span><span>Saldo akhir <b class="neg">(75.600.000)</b></span></div></div>
+        <div class="acc"><div class="t"><span>1114 Saldo Marketplace</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>212.700.000</b></span><span>Debit <b>40.000.000</b></span><span>Kredit <b>4.600.000</b></span><span>Saldo akhir <b>248.100.000</b></span></div></div>
+        <div class="acc"><div class="t"><span>1201 Piutang Usaha</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>44.500.000</b></span><span>Debit <b>11.000.000</b></span><span>Kredit <b>–</b></span><span>Saldo akhir <b>55.500.000</b></span></div></div>
+        <div class="acc"><div class="t"><span>1503 Mesin &amp; Peralatan</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>192.000.000</b></span><span>Debit <b>–</b></span><span>Kredit <b>–</b></span><span>Saldo akhir <b>192.000.000</b></span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Biasa</b> — 🔍 dan ⚙ Filter kecil sejajar judul; angka di ⚙ = jumlah filter aktif</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="hrow"><div class="sfield">🔍 <span>kas<b>|</b></span>✕</div><div class="ib">⚙<i>2</i></div></div>
+      <div class="chips"><span class="chip">1–31 Agu ✕</span><span class="chip">Kas Besar ✕</span></div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>1102 Kas Besar</span><span class="pill">saldo minus</span></div>
+          <div class="g"><span>Saldo awal <b class="neg">(57.200.000)</b></span><span>Debit <b>41.000.000</b></span><span>Kredit <b>59.400.000</b></span><span>Saldo akhir <b class="neg">(75.600.000)</b></span></div></div>
+        <div class="acc"><div class="t"><span>1101 Kas Kecil</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>0</b></span><span>Debit <b>–</b></span><span>Kredit <b>–</b></span><span>Saldo akhir <b>0</b></span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>🔍 diketuk</b> — kotak search menggantikan judul di baris yang sama; ✕ menutup dan mengosongkan pencarian</div>
+  </div>
+</div>

@@ -1,0 +1,104 @@
+<style>
+  .phones { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 300px; height: 600px; border: 10px solid #111; border-radius: 34px; overflow: hidden; position: relative; background: #f3f5f9; font-family: system-ui, sans-serif; color: #1b2340; box-shadow: 0 10px 30px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+  .bar { background: #222c5c; color: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex: none; }
+  .logo { font-weight: 800; font-size: 15px; } .logo b { color: #f6c445; }
+  .burger { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+  .per { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.14); padding: 5px 9px; border-radius: 999px; }
+  .h { font-weight: 800; font-size: 19px; padding: 12px 14px 6px; flex: none; }
+  .hint { font-size: 11px; color: #667; padding: 0 14px 8px; flex: none; }
+  /* A: tabel geser */
+  .tw { margin: 0 10px 10px; background: #fff; border-radius: 12px; overflow: auto; flex: 1; position: relative; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+  .tw table { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 560px; }
+  .tw th, .tw td { padding: 9px 10px; white-space: nowrap; border-bottom: 1px solid #eef0f5; text-align: right; background: #fff; }
+  .tw th { position: sticky; top: 0; z-index: 2; font-size: 10px; letter-spacing: .06em; color: #667; background: #f7f8fb; }
+  .tw .c1 { position: sticky; left: 0; z-index: 1; text-align: left; box-shadow: 6px 0 8px -6px rgba(0,0,0,.25); }
+  .tw th.c1 { z-index: 3; }
+  .tw .neg { color: #c62828; }
+  .tw .grp td { background: #f2f4f9; font-size: 10px; letter-spacing: .06em; color: #667; text-align: left; }
+  .swipe { position: absolute; right: 14px; bottom: 90px; background: #222c5c; color: #fff; font-size: 11px; padding: 6px 10px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+  /* B: kartu */
+  .list { overflow: auto; flex: 1; padding: 0 10px 10px; }
+  .acc { background: #fff; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .acc .t { display: flex; justify-content: space-between; font-weight: 700; }
+  .acc .g { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 7px; color: #556; font-size: 11px; }
+  .acc .g b { color: #1b2340; float: right; }
+  .pill { background: #fde4e4; color: #c62828; font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; }
+  .cap { text-align: center; font-size: 12px; color: #667; margin-top: 8px; max-width: 300px; }
+</style>
+
+<h2>Tabel angka di HP: digeser, atau diubah jadi kartu?</h2>
+<p class="subtitle">Contoh: Buku Besar. Sekarang kolom angka (saldo awal, debit, kredit, saldo akhir) terpotong di kanan dan susah digeser. Coba geser tabel di pilihan A dengan mouse/trackpad.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tabel tetap, digeser dengan mulus</h3>
+      <p>Tabel bisa digeser kanan-kiri dan atas-bawah di dalam kotaknya. Kolom kode &amp; nama akun <b>menempel di kiri</b>, judul kolom <b>menempel di atas</b>, jadi waktu digeser Anda tidak kehilangan "ini baris apa / kolom apa". Ada petunjuk "geser →" yang hilang setelah digeser sekali.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tiap baris jadi kartu</h3>
+      <p>Di HP, setiap akun tampil sebagai kartu: nama di atas, empat angka di bawahnya. Tidak perlu geser ke samping sama sekali, cukup gulir ke bawah. Ketuk kartu untuk membuka rincian mutasi. Di laptop tetap tabel.</p>
+    </div>
+  </div>
+</div>
+
+<div class="phones" style="margin-top: 22px">
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="h">Buku Besar</div>
+      <div class="hint">Geser tabel ke kanan untuk melihat angka</div>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="c1">AKUN</th><th>SALDO AWAL</th><th>DEBIT</th><th>KREDIT</th><th>SALDO AKHIR</th></tr></thead>
+          <tbody>
+            <tr class="grp"><td class="c1" colspan="5">ASET LANCAR</td></tr>
+            <tr><td class="c1">1102 Kas Besar <span class="pill">minus</span></td><td class="neg">(57.200.000)</td><td>41.000.000</td><td>59.400.000</td><td class="neg">(75.600.000)</td></tr>
+            <tr><td class="c1">1114 Saldo Marketplace</td><td>212.700.000</td><td>40.000.000</td><td>4.600.000</td><td>248.100.000</td></tr>
+            <tr><td class="c1">1201 Piutang Usaha</td><td>44.500.000</td><td>11.000.000</td><td>–</td><td>55.500.000</td></tr>
+            <tr><td class="c1">1301 Persediaan</td><td>8.250.000</td><td>–</td><td>–</td><td>8.250.000</td></tr>
+            <tr class="grp"><td class="c1" colspan="5">ASET TIDAK LANCAR</td></tr>
+            <tr><td class="c1">1502 Bangunan Pabrik</td><td>36.000.000</td><td>–</td><td>–</td><td>36.000.000</td></tr>
+            <tr><td class="c1">1503 Mesin &amp; Peralatan</td><td>192.000.000</td><td>–</td><td>–</td><td>192.000.000</td></tr>
+            <tr><td class="c1">1551 Akum. Peny. Bangunan</td><td>1.800.000</td><td>–</td><td>300.000</td><td>2.100.000</td></tr>
+            <tr><td class="c1">1552 Akum. Peny. Mesin</td><td>23.625.000</td><td>–</td><td>4.000.000</td><td>27.625.000</td></tr>
+            <tr class="grp"><td class="c1" colspan="5">PENDAPATAN</td></tr>
+            <tr><td class="c1">4101 Penjualan Produk</td><td>0</td><td>–</td><td>92.000.000</td><td>92.000.000</td></tr>
+            <tr class="grp"><td class="c1" colspan="5">BEBAN</td></tr>
+            <tr><td class="c1">6101 Beban Gaji</td><td>0</td><td>12.500.000</td><td>–</td><td>12.500.000</td></tr>
+            <tr><td class="c1">6104 Beban Sewa</td><td>0</td><td>8.000.000</td><td>–</td><td>8.000.000</td></tr>
+            <tr><td class="c1">6105 Listrik &amp; Internet</td><td>0</td><td>15.900.000</td><td>–</td><td>15.900.000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="swipe">geser →</div>
+    </div>
+    <div class="cap"><b>A</b> — kolom akun &amp; judul kolom menempel; isi tabel digeser</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="h">Buku Besar</div>
+      <div class="hint">Ketuk akun untuk melihat rincian mutasi</div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>1102 Kas Besar</span><span class="pill">saldo minus</span></div>
+          <div class="g"><span>Saldo awal <b style="color:#c62828">(57.200.000)</b></span><span>Debit <b>41.000.000</b></span><span>Kredit <b>59.400.000</b></span><span>Saldo akhir <b style="color:#c62828">(75.600.000)</b></span></div></div>
+        <div class="acc"><div class="t"><span>1114 Saldo Marketplace</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>212.700.000</b></span><span>Debit <b>40.000.000</b></span><span>Kredit <b>4.600.000</b></span><span>Saldo akhir <b>248.100.000</b></span></div></div>
+        <div class="acc"><div class="t"><span>1201 Piutang Usaha</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>44.500.000</b></span><span>Debit <b>11.000.000</b></span><span>Kredit <b>–</b></span><span>Saldo akhir <b>55.500.000</b></span></div></div>
+        <div class="acc"><div class="t"><span>1503 Mesin &amp; Peralatan</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>192.000.000</b></span><span>Debit <b>–</b></span><span>Kredit <b>–</b></span><span>Saldo akhir <b>192.000.000</b></span></div></div>
+        <div class="acc"><div class="t"><span>4101 Penjualan Produk</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>0</b></span><span>Debit <b>–</b></span><span>Kredit <b>92.000.000</b></span><span>Saldo akhir <b>92.000.000</b></span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>B</b> — tidak ada geser samping; angka lebih kecil, lebih panjang ke bawah</div>
+  </div>
+</div>

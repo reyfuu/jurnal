@@ -6,6 +6,9 @@ import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { FileSpreadsheet, Info, Landmark, Pencil, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/PageHeader'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { LembarBawah } from '@/components/hp/LembarBawah'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CatatJurnal } from '@/views/CatatJurnal'
@@ -55,6 +58,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     return { bulan: bulanAwal(tersimpan, bulanIni), jenis: '', cari: '', arah: '', channel: '' }
   })
   const [limit, setLimit] = useState(PAGE)
+  const hp = useHP()
+  const [bukaFilter, setBukaFilter] = useState(false)
   const [editing, setEditing] = useState<Editing>(null)
   // Catat baru & catatan jurnal multi-akun dibuka di halaman penuh (CatatJurnal), bukan dialog.
   const [halaman, setHalaman] = useState<{ jenis: string; grup?: number } | null>(() =>
@@ -181,9 +186,61 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     )
   }
 
+  const pilihanFilter = (
+    <>
+      <Select value={filter.bulan || ALL} onValueChange={(v) => setF({ bulan: v === ALL ? '' : v })}>
+        <SelectTrigger className="tx-filter" aria-label="Filter bulan"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Semua bulan</SelectItem>
+          {months.map((m) => <SelectItem key={m} value={m}>{labelBulan(m)}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select value={filter.arah || ALL} onValueChange={(v) => setF({ arah: v === ALL ? '' : v })}>
+        <SelectTrigger className="tx-filter" aria-label="Filter arah"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Semua arah</SelectItem>
+          <SelectItem value="masuk">Pemasukan (Masuk)</SelectItem>
+          <SelectItem value="keluar">Pengeluaran (Keluar)</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={filter.channel || ALL} onValueChange={(v) => setF({ channel: v === ALL ? '' : v })}>
+        <SelectTrigger className="tx-filter" aria-label="Filter channel"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Semua channel</SelectItem>
+          {channels.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select value={filter.jenis || ALL} onValueChange={(v) => setF({ jenis: v === ALL ? '' : v })}>
+        <SelectTrigger className="tx-filter" aria-label="Filter jenis"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Semua jenis</SelectItem>
+          {jenis.map((j) => <SelectItem key={j.nama} value={j.nama}>{j.nama}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </>
+  )
+  // HP: filter selain kata kunci yang sedang aktif, sebagai label yang bisa dihapus.
+  const chipFilter = [
+    ...(filter.bulan !== bulanIni ? [{ label: filter.bulan ? labelBulan(filter.bulan) : 'Semua bulan', onHapus: () => setF({ bulan: bulanIni }) }] : []),
+    ...(filter.arah ? [{ label: filter.arah === 'masuk' ? 'Pemasukan' : 'Pengeluaran', onHapus: () => setF({ arah: '' }) }] : []),
+    ...(filter.channel ? [{ label: filter.channel, onHapus: () => setF({ channel: '' }) }] : []),
+    ...(filter.jenis ? [{ label: filter.jenis, onHapus: () => setF({ jenis: '' }) }] : []),
+  ]
+
   return (
     <>
-      <PageHeader title="Transaksi" subtitle="Catat, ubah, dan cari transaksi" />
+      {hp
+        ? <KepalaHP judul="Transaksi" cari={filter.cari} onCari={(q) => setF({ cari: q })} placeholderCari="Cari keterangan, produk, pelanggan"
+            jumlahFilter={chipFilter.length} onFilter={() => setBukaFilter(true)} chips={chipFilter} />
+        : <PageHeader title="Transaksi" subtitle="Catat, ubah, dan cari transaksi" />}
+      {hp && (
+        <LembarBawah buka={bukaFilter} judul="Filter" onTutup={() => setBukaFilter(false)}>
+          <div className="grid gap-2" style={{ paddingTop: 4 }}>
+            {pilihanFilter}
+            <Button style={{ marginTop: 6 }} onClick={() => setBukaFilter(false)}>Selesai</Button>
+          </div>
+        </LembarBawah>
+      )}
 
       {terkirim && <div className="pill-status pill-green" role="status" style={{ alignSelf: 'flex-start' }}>{terkirim}</div>}
       <div className="tx-toolbar">
@@ -204,44 +261,18 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
         )}
       </div>
       {/* Baris kedua: cari & filter, supaya tombol aksi tidak berdesakan dengan filter. */}
-      <div className="card filter-bar">
-        <Input
-          className="tx-search"
-          aria-label="Cari transaksi"
-          placeholder="Cari keterangan, produk, pelanggan"
-          value={filter.cari}
-          onChange={(e) => setF({ cari: e.target.value })}
-        />
-        <Select value={filter.bulan || ALL} onValueChange={(v) => setF({ bulan: v === ALL ? '' : v })}>
-          <SelectTrigger className="tx-filter" aria-label="Filter bulan"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Semua bulan</SelectItem>
-            {months.map((m) => <SelectItem key={m} value={m}>{labelBulan(m)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filter.arah || ALL} onValueChange={(v) => setF({ arah: v === ALL ? '' : v })}>
-          <SelectTrigger className="tx-filter" aria-label="Filter arah"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Semua arah</SelectItem>
-            <SelectItem value="masuk">Pemasukan (Masuk)</SelectItem>
-            <SelectItem value="keluar">Pengeluaran (Keluar)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filter.channel || ALL} onValueChange={(v) => setF({ channel: v === ALL ? '' : v })}>
-          <SelectTrigger className="tx-filter" aria-label="Filter channel"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Semua channel</SelectItem>
-            {channels.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filter.jenis || ALL} onValueChange={(v) => setF({ jenis: v === ALL ? '' : v })}>
-          <SelectTrigger className="tx-filter" aria-label="Filter jenis"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Semua jenis</SelectItem>
-            {jenis.map((j) => <SelectItem key={j.nama} value={j.nama}>{j.nama}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+      {!hp && (
+        <div className="card filter-bar">
+          <Input
+            className="tx-search"
+            aria-label="Cari transaksi"
+            placeholder="Cari keterangan, produk, pelanggan"
+            value={filter.cari}
+            onChange={(e) => setF({ cari: e.target.value })}
+          />
+          {pilihanFilter}
+        </div>
+      )}
       <p className="workspace-subtitle" style={{ margin: '-4px 0 0' }}>
         {filter.bulan ? `Menampilkan ${labelBulan(filter.bulan)}` : 'Menampilkan semua bulan'}
         {onJurnalUmum && <> · <button type="button" className="underline underline-offset-4" onClick={onJurnalUmum}>Lihat semua di Jurnal Umum</button></>}

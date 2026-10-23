@@ -6,6 +6,9 @@ import { bukuBesarXlsxUrl, getBukuBesar, type AkunBukuBesar, type BukuBesar as D
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { FilterRentangAkun } from '@/components/hp/FilterRentangAkun'
 
 const RED = 'var(--text-danger)'
 
@@ -21,6 +24,8 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
   const [cari, setCari] = useState('')
   const [semua, setSemua] = useState(false)
   const [buka, setBuka] = useState<Set<string>>(new Set())
+  const hp = useHP()
+  const [bukaFilter, setBukaFilter] = useState(false)
 
   // Ganti periode laporan di atas = rentang ikut ke bulan itu (akun yang dipilih tetap).
   useEffect(() => { setF((x) => ({ ...x, ...rentangBulan(period) })) }, [period])
@@ -65,6 +70,88 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
   })
 
   if (!data) return error ? <p className="pill-status pill-red" role="alert">{error}</p> : <p className="workspace-subtitle">Memuat buku besar…</p>
+
+  if (hp && data.supported) {
+    // HP: satu kartu per akun (angka 2×2), ketuk kartu untuk mutasinya; filter di lembar bawah.
+    const bulanIni = rentangBulan(period)
+    const rentangLain = f.dari !== bulanIni.dari || f.sampai !== bulanIni.sampai
+    const akunDipilih = data.pilihan.find((a) => a.kode === f.akun)
+    return (
+      <>
+        <KepalaHP judul="Buku Besar" cari={cari} onCari={setCari} placeholderCari="Cari kode atau nama akun"
+          jumlahFilter={(rentangLain ? 1 : 0) + (f.akun ? 1 : 0) + (semua ? 1 : 0)} onFilter={() => setBukaFilter(true)}
+          aksi={bisaEkspor && <button type="button" className="kepala-hp-ikon" aria-label="Ekspor Excel" onClick={() => void ekspor(bukuBesarXlsxUrl(f))}><FileSpreadsheet size={16} aria-hidden="true" /></button>}
+          chips={[
+            ...(rentangLain ? [{ label: data.period_label, onHapus: () => ubah(bulanIni) }] : []),
+            ...(akunDipilih ? [{ label: `${akunDipilih.kode} ${akunDipilih.nama}`, onHapus: () => ubah({ akun: undefined }) }] : []),
+            ...(semua ? [{ label: 'Termasuk akun tanpa saldo', onHapus: () => setSemua(false) }] : []),
+          ]} />
+        <div className="hp-ringkas tabular">
+          <span>{data.period_label}</span>
+          <span className={'pill-status ' + (data.seimbang ? 'pill-green' : 'pill-red')}>{data.seimbang ? 'Seimbang' : 'Debit ≠ Kredit'}</span>
+          <span>Mutasi {formatRp(data.total_debit)}</span>
+        </div>
+        {error && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10 }}>{error}</p>}
+        {kelompok.length === 0 && (
+          <p className="text-sm text-muted-foreground">{kosong && !cari.trim() ? `Belum ada saldo awal maupun transaksi di ${data.period_label}.` : 'Tidak ada akun yang cocok.'}</p>
+        )}
+        <div>{kelompok.map((g) => (
+          <Fragment key={g.nama}>
+            <div className="kelompok-hp">{g.nama}</div>
+            {g.akun.map((a) => {
+              const salah = (n: number) => n < 0 && !a.boleh_minus
+              const bermasalah = salah(a.saldo_awal) || salah(a.saldo_akhir) || a.baris.some((b) => salah(b.saldo))
+              const terbuka = buka.has(a.kode)
+              const angka = (n: number) => <b style={{ color: salah(n) ? RED : undefined }}>{formatRp(n)}</b>
+              return (
+                <div className="kartu-hp tabular" key={a.kode}>
+                  <button type="button" className="w-full text-left" aria-expanded={a.baris.length ? terbuka : undefined} disabled={!a.baris.length} onClick={() => toggle(a.kode)}>
+                    <div className="kartu-hp-judul">
+                      <span>{a.kode} {a.nama}</span>
+                      {bermasalah ? <span className="pill-status pill-red">saldo minus</span>
+                        : a.baris.length > 0 && (terbuka ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />)}
+                    </div>
+                    <div className="kartu-hp-grid">
+                      <div><span>Saldo awal</span>{angka(a.saldo_awal)}</div>
+                      <div><span>Debit</span><b>{a.debit ? formatRp(a.debit) : '–'}</b></div>
+                      <div><span>Kredit</span><b>{a.kredit ? formatRp(a.kredit) : '–'}</b></div>
+                      <div><span>Saldo akhir</span>{angka(a.saldo_akhir)}</div>
+                    </div>
+                    {a.baris.length > 0 && !terbuka && <div className="kartu-hp-sub" style={{ marginTop: 6 }}>{a.baris.length} mutasi · ketuk untuk rincian</div>}
+                  </button>
+                  {terbuka && (
+                    <div className="mutasi-hp">
+                      {a.baris.map((b, i) => {
+                        const mulaiMinus = salah(b.saldo) && !salah(i ? a.baris[i - 1].saldo : a.saldo_awal)
+                        return (
+                          <div key={i} className={'mutasi-hp-baris' + (mulaiMinus ? ' mulai-minus' : '')}>
+                            <div>
+                              <b>{b.bukti}{mulaiMinus && <span className="pill-status pill-red" style={{ marginLeft: 6 }}>mulai minus</span>}</b>
+                              <b>{b.debit ? `+${formatRp(b.debit)}` : `−${formatRp(b.kredit)}`}</b>
+                            </div>
+                            <div>
+                              <span>{formatTanggal(b.tanggal)} · {b.keterangan}</span>
+                              <span style={{ flex: 'none', color: salah(b.saldo) ? RED : undefined }}>{formatRp(b.saldo)}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </Fragment>
+        ))}</div>
+        <FilterRentangAkun buka={bukaFilter} onTutup={() => setBukaFilter(false)} nilai={f} period={period} pilihan={data.pilihan}
+          labelSemuaAkun="Semua akun (gambaran besar)" onTerapkan={(n) => ubah({ dari: n.dari, sampai: n.sampai, akun: n.akun })}>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan akun tanpa saldo
+          </label>
+        </FilterRentangAkun>
+      </>
+    )
+  }
 
   return (
     <>

@@ -10,6 +10,9 @@ import { Switch } from '@/components/ui/switch'
 import { HapusPermanenDialog, KonfirmasiDialog } from './KelolaDialog'
 import { getTim, hapusAnggotaTim, hapusRole, simpanRole, tambahAnggota, ubahAnggota, type AnggotaRow, type Izin, type MasterRole, type TimData } from '@/lib/api'
 import { formatRelatif } from '@/lib/format'
+import { useHP } from '@/lib/hp'
+import { AksiLembar, LembarBawah } from '@/components/hp/LembarBawah'
+import { BarisRingkas } from '@/components/hp/BarisRingkas'
 
 type Form = { id: number | null; nama: string; email: string; password: string; role: string; klien: number[]; aktif: boolean }
 
@@ -22,6 +25,8 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
   const [roleBaru, setRoleBaru] = useState<{ nama: string; izin: Izin[] } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const hp = useHP()
+  const [aksi, setAksi] = useState<AnggotaRow | null>(null) // lembar ⋯ di HP
   const muat = useCallback(() => getTim().then(setTim, (e: Error) => setError(e.message)), [])
   useEffect(() => { void muat() }, [muat])
 
@@ -70,7 +75,40 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
       </div>
       {error && !form && !roleBaru && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
 
-      {tim && tab === 'anggota' && (
+      {tim && tab === 'anggota' && hp && (
+        // HP: satu baris per anggota; ⋯ membuka aksi lain di lembar bawah.
+        <div className="daftar-ringkas">
+          {tim.anggota.map((a) => {
+            const klien = lihatSemua(a.role) ? 'Semua klien'
+              : a.klien.map((id) => tim.klien.find((k) => k.id === id)?.nama ?? `#${id}`).join(', ') || 'Belum ada klien'
+            const bisaLain = a.user.id !== selfId
+            return (
+              <BarisRingkas key={a.user.id} label={a.user.name} aktif={a.user.active}
+                judul={<>{a.user.name}{a.user.id === selfId && <span className="text-muted-foreground font-normal"> (Anda)</span>}</>}
+                sub={`${a.role ? roleNama(a.role) : 'Tanpa role'} · ${klien}`}
+                labelUbah="Ubah role & klien" onUbah={() => edit(a)} onLainnya={bisaLain ? () => setAksi(a) : undefined} />
+            )
+          })}
+        </div>
+      )}
+      <LembarBawah buka={!!aksi} judul={aksi?.user.name ?? ''} onTutup={() => setAksi(null)}>
+        {aksi && (
+          <>
+            <dl className="lembar-rinci">
+              <dt>Email</dt><dd>{aksi.user.email}</dd>
+              <dt>Role</dt><dd>{aksi.role ? roleNama(aksi.role) : 'Tanpa role'}</dd>
+              <dt>Status</dt><dd>{aksi.user.active ? 'Aktif' : 'Nonaktif'}</dd>
+              <dt>Terakhir aktif</dt><dd>{formatRelatif(aksi.user.last_seen)}</dd>
+            </dl>
+            {aksi.user.active
+              ? <AksiLembar ikon={<UserX />} onClick={() => { setAksi(null); setNonaktif(aksi) }}>Nonaktifkan</AksiLembar>
+              : <AksiLembar ikon={<UserCheck />} disabled={busy} onClick={() => { setAksi(null); void jalankan(() => setAktif(aksi, true)) }}>Aktifkan</AksiLembar>}
+            {bisaHapus && <AksiLembar ikon={<Trash2 />} bahaya onClick={() => { setAksi(null); setHapus(aksi) }}>Hapus permanen</AksiLembar>}
+          </>
+        )}
+      </LembarBawah>
+
+      {tim && tab === 'anggota' && !hp && (
         <div className="card" style={{ padding: 20 }}>
           <div className="table-scroll">
             <table className="data-table" style={{ minWidth: 720 }}>
@@ -110,7 +148,8 @@ export function TimAkses({ selfId, bisaHapus }: { selfId: number; bisaHapus: boo
         <div className="card" style={{ padding: 20 }}>
           <div className="chart-subtitle">Centang untuk mengubah izin; tersimpan langsung dan tercatat di audit log. Role Master selalu punya semua izin.</div>
           <div className="table-scroll">
-            <table className="data-table" style={{ minWidth: 320 + tim.roles.length * 120 }}>
+            {/* Matriks centang: di HP tetap tabel geser dengan kolom izin menempel di kiri. */}
+            <table className="data-table tabel-matriks" data-kartu="tidak" style={{ minWidth: 320 + tim.roles.length * 120 }}>
               <thead>
                 <tr>
                   <th>Izin</th>
