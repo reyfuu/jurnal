@@ -148,7 +148,9 @@ func BagianLabaRugi(is IncomeStatement) BagianLaporan {
 	}
 	baris(GayaBaris, "omzet", "Omzet (penjualan kotor)", is.Omzet, "")
 	s.b.Baris[len(s.b.Baris)-1].wajib = true
-	baris(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees, SifatKontra)
+	// Potongan channel dicatat di akun beban (6108 Beban Marketplace), bukan kontra penjualan:
+	// ditulis seperti beban lain, tanpa kurung.
+	baris(GayaBaris, "potongan", "Potongan channel / aplikasi", -is.ChannelFees, SifatPengurang)
 	baris(GayaTotal, "penjualan_bersih", "Penjualan bersih", is.NetSales, "", tambah("omzet"), kurang("potongan"))
 	baris(GayaBaris, "hpp", "HPP (bahan baku)", -is.COGS, SifatPengurang)
 	baris(GayaTotal, "laba_kotor", "Laba (rugi) kotor", is.GrossProfit, "", tambah("penjualan_bersih"), kurang("hpp"))
