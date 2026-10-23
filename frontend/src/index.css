@@ -1400,7 +1400,7 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
 
 /* Komponen khusus HP: kepala ringkas (judul + cari + filter) & lembar bawah (bottom sheet). */
 @layer components {
-  .kepala-hp { margin: 2px 0 12px; }
+  .kepala-hp { margin: 0; }
   .kepala-hp-baris { display: flex; align-items: center; gap: 6px; min-height: 40px; }
   .kepala-hp-judul {
     flex: 1;
@@ -1515,4 +1515,32 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   @media (prefers-reduced-motion: reduce) {
     .lembar-bawah, .lembar-bawah-latar { animation: none; }
   }
+}
+@layer components {
+  .kepala-hp-chip.aktif { background: var(--navy-700); color: var(--neutral-0); }
+  .hp-ringkas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -14px 0 -4px; font-size: 12px; color: var(--text-muted); }
+  .kartu-hp {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .kartu-hp-judul { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; }
+  .kartu-hp-sub { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .kartu-hp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 14px; margin-top: 8px; }
+  .kartu-hp-grid > div { display: flex; flex-direction: column; min-width: 0; }
+  .kartu-hp-grid span { font-size: 10.5px; font-weight: 600; color: var(--text-muted); }
+  .kartu-hp-grid b { font-weight: 600; overflow-wrap: anywhere; }
+  .kelompok-hp { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 14px 2px 6px; }
+  .jurnal-hp-baris { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .jurnal-hp-baris.kredit { padding-left: 16px; color: var(--text-secondary); }
+  .jurnal-hp-baris > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .jurnal-hp-baris > span:last-child { flex: none; }
+  .mutasi-hp { border-top: 1px dashed var(--border-subtle); margin-top: 10px; padding-top: 8px; display: grid; gap: 4px; }
+  .mutasi-hp-baris { background: var(--bg-raised); border-radius: 8px; padding: 7px 9px; font-size: 12px; }
+  .mutasi-hp-baris.mulai-minus { background: var(--accent-red-soft); }
+  .mutasi-hp-baris > div { display: flex; justify-content: space-between; gap: 8px; }
+  .mutasi-hp-baris > div + div { color: var(--text-muted); margin-top: 2px; }
 }

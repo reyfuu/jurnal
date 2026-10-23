@@ -47,7 +47,8 @@ import { UsulanKoreksi } from '@/views/UsulanKoreksi'
 import { Pustaka } from '@/views/Pustaka'
 import { PrimbonPajak } from '@/views/primbon/PrimbonPajak'
 import { bacaRute, tulisRute } from '@/lib/rute'
-import { BarAtasHP, Laci, useLaci } from '@/components/hp/Laci'
+import { BarAtasHP, Laci } from '@/components/hp/Laci'
+import { useLaci } from '@/components/hp/useLaci'
 import { useKartuOtomatis } from '@/components/hp/useKartuOtomatis'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }

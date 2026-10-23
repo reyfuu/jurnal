@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 // Tampilan HP: sama dengan breakpoint ponsel di index.css.
-const KUERI_HP = '(max-width: 760px)'
+export const KUERI_HP = '(max-width: 760px)'
 
 function langganan(ubah: () => void) {
   if (typeof window === 'undefined' || !window.matchMedia) return () => {}
