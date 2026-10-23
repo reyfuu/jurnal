@@ -48,6 +48,7 @@ import { Pustaka } from '@/views/Pustaka'
 import { PrimbonPajak } from '@/views/primbon/PrimbonPajak'
 import { bacaRute, tulisRute } from '@/lib/rute'
 import { BarAtasHP, Laci, useLaci } from '@/components/hp/Laci'
+import { useKartuOtomatis } from '@/components/hp/useKartuOtomatis'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -73,6 +74,8 @@ export default function App() {
   const [masukTerkunci, setMasukTerkunci] = useState(() => { try { return sessionStorage.getItem('masuk-terkunci') === '1' } catch { return false } })
   const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
   const laci = useLaci() // menu ☰ di HP
+  const [ruangKerja, setRuangKerja] = useState<HTMLElement | null>(null)
+  useKartuOtomatis(ruangKerja) // tabel jadi kartu di HP
 
   const me = session.status === 'in' ? session.me : null
   // Token dari tautan email (#/atur-password?token=…) dibaca sekali saat dimuat: sinkronisasi
@@ -289,7 +292,7 @@ export default function App() {
           <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={dariLaci} onLogout={onLogout} terkunci={terkunci}
             onCatat={!me.lihat && !terkunci ? dariLaci : undefined} />
         </Laci>
-        <section className="workspace">
+        <section className="workspace" ref={setRuangKerja}>
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
           {terkunci && view !== 'langganan' && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" role="status"

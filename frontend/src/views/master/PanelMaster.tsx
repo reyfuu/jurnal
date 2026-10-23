@@ -3,6 +3,7 @@ import { BellRing, BookOpen, Brain, Contact, MessageSquareText, CreditCard, File
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { BarAtasHP, Laci, useLaci } from '@/components/hp/Laci'
+import { useKartuOtomatis } from '@/components/hp/useKartuOtomatis'
 import type { Izin, Me } from '@/lib/api'
 import { KlienDetailView, KlienList, Ringkasan } from './Klien'
 import { TiketBoard } from './Tiket'
@@ -59,6 +60,8 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
   const [page, setPage] = useState<Page>('ringkasan')
   const [klienId, setKlienId] = useState<number | null>(null)
   const laci = useLaci() // menu ☰ di HP
+  const [ruangKerja, setRuangKerja] = useState<HTMLElement | null>(null)
+  useKartuOtomatis(ruangKerja) // tabel jadi kartu di HP
   const go = (p: Page) => { setPage(p); setKlienId(null); laci.setBuka(false) }
   const buka = (id: number) => { setPage('klien'); setKlienId(id) }
   const initials = me.user.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -123,7 +126,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
           </div>
         </aside>
         </Laci>
-        <section className="workspace">
+        <section className="workspace" ref={setRuangKerja}>
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
             ? <KlienList onBuka={buka} bisaLihat={bisa('lihat_sebagai')} bisaLangganan={bisa('langganan')} onLihat={onLihat} />
