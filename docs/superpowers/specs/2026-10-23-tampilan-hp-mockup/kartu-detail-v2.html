@@ -1,0 +1,100 @@
+<style>
+  .phones { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 290px; height: 600px; border: 10px solid #111; border-radius: 34px; overflow: hidden; position: relative; background: #f3f5f9; font-family: system-ui, sans-serif; color: #1b2340; box-shadow: 0 10px 30px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+  .bar { background: #222c5c; color: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex: none; }
+  .logo { font-weight: 800; font-size: 14px; } .logo b { color: #f6c445; }
+  .burger { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+  .per { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.14); padding: 5px 9px; border-radius: 999px; }
+  .h { font-weight: 800; font-size: 18px; padding: 12px 14px 8px; flex: none; }
+  .list { overflow: auto; flex: 1; padding: 0 10px 10px; }
+  .acc { background: #fff; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .t { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .g { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 7px; color: #556; font-size: 11px; }
+  .g b { color: #1b2340; float: right; }
+  .pill { background: #fde4e4; color: #c62828; font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+  .pill.ok { background: #e3f4e8; color: #1e7a3c; }
+  .pill.grey { background: #eceef4; color: #556; }
+  .mut { border-top: 1px dashed #e3e6ef; margin-top: 9px; padding-top: 8px; }
+  .m { padding: 7px 8px; border-radius: 8px; margin-bottom: 4px; background: #f7f8fb; font-size: 11px; }
+  .m.hot { background: #fde4e4; }
+  .m .r1 { display: flex; justify-content: space-between; font-weight: 700; }
+  .m .r2 { display: flex; justify-content: space-between; color: #667; margin-top: 2px; }
+  .neg { color: #c62828 !important; }
+  .jl { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; color: #445; }
+  .jl.k { padding-left: 14px; color: #667; }
+  .btns { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .btn { flex: 1; text-align: center; font-size: 11px; font-weight: 700; padding: 8px 6px; border-radius: 8px; border: 1px solid #cfd5e6; background: #fff; }
+  .btn.d { border-color: #f1b5b5; color: #c62828; }
+  .muted { color: #667; font-weight: 400; font-size: 11px; }
+  .cap { text-align: center; font-size: 12px; color: #667; margin-top: 8px; max-width: 290px; }
+</style>
+
+<h2>Kartu di tiga tempat yang Anda sebut</h2>
+<p class="subtitle">Bukan pilihan, ini usulan untuk dikoreksi: apa yang kurang, salah urutan, atau tidak perlu?</p>
+
+<div class="phones" style="margin-top: 14px">
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Apr 2026 ▾</div></div>
+      <div class="h">Buku Besar</div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>1102 Kas Besar</span><span class="pill">saldo minus</span></div>
+          <div class="g"><span>Saldo awal <b>11.900.000</b></span><span>Debit <b>40.000.000</b></span><span>Kredit <b>56.500.000</b></span><span>Saldo akhir <b class="neg">(4.600.000)</b></span></div>
+          <div class="mut">
+            <div class="m"><div class="r1"><span>JU-202604-0001</span><span>+12.800.000</span></div><div class="r2"><span>1 Apr · Penjualan — Dine-in</span><span>24.700.000</span></div></div>
+            <div class="m"><div class="r1"><span>JU-202604-0034</span><span>−23.500.000</span></div><div class="r2"><span>16 Apr · Beli Bahan</span><span>28.400.000</span></div></div>
+            <div class="m"><div class="r1"><span>JU-202604-0036</span><span>−8.000.000</span></div><div class="r2"><span>22 Apr · Sewa Tempat</span><span>7.900.000</span></div></div>
+            <div class="m hot"><div class="r1"><span>JU-202604-0037 <span class="pill">mulai minus</span></span><span>−12.500.000</span></div><div class="r2"><span>25 Apr · Listrik, Air</span><span class="neg">(4.600.000)</span></div></div>
+          </div>
+        </div>
+        <div class="acc"><div class="t"><span>1114 Saldo Marketplace</span><span>›</span></div>
+          <div class="g"><span>Saldo awal <b>85.100.000</b></span><span>Debit <b>34.000.000</b></span><span>Kredit <b>4.000.000</b></span><span>Saldo akhir <b>115.100.000</b></span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Buku Besar</b> — kartu dibuka: tiap mutasi menunjukkan No. Bukti, tanggal, keterangan, jumlah (+ debit / − kredit) dan saldo berjalan</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="h">Jurnal Umum</div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>JU-202608-0001</span><span class="muted">1 Agu 2026</span></div>
+          <div class="muted" style="margin:3px 0 6px">Penjualan — Kasir Dine-in &amp; Takeaway</div>
+          <div class="jl"><span>1102 Kas Besar</span><span>13.120.000</span></div>
+          <div class="jl k"><span>4101 Penjualan Produk</span><span>13.120.000</span></div></div>
+        <div class="acc"><div class="t"><span>SIS-202608-1</span><span class="muted">1 Agu 2026</span></div>
+          <div class="muted" style="margin:3px 0 6px">Penyusutan &amp; amortisasi bulan ini</div>
+          <div class="jl"><span>6113 Beban Penyusutan</span><span>4.300.000</span></div>
+          <div class="jl"><span>6124 Beban Amortisasi</span><span>375.000</span></div>
+          <div class="jl k"><span>1552 Akum. Peny. Mesin</span><span>4.000.000</span></div>
+          <div class="jl k"><span>1551 Akum. Peny. Bangunan</span><span>300.000</span></div>
+          <div class="jl k"><span>1651 Akum. Amortisasi</span><span>375.000</span></div></div>
+        <div class="acc"><div class="t"><span>JU-202608-0002</span><span class="muted">1 Agu 2026</span></div>
+          <div class="muted" style="margin:3px 0 6px">Penjualan — Kasir Dine-in &amp; Takeaway</div>
+          <div class="jl"><span>1102 Kas Besar</span><span>7.380.000</span></div>
+          <div class="jl k"><span>4101 Penjualan Produk</span><span>7.380.000</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Jurnal Umum</b> — satu kartu per bukti; baris debit rata kiri, baris kredit menjorok (cara menulis jurnal yang biasa)</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Panel <b>Master</b></div></div>
+      <div class="h">Pengguna Klien</div>
+      <div class="list">
+        <div class="acc"><div class="t"><span>Bu Sari (Pemilik)</span><span class="pill ok">aktif</span></div>
+          <div class="muted" style="margin-top:3px">owner@kedaikopisenja.id · Owner<br>Kedai Kopi Senja · no HP —</div>
+          <div class="btns"><div class="btn">Ubah</div><div class="btn">Reset password</div><div class="btn d">Nonaktifkan</div><div class="btn d">Hapus</div></div></div>
+        <div class="acc"><div class="t"><span>Dimas (Keuangan)</span><span class="pill ok">aktif</span></div>
+          <div class="muted" style="margin-top:3px">admin@kedaikopisenja.id · Admin<br>Kedai Kopi Senja · no HP —</div>
+          <div class="btns"><div class="btn">Ubah</div><div class="btn">Reset password</div><div class="btn d">Nonaktifkan</div><div class="btn d">Hapus</div></div></div>
+        <div class="acc"><div class="t"><span>Rani (Kasir)</span><span class="pill grey">nonaktif</span></div>
+          <div class="muted" style="margin-top:3px">kasir@kedaikopisenja.id · Kasir<br>Kedai Kopi Senja · no HP —</div>
+          <div class="btns"><div class="btn">Ubah</div><div class="btn">Reset password</div><div class="btn">Aktifkan</div><div class="btn d">Hapus</div></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Panel Master</b> — tombol aksi selalu kelihatan di dalam kartu, tidak terpotong; aksi berbahaya berwarna merah dan tetap minta konfirmasi</div>
+  </div>
+</div>
