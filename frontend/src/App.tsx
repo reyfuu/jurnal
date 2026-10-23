@@ -47,6 +47,7 @@ import { UsulanKoreksi } from '@/views/UsulanKoreksi'
 import { Pustaka } from '@/views/Pustaka'
 import { PrimbonPajak } from '@/views/primbon/PrimbonPajak'
 import { bacaRute, tulisRute } from '@/lib/rute'
+import { BarAtasHP, Laci, useLaci } from '@/components/hp/Laci'
 
 type Session = { status: 'checking' } | { status: 'anon' } | { status: 'in'; me: Me }
 
@@ -71,6 +72,7 @@ export default function App() {
   // Belum berlangganan tapi memilih "Masuk ke aplikasi": workspace dengan menu bergembok.
   const [masukTerkunci, setMasukTerkunci] = useState(() => { try { return sessionStorage.getItem('masuk-terkunci') === '1' } catch { return false } })
   const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
+  const laci = useLaci() // menu ☰ di HP
 
   const me = session.status === 'in' ? session.me : null
   // Token dari tautan email (#/atur-password?token=…) dibaca sekali saat dimuat: sinkronisasi
@@ -198,12 +200,19 @@ export default function App() {
 
   const canSee = (v: View) => me.views.includes(v)
   const terkunci = me.langganan.status === 'habis'
-  const navigate = (v: View, tab?: string) => {
-    if (!canSee(v) && v !== 'catatan' && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return
+  // ganti = mengganti entri riwayat saat ini (dipakai saat pindah dari laci menu HP); true bila pindah halaman.
+  const navigate = (v: View, tab?: string, ganti = false): boolean => {
+    if (!canSee(v) && v !== 'catatan' && !(terkunci && (v === 'laporan-ai' || v === 'alat-gratis'))) return false
     if (v === 'lapor-bug' && view !== 'lapor-bug') setBugFrom(view)
     setBukaTab({ tab, n: Date.now() }) // tab awal halaman tujuan, mis. dari tautan Tanya AI
-    if (v !== view) history.pushState(null, '', tulisRute(v, period))
+    if (v !== view) history[ganti ? 'replaceState' : 'pushState'](null, '', tulisRute(v, period))
     setView(v)
+    return v !== view
+  }
+  // Pilih menu dari laci HP: laci tertutup, dan entri riwayat laci dipakai untuk halaman baru.
+  const dariLaci = (v: View, tab?: string) => {
+    const ganti = laci.tutupUntukPindah()
+    if (!navigate(v, tab, ganti) && ganti) history.back()
   }
 
   // Tanya AI mengisi form: halaman form dibuka (tidak di-remount bila sudah terbuka, supaya isi
@@ -268,9 +277,18 @@ export default function App() {
 
   return (
     <main>
+      <BarAtasHP onMenu={() => laci.setBuka(true)}>
+        {data && (
+          <select className="bar-atas-periode tabular" aria-label="Periode laporan" value={period} onChange={(e) => changePeriod(e.target.value)} aria-busy={memuat}>
+            {periods.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        )}
+      </BarAtasHP>
       <div className="app-shell">
-        <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={navigate} onLogout={onLogout} terkunci={terkunci}
-          onCatat={!me.lihat && !terkunci ? navigate : undefined} />
+        <Laci buka={laci.buka} onTutup={() => laci.setBuka(false)}>
+          <Sidebar me={me} tenant={data?.dash.tenant} view={view} onNavigate={dariLaci} onLogout={onLogout} terkunci={terkunci}
+            onCatat={!me.lihat && !terkunci ? dariLaci : undefined} />
+        </Laci>
         <section className="workspace">
           {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start' }}>{error}</div>}
           {terkunci && view !== 'langganan' && (
@@ -314,7 +332,7 @@ export default function App() {
             </div>
           )}
           {data && (
-            <div className="period-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: 'var(--bg-raised)', padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-shell)' }}>
+            <div className="period-toolbar sembunyi-di-hp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, background: 'var(--bg-raised)', padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-shell)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Periode Laporan:

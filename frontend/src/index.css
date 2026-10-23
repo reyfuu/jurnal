@@ -1028,52 +1028,79 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  /* Ponsel: sidebar jadi strip navigasi horizontal, grid dipadatkan, tabel bisa digulir. */
+  /* Laci menu HP: di laptop pembungkusnya tidak terlihat (sidebar tetap kolom grid). */
+  .laci { display: contents; }
+  .laci-latar, .bar-atas-hp { display: none; }
+
+  /* Ponsel: sidebar jadi laci (☰) yang meluncur dari kiri, grid dipadatkan. */
   @media (max-width: 760px) {
     .app-shell {
       grid-template-columns: minmax(0, 1fr);
       min-height: 0;
     }
-    .sidebar {
-      border-right: none;
-      border-bottom: 1px solid var(--border-subtle);
-      padding: 14px 12px;
-      position: static;
-      height: auto;
-    }
-    .sidebar-main {
-      overflow: visible;
-    }
-    .sidebar-brand {
-      padding: 0 4px 10px;
-    }
-    .sidebar-nav {
+    .bar-atas-hp {
       display: flex;
-      gap: 4px;
-      overflow-x: auto;
-      padding-bottom: 4px;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      height: 52px;
+      padding: 0 12px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .nav-group {
-      display: contents;
+    .bar-atas-menu {
+      width: 40px;
+      height: 40px;
+      margin-left: -6px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: var(--text-primary);
+      background: color-mix(in srgb, var(--text-primary) 8%, transparent);
     }
-    .nav-group-label,
-    .nav-group-head,
-    .nav-sub-label {
-      display: none;
+    .bar-atas-kanan { margin-left: auto; min-width: 0; display: flex; align-items: center; }
+    .bar-atas-periode {
+      max-width: 150px;
+      height: 32px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 600;
     }
-    /* Ponsel: semua menu tetap satu baris geser, grup tidak dilipat. */
-    .nav-sub,
-    .nav-sub.tertutup {
-      display: contents;
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 60;
+      width: min(300px, 84vw);
+      height: 100dvh;
+      border-right: 1px solid var(--border-subtle);
+      transform: translateX(-102%);
+      transition: transform 0.2s ease;
+      box-shadow: var(--shadow-3);
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
-    .nav-item {
-      width: auto;
-      white-space: nowrap;
+    .laci-terbuka .sidebar { transform: translateX(0); }
+    .laci-latar {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background: rgba(10, 14, 30, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
     }
-    .tenant-box {
-      margin-top: 10px;
-      padding-top: 10px;
-    }
+    .laci-terbuka .laci-latar { opacity: 1; pointer-events: auto; }
+    .nav-item { min-height: 40px; }
+    .sembunyi-di-hp { display: none !important; }
+    /* Tanya AI: tombol bulat ikon saja supaya tidak menutupi angka. */
+    .ai-fab { padding: 13px !important; }
+    .ai-fab .ai-fab-label { display: none; }
     .workspace {
       padding: 18px 16px 24px;
       min-width: 0;
@@ -1101,6 +1128,9 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
       overflow-x: auto;
       white-space: nowrap;
     }
+  }
+  @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+    .sidebar, .laci-latar { transition: none; }
   }
 }
 

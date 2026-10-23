@@ -346,8 +346,9 @@ export const AIAgentBubble: React.FC<{
         {...geser.handlers}
         onClick={() => { if (geser.diklik()) setIsOpen((prev) => !prev) }}
         title="Klik untuk bertanya; tahan lalu geser untuk memindahkan"
+        aria-label="Tanya AI Pajak"
         style={{ touchAction: 'none' }}
-        className="group relative flex cursor-grab items-center gap-2.5 px-4 py-3 rounded-full active:cursor-grabbing bg-[var(--navy-700)] text-white text-sm shadow-[var(--shadow-2)] hover:bg-[var(--navy-900)] active:scale-[0.98] transition border border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="ai-fab group relative flex cursor-grab items-center gap-2.5 px-4 py-3 rounded-full active:cursor-grabbing bg-[var(--navy-700)] text-white text-sm shadow-[var(--shadow-2)] hover:bg-[var(--navy-900)] active:scale-[0.98] transition border border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <div className="relative">
           <Bot className="w-5 h-5 text-white" />
@@ -356,8 +357,8 @@ export const AIAgentBubble: React.FC<{
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--yellow-500)]"></span>
           </span>
         </div>
-        <span className="font-semibold tracking-wide">Tanya AI Pajak</span>
-        <Sparkles className="w-4 h-4 text-[var(--navy-200)]" />
+        <span className="ai-fab-label font-semibold tracking-wide">Tanya AI Pajak</span>
+        <Sparkles className="ai-fab-label w-4 h-4 text-[var(--navy-200)]" />
       </button>
     </div>
   )

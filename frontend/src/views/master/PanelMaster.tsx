@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BellRing, BookOpen, Brain, Contact, MessageSquareText, CreditCard, FileCheck2, Gauge, LayoutGrid, LogOut, Network, Percent, ScrollText, Ticket, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { BarAtasHP, Laci, useLaci } from '@/components/hp/Laci'
 import type { Izin, Me } from '@/lib/api'
 import { KlienDetailView, KlienList, Ringkasan } from './Klien'
 import { TiketBoard } from './Tiket'
@@ -57,7 +58,8 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
   const bisa = (i?: Izin | Izin[]) => (i ? [i].flat().some((x) => izin.includes(x)) : izin.includes('klien_lihat') || izin.includes('klien_semua'))
   const [page, setPage] = useState<Page>('ringkasan')
   const [klienId, setKlienId] = useState<number | null>(null)
-  const go = (p: Page) => { setPage(p); setKlienId(null) }
+  const laci = useLaci() // menu ☰ di HP
+  const go = (p: Page) => { setPage(p); setKlienId(null); laci.setBuka(false) }
   const buka = (id: number) => { setPage('klien'); setKlienId(id) }
   const initials = me.user.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -72,7 +74,11 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
 
   return (
     <main>
+      <BarAtasHP onMenu={() => laci.setBuka(true)}>
+        <span className="label-caps" style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Panel Master</span>
+      </BarAtasHP>
       <div className="app-shell">
+        <Laci buka={laci.buka} onTutup={() => laci.setBuka(false)}>
         <aside className="sidebar dark">
           <div className="sidebar-main">
             <div className="sidebar-brand">
@@ -116,6 +122,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
             </div>
           </div>
         </aside>
+        </Laci>
         <section className="workspace">
           {page === 'ringkasan' && <Ringkasan onBuka={buka} />}
           {page === 'klien' && (klienId === null
