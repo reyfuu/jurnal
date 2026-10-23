@@ -10,8 +10,8 @@ import { IsiAIBanner } from '@/components/IsiAIBanner'
 import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import {
-  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
-  type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow,
+  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, getPelanggan, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
+  type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow, type Pelanggan,
 } from '@/lib/api'
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
@@ -74,6 +74,21 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [impor, setImpor] = useState(false)
+  const [pelanggan, setPelanggan] = useState<Pelanggan[]>([])
+  useEffect(() => { getPelanggan().then(setPelanggan, () => {}) }, [])
+  // Nama cocok dengan daftar pelanggan: alamat & NPWP diisi dari daftar. Nilai yang diisi otomatis
+  // diganti bila nama berpindah ke pelanggan lain (mis. "PT A" → "PT AB") dan dikosongkan bila
+  // tidak cocok lagi; isian yang diketik sendiri tidak disentuh.
+  const isiOtomatis = useRef<{ alamat: string; npwp: string }>({ alamat: '', npwp: '' })
+  const pilihPelanggan = (nama: string) => {
+    if (!form) return
+    const p = pelanggan.find((x) => x.nama.toLowerCase() === nama.trim().toLowerCase())
+    const auto = isiOtomatis.current
+    const baru = { alamat: p?.alamat ?? '', npwp: p?.npwp ?? '' }
+    const ganti = (sekarang: string | undefined, lama: string, isi: string) => (!sekarang || sekarang === lama ? isi : sekarang)
+    isiOtomatis.current = baru
+    setForm({ ...form, pelanggan_nama: nama, pelanggan_alamat: ganti(form.pelanggan_alamat, auto.alamat, baru.alamat), pelanggan_npwp: ganti(form.pelanggan_npwp, auto.npwp, baru.npwp) })
+  }
   const urut = useKolomUrut()
   // Invoice baru yang belum tersimpan disimpan sebagai draft (error / muat ulang tidak menghapusnya).
   useSimpanDraft(form && editId === null ? DRAFT_INV : null, form)
@@ -158,6 +173,7 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
           + Buat Invoice
         </button>
       </PageHeader>
+
 
       <MenuImportDialog
         open={impor} onOpenChange={setImpor} onImported={() => void muat()}
@@ -262,7 +278,8 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginTop: 12 }}>
             <Field label="Nama pelanggan">
-              <input className="input-field" required value={form.pelanggan_nama} onChange={(e) => setForm({ ...form, pelanggan_nama: e.target.value })} />
+              <input className="input-field" required list="daftar-pelanggan" value={form.pelanggan_nama} onChange={(e) => pilihPelanggan(e.target.value)} />
+              <datalist id="daftar-pelanggan">{pelanggan.map((p) => <option key={p.id} value={p.nama} />)}</datalist>
             </Field>
             <Field label="NPWP pelanggan">
               <input className="input-field" value={form.pelanggan_npwp ?? ''} onChange={(e) => setForm({ ...form, pelanggan_npwp: e.target.value })} />

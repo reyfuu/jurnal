@@ -105,7 +105,7 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
                     </td></tr>
                   )}
                   {tampil.map((e) => (
-                    <Fragment key={e.bukti + e.tanggal + e.keterangan}>
+                    <Fragment key={`${e.bukti}|${e.tx_id ?? ''}|${e.tanggal}|${e.keterangan}`}>
                       <tr style={{ background: 'var(--bg-raised)' }}>
                         <td style={{ whiteSpace: 'nowrap' }}>{formatTanggal(e.tanggal)}</td>
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{e.bukti}</td>

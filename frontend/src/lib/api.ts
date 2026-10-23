@@ -51,7 +51,11 @@ export interface Me {
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
-export interface LanggananStatus { status: 'trial' | 'aktif' | 'habis'; sampai?: string }
+export interface LanggananStatus {
+  status: 'trial' | 'aktif' | 'habis'; sampai?: string
+  /** tingkat paket terbayar terakhir saat aktif; pro: fitur Pro terbuka (trial, Pro, Premium, paket lama) */
+  tingkat?: 'starter' | 'pro' | 'premium'; pro: boolean
+}
 export interface Paket {
   id: string; nama: string; harga: number; hari: number; hemat?: string
   /** starter | pro | premium; kosong = paket lama satu tingkat. */
@@ -168,6 +172,7 @@ export interface Dashboard {
   }[]
   inventory: { sku: string; name: string; type: string; stock: string; cogs: number; sell_price: number; status: string }[]
   tax_report: {
+    entity_type: string // OP | Badan
     yearly_exemption: number
     total_gross: number
     total_taxable: number
@@ -294,6 +299,10 @@ export interface Tx {
   no_bukti?: string
   /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
   sumber?: 'mutasi' | 'foto'
+  /** Nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server. */
+  no_jurnal?: string
+  /** Setor PPh Final / Setor PPN: masa (YYYY-MM) yang dilunasi; bawaan bulan sebelum tanggal setor. */
+  masa_pajak?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -395,6 +404,10 @@ export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string) => api<Me>('/auth/login', { method: 'POST', body: { email, password } })
 export interface DaftarInput { name: string; email: string; password: string; wa: string; setuju_pdp: boolean }
 export const register = (body: DaftarInput) => api<Me>('/auth/register', { method: 'POST', body })
+/** Lupa password: balasan selalu sama (keberadaan akun tidak bocor). */
+export const lupaPassword = (email: string) => api<{ pesan: string }>('/auth/lupa-password', { method: 'POST', body: { email } })
+/** Atur password baru dari tautan email (token sekali pakai, 30 menit). */
+export const aturPassword = (token: string, password: string) => api<void>('/auth/atur-password', { method: 'POST', body: { token, password } })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 
 /** Ambil dashboard + laporan yang boleh diakses role ini (laporan lain 403 untuk Kasir). */
@@ -508,6 +521,8 @@ export interface AssetSummary {
 }
 
 export const getAssets = (period: string) => api<AssetSummary>(`/assets?period=${encodeURIComponent(period)}`)
+/** Register aset per tanggal bebas (YYYY-MM-DD), sama dengan Neraca per tanggal itu. */
+export const getAssetsPada = (pada: string) => api<AssetSummary>(`/assets?pada=${encodeURIComponent(pada)}`)
 export const createAsset = (a: AssetInput) => api<Asset>('/assets', { method: 'POST', body: a })
 export const updateAsset = (id: number, a: AssetInput) => api<Asset>(`/assets/${id}`, { method: 'PUT', body: a })
 export const deleteAsset = (id: number) => api<void>(`/assets/${id}`, { method: 'DELETE' })
@@ -1257,7 +1272,8 @@ export const getTagihan = () => api<TagihanSummary>('/tagihan')
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
 export const deleteTagihan = (id: number) => api<void>(`/tagihan/${id}`, { method: 'DELETE' })
 
-export const getStok = () => api<StokSummary>('/stok')
+/** pada (YYYY-MM-DD): jumlah & nilai per tanggal itu dari kartu stok; kosong = sekarang. */
+export const getStok = (pada = '') => api<StokSummary>(pada ? `/stok?pada=${encodeURIComponent(pada)}` : '/stok')
 export const createStok = (s: StokInput) => api<StokItem>('/stok', { method: 'POST', body: s })
 export const updateStok = (id: number, s: StokInput) => api<StokItem>(`/stok/${id}`, { method: 'PUT', body: s })
 export const deleteStok = (id: number) => api<void>(`/stok/${id}`, { method: 'DELETE' })
@@ -1487,6 +1503,34 @@ export const terapkanHPP = (id: number) => api<{ sku: string; harga_pokok: numbe
 export const createSupplier = (s: SupplierInput) => api<Supplier>('/produksi/supplier', { method: 'POST', body: s })
 export const updateSupplier = (id: number, s: SupplierInput) => api<Supplier>(`/produksi/supplier/${id}`, { method: 'PUT', body: s })
 export const deleteSupplier = (id: number) => api<void>(`/produksi/supplier/${id}`, { method: 'DELETE' })
+
+/** Master pelanggan (Invoice → Daftar pelanggan); invoice tetap menyimpan nama sebagai teks. */
+export interface Pelanggan {
+  id: number
+  nama: string
+  kontak?: string
+  telepon?: string
+  email?: string
+  alamat?: string
+  npwp?: string
+  /** Termin pembayaran dalam hari; 0 = tunai. */
+  tempo_hari: number
+  catatan?: string
+}
+export type PelangganInput = Omit<Pelanggan, 'id'>
+export const getPelanggan = () => api<Pelanggan[]>('/pelanggan')
+export const createPelanggan = (p: PelangganInput) => api<Pelanggan>('/pelanggan', { method: 'POST', body: p })
+export const updatePelanggan = (id: number, p: PelangganInput) => api<Pelanggan>(`/pelanggan/${id}`, { method: 'PUT', body: p })
+export const deletePelanggan = (id: number) => api<void>(`/pelanggan/${id}`, { method: 'DELETE' })
+/** Riwayat transaksi satu pelanggan / supplier (dicocokkan lewat nama) dalam rentang tanggal. */
+export interface RiwayatPihak {
+  nama: string; dari: string; sampai: string; transaksi: Tx[]
+  total_masuk: number; total_keluar: number; piutang_terbuka: number; utang_terbuka: number
+}
+export const getRiwayatPihak = (nama: string, dari: string, sampai: string) =>
+  api<RiwayatPihak>(`/pihak/riwayat?nama=${encodeURIComponent(nama)}&dari=${dari}&sampai=${sampai}`)
+/** Tambahkan nama pelanggan dari transaksi penjualan & invoice yang belum ada di daftar. */
+export const pelangganDariData = () => api<{ ditambah: number }>('/pelanggan/dari-data', { method: 'POST' })
 
 // --- Invoice: faktur penjualan + cetak PDF ---
 
@@ -1908,10 +1952,11 @@ export const simulasiUsaha = (period: string, s: Skenario) => api<SimulasiUsaha>
 
 export type BagianPDF = 'semua' | 'laba-rugi' | 'neraca' | 'arus-kas' | 'aset'
 /** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk satu bulan. */
-export const daftarUrl = (period: string, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?period=${period}`
-/** rentang: laba rugi & arus kas dari..sampai (neraca tetap posisi akhir periode). */
-export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggalNeraca?: string) =>
-  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggalNeraca ? `&tanggal=${tanggalNeraca}` : ''}`
+/** Semua daftar (piutang, utang, invoice, barang, pelanggan, pemasok) untuk rentang tanggal. */
+export const daftarUrl = (r: { dari: string; sampai: string }, format: 'xlsx' | 'pdf') => `/api/v1/reports/daftar.${format}?dari=${r.dari}&sampai=${r.sampai}`
+/** rentang: laba rugi & arus kas; tanggal: posisi neraca atau register aset. */
+export const laporanPdfUrl = (period: string, bagian: BagianPDF, metode?: 'langsung' | 'tidak-langsung', rentang?: { dari: string; sampai: string }, tanggal?: string) =>
+  `/api/v1/reports/pdf?period=${period}&bagian=${bagian}${metode ? `&metode=${metode}` : ''}${rentang ? `&dari=${rentang.dari}&sampai=${rentang.sampai}` : ''}${tanggal ? `&tanggal=${tanggal}` : ''}`
 /** Neraca per tanggal bebas (YYYY-MM-DD), mis. per 15 Agustus 2026. */
 /** Nama akun CoA usaha untuk tiap baris laporan (kunci baris → nama akun), mis. piutang → "Piutang Usaha". */
 export const getNamaAkunLaporan = () => api<Record<string, string>>('/reports/nama-akun')
@@ -1932,6 +1977,20 @@ export interface BagianBanding { kode: 'laba-rugi' | 'neraca' | 'arus-kas'; judu
 export interface Banding { kolom: { periode: string; label: string }[]; bagian: BagianBanding[] }
 export const MAKS_BANDING = 12
 export const getBanding = (periode: string[]) => api<Banding>(`/reports/banding?periode=${periode.join(',')}`)
+export type StatusRekon = 'cocok' | 'kurang' | 'lebih' | 'belum_jatuh_tempo' | 'nihil' | 'berjalan'
+export interface RekonBulan {
+  masa: string; bulan: string; omzet: number; omzet_kumulatif: number; dasar_pajak: number
+  pph_terutang: number; pph_disetor: number; selisih: number; jatuh_tempo: string; status: StatusRekon
+  pajak_lain?: number; ppn_keluaran?: number; ppn_disetor?: number
+}
+export interface Rekonsiliasi {
+  tahun: number; subjek: 'OP' | 'Badan'; bebas_op: number; tarif_bps: number; pkp: boolean; bulan: RekonBulan[]
+  total_omzet: number; total_terutang: number; total_disetor: number; perlu_dicek: number; peringatan?: string[]
+  /** terutang − disetor untuk masa yang sudah jatuh tempo; selesai: semua masa lewat jatuh tempo (angka SPT Tahunan) */
+  kurang_bayar: number; selesai: boolean
+}
+export const getRekonsiliasi = (tahun: number) => api<Rekonsiliasi>(`/reports/rekonsiliasi?tahun=${tahun}`)
+export const rekonsiliasiUrl = (tahun: number, format: 'xlsx' | 'pdf') => `/api/v1/reports/rekonsiliasi.${format}?tahun=${tahun}`
 export const bandingPdfUrl = (periode: string[]) => `/api/v1/reports/banding.pdf?periode=${periode.join(',')}`
 
 // --- Laporan produksi ---

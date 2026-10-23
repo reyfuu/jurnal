@@ -274,6 +274,10 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		s.nextTxID++
 		s.txs = append(s.txs, txs[i])
 	}
+	s.beriNomorJurnalLocked()
+	for i := range txs { // contoh di respons memuat nomor jurnalnya
+		txs[i].NoJurnal = s.txs[len(s.txs)-len(txs)+i].NoJurnal
+	}
 	s.mu.Unlock()
 	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
 }

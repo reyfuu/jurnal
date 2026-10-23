@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/PageHeader'
 import { Input } from '@/components/ui/input'
 import { type Dashboard } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { FiturTerkunci } from '@/components/FiturTerkunci'
+import { RekonsiliasiPajak } from '@/views/Rekonsiliasi'
 
 export function StokModule({ d, title }: { d: Dashboard; title: string }) {
   const [cari, setCari] = useState('')
@@ -95,21 +97,30 @@ export function StokModule({ d, title }: { d: Dashboard; title: string }) {
   )
 }
 
-export function PajakUMKM({ d }: { d: Dashboard }) {
+export function PajakUMKM({ d, period, pro, bisaEkspor, bisaCatat, onLangganan }: {
+  d: Dashboard; period: string; pro: boolean; bisaEkspor: boolean; bisaCatat: boolean; onLangganan?: () => void
+}) {
   const tr = d.tax_report
+  const tahun = period.slice(0, 4)
+  const op = tr.entity_type === 'OP'
+  const akhir = tr.months.at(-1)?.month_name.slice(0, 3)
+  const mulai = tr.months.find((m) => m.taxable_amount > 0)?.month_name
   const kpis = [
-    { label: 'Akumulasi Omzet 2026', value: tr.total_gross, meta: <span className="badge-up">Jan – Agu 2026</span> },
-    { label: 'Kuota Bebas Pajak WP OP', value: tr.yearly_exemption, meta: <span>PP 55/2022 Pasal 60</span> },
-    { label: 'Omzet Kena Pajak (Di atas Rp500.000.000)', value: tr.total_taxable, color: 'var(--text-warn)', meta: <span>Mulai terlewati di bulan Juli</span> },
-    { label: 'Total PPh Final 0,5% Terutang', value: tr.total_tax_due, color: 'var(--accent-green)', meta: <span>Siap dilampirkan ke SPT Tahunan</span> },
+    { label: `Akumulasi Omzet ${tahun}`, value: tr.total_gross, meta: <span className="badge-up">{akhir ? `Jan – ${akhir} ${tahun}` : tahun}</span> },
+    op
+      ? { label: 'Kuota Bebas Pajak WP OP', value: tr.yearly_exemption, meta: <span>PP 55/2022 Pasal 60</span> }
+      : { label: 'Kuota Bebas Pajak', value: 0, meta: <span>Hanya untuk orang pribadi</span> },
+    { label: op ? 'Omzet Kena Pajak (Di atas Rp500.000.000)' : 'Omzet Kena Pajak', value: tr.total_taxable, color: 'var(--text-warn)',
+      meta: <span>{!op ? 'Sejak rupiah pertama' : mulai ? `Mulai terlewati di bulan ${mulai}` : 'Kuota belum terlewati'}</span> },
+    { label: 'Total PPh Final 0,5% Terutang', value: tr.total_tax_due, color: 'var(--accent-green)', meta: <span>Rekap untuk SPT Tahunan</span> },
   ]
   return (
     <>
       <PageHeader
         title="Pajak UMKM (PP 55 Tahun 2022)"
-        subtitle="Kalkulasi PPh Final 0,5% & Pemantauan Kuota Bebas Pajak Rp500 Juta/Tahun (WP Orang Pribadi)"
+        subtitle={op ? 'Kalkulasi PPh Final 0,5% & Pemantauan Kuota Bebas Pajak Rp500 Juta/Tahun (WP Orang Pribadi)' : 'Kalkulasi PPh Final 0,5% dari omzet bruto (WP Badan)'}
       >
-        <span className="pill-status pill-brand">Status WP: Orang Pribadi (Bebas Pajak s/d Rp500.000.000)</span>
+        <span className="pill-status pill-brand">{op ? 'Status WP: Orang Pribadi (Bebas Pajak s/d Rp500.000.000)' : 'Status WP: Badan'}</span>
       </PageHeader>
 
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
@@ -121,6 +132,10 @@ export function PajakUMKM({ d }: { d: Dashboard }) {
           </div>
         ))}
       </div>
+
+      {pro
+        ? <RekonsiliasiPajak tahunAwal={Number(tahun)} bisaEkspor={bisaEkspor} bisaCatat={bisaCatat} />
+        : <FiturTerkunci pro nama="Rekonsiliasi bulanan vs tahunan" onLangganan={onLangganan} />}
 
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Kertas Kerja Rekapitulasi Peredaran Bruto Bulanan</div>

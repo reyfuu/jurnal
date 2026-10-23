@@ -30,3 +30,11 @@ func TestCashWarnings_NoneWhenPositive(t *testing.T) {
 		t.Fatalf("want no warnings, got %+v", got)
 	}
 }
+
+// Pindah dana antar rekening sendiri tidak mengubah total kas, jadi tidak memicu kas minus.
+func TestCashWarnings_PindahDanaNetral(t *testing.T) {
+	txs := []Transaction{{ID: 1, Tanggal: "2026-10-01", Jenis: JenisPindahDana, Nominal: 500_000, Lunas: true, Akun: "1101", Lawan: "1102"}}
+	if w := CashWarnings(txs, 100_000); len(w) != 0 {
+		t.Fatalf("peringatan palsu: %+v", w)
+	}
+}

@@ -3,6 +3,7 @@ import { useGulirKeForm } from '@/lib/gulir'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { IsiAIBanner } from '@/components/IsiAIBanner'
+import { RiwayatPihakDialog } from '@/views/RiwayatPihak'
 import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import {
   createProduk, createSupplier, deleteProduk, deleteSupplier, getProduksi, getStok, terapkanHPP,
@@ -204,6 +205,7 @@ function EditorResep({ bahan, stok, onChange }: { bahan: ResepBahan[]; stok: Sto
 /** isiAI: isian dari Tanya AI untuk pemasok baru (bisa diurungkan). */
 export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolean; aksi?: string; isiAI?: SinyalAI }) {
   const [tab, setTab] = useState<'produksi' | 'produk' | 'supplier'>('produksi')
+  const [riwayat, setRiwayat] = useState<string | null>(null) // nama supplier yang riwayatnya dibuka
   const [muatUlang, setMuatUlang] = useState(0)
   const [data, setData] = useState<ProduksiSummary | null>(null)
   const [stok, setStok] = useState<StokRow[]>([])
@@ -540,6 +542,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
 
       </>}
 
+      <RiwayatPihakDialog nama={riwayat} onTutup={() => setRiwayat(null)} />
       {tab === 'supplier' && (
       <div className="card" style={{ padding: 20 }}>
         <div className="chart-title">Supplier</div>
@@ -601,7 +604,7 @@ export function ProduksiSupplier({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: 
               )}
               {supplier.map((s) => (
                 <tr key={s.id}>
-                  <td style={{ fontWeight: 600 }}>{s.nama}</td>
+                  <td style={{ fontWeight: 600 }}><button type="button" className="underline underline-offset-4" title="Lihat riwayat transaksi" onClick={() => setRiwayat(s.nama)}>{s.nama}</button></td>
                   <td>{s.kontak || '—'}</td>
                   <td>{s.telepon || '—'}</td>
                   <td style={{ color: 'var(--text-muted)' }}>{s.alamat || '—'}</td>

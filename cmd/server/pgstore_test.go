@@ -209,6 +209,10 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.gerak = []finance.GerakStok{filled[finance.GerakStok](17)}
 	tn.gerak[0].ID = 1
 	tn.nextGerakID = 2
+	tn.pelanggan = []finance.Pelanggan{filled[finance.Pelanggan](18)}
+	tn.pelanggan[0].ID = 1
+	tn.nextPelangganID = 2
+	tn.nomorJurnal = map[string]int{"202601": 7}
 	tn.tutupBuku = "2026-01"
 	tn.coaTemplateID = 1
 	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3

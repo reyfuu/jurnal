@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, register, type Me } from '@/lib/api'
+import { LupaPassword } from '@/views/LupaPassword'
 
 // Akun demo hanya tampil di `npm run dev`; build produksi membuangnya (password prod dari env SEED_PASSWORD).
 const DEMO_PASSWORD = 'senja2026'
@@ -28,6 +29,7 @@ export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogi
   const [wa, setWa] = useState(awal?.wa ?? '')
   const [setujuPDP, setSetujuPDP] = useState(awal?.setuju_pdp ?? false)
   const [showPassword, setShowPassword] = useState(false)
+  const [lupa, setLupa] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -56,7 +58,7 @@ export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogi
           <Logo tinggi={32} />
         </div>
 
-        <Card>
+        {lupa ? <LupaPassword emailAwal={email} onKembali={() => setLupa(false)} /> : <Card>
           <CardHeader>
             <CardTitle className="text-xl">{daftar ? 'Daftar' : 'Masuk'}</CardTitle>
             <CardDescription>
@@ -80,7 +82,10 @@ export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogi
                 <Input id="wa" className="h-11" type="tel" inputMode="tel" autoComplete="tel" placeholder="0812-3456-7890" required value={wa} onChange={(e) => setWa(e.target.value)} />
               </div>}
               <div className="grid gap-1.5">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  {!daftar && <button type="button" className="text-sm text-muted-foreground underline-offset-4 hover:underline" onClick={() => { setLupa(true); setError('') }}>Lupa password?</button>}
+                </div>
                 <div className="relative">
                   <Input id="password" className="h-11 pr-12" type={showPassword ? 'text' : 'password'} autoComplete={daftar ? 'new-password' : 'current-password'} required minLength={daftar ? 8 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
                   <Button
@@ -119,7 +124,7 @@ export function Login({ onLogin, initialDaftar = false, awal, onBack }: { onLogi
               </button>
             </p>
           </CardContent>
-        </Card>
+        </Card>}
 
         {import.meta.env.DEV && <div className="dark mt-5 rounded-xl border border-[var(--border-subtle)] p-3.5 text-xs text-muted-foreground">
           <div className="mb-2 font-semibold text-foreground">Akun demo · password <code className="font-mono">{DEMO_PASSWORD}</code></div>

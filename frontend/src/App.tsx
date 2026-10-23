@@ -14,6 +14,8 @@ import { ApiError, getBusiness, getMe, getPeriods, loadAll, logout, selesaiLihat
 import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login, type AwalDaftar } from '@/views/Login'
+import { AturPassword } from '@/views/LupaPassword'
+import { TagihanTabs } from '@/views/Tagihan'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
@@ -71,6 +73,10 @@ export default function App() {
   const ingatMasuk = (v: boolean) => { setMasukTerkunci(v); try { sessionStorage.setItem('masuk-terkunci', v ? '1' : '') } catch { /* mode privat */ } }
 
   const me = session.status === 'in' ? session.me : null
+  // Token dari tautan email (#/atur-password?token=…) dibaca sekali saat dimuat: sinkronisasi
+  // rute di bawah bisa menimpa hash bila browser masih masuk.
+  const [tokenReset, setTokenReset] = useState<string | null>(() =>
+    window.location.hash.startsWith('#/atur-password') ? new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('token') ?? '' : null)
 
   const fail = useCallback((e: unknown) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -154,6 +160,11 @@ export default function App() {
   }, [])
 
   if (session.status === 'checking') return null
+  // Tautan atur ulang password dari email: #/atur-password?token=… (juga bila browser masih
+  // masuk; setelah diganti semua sesi berakhir, jadi kembali ke halaman Masuk).
+  if (tokenReset !== null) {
+    return <AturPassword token={tokenReset} onSelesai={() => { history.replaceState(null, '', '#/masuk'); setTokenReset(null); setSession({ status: 'anon' }); setAuth('masuk') }} />
+  }
   if (!me) {
     // Buka Masuk / Daftar sebagai langkah riwayat baru supaya tombol Back browser kembali ke landing.
     const bukaAuth = (jenis: 'masuk' | 'daftar') => {
@@ -384,7 +395,7 @@ export default function App() {
         )
       case 'umur-piutang':
       case 'piutang-utang':
-        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} />
+        return <TagihanTabs view="piutang-utang" boleh={canSee} onPilih={navigate}><UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} /></TagihanTabs>
       case 'tutup-buku':
         return <TutupBuku periods={periods} period={period} bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onBuka={navigate} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
@@ -398,11 +409,12 @@ export default function App() {
       case 'produksi-supplier':
         return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'invoice':
-        return <InvoiceView isiAI={sinyalAI} />
+        return <TagihanTabs view="invoice" boleh={canSee} onPilih={navigate}><InvoiceView isiAI={sinyalAI} /></TagihanTabs>
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':
-        return <PajakUMKM d={d} />
+        return <PajakUMKM d={d} period={period} pro={me!.langganan.pro} bisaEkspor={!me!.lihat} bisaCatat={!me!.lihat && canSee('transaksi')}
+          onLangganan={canSee('langganan') ? () => navigate('langganan') : undefined} />
       case 'kalkulator-pajak':
         return <KalkulatorPajak profile={business?.profile ?? null} />
       case 'perencanaan-pajak':

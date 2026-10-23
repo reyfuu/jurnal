@@ -29,6 +29,7 @@ import (
 	"pajak/internal/master"
 	"pajak/internal/pengetahuan"
 	"pajak/internal/primbon"
+	"pajak/internal/surel"
 	"pajak/internal/xlsx"
 )
 
@@ -61,6 +62,9 @@ type tenant struct {
 	nextProdukID   int
 	supplier       []finance.Supplier
 	nextSupplierID int
+	// pelanggan: master pelanggan (Invoice → Daftar pelanggan).
+	pelanggan       []finance.Pelanggan
+	nextPelangganID int
 	// koreksi: usulan tim Master Pajak; mengubah txs hanya setelah disetujui pemilik.
 	koreksi       []finance.Koreksi
 	nextKoreksiID int
@@ -74,6 +78,8 @@ type tenant struct {
 	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
 	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
 	tutupBuku string
+	// nomorJurnal: nomor jurnal terakhir per bulan ("202610" → 12); tidak pernah turun.
+	nomorJurnal map[string]int
 	// coaTemplateID: versi template COA yang dipatok untuk usaha ini; 0 = ikut versi terbaru.
 	coaTemplateID int
 	// arsip: diarsipkan tim Master Pajak (soft delete); semua user usaha ini tidak bisa masuk.
@@ -94,8 +100,10 @@ type Server struct {
 	saveMu    sync.Mutex // serialisasi penulisan state
 	loginMu   sync.Mutex
 	failures  map[string]loginFailure // per IP
-	aiEngine  *ai.Engine
-	llm       *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
+	// kirimSurel: pengirim email (lupa password); diganti di test.
+	kirimSurel func(ke, subjek, isi string) error
+	aiEngine   *ai.Engine
+	llm        *llm.Client // nil-aman: tanpa LLM_API_KEY, analisis AI mati dan laporan tetap jalan
 	// llmGambar: model pembaca foto nota (LLM_VISION_*; kosong = ikut LLM_*).
 	llmGambar *llm.Client
 	mux       *http.ServeMux
@@ -182,6 +190,9 @@ func (t *tenant) restore(st *state) {
 	if st.NextSupplierID > 0 {
 		t.supplier, t.nextSupplierID = st.Supplier, st.NextSupplierID
 	}
+	if st.NextPelangganID > 0 {
+		t.pelanggan, t.nextPelangganID = st.Pelanggan, st.NextPelangganID
+	}
 	if st.NextKoreksiID > 0 {
 		t.koreksi, t.nextKoreksiID = st.Koreksi, st.NextKoreksiID
 	}
@@ -194,6 +205,8 @@ func (t *tenant) restore(st *state) {
 	t.coaTemplateID = st.CoaTemplate
 	t.arsip, t.arsipAlasan = st.Arsip, st.ArsipAlasan
 	t.tutupBuku = st.TutupBuku
+	t.nomorJurnal = st.NomorJurnal
+	t.beriNomorJurnalLocked() // transaksi lama tanpa nomor (migrasi, sekali)
 }
 
 func NewServer() *Server {
@@ -205,6 +218,11 @@ func NewServer() *Server {
 		mux:       http.NewServeMux(),
 		bugHook:   newBugHook(),
 		lihat:     map[int]lihatGrant{},
+	}
+	smtpCfg := surel.ConfigFromEnv()
+	s.kirimSurel = smtpCfg.Kirim
+	if os.Getenv("APP_URL") != "" && !smtpCfg.Aktif() {
+		log.Printf("PERINGATAN: APP_URL diisi tetapi SMTP_HOST/SMTP_FROM kosong: email 'Lupa password' tidak akan terkirim")
 	}
 	loaded := false
 	if url := os.Getenv("DATABASE_URL"); url != "" {
@@ -219,7 +237,11 @@ func NewServer() *Server {
 	if !loaded {
 		// DB kosong: impor berkas JSON lama (atau seed) lalu simpan. Mode JSON: seed hanya
 		// disimpan bila state.json belum ada; SEED_PASSWORD hanya dipakai saat itu.
-		if fromFiles := s.loadFiles(); s.db != nil || !fromFiles {
+		fromFiles := s.loadFiles()
+		for _, t := range s.tenants { // usaha seed / berkas lama: nomor jurnal sebelum disimpan
+			t.beriNomorJurnal()
+		}
+		if s.db != nil || !fromFiles {
 			s.saveAll()
 		}
 	}
@@ -349,6 +371,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.persisting(s.handleLogin))
 	s.mux.HandleFunc("POST /api/v1/auth/register", s.persisting(s.handleRegister))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.persisting(s.handleLogout))
+	s.mux.HandleFunc("POST /api/v1/auth/lupa-password", s.handleLupaPassword)
+	s.mux.HandleFunc("POST /api/v1/auth/atur-password", s.handleAturPassword)
 	s.mux.HandleFunc("GET /api/v1/auth/me", s.guard("", s.handleMe))
 	s.mux.HandleFunc("GET /api/v1/periods", s.guard("", s.handlePeriods))
 
@@ -387,6 +411,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.xlsx", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarXlsx))))
 	s.mux.HandleFunc("GET /api/v1/reports/daftar.pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleDaftarPDF))))
 	s.mux.HandleFunc("GET /api/v1/reports/banding", s.guard("laporan-keuangan", s.on((*tenant).handleBanding)))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi", s.guard("pajak-umkm", s.pro(s.on((*tenant).handleRekonsiliasi))))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi.xlsx", s.guard("pajak-umkm", s.pro(s.exporting(s.on((*tenant).handleRekonsiliasiXlsx)))))
+	s.mux.HandleFunc("GET /api/v1/reports/rekonsiliasi.pdf", s.guard("pajak-umkm", s.pro(s.exporting(s.on((*tenant).handleRekonsiliasiPDF)))))
 	s.mux.HandleFunc("GET /api/v1/reports/banding.pdf", s.guard("laporan-keuangan", s.exporting(s.on((*tenant).handleBandingPDF))))
 	s.mux.HandleFunc("POST /api/v1/pricing/simulate", s.guard("simulasi-harga", s.on((*tenant).handleSimulatePrice)))
 	s.mux.HandleFunc("POST /api/v1/simulasi", s.guard("simulasi-harga", s.on((*tenant).handleSimulasi)))
@@ -442,6 +469,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateProduk))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/produk/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteProduk))))
 	s.mux.HandleFunc("POST /api/v1/produksi/produk/{id}/terapkan-hpp", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleTerapkanHPP))))
+	s.mux.HandleFunc("GET /api/v1/pihak/riwayat", s.guard("transaksi", s.on((*tenant).handleRiwayatPihak)))
+	s.mux.HandleFunc("GET /api/v1/pelanggan", s.guard("invoice", s.on((*tenant).handleListPelanggan)))
+	s.mux.HandleFunc("POST /api/v1/pelanggan", s.persisting(s.guard("invoice", s.on((*tenant).handleCreatePelanggan))))
+	s.mux.HandleFunc("POST /api/v1/pelanggan/dari-data", s.persisting(s.guard("invoice", s.on((*tenant).handlePelangganDariData))))
+	s.mux.HandleFunc("PUT /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleUpdatePelanggan))))
+	s.mux.HandleFunc("DELETE /api/v1/pelanggan/{id}", s.persisting(s.guard("invoice", s.on((*tenant).handleDeletePelanggan))))
 	s.mux.HandleFunc("POST /api/v1/produksi/supplier", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleCreateSupplier))))
 	s.mux.HandleFunc("PUT /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleUpdateSupplier))))
 	s.mux.HandleFunc("DELETE /api/v1/produksi/supplier/{id}", s.persisting(s.guard("produksi-supplier", s.on((*tenant).handleDeleteSupplier))))
@@ -586,7 +619,7 @@ func (s *Server) newMe(u auth.User) meResp {
 		me.Master = s.masterInfoFor(u)
 		if me.Lihat = s.lihatInfoFor(u); me.Lihat != nil {
 			// Menu klien versi baca; layar bayar tidak relevan untuk tim.
-			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif"}
+			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif", Pro: true}
 		}
 		return me
 	}
@@ -847,10 +880,7 @@ func (s *tenant) report(period string) finance.PeriodReport {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rep := s.reportLocked(period)
-	if rep.Assets.MetodeUsaha = s.metodeUsaha(); rep.Assets.MetodeUsaha == "" {
-		saran, seragam := finance.MetodeSeragam(s.assets)
-		rep.Assets.MetodeSaran, rep.Assets.MetodeCampur = saran, !seragam
-	}
+	s.isiMetodeAsetLocked(&rep.Assets)
 	return rep
 }
 
@@ -1066,7 +1096,11 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
+	if ok && t.Jenis == finance.JenisPindahDana { // rekening asal (Lawan) hanya bisa dipilih di Catat
+		http.Error(w, "pindah dana dicatat lewat Catat: pilih rekening asal dan rekening tujuan", http.StatusBadRequest)
+		return t, false
+	}
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber, t.NoJurnal = 0, 0, "", "", "" // tautan invoice, catatan jurnal, asal & nomor hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1105,6 +1139,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
+	t.NoJurnal = s.nomorTxLocked(t.ID)
 	resp := s.withWarnings(t)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
@@ -1146,8 +1181,9 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
-	t.ID = s.txs[i].ID
+	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal
 	s.txs[i] = t
+	t.NoJurnal = s.nomorTxLocked(t.ID) // pindah bulan → nomor baru
 	writeJSON(w, s.withWarnings(t))
 }
 

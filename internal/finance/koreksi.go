@@ -65,10 +65,15 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 		}
 		u := *k.Usulan
 		u.ID = k.TransaksiID
+		// field yang diatur server tidak bisa diubah lewat usulan
+		u.NoJurnal, u.Grup, u.InvoiceID, u.Sumber = "", k.Sebelum.Grup, k.Sebelum.InvoiceID, k.Sebelum.Sumber
+		if u.Jenis == JenisPindahDana || k.Sebelum.Jenis == JenisPindahDana {
+			return errors.New("pindah dana diubah lewat halaman Catat, bukan usulan koreksi")
+		}
 		if err := Validate(&u); err != nil {
 			return err
 		}
-		if u == k.Sebelum {
+		if u == tanpaNomor(k.Sebelum) {
 			return errors.New("usulan sama dengan transaksi sekarang")
 		}
 		k.Usulan = &u
@@ -82,7 +87,7 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 // TerapkanKoreksi mengembalikan daftar transaksi baru (txs tidak diubah).
 func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 	i := txIndex(txs, k.TransaksiID)
-	if i < 0 || txs[i] != k.Sebelum {
+	if i < 0 || tanpaNomor(txs[i]) != tanpaNomor(k.Sebelum) { // nomor jurnal bisa diberikan setelah usulan dibuat
 		return nil, ErrKoreksiBasi
 	}
 	out := slices.Clone(txs)
@@ -90,8 +95,11 @@ func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 		return slices.Delete(out, i, i+1), nil
 	}
 	out[i] = *k.Usulan
+	out[i].NoJurnal = txs[i].NoJurnal
 	return out, nil
 }
+
+func tanpaNomor(t Transaction) Transaction { t.NoJurnal = ""; return t }
 
 // DampakKoreksi: laba bersih satu bulan sebelum & sesudah koreksi diterapkan (tanpa penyusutan
 // dari register aset, yang tidak ikut berubah).

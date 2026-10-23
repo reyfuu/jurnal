@@ -72,3 +72,30 @@ func TestPecahCatat_PenjualanDanPenolakan(t *testing.T) {
 		}
 	}
 }
+
+// Checklist tester No 20: pindah dana antar rekening sendiri (Kas/Bank/e-wallet) dicatat sebagai
+// "Pindah Dana": Akun = rekening tujuan, Lawan = rekening asal; biaya admin tetap beban.
+func TestPecahCatat_PindahDana(t *testing.T) {
+	p := finance.BusinessProfile{JenisUsaha: "perdagangan", BentukUsaha: "op", MetodePersediaan: "periodik"}
+	peta := PetaDari(Master)
+	txs, err := PecahCatat([]BarisCatat{{Akun: "1101", Debit: 2_000_000}, {Akun: "1102", Kredit: 2_000_000}}, Master, p, peta)
+	if err != nil || len(txs) != 1 || txs[0].Jenis != "Pindah Dana" || txs[0].Akun != "1101" || txs[0].Lawan != "1102" || !txs[0].Lunas {
+		t.Fatalf("bank → kas: %+v %v", txs, err)
+	}
+	txs, err = PecahCatat([]BarisCatat{{Akun: "1103", Debit: 1_000_000}, {Akun: "9102", Debit: 6_500}, {Akun: "1102", Kredit: 1_006_500}}, Master, p, peta)
+	if err != nil || len(txs) != 2 || txs[0].Jenis != "Pindah Dana" || txs[0].Akun != "1103" || txs[0].Lawan != "1102" || txs[1].Akun != "9102" {
+		t.Fatalf("bank → e-wallet + admin: %+v %v", txs, err)
+	}
+	// susun ulang untuk layar ubah tetap Dr tujuan / Cr asal
+	if b := SusunCatat(txs[:1], p, peta); len(b) != 2 || b[0].Akun != "1103" || b[0].Debit != 1_000_000 || b[1].Akun != "1102" || b[1].Kredit != 1_000_000 {
+		t.Fatalf("susun ulang: %+v", b)
+	}
+	for nama, b := range map[string][]BarisCatat{
+		"rekening sama": {{Akun: "1101", Debit: 10}, {Akun: "1101", Kredit: 10}},
+		"piutang ↔ kas": {{Akun: "1101", Debit: 10}, {Akun: "1201", Kredit: 10}},
+	} {
+		if _, err := PecahCatat(b, Master, p, peta); err == nil {
+			t.Errorf("%s harus ditolak", nama)
+		}
+	}
+}

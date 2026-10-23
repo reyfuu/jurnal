@@ -11,7 +11,7 @@ type Periode = 'bulanan' | 'tahunan'
 // semua paket saat ini membuka seluruh aplikasi.
 const TINGKAT: { id: string; nama: string; populer?: boolean; fitur: [string, segera?: boolean][] }[] = [
   { id: 'starter', nama: 'Starter', fitur: [['Foto nota via WhatsApp jadi jurnal', true], ['4 laporan keuangan otomatis'], ['Konsultan Pajak AI'], ['Zoom mingguan bersama tim ahli']] },
-  { id: 'pro', nama: 'Pro', populer: true, fitur: [['Semua fitur Starter'], ['Pajak masukan otomatis jadi kredit pajak', true], ['Rekonsiliasi bulanan vs tahunan', true], ['Ekspor XML siap Coretax', true]] },
+  { id: 'pro', nama: 'Pro', populer: true, fitur: [['Semua fitur Starter'], ['Pajak masukan otomatis jadi kredit pajak', true], ['Rekonsiliasi bulanan vs tahunan'], ['Ekspor XML siap Coretax', true]] },
   { id: 'premium', nama: 'Premium Master', fitur: [['Semua fitur Pro'], ['Akses webinar eksklusif'], ['Pembahasan SP2DK dan ekualisasi'], ['Pendampingan pemeriksaan dan audit']] },
 ]
 

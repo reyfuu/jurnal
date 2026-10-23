@@ -73,6 +73,7 @@ func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) e
 	s.pakaiRekeningBawaanLocked(&t, lama)
 	if i >= 0 {
 		t.ID = s.txs[i].ID
+		t.NoJurnal = s.txs[i].NoJurnal
 		s.txs[i] = t
 	} else {
 		t.ID = s.nextTxID

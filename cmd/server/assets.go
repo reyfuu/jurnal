@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"time"
 
 	"pajak/internal/finance"
 )
@@ -21,8 +22,28 @@ type asetListResp struct {
 	TanggalSaldoAwal   string `json:"tanggal_saldo_awal"`
 }
 
+// Pemanggil memegang s.mu; metadata metode sama untuk laporan bulanan dan per tanggal.
+func (s *tenant) isiMetodeAsetLocked(as *finance.AssetSummary) {
+	if as.MetodeUsaha = s.metodeUsaha(); as.MetodeUsaha == "" {
+		saran, seragam := finance.MetodeSeragam(s.assets)
+		as.MetodeSaran, as.MetodeCampur = saran, !seragam
+	}
+}
+
 func (s *tenant) handleListAssets(w http.ResponseWriter, r *http.Request) {
-	out := asetListResp{AssetSummary: s.report(periodOrDefault(r)).Assets}
+	var out asetListResp
+	if pada := r.URL.Query().Get("pada"); pada != "" { // per tanggal bebas (checklist No 22)
+		if _, err := time.Parse(time.DateOnly, pada); err != nil {
+			http.Error(w, "pada harus YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		s.mu.RLock()
+		out.AssetSummary = finance.AssetsPada(s.assets, s.txs, pada)
+		s.isiMetodeAsetLocked(&out.AssetSummary)
+		s.mu.RUnlock()
+	} else {
+		out.AssetSummary = s.report(periodOrDefault(r)).Assets
+	}
 	s.mu.RLock()
 	out.TanggalSaldoAwal = s.bukuAwalLocked().Tanggal
 	for _, a := range s.assets {
@@ -81,6 +102,7 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 	s.pakaiRekeningBawaanLocked(&t, lawanLama)
 	if i >= 0 {
 		t.ID = s.txs[i].ID
+		t.NoJurnal = s.txs[i].NoJurnal
 		s.txs[i] = t
 	} else {
 		t.ID = s.nextTxID

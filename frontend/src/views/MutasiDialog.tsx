@@ -234,7 +234,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                     )}
                     {urutan.map((i) => {
                       const r = rows[i]
-                      const pilihan = jenis.filter((j) => j.arah === r.arah)
+                      const pilihan = jenis.filter((j) => j.arah === r.arah && j.pos !== 'pindah') // pindah dana hanya lewat Catat
                       const aksi = !r.pilih ? 'lewati' : r.lunasi ? 'lunasi' : 'baru'
                       return (
                         <Fragment key={`${r.baris}-${i}`}>

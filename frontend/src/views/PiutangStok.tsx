@@ -304,13 +304,15 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
   const formRef = useRef<HTMLDivElement>(null)
   useGulirKeForm(formRef, tambahBanyak || !!form)
 
-  const muat = useCallback(() => { getStok().then(setData, (e: Error) => setError(e.message)) }, [])
+  // Per tanggal (checklist No 22): jumlah & nilai dari kartu stok pada tanggal itu; '' = sekarang.
+  const [pada, setPada] = useState('')
+  const muat = useCallback(() => { getStok(pada).then(setData, (e: Error) => setError(e.message)) }, [pada])
   useEffect(muat, [muat])
   const isiAi = useIsiAI<{ tab: typeof tab; form: StokInput | null; editId: number | null; tambahBanyak: boolean }, Partial<StokInput>>(isiAI, 'stok', {
     ambil: () => ({ tab, form, editId, tambahBanyak }),
     pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId); setTambahBanyak(s.tambahBanyak) },
     isi: (isian) => {
-      setError(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
+      setError(''); setPada(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
       const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, ...isian }
       // SKU otomatis dari nama, sama seperti tabel Tambah barang
       if (!b.sku) b.sku = buatSKU(b.nama, new Set((data?.items ?? []).map((x) => x.sku.toUpperCase()).filter(Boolean)))
@@ -371,14 +373,14 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
         ? `Kartu stok aktif sejak ${formatTanggal(mulai)}: stok bergerak otomatis dari beli, jual, produksi & opname.`
         : 'Daftar bahan baku & produk jadi, nilai persediaan, dan peringatan stok menipis.'}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {bisaUbah && mulai && <>
+          {bisaUbah && mulai && !pada && <>
             <button className="btn-cta accent" style={{ padding: '8px 16px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setDialog('beli')} disabled={list.length === 0}>
               <ShoppingCart size={15} aria-hidden /> Beli bahan
             </button>
           </>}
-          <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
+          {!pada && <button className="nav-item" style={{ width: 'auto', padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setImpor(true)}>
             <Upload size={15} aria-hidden /> Impor Excel
-          </button>
+          </button>}
         </div>
       </PageHeader>
 
@@ -395,7 +397,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                 berkurang dari penjualan, dan dicocokkan lewat stok opname. Disarankan untuk usaha dagang & produksi; usaha jasa boleh melewatinya.
               </div>
             </div>
-            {bisaUbah && <button className="btn-cta" style={{ padding: '9px 18px', fontSize: 13 }} disabled={list.length === 0} onClick={() => setTab('opname')}>Hitung stok awal</button>}
+            {bisaUbah && <button className="btn-cta" style={{ padding: '9px 18px', fontSize: 13 }} disabled={list.length === 0} onClick={() => { setPada(''); setTab('opname') }}>Hitung stok awal</button>}
           </div>
         </div>
       )}
@@ -403,9 +405,9 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
       {pesan && <div className="pill-status pill-green" role="status" style={{ alignSelf: 'flex-start', marginBottom: 12, whiteSpace: 'normal' }}>{pesan}</div>}
       <div className="tabbar" role="tablist" aria-label="Bagian stok" style={{ marginBottom: 12 }}>
         <button role="tab" className="tab-btn" aria-selected={tab === 'daftar'} onClick={() => setTab('daftar')}>Daftar barang</button>
-        <button role="tab" className="tab-btn" aria-selected={tab === 'opname'} onClick={() => { setPesan(''); setTab('opname') }}>{mulai ? 'Stok opname' : 'Stok opname / saldo awal'}</button>
-        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'mutasi'} onClick={() => setTab('mutasi')}>Laporan mutasi</button>}
-        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'riwayat'} onClick={() => setTab('riwayat')}>Riwayat opname & produksi</button>}
+        <button role="tab" className="tab-btn" aria-selected={tab === 'opname'} onClick={() => { setPesan(''); setPada(''); setTab('opname') }}>{mulai ? 'Stok opname' : 'Stok opname / saldo awal'}</button>
+        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'mutasi'} onClick={() => { setPada(''); setTab('mutasi') }}>Laporan mutasi</button>}
+        {mulai && <button role="tab" className="tab-btn" aria-selected={tab === 'riwayat'} onClick={() => { setPada(''); setTab('riwayat') }}>Riwayat opname & produksi</button>}
       </div>
       {tab === 'opname' && <StokOpnamePanel key={mulai + list.length} items={list} mulai={mulai} bisaUbah={bisaUbah}
         onDone={(m) => { setPesan(m); setTab('daftar'); muat() }} />}
@@ -445,11 +447,19 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
             <div className="chart-title">Daftar Stok</div>
             <div className="chart-subtitle">{mulai ? 'Klik nama barang untuk melihat kartu stoknya (riwayat masuk & keluar). Klik judul kolom untuk mengurutkan.' : 'Klik judul kolom untuk mengurutkan. Banyak barang sekaligus bisa lewat + Tambah barang atau Impor Excel.'}</div>
           </div>
-          {bisaUbah && (
-            <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => { setError(''); setForm(null); setEditId(null); setTambahBanyak(true) }}>
-              + Tambah barang
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {mulai && (
+              <label className="flex items-center gap-1 text-sm text-muted-foreground" title="Jumlah & nilai menurut kartu stok pada tanggal itu">Per tanggal
+                <input className="input-field" type="date" style={{ width: 'auto' }} aria-label="Stok per tanggal" value={pada} min={mulai}
+                  onChange={(e) => { setForm(null); setTambahBanyak(false); setPada(e.target.value) }} /></label>
+            )}
+            {pada && <button type="button" className="text-sm underline underline-offset-4" onClick={() => setPada('')}>Posisi sekarang</button>}
+            {bisaUbah && !pada && (
+              <button className="btn-cta" style={{ padding: '8px 18px', fontSize: 13 }} onClick={() => { setError(''); setForm(null); setEditId(null); setTambahBanyak(true) }}>
+                + Tambah barang
+              </button>
+            )}
+          </div>
         </div>
         {/* Form tambah / ubah muncul di sini, tepat di atas tabel, dan halaman bergeser ke sini. */}
         <div ref={formRef} style={{ scrollMarginTop: 16 }}>
@@ -551,7 +561,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                   </td>
                   <td style={{ textAlign: 'right', color: BLUE }}>{formatRp(it.nilai)}</td>
                   <td><span className={'pill-status ' + STATUS_CLS[it.status]} style={{ fontSize: 10 }}>{it.status}</span></td>
-                  <Aksi onEdit={() => { setError(''); setEditId(it.id); setForm(toStokInput(it)) }} onDelete={() => void hapus(it)} />
+                  {pada ? <td /> : <Aksi onEdit={() => { setError(''); setEditId(it.id); setForm(toStokInput(it)) }} onDelete={() => void hapus(it)} />}
                 </tr>
               ))}
             </tbody>
