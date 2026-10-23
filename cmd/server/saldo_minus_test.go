@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -88,6 +89,54 @@ func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 	minus := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
 	if len(minus) != 1 || minus[0].Kode != "1102" || minus[0].Nilai != 2_500_000 || minus[0].Normal != "debit" {
 		t.Fatalf("peringatan: %+v", minus)
+	}
+}
+
+// Peringatan menyebut SEMUA titik saldo berbalik minus (tanggal & No. Bukti) sejak awal pembukuan,
+// supaya seluruh jurnal penyebabnya bisa diperiksa sekaligus, tidak satu per satu mundur.
+func TestSaldoMinus_SemuaTitikMinus(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	var sewa []finance.Transaction
+	for _, tx := range []string{
+		`{"tanggal":"2026-01-05","jenis":"Penjualan","nominal":500000,"lunas":true}`,
+		`{"tanggal":"2026-01-06","jenis":"Sewa Tempat","nominal":4000000,"lunas":true}`, // minus 2,5 jt
+		`{"tanggal":"2026-02-02","jenis":"Penjualan","nominal":5000000,"lunas":true}`,   // pulih +2,5 jt
+		`{"tanggal":"2026-02-10","jenis":"Sewa Tempat","nominal":4000000,"lunas":true}`, // minus lagi 1,5 jt
+	} {
+		x := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", tx)
+		if x.Jenis == "Sewa Tempat" {
+			sewa = append(sewa, x)
+		}
+	}
+	jan := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
+	if len(jan) != 1 || !slices.Equal(jan[0].Titik, []titikMinus{{"2026-01-06", sewa[0].NoJurnal}}) || !strings.Contains(jan[0].Pesan, sewa[0].NoJurnal) {
+		t.Fatalf("januari: %+v (bukti sewa %s)", jan, sewa[0].NoJurnal)
+	}
+	feb := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-02")
+	want := []titikMinus{{"2026-01-06", sewa[0].NoJurnal}, {"2026-02-10", sewa[1].NoJurnal}}
+	if len(feb) != 1 || !slices.Equal(feb[0].Titik, want) || !strings.Contains(feb[0].Pesan, sewa[0].NoJurnal) || !strings.Contains(feb[0].Pesan, sewa[1].NoJurnal) {
+		t.Fatalf("februari harus menyebut semua titik minus: %+v, mau %+v", feb, want)
+	}
+}
+
+// Buku Besar menandai akun yang boleh minus (laba ditahan) dengan aturan yang sama dengan
+// peringatan, supaya tampilan hanya memerahkan saldo yang memang salah.
+func TestBukuBesar_BolehMinusSamaDenganPeringatan(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	body := `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},` +
+		`{"nama":"Modal Pemilik","kategori":"modal","nominal":3000000},{"nama":"Laba Ditahan","kategori":"laba_ditahan","nominal":-1000000}]}`
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening?paksa=1", body); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	boleh := map[string]bool{}
+	for _, a := range getJSON[bukuBesarResp](t, srv, qa, "/api/v1/reports/buku-besar?period=2026-01").Akun {
+		boleh[a.Kode] = a.BolehMinus
+	}
+	if !boleh["3201"] || boleh[coa.KodeSelisihSaldoAwal] || boleh["1102"] {
+		t.Fatalf("boleh minus: 3201=%v 3299=%v 1102=%v", boleh["3201"], boleh[coa.KodeSelisihSaldoAwal], boleh["1102"])
 	}
 }
 

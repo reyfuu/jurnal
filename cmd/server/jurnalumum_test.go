@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"net/http"
 	"strings"
 	"testing"
@@ -46,6 +47,45 @@ func TestJurnalUmum_SeimbangDanCocokBukuBesar(t *testing.T) {
 		if c != 1 {
 			t.Errorf("%s muncul %d kali", b, c)
 		}
+	}
+}
+
+// Rincian Buku Besar mencantumkan No. Bukti yang sama dengan Jurnal Umum (JU-, SIS-, BYR-),
+// supaya mutasi yang salah bisa ditelusuri ke transaksinya.
+func TestBukuBesar_NoBuktiSamaDenganJurnalUmum(t *testing.T) {
+	srv := NewServer()
+	owner := login(t, srv, "owner@kedaikopisenja.id")
+	do(srv, owner, http.MethodPut, "/api/v1/business", strings.Replace(profileBody, "manufaktur", "perdagangan", 1))
+	ju := getJSON[jurnalUmumResp](t, srv, owner, "/api/v1/reports/jurnal?period=2026-08")
+	bb := getJSON[struct {
+		Akun []struct {
+			Kode  string
+			Baris []struct{ Bukti string }
+		}
+	}](t, srv, owner, "/api/v1/reports/buku-besar?period=2026-08")
+	dariJU, dariBB := map[string]bool{}, map[string]bool{}
+	for _, e := range ju.Entri {
+		for _, b := range e.Baris {
+			dariJU[e.Bukti+" "+b.Kode] = true
+		}
+	}
+	for _, a := range bb.Akun {
+		for _, b := range a.Baris {
+			if b.Bukti == "" {
+				t.Fatalf("akun %s: baris buku besar tanpa no. bukti", a.Kode)
+			}
+			dariBB[b.Bukti+" "+a.Kode] = true
+		}
+	}
+	if len(dariJU) == 0 || !maps.Equal(dariJU, dariBB) {
+		t.Errorf("no. bukti per akun beda: jurnal umum %d, buku besar %d", len(dariJU), len(dariBB))
+	}
+	sis := false
+	for k := range dariBB {
+		sis = sis || strings.HasPrefix(k, "SIS-")
+	}
+	if !sis {
+		t.Error("entri sistem (penyusutan) tidak bernomor SIS- di buku besar")
 	}
 }
 
