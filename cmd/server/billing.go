@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"pajak/internal/auth"
 	"pajak/internal/midtrans"
 )
 
@@ -32,8 +33,9 @@ type paket struct {
 	HargaNormal int64 `json:"harga_normal,omitempty"`
 }
 
-// paketList: paket yang dijual (3 tingkat × bulanan/tahunan, sama dengan landing page). Fitur
-// belum dibedakan per tingkat: semua paket membuka seluruh aplikasi. Ubah harga di sini saja.
+// paketList: paket yang dijual (3 tingkat × bulanan/tahunan, sama dengan landing page). Starter
+// membuka seluruh aplikasi kecuali fitur Pro (lihat pro); Pro & Premium membuka semuanya.
+// Ubah harga di sini saja.
 var paketList = []paket{
 	{"starter-bulanan", "Starter Bulanan", 199_000, 30, "", "starter", 399_000},
 	{"starter-tahunan", "Starter Tahunan", 1_990_000, 365, "Hemat 2 bulan", "starter", 4_790_000},
@@ -187,23 +189,47 @@ func (s *Server) exporting(h http.HandlerFunc) http.HandlerFunc {
 type langgananStatus struct {
 	Status string    `json:"status"` // trial | aktif | habis
 	Sampai time.Time `json:"sampai,omitzero"`
+	// Tingkat: tingkat paket terbayar terakhir saat aktif (starter | pro | premium; kosong =
+	// masa coba, habis, atau paket lama). Pro: fitur Pro terbuka (masa coba, Pro, Premium, paket lama).
+	Tingkat string `json:"tingkat,omitempty"`
+	Pro     bool   `json:"pro"`
 }
 
 // status: usaha 1 (milik operator) selalu aktif.
 func (t *tenant) langgananStatus(now time.Time) langgananStatus {
 	if t.id == 1 {
-		return langgananStatus{Status: "aktif"}
+		return langgananStatus{Status: "aktif", Pro: true}
 	}
 	t.mu.RLock()
 	l := t.langganan
 	t.mu.RUnlock()
 	switch {
 	case now.Before(l.AktifSampai):
-		return langgananStatus{"aktif", l.AktifSampai}
+		tingkat := ""
+		for _, o := range slices.Backward(l.Orders) { // pesanan urut waktu: terbayar terakhir menentukan
+			if o.Status == "lunas" || o.Status == "manual" {
+				p, _ := findPaket(o.Paket)
+				tingkat = p.Tingkat
+				break
+			}
+		}
+		return langgananStatus{Status: "aktif", Sampai: l.AktifSampai, Tingkat: tingkat, Pro: tingkat != "starter"}
 	case now.Before(l.TrialSampai):
-		return langgananStatus{"trial", l.TrialSampai}
+		return langgananStatus{Status: "trial", Sampai: l.TrialSampai, Pro: true}
 	}
-	return langgananStatus{"habis", cmp.Or(l.AktifSampai, l.TrialSampai)}
+	return langgananStatus{Status: "habis", Sampai: cmp.Or(l.AktifSampai, l.TrialSampai)}
+}
+
+// pro: fitur khusus paket Pro/Premium. Paket lain mendapat 402 berisi ajakan upgrade. Tim
+// Master Pajak (lihat-sebagai) selalu boleh. Dipasang di dalam guard.
+func (s *Server) pro(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if currentUser(r).Role != auth.MP && !s.tenantOf(r).langgananStatus(time.Now()).Pro {
+			http.Error(w, "Fitur ini khusus paket Pro. Upgrade di menu Langganan untuk membukanya.", http.StatusPaymentRequired)
+			return
+		}
+		h(w, r)
+	}
 }
 
 // lockedWrite: langganan belum/tidak aktif → hanya baca. Pembayaran, sesi, lapor bug,

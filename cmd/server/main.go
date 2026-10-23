@@ -616,7 +616,7 @@ func (s *Server) newMe(u auth.User) meResp {
 		me.Master = s.masterInfoFor(u)
 		if me.Lihat = s.lihatInfoFor(u); me.Lihat != nil {
 			// Menu klien versi baca; layar bayar tidak relevan untuk tim.
-			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif"}
+			me.Views, me.Langganan = auth.Roles[auth.Lihat].Views, langgananStatus{Status: "aktif", Pro: true}
 		}
 		return me
 	}

@@ -51,7 +51,11 @@ export interface Me {
 }
 
 /** Status langganan usaha; 'habis' = hanya bisa melihat data dan membayar. */
-export interface LanggananStatus { status: 'trial' | 'aktif' | 'habis'; sampai?: string }
+export interface LanggananStatus {
+  status: 'trial' | 'aktif' | 'habis'; sampai?: string
+  /** tingkat paket terbayar terakhir saat aktif; pro: fitur Pro terbuka (trial, Pro, Premium, paket lama) */
+  tingkat?: 'starter' | 'pro' | 'premium'; pro: boolean
+}
 export interface Paket {
   id: string; nama: string; harga: number; hari: number; hemat?: string
   /** starter | pro | premium; kosong = paket lama satu tingkat. */
