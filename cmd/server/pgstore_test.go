@@ -149,6 +149,8 @@ type tenantData struct {
 	Gerak                                                []finance.GerakStok
 	NextGerakID                                          int
 	TutupBuku                                            string
+	TxBatal                                              []finance.Transaction
+	RefMulai                                             int
 }
 
 // tenantJSON: semua data usaha yang disimpan, dalam bentuk yang bisa dibandingkan.
@@ -158,7 +160,7 @@ func tenantJSON(t *testing.T, tn *tenant) string {
 	d := tenantData{tn.txs, tn.assets, tn.opening, tn.karyawan, tn.invoices, tn.profile, tn.langganan,
 		tn.tagihan, tn.stok, tn.produk, tn.supplier, tn.koreksi,
 		tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID,
-		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID, tn.gerak, tn.nextGerakID, tn.tutupBuku}
+		tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID, tn.nextKoreksiID, tn.coaTemplateID, tn.arsip, tn.arsipAlasan, tn.catatan, tn.nextCatatanID, tn.gerak, tn.nextGerakID, tn.tutupBuku, tn.txBatal, tn.refMulai}
 	tn.mu.RUnlock()
 	return normJSON(t, d)
 }
@@ -180,6 +182,11 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.mu.Lock()
 	tn.txs = []finance.Transaction{filled[finance.Transaction](1), filled[finance.Transaction](2)}
 	tn.txs[0].ID, tn.txs[1].ID = 1, 2
+	// transaksi aktif tanpa jejak batal; yang batal disimpan di tabel yang sama (kolom batal)
+	tn.txs[0].Batal, tn.txs[1].Batal = nil, nil
+	tn.txBatal = []finance.Transaction{filled[finance.Transaction](3)}
+	tn.txBatal[0].ID = 3
+	tn.refMulai = 2
 	tn.assets = []finance.Asset{filled[finance.Asset](3)}
 	tn.karyawan = []finance.Karyawan{filled[finance.Karyawan](4)}
 	tn.invoices = []finance.Invoice{filled[finance.Invoice](5), filled[finance.Invoice](6)}
@@ -211,7 +218,7 @@ func TestPostgresSimpanMuatSemuaField(t *testing.T) {
 	tn.nextGerakID = 2
 	tn.tutupBuku = "2026-01"
 	tn.coaTemplateID = 1
-	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 3, 2, 2, 3
+	tn.nextTxID, tn.nextAssetID, tn.nextKaryawanID, tn.nextInvoiceID = 4, 2, 2, 3
 	tn.nextTagihanID, tn.nextStokID, tn.nextProdukID, tn.nextSupplierID = 3, 2, 2, 2
 	tn.mu.Unlock()
 	srv.saveFor(tn)

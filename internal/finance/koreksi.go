@@ -89,7 +89,9 @@ func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 	if k.Jenis == KoreksiHapus {
 		return slices.Delete(out, i, i+1), nil
 	}
-	out[i] = *k.Usulan
+	u := *k.Usulan
+	u.Ref, u.Batal = txs[i].Ref, nil // nomor referensi tetap
+	out[i] = u
 	return out, nil
 }
 

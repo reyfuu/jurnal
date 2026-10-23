@@ -127,14 +127,18 @@ func TestBuktiNota_SimpanLihatDuplikatHapus(t *testing.T) {
 		t.Fatalf("foto yang sama harus diperingatkan sekali per catatan: %+v", lagi.Duplikat)
 	}
 
-	if rec := do(srv, qa, http.MethodDelete, url, ""); rec.Code != http.StatusNoContent {
+	if rec := do(srv, qa, http.MethodDelete, url, ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("hapus tanpa alasan harus ditolak: %d", rec.Code)
+	}
+	if rec := do(srv, qa, http.MethodDelete, url+"?alasan=input+dobel", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("hapus: %d %s", rec.Code, rec.Body)
 	}
-	if _, err := os.Stat(filepath.Join(dir, strconv.Itoa(grup)+".png")); !os.IsNotExist(err) {
-		t.Fatal("foto bukti harus ikut terhapus")
+	// dibatalkan, bukan dihapus: foto nota tetap disimpan sebagai riwayat pembatalan
+	if _, err := os.Stat(filepath.Join(dir, strconv.Itoa(grup)+".png")); err != nil {
+		t.Fatal("foto bukti catatan yang dibatalkan harus tetap tersimpan")
 	}
-	if rec := do(srv, qa, http.MethodGet, url+"/bukti", ""); rec.Code != http.StatusNotFound {
-		t.Fatalf("bukti catatan terhapus: %d", rec.Code)
+	if rec := do(srv, qa, http.MethodGet, url, ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("catatan batal tidak tampil sebagai catatan aktif: %d", rec.Code)
 	}
 }
 

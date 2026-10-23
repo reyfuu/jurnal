@@ -24,48 +24,58 @@ func TestAkunTambahan(t *testing.T) {
 		_ = json.NewDecoder(do(srv, owner, http.MethodGet, "/api/v1/coa", "").Body).Decode(&c)
 		return c.Accounts
 	}
-	induk, ok := coa.Find(akun(), "1101")
-	if !ok {
-		t.Fatal("akun 1101 tidak ada")
+	bank, _ := coa.Find(akun(), "1104") // akun terdekat di bawah 1105 dalam seri 11xx
+	// nomor diketik sendiri; kelompok & saldo normal dari seri 11xx
+	rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"kode":"1105","nama":"Bank BRI Operasional"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tambah akun: %d %s", rec.Code, rec.Body)
 	}
-	rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"nama":"Kas Cabang Bandung","induk":"1101"}`)
-	var baru struct{ Kode, Nama, Induk string }
-	_ = json.NewDecoder(rec.Body).Decode(&baru)
-	if rec.Code != http.StatusOK || baru.Kode == "" || baru.Kode[:2] != "11" {
-		t.Fatalf("tambah akun: %d %+v", rec.Code, baru)
+	a, ok := coa.Find(akun(), "1105")
+	if !ok || a.Nama != "Bank BRI Operasional" || a.Kelompok != bank.Kelompok || a.Normal != bank.Normal || a.Subtype != bank.Subtype || a.Peran != "" {
+		t.Fatalf("akun baru di CoA: %+v (bank %+v)", a, bank)
 	}
-	a, ok := coa.Find(akun(), baru.Kode)
-	if !ok || a.Nama != "Kas Cabang Bandung" || a.Kelompok != induk.Kelompok || a.Normal != induk.Normal || a.Subtype != induk.Subtype || a.Peran != "" {
-		t.Fatalf("akun baru di CoA: %+v (induk %+v)", a, induk)
+	for _, c := range []struct {
+		body string
+		kode int
+	}{
+		{`{"kode":"1105","nama":"Lain"}`, http.StatusBadRequest},               // nomor sudah dipakai
+		{`{"kode":"11A3","nama":"Lain"}`, http.StatusBadRequest},               // bukan 4 angka
+		{`{"kode":"1109","nama":"bank bri operasional"}`, http.StatusConflict}, // nama ganda
+		{`{"kode":"1701","nama":"Deposit Sewa"}`, http.StatusBadRequest},       // seri baru tanpa kelompok
+	} {
+		if rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", c.body); rec.Code != c.kode {
+			t.Errorf("%s: %d, mau %d (%s)", c.body, rec.Code, c.kode, rec.Body)
+		}
 	}
-	if rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"nama":"kas cabang bandung","induk":"1101"}`); rec.Code != http.StatusConflict {
-		t.Errorf("nama ganda harus ditolak: %d", rec.Code)
+	// seri baru dengan kelompok pilihan
+	if rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"kode":"1701","nama":"Deposit Sewa","kelompok":"`+string(bank.Kelompok)+`"}`); rec.Code != http.StatusOK {
+		t.Fatalf("seri baru: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"nama":"X","induk":"9999"}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("induk tidak dikenal harus ditolak: %d", rec.Code)
+	if d, ok := coa.Find(akun(), "1701"); !ok || d.Kelompok != bank.Kelompok {
+		t.Errorf("akun seri baru: %+v", d)
 	}
-	// simpan profil lagi (formulir tidak mengirim akun_tambahan): akun tetap ada
+	// ubah nama: boleh; nomor tetap
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/coa/akun/1105", `{"nama":"Bank BRI"}`); rec.Code != http.StatusOK {
+		t.Fatalf("ubah nama: %d %s", rec.Code, rec.Body)
+	}
+	if a, _ := coa.Find(akun(), "1105"); a.Nama != "Bank BRI" {
+		t.Errorf("nama baru: %q", a.Nama)
+	}
+	if rec := do(srv, owner, http.MethodPut, "/api/v1/coa/akun/1101", `{"nama":"Kas Besar"}`); rec.Code != http.StatusNotFound {
+		t.Errorf("nama akun template tidak diubah di sini: %d", rec.Code)
+	}
+	// simpan profil lagi: akun tetap ada
 	do(srv, owner, http.MethodPut, "/api/v1/business", dagangCV)
-	if _, ok := coa.Find(akun(), baru.Kode); !ok {
+	if _, ok := coa.Find(akun(), "1105"); !ok {
 		t.Fatal("akun tambahan hilang setelah profil disimpan ulang")
 	}
-	// dipakai transaksi → tidak bisa dihapus
-	do(srv, owner, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-03","jenis":"Penjualan","nominal":1000,"lunas":true,"akun":"`+baru.Kode+`"}`)
-	if rec := do(srv, owner, http.MethodDelete, "/api/v1/coa/akun/"+baru.Kode, ""); rec.Code != http.StatusConflict {
+	// dipakai transaksi → tidak bisa dihapus; yang belum dipakai bisa
+	do(srv, owner, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-08-03","jenis":"Penjualan","nominal":1000,"lunas":true,"akun":"1105"}`)
+	if rec := do(srv, owner, http.MethodDelete, "/api/v1/coa/akun/1105", ""); rec.Code != http.StatusConflict {
 		t.Errorf("akun terpakai harus ditolak dihapus: %d", rec.Code)
 	}
-	// akun template tidak bisa dihapus lewat endpoint ini
-	if rec := do(srv, owner, http.MethodDelete, "/api/v1/coa/akun/1101", ""); rec.Code != http.StatusNotFound {
-		t.Errorf("akun template: %d", rec.Code)
-	}
-	rec = do(srv, owner, http.MethodPost, "/api/v1/coa/akun", `{"nama":"Kas Kecil Gudang","induk":"1101"}`)
-	var kedua struct{ Kode string }
-	_ = json.NewDecoder(rec.Body).Decode(&kedua)
-	if rec := do(srv, owner, http.MethodDelete, "/api/v1/coa/akun/"+kedua.Kode, ""); rec.Code != http.StatusNoContent {
+	if rec := do(srv, owner, http.MethodDelete, "/api/v1/coa/akun/1701", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("hapus akun tidak terpakai: %d", rec.Code)
-	}
-	if _, ok := coa.Find(akun(), kedua.Kode); ok {
-		t.Error("akun yang dihapus masih ada")
 	}
 }
 

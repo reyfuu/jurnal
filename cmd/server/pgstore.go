@@ -103,6 +103,7 @@ type tenantRow struct {
 	ArsipAlasan    string    `json:"arsip_alasan,omitempty"`
 	NextGerakID    int       `json:"next_gerak_id"`
 	TutupBuku      string    `json:"tutup_buku,omitempty"`
+	RefMulai       int       `json:"ref_mulai"`
 }
 
 type invoiceItemRow struct {
@@ -149,7 +150,7 @@ func saveTenantDB(db *sql.DB, t *tenant) error {
 	}
 	row := tenantRow{t.id, st.NextTxID, st.NextAssetID, st.NextKaryawanID, st.NextInvoiceID,
 		st.NextTagihanID, st.NextStokID, st.NextProdukID, st.NextSupplierID, st.NextKoreksiID, st.NextCatatanID, st.CoaTemplate, l.TrialSampai, l.AktifSampai,
-		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan, st.Arsip, st.ArsipAlasan, st.NextGerakID, st.TutupBuku}
+		l.EksporPertama, l.GaransiDiklaim, l.GaransiAlasan, st.Arsip, st.ArsipAlasan, st.NextGerakID, st.TutupBuku, st.RefMulai}
 	if err := insertRows(tx, "tenants", nil, []tenantRow{row}); err != nil {
 		return err
 	}
@@ -434,7 +435,7 @@ func loadTenantDB(db *sql.DB, t *tenant) error {
 	}
 	st := state{NextTxID: row.NextTxID, NextAssetID: row.NextAssetID, NextKaryawanID: row.NextKaryawanID, NextInvoiceID: row.NextInvoiceID,
 		NextTagihanID: row.NextTagihanID, NextStokID: row.NextStokID, NextProdukID: row.NextProdukID, NextSupplierID: row.NextSupplierID,
-		NextKoreksiID: row.NextKoreksiID, NextCatatanID: row.NextCatatanID, NextGerakID: row.NextGerakID, TutupBuku: row.TutupBuku, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
+		NextKoreksiID: row.NextKoreksiID, NextCatatanID: row.NextCatatanID, NextGerakID: row.NextGerakID, RefMulai: row.RefMulai, TutupBuku: row.TutupBuku, CoaTemplate: row.CoaTemplate, Arsip: row.Arsip, ArsipAlasan: row.ArsipAlasan,
 		Langganan: &langganan{TrialSampai: row.TrialSampai, AktifSampai: row.AktifSampai,
 			EksporPertama: row.EksporPertama, GaransiDiklaim: row.GaransiDiklaim, GaransiAlasan: row.GaransiAlasan}}
 	var items []invoiceItemRow

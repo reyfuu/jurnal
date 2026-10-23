@@ -274,6 +274,7 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		s.nextTxID++
 		s.txs = append(s.txs, txs[i])
 	}
+	s.beriRefLocked()
 	s.mu.Unlock()
 	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
 }

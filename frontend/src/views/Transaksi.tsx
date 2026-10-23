@@ -35,7 +35,7 @@ const EMPTY: TxInput = {
   tanggal: '', jenis: 'Penjualan', nominal: 0, keterangan: '', item: '', qty: 0, channel: '', pihak: '', lunas: true, tanggal_lunas: '',
 }
 
-type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | null
+type Editing = { id: number | null; input: TxInput; confirmDelete: boolean; ref?: string } | null
 
 /** lihat: tim Master Pajak sedang "lihat sebagai klien". bolehUsul = dialog ubah menjadi form usulan
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
@@ -65,6 +65,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
   const [importing, setImporting] = useState(false)
   const [coa, setCoa] = useState<CoAInfo | null>(null)
   const [alasan, setAlasan] = useState('')
+  const [alasanBatal, setAlasanBatal] = useState('')
   const [terkirim, setTerkirim] = useState('')
   const usulMode = !!lihat?.bolehUsul
   const bisaBuka = canEdit || usulMode
@@ -92,7 +93,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
   const shown = useMemo(() => filterTx(txs, filter, jenis), [txs, filter, jenis])
   const urut = useKolomUrut()
   const kolomTx: Pengurut<Tx> = {
-    tanggal: (t) => t.tanggal, jenis: (t) => t.jenis, akun: (t) => t.akun || '', keterangan: (t) => t.keterangan, pihak: (t) => t.pihak,
+    tanggal: (t) => t.tanggal, ref: (t) => t.ref ?? '', jenis: (t) => t.jenis, akun: (t) => t.akun || '', keterangan: (t) => t.keterangan, pihak: (t) => t.pihak,
     nominal: (t) => t.nominal, status: (t) => (t.lunas ? 1 : 0),
   }
   const sum = useMemo(() => summarize(shown, jenis), [shown, jenis])
@@ -131,9 +132,10 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     }
     setError('')
     setAlasan('')
-    const { id, ...input } = t
+    const { id, ref, batal, ...input } = t
+    void batal
     setQtyTeks(qtyKeTeks(t.qty_stok ?? 0))
-    setEditing({ id, input, confirmDelete: false })
+    setEditing({ id, input, confirmDelete: false, ref })
   }
 
   async function run(fn: () => Promise<unknown>) {
@@ -293,7 +295,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
           <table className="data-table">
             <thead>
               <tr>
-                <ThUrut k="tanggal" urut={urut}>Tanggal</ThUrut><ThUrut k="jenis" urut={urut}>Jenis</ThUrut>{coa?.supported && <ThUrut k="akun" urut={urut}>Akun</ThUrut>}
+                <ThUrut k="tanggal" urut={urut}>Tanggal</ThUrut><ThUrut k="ref" urut={urut}>No. Referensi</ThUrut><ThUrut k="jenis" urut={urut}>Jenis</ThUrut>{coa?.supported && <ThUrut k="akun" urut={urut}>Akun</ThUrut>}
                 <ThUrut k="keterangan" urut={urut}>Keterangan</ThUrut><ThUrut k="pihak" urut={urut}>Pihak</ThUrut><ThUrut k="nominal" urut={urut} kanan>Nominal</ThUrut><ThUrut k="status" urut={urut}>Status</ThUrut>
                 {bisaBuka && <th />}
               </tr>
@@ -305,6 +307,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                 return (
                   <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>{formatTanggal(t.tanggal)}</td>
+                    <td className="tabular" style={{ whiteSpace: 'nowrap', color: t.ref ? 'var(--text-brand)' : 'var(--text-muted)' }}>{t.ref ?? '—'}</td>
                     <td><span className={'pill-status ' + (masuk ? 'pill-green' : 'pill-status-muted')}>{t.jenis}</span></td>
                     {coa?.supported && (
                       <td className="tabular" title={akunNama(akunOf(t))} style={{ color: t.akun ? 'var(--text-brand)' : 'var(--text-secondary)' }}>{akunOf(t)}</td>
@@ -478,20 +481,31 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
               <DialogFooter className="sm:justify-between">
                 {editing.id !== null ? (
                   editing.confirmDelete ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{usulMode ? 'Usulkan hapus transaksi ini?' : 'Hapus transaksi ini?'}</span>
-                      <Button type="button" variant="destructive" size="sm" disabled={busy || (usulMode && !alasan.trim())}
-                        title={usulMode && !alasan.trim() ? 'Isi alasan dulu' : undefined}
-                        onClick={() => void run(() => usulMode
-                          ? usulKoreksi(lihat!.klienId, { transaksi_id: editing.id!, jenis: 'hapus', alasan })
-                          : deleteTransaction(editing.id!))}>
-                        {usulMode ? 'Ya, usulkan' : 'Ya, hapus'}
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ ...editing, confirmDelete: false })}>Batal</Button>
+                    <div className="grid gap-2" style={{ minWidth: 0, flex: 1 }}>
+                      <span className="text-sm text-muted-foreground">
+                        {usulMode ? 'Usulkan pembatalan transaksi ini?' : `Batalkan ${editing.ref ?? 'transaksi ini'}? Transaksi keluar dari laporan; nomornya tetap tercatat sebagai batal.`}
+                      </span>
+                      {!usulMode && (
+                        <label className="grid gap-1 text-sm" htmlFor="tx-alasan-batal">Alasan pembatalan (wajib)
+                          <textarea id="tx-alasan-batal" rows={2} maxLength={300} value={alasanBatal} onChange={(e) => setAlasanBatal(e.target.value)}
+                            className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                            placeholder="mis. input dobel, sudah ada di TRX-2610-0004" />
+                        </label>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" variant="destructive" size="sm" disabled={busy || (usulMode ? !alasan.trim() : !alasanBatal.trim())}
+                          title={(usulMode ? !alasan.trim() : !alasanBatal.trim()) ? 'Isi alasan dulu' : undefined}
+                          onClick={() => void run(() => usulMode
+                            ? usulKoreksi(lihat!.klienId, { transaksi_id: editing.id!, jenis: 'hapus', alasan })
+                            : deleteTransaction(editing.id!, alasanBatal.trim()))}>
+                          {usulMode ? 'Ya, usulkan' : 'Batalkan transaksi'}
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ ...editing, confirmDelete: false })}>Kembali</Button>
+                      </div>
                     </div>
                   ) : (
-                    <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setEditing({ ...editing, confirmDelete: true })}>
-                      {usulMode ? 'Usulkan hapus' : 'Hapus'}
+                    <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => { setAlasanBatal(''); setEditing({ ...editing, confirmDelete: true }) }}>
+                      {usulMode ? 'Usulkan batal' : 'Batalkan'}
                     </Button>
                   )
                 ) : <span />}

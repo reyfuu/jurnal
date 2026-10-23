@@ -2,6 +2,8 @@ package coa
 
 import (
 	"cmp"
+	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -394,16 +396,35 @@ func AkunTambahanKlien(list []finance.AkunTambahan, all []Account) []Account {
 	return out
 }
 
-// KodeTurunan: kode kosong pertama setelah induk dalam ratusan yang sama (6101 → 6102 … 6199).
-func KodeTurunan(induk string, all []Account) string {
-	n, err := strconv.Atoi(induk)
-	if err != nil || len(induk) != 4 {
-		return ""
+// IndukNomor: akun yang jenisnya ditiru akun baru bernomor kode — akun terdekat di seri ratusan
+// yang sama (1103 → 1102 / 1101); seri yang belum ada memakai akun pertama di kelompok pilihan.
+// Error bila nomor tidak 4 angka, sudah dipakai, atau seri baru tanpa kelompok.
+func IndukNomor(all []Account, kode string, kelompok Kelompok) (string, error) {
+	if n, err := strconv.Atoi(kode); err != nil || len(kode) != 4 || n < 1000 {
+		return "", errors.New("nomor akun harus 4 angka, mis. 1103")
 	}
-	for k := n + 1; k/100 == n/100; k++ {
-		if _, ada := Find(all, strconv.Itoa(k)); !ada {
-			return strconv.Itoa(k)
+	if a, ada := Find(all, kode); ada {
+		return "", fmt.Errorf("nomor %s sudah dipakai akun %s", kode, a.Nama)
+	}
+	induk := ""
+	for _, a := range all { // all urut kode: akun terakhir di bawah kode, selain itu yang pertama di atasnya
+		if a.Kode[:min(2, len(a.Kode))] != kode[:2] {
+			continue
+		}
+		if a.Kode < kode || induk == "" {
+			induk = a.Kode
 		}
 	}
-	return ""
+	if induk != "" {
+		return induk, nil
+	}
+	if kelompok == "" {
+		return "", fmt.Errorf("seri %sxx belum ada di daftar akun; pilih kelompoknya", kode[:2])
+	}
+	for _, a := range all {
+		if a.Kelompok == kelompok {
+			return a.Kode, nil
+		}
+	}
+	return "", fmt.Errorf("kelompok %q tidak dikenal", kelompok)
 }

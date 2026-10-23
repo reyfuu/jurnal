@@ -272,6 +272,7 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		s.nextTxID++
 		s.txs = append(s.txs, t)
 	}
+	s.beriRefLocked()
 	s.mu.Unlock()
 	resp.Imported = true
 	writeJSON(w, resp)

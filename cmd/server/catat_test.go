@@ -52,7 +52,7 @@ func TestCatat_JurnalMultiAkun(t *testing.T) {
 	if rec := do(srv, qa, http.MethodPost, "/api/v1/catat", `{"tanggal":"2026-01-10","baris":[{"akun":"6190","debit":10},{"akun":"1101","kredit":9}]}`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("tidak seimbang harus ditolak: %d", rec.Code)
 	}
-	if rec := do(srv, qa, http.MethodDelete, url, ""); rec.Code != http.StatusNoContent {
+	if rec := do(srv, qa, http.MethodDelete, url+"?alasan=salah+input", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("hapus: %d %s", rec.Code, rec.Body)
 	}
 	if rec := do(srv, qa, http.MethodGet, url, ""); rec.Code != http.StatusNotFound {

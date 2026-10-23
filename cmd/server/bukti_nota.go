@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
 	"pajak/internal/ai"
+	"pajak/internal/finance"
 )
 
 // Bukti foto nota (handoff §15: hasil OCR hanya draf, sumber & jejak persetujuan disimpan).
@@ -208,7 +210,9 @@ func (s *tenant) lampirkanBuktiLocked(r *http.Request, grup int, token string) *
 func (s *tenant) duplikatNotaLocked(hash string) []duplikatNota {
 	var out []duplikatNota
 	for _, m := range s.semuaBuktiLocked() {
-		if m.Hash == hash && len(out) < maxDuplikatNota {
+		// catatan yang sudah dibatalkan tidak dihitung dobel (fotonya hanya disimpan sebagai riwayat)
+		aktif := slices.ContainsFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == m.Grup })
+		if m.Hash == hash && aktif && len(out) < maxDuplikatNota {
 			out = append(out, duplikatNota{Grup: m.Grup, Tanggal: m.Saran.Tanggal, Nominal: m.Saran.Nominal, Pihak: m.Saran.Pihak,
 				Keterangan: m.Saran.Keterangan, Alasan: "foto yang sama sudah pernah dicatat"})
 		}

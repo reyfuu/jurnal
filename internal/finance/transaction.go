@@ -89,6 +89,11 @@ type Transaction struct {
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
 	QtyStok int64 `json:"qty_stok,omitempty"`
+	// Ref: No. Referensi "TRX-yymm-urut" (bulan tanggal transaksi); satu catatan / invoice satu
+	// nomor. Diatur server; transaksi sebelum fitur ini kosong.
+	Ref string `json:"ref,omitempty"`
+	// Batal: terisi bila transaksi dibatalkan (pengganti hapus); nomornya tidak dipakai ulang.
+	Batal *Pembatalan `json:"batal,omitempty"`
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.

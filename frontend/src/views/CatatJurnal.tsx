@@ -57,6 +57,8 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
   const [opsi, setOpsi] = useState<OpsiCatat | null>(null)
   const [jenis, setJenis] = useState(jenisAwal)
   const [kepala, setKepala] = useState<Kepala>(KEPALA_KOSONG)
+  const [batalkan, setBatalkan] = useState(false)
+  const [alasanBatal, setAlasanBatal] = useState('')
   const [baris, setBaris] = useState<Baris[]>([])
   const [nota, setNota] = useState<SaranNota | null>(null)
   const [fotoNota, setFotoNota] = useState<FotoNota | null>(null) // bukti catatan yang sedang diubah
@@ -174,10 +176,11 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
 
   async function hapus() {
     if (!grup) return
+    if (!alasanBatal.trim()) { setError('Isi alasan pembatalan dulu.'); return }
     setBusy(true)
     try {
-      await hapusCatatanJurnal(grup)
-      await onTersimpan('Catatan dihapus.')
+      await hapusCatatanJurnal(grup, alasanBatal.trim())
+      await onTersimpan('Catatan dibatalkan. Nomornya tetap tercatat di riwayat batal.')
       onKembali()
     } catch (err) {
       setError((err as Error).message)
@@ -261,7 +264,7 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
                 <input className="input-field" type="date" required value={kepala.tanggal} onChange={(e) => setKepala({ ...kepala, tanggal: e.target.value })} /></label>
               <label><span className="kpi-label">Pelanggan / supplier</span>
                 <input className="input-field" value={kepala.pihak} placeholder="Opsional" onChange={(e) => setKepala({ ...kepala, pihak: e.target.value })} /></label>
-              <label><span className="kpi-label">No. nota / bukti</span>
+              <label><span className="kpi-label">No. nota pemasok / bukti</span>
                 <input className="input-field" value={kepala.no_bukti} placeholder="Opsional" onChange={(e) => setKepala({ ...kepala, no_bukti: e.target.value })} /></label>
               <label><span className="kpi-label">Keterangan</span>
                 <input className="input-field" value={kepala.keterangan} placeholder="mis. Belanja bahan minggu ini" onChange={(e) => setKepala({ ...kepala, keterangan: e.target.value })} /></label>
@@ -352,8 +355,19 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan }: {
               </label>
             </div>
           )}
+          {grup && batalkan && (
+            <div className="grid gap-2" style={{ padding: 12, borderRadius: 10, border: '1px solid var(--accent-red)' }}>
+              <label className="grid gap-1 text-sm" htmlFor="catat-alasan-batal">Alasan pembatalan (wajib). Catatan keluar dari laporan; nomornya tetap tercatat sebagai batal.
+                <textarea id="catat-alasan-batal" className="input-field" rows={2} maxLength={300} value={alasanBatal} onChange={(e) => setAlasanBatal(e.target.value)} placeholder="mis. input dobel" />
+              </label>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setBatalkan(false)}>Kembali</Button>
+                <Button type="button" variant="destructive" disabled={busy || !alasanBatal.trim()} onClick={() => void hapus()}>Batalkan catatan</Button>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
-            {grup && <Button type="button" variant="ghost" className="text-destructive" disabled={busy} onClick={() => void hapus()}>Hapus</Button>}
+            {grup && !batalkan && <Button type="button" variant="ghost" className="text-destructive" disabled={busy} onClick={() => { setAlasanBatal(''); setBatalkan(true) }}>Batalkan</Button>}
             <Button type="button" variant="outline" onClick={() => { if (draftKey) hapusDraft(draftKey); onKembali() }}>Batal</Button>
             {!grup && <Button type="button" variant="outline" disabled={!bisaSimpan} onClick={() => void simpan(true)}>Simpan &amp; catat lagi</Button>}
             <Button type="button" disabled={!bisaSimpan} onClick={() => void simpan(false)}>{busy ? 'Menyimpan…' : 'Simpan'}</Button>

@@ -10,13 +10,67 @@ import (
 	"pajak/internal/finance"
 )
 
-// Akun buatan klien di Daftar Akun: jenisnya mengikuti akun induk (kelompok, saldo normal,
-// posisi di laporan), kodenya kode kosong berikutnya setelah induk.
+// Akun buatan klien di Daftar Akun: klien mengisi nomor akun & nama. Kelompok, saldo normal, dan
+// posisi di laporan dibaca dari seri nomornya (akun lain di ratusan yang sama); seri baru memilih
+// kelompoknya sekali. Nomor tidak bisa diubah, nama bisa.
 
 func (s *tenant) handleTambahAkun(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Nama  string `json:"nama"`
-		Induk string `json:"induk"`
+		Kode     string `json:"kode"`
+		Nama     string `json:"nama"`
+		Kelompok string `json:"kelompok"` // hanya untuk seri nomor yang belum ada di daftar
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "data tidak valid", http.StatusBadRequest)
+		return
+	}
+	req.Kode, req.Nama = strings.TrimSpace(req.Kode), strings.TrimSpace(req.Nama)
+	if req.Nama == "" || len(req.Nama) > 80 {
+		http.Error(w, "nama akun wajib diisi (maks. 80 huruf)", http.StatusBadRequest)
+		return
+	}
+	all, _, _ := s.coaAkun()
+	if all == nil {
+		http.Error(w, "daftar akun belum tersedia untuk jenis usaha ini", http.StatusConflict)
+		return
+	}
+	induk, err := coa.IndukNomor(all, req.Kode, coa.Kelompok(req.Kelompok))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if slices.ContainsFunc(all, func(a coa.Account) bool { return strings.EqualFold(a.Nama, req.Nama) }) {
+		http.Error(w, "nama akun sudah ada di daftar", http.StatusConflict)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.profile == nil {
+		http.Error(w, "lengkapi profil usaha dulu", http.StatusConflict)
+		return
+	}
+	// induk berupa akun tambahan lain: rujuk induk aslinya di template
+	for _, t := range s.profile.AkunTambahan {
+		if t.Kode == induk {
+			induk = t.Induk
+		}
+	}
+	prof := *s.profile
+	baru := finance.AkunTambahan{Kode: req.Kode, Nama: req.Nama, Induk: induk}
+	prof.AkunTambahan = append(slices.Clone(prof.AkunTambahan), baru)
+	if err := saveProfile(s.file("business"), prof); err != nil {
+		http.Error(w, "gagal menyimpan akun", http.StatusInternalServerError)
+		return
+	}
+	s.profile = &prof
+	writeJSON(w, baru)
+}
+
+// handleUbahNamaAkun: nama akun buatan sendiri boleh diubah; nomornya tetap.
+func (s *tenant) handleUbahNamaAkun(w http.ResponseWriter, r *http.Request) {
+	kode := r.PathValue("kode")
+	var req struct {
+		Nama string `json:"nama"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "data tidak valid", http.StatusBadRequest)
@@ -27,45 +81,31 @@ func (s *tenant) handleTambahAkun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "nama akun wajib diisi (maks. 80 huruf)", http.StatusBadRequest)
 		return
 	}
-	all, active, _ := s.coaAkun()
-	if all == nil {
-		http.Error(w, "daftar akun belum tersedia untuk jenis usaha ini", http.StatusConflict)
-		return
-	}
-	if _, ok := coa.Find(active, req.Induk); !ok {
-		http.Error(w, "pilih akun induk dari daftar", http.StatusBadRequest)
-		return
-	}
-	if slices.ContainsFunc(all, func(a coa.Account) bool { return strings.EqualFold(a.Nama, req.Nama) }) {
+	all, _, _ := s.coaAkun()
+	if slices.ContainsFunc(all, func(a coa.Account) bool { return a.Kode != kode && strings.EqualFold(a.Nama, req.Nama) }) {
 		http.Error(w, "nama akun sudah ada di daftar", http.StatusConflict)
 		return
 	}
-	// induk turunan (akun tambahan) tetap merujuk induk aslinya di template
-	induk := req.Induk
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.profile == nil {
-		http.Error(w, "lengkapi profil usaha dulu", http.StatusConflict)
+		http.Error(w, "akun tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	for _, t := range s.profile.AkunTambahan {
-		if t.Kode == induk {
-			induk = t.Induk
-		}
-	}
-	kode := coa.KodeTurunan(req.Induk, all)
-	if kode == "" {
-		http.Error(w, "kode di kelompok akun ini sudah penuh; pilih akun induk lain", http.StatusConflict)
+	i := slices.IndexFunc(s.profile.AkunTambahan, func(t finance.AkunTambahan) bool { return t.Kode == kode })
+	if i < 0 {
+		http.Error(w, "hanya nama akun yang ditambahkan sendiri yang bisa diubah", http.StatusNotFound)
 		return
 	}
 	prof := *s.profile
-	prof.AkunTambahan = append(slices.Clone(prof.AkunTambahan), finance.AkunTambahan{Kode: kode, Nama: req.Nama, Induk: induk})
+	prof.AkunTambahan = slices.Clone(prof.AkunTambahan)
+	prof.AkunTambahan[i].Nama = req.Nama
 	if err := saveProfile(s.file("business"), prof); err != nil {
 		http.Error(w, "gagal menyimpan akun", http.StatusInternalServerError)
 		return
 	}
 	s.profile = &prof
-	writeJSON(w, finance.AkunTambahan{Kode: kode, Nama: req.Nama, Induk: induk})
+	writeJSON(w, prof.AkunTambahan[i])
 }
 
 func (s *tenant) handleHapusAkun(w http.ResponseWriter, r *http.Request) {

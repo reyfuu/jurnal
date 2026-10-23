@@ -152,7 +152,7 @@ func (s *tenant) handleLaporanTransaksiXlsx(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	lt := s.laporanTransaksi(f)
-	rows := [][]string{{"Tanggal", "No", "Jenis", "Arah", "Keterangan", "Produk / Bahan", "Pelanggan / Supplier", "Channel", "Status", "Tanggal Lunas", "Masuk (Rp)", "Keluar (Rp)"}}
+	rows := [][]string{{"Tanggal", "No. Referensi", "Jenis", "Arah", "Keterangan", "Produk / Bahan", "Pelanggan / Supplier", "Channel", "Status", "Tanggal Lunas", "Masuk (Rp)", "Keluar (Rp)"}}
 	for _, t := range lt.Transaksi {
 		j, _ := finance.LookupJenis(t.Jenis)
 		masuk, keluar := "", ""
@@ -165,7 +165,7 @@ func (s *tenant) handleLaporanTransaksiXlsx(w http.ResponseWriter, r *http.Reque
 		if !t.Lunas {
 			status = "Belum Lunas"
 		}
-		rows = append(rows, []string{t.Tanggal, rp(int64(t.ID)), t.Jenis, j.Arah, t.Keterangan, t.Item, t.Pihak, t.Channel, status, t.TanggalLunas, masuk, keluar})
+		rows = append(rows, []string{t.Tanggal, cmp.Or(t.Ref, "-"), t.Jenis, j.Arah, t.Keterangan, t.Item, t.Pihak, t.Channel, status, t.TanggalLunas, masuk, keluar})
 	}
 	rows = append(rows, []string{"", "", "", "", "TOTAL", "", "", "", "", "", rp(lt.TotalMasuk), rp(lt.TotalKeluar)})
 	rekap := [][]string{{"Jenis", "Arah", "Jumlah transaksi", "Total (Rp)"}}

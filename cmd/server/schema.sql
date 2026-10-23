@@ -490,3 +490,8 @@ ALTER TABLE gerak_stok ADD COLUMN IF NOT EXISTS grup INT;
 
 -- Cegah transaksi dobel (Okt 2026): asal pencatatan (mutasi / foto).
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sumber TEXT;
+
+-- No. Referensi transaksi & pembatalan (Okt 2026). ref_mulai 0 = belum diatur (diisi saat dimuat).
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ref_mulai INT NOT NULL DEFAULT 0;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ref TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS batal JSONB;

@@ -412,7 +412,7 @@ export default function App() {
       case 'master-data':
         return <DaftarAkun bisaPerbarui={canSee('profil-usaha') && !me!.lihat} />
       case 'laporan-transaksi':
-        return <LaporanTransaksi period={period} bisaEkspor={!me!.lihat} />
+        return <LaporanTransaksi period={period} bisaEkspor={!me!.lihat} bisaPulihkan={me!.user.role === 'owner' && !me!.lihat} />
       case 'buku-besar':
         return <BukuBesar period={period} bisaEkspor={!me!.lihat} navigate={navigate} />
       case 'jurnal-umum':

@@ -22,8 +22,9 @@ import (
 // ganti ke database saat multi-tenant (roadmap) — tanpa dependensi, image scratch tetap.
 
 type state struct {
-	Transactions []finance.Transaction `json:"transactions"`
+	Transactions []finance.Transaction `json:"transactions"` // termasuk yang batal (Batal terisi)
 	NextTxID     int                   `json:"next_tx_id"`
+	RefMulai     int                   `json:"ref_mulai,omitempty"`
 	Assets       []finance.Asset       `json:"assets"`
 	NextAssetID  int                   `json:"next_asset_id"`
 	// Opening: neraca awal onboarding; nil = belum diisi.
@@ -130,7 +131,7 @@ func (t *tenant) snapshot() state {
 	l := t.langganan
 	l.Orders = slices.Clone(l.Orders)
 	return state{
-		Transactions: slices.Clone(t.txs), NextTxID: t.nextTxID,
+		Transactions: append(slices.Clone(t.txs), t.txBatal...), NextTxID: t.nextTxID, RefMulai: t.refMulai,
 		Assets: slices.Clone(t.assets), NextAssetID: t.nextAssetID,
 		Opening: t.opening, Karyawan: slices.Clone(t.karyawan), NextKaryawanID: t.nextKaryawanID,
 		Invoices: slices.Clone(t.invoices), NextInvoiceID: t.nextInvoiceID,

@@ -465,6 +465,7 @@ func (s *Server) katalogRoutes() {
 	m.HandleFunc("GET /api/v1/master/benchmark/{id}/xlsx", s.guardMP(s.handleUnduhBenchmark, master.Benchmark))
 	s.parameterRoutes()
 	s.mux.HandleFunc("POST /api/v1/coa/akun", s.persisting(s.guard("profil-usaha", s.on((*tenant).handleTambahAkun))))
+	s.mux.HandleFunc("PUT /api/v1/coa/akun/{kode}", s.persisting(s.guard("profil-usaha", s.on((*tenant).handleUbahNamaAkun))))
 	s.mux.HandleFunc("DELETE /api/v1/coa/akun/{kode}", s.persisting(s.guard("profil-usaha", s.on((*tenant).handleHapusAkun))))
 	s.mux.HandleFunc("POST /api/v1/coa/perbarui", s.persisting(s.guard("profil-usaha", s.on((*tenant).handlePerbaruiCOA))))
 }

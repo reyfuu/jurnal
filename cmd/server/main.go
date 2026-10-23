@@ -71,6 +71,11 @@ type tenant struct {
 	// & jual berasal dari transaksi bertanda barang; kartu dihitung ulang dari keduanya.
 	gerak       []finance.GerakStok
 	nextGerakID int
+	// txBatal: transaksi yang dibatalkan (pengganti hapus), di luar txs supaya tidak ikut
+	// laporan; disimpan di tabel transaksi yang sama dengan kolom batal terisi.
+	txBatal []finance.Transaction
+	// refMulai: transaksi ber-ID >= ini mendapat No. Referensi (transaksi lama tetap tanpa nomor).
+	refMulai int
 	// tutupBuku: bulan terakhir yang sudah ditutup (YYYY-MM); data bertanggal sampai akhir
 	// bulan itu tidak bisa diubah lagi. Kosong = belum ada yang ditutup.
 	tutupBuku string
@@ -126,7 +131,7 @@ type Server struct {
 func newTenant(id int) *tenant {
 	t := &tenant{id: id, snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{},
 		nextTxID: 1, nextAssetID: 1, nextKaryawanID: 1, nextInvoiceID: 1, nextTagihanID: 1, nextStokID: 1,
-		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1}
+		nextProdukID: 1, nextSupplierID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1, refMulai: 1}
 	for _, p := range finance.AvailablePeriods() {
 		t.snapshots[p.ID] = finance.EmptySnapshot(p.ID)
 	}
@@ -140,6 +145,7 @@ func demoTenant() *tenant {
 		produk: finance.SeedProduk(), supplier: finance.SeedSupplier(),
 		snapshots: map[string]finance.DashboardSnapshot{}, seedTx: map[string]int{}, nextKaryawanID: 1, nextKoreksiID: 1, nextCatatanID: 1, nextGerakID: 1}
 	t.nextTxID, t.nextAssetID = len(t.txs)+1, len(t.assets)+1
+	t.refMulai = t.nextTxID // data contoh tanpa nomor; transaksi baru bernomor
 	t.nextInvoiceID = len(t.invoices) + 1
 	t.nextTagihanID, t.nextStokID = len(t.tagihan)+1, len(t.stok)+1
 	t.nextProdukID, t.nextSupplierID = len(t.produk)+1, len(t.supplier)+1
@@ -152,7 +158,19 @@ func demoTenant() *tenant {
 
 // restore menimpa data tenant dengan isi berkas state.
 func (t *tenant) restore(st *state) {
-	t.txs, t.nextTxID = st.Transactions, st.NextTxID
+	t.txs, t.txBatal, t.nextTxID = nil, nil, st.NextTxID
+	for _, x := range st.Transactions {
+		if x.Batal != nil {
+			t.txBatal = append(t.txBatal, x)
+		} else {
+			t.txs = append(t.txs, x)
+		}
+	}
+	// No. Referensi mulai berlaku sejak pertama dimuat versi ini: transaksi lama tanpa nomor.
+	t.refMulai = st.RefMulai
+	if t.refMulai <= 0 {
+		t.refMulai = max(1, t.nextTxID)
+	}
 	// state.json dari versi sebelum register aset tidak punya daftar aset: pakai seed.
 	if st.NextAssetID > 0 {
 		t.assets, t.nextAssetID = st.Assets, st.NextAssetID
@@ -397,6 +415,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/transactions/mirip", s.guard("transaksi", s.on((*tenant).handleCariMirip)))
 	s.mux.HandleFunc("GET /api/v1/transactions/dobel", s.guard("transaksi", s.on((*tenant).handleDobel)))
 	s.mux.HandleFunc("POST /api/v1/transactions/foto", s.guard("transaksi", s.handleBacaNota))
+	s.mux.HandleFunc("GET /api/v1/transactions/batal", s.guard("transaksi", s.on((*tenant).handleTransaksiBatal)))
+	s.mux.HandleFunc("POST /api/v1/transactions/{id}/pulihkan", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handlePulihkanTransaksi))))
 	s.mux.HandleFunc("POST /api/v1/transactions/import", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleImportTransactions))))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi", s.guard("transaksi-kelola", s.handleMutasiPreview))
 	s.mux.HandleFunc("POST /api/v1/transactions/mutasi/commit", s.persisting(s.guard("transaksi-kelola", s.on((*tenant).handleMutasiCommit))))
@@ -1066,7 +1086,7 @@ func decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool
 // decodeTx + cek akun koreksi terhadap CoA aktif. Tautan invoice hanya diatur server.
 func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Transaction, bool) {
 	t, ok := decodeTx(w, r)
-	t.InvoiceID, t.Grup, t.Lawan, t.Sumber = 0, 0, "", "" // tautan invoice, catatan jurnal & asal hanya diatur server
+	t.InvoiceID, t.Grup, t.Lawan, t.Sumber, t.Ref, t.Batal = 0, 0, "", "", "", nil // tautan, nomor & asal hanya diatur server
 	if ok && !s.validAkun(t) {
 		http.Error(w, "akun "+t.Akun+" tidak ada di daftar akun usaha ini", http.StatusBadRequest)
 		return t, false
@@ -1105,6 +1125,8 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	t.ID = s.nextTxID
 	s.nextTxID++
 	s.txs = append(s.txs, t)
+	s.beriRefLocked()
+	t = s.txs[len(s.txs)-1]
 	resp := s.withWarnings(t)
 	s.mu.Unlock()
 	w.WriteHeader(http.StatusCreated)
@@ -1146,6 +1168,7 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
+	t.Ref = s.txs[i].Ref // nomor tetap walau tanggal / isinya diubah
 	t.ID = s.txs[i].ID
 	s.txs[i] = t
 	writeJSON(w, s.withWarnings(t))
@@ -1177,7 +1200,13 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi ini adalah pembelian aset \""+s.assets[j].Nama+"\"; ubah atau hapus dari menu Aset supaya neraca tetap seimbang", http.StatusConflict)
 		return
 	}
-	s.txs = slices.Delete(s.txs, i, i+1)
+	alasan, err := alasanBatal(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	id := s.txs[i].ID
+	s.batalkanLocked(func(t finance.Transaction) bool { return t.ID == id }, "transaksi", currentUser(r).Name, alasan)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1233,6 +1262,7 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 			s.nextTxID++
 			s.txs = append(s.txs, t)
 		}
+		s.beriRefLocked()
 		s.mu.Unlock()
 		res.Imported = len(txs)
 	}

@@ -66,13 +66,13 @@ func TestTransactionsCRUD_UpdatesReportsAndDashboard(t *testing.T) {
 		t.Fatalf("update not reflected: omzet=%d receivables=%d", omzetAug(t, srv, owner), cf.NewReceivables)
 	}
 
-	if rec := do(srv, owner, http.MethodDelete, path, ""); rec.Code != http.StatusNoContent {
+	if rec := do(srv, owner, http.MethodDelete, path+"?alasan=uji", ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete: %d", rec.Code)
 	}
 	if got := omzetAug(t, srv, owner); got != base {
 		t.Fatalf("omzet after delete: want %d, got %d", base, got)
 	}
-	if rec := do(srv, owner, http.MethodDelete, path, ""); rec.Code != http.StatusNotFound {
+	if rec := do(srv, owner, http.MethodDelete, path+"?alasan=uji", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("delete twice: want 404, got %d", rec.Code)
 	}
 }

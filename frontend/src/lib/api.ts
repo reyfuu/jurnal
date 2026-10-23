@@ -294,9 +294,16 @@ export interface Tx {
   no_bukti?: string
   /** Asal pencatatan: dari impor mutasi bank atau dibaca AI dari foto nota. */
   sumber?: 'mutasi' | 'foto'
+  /** No. Referensi TRX-yymm-urut (diatur server); transaksi lama kosong. */
+  ref?: string
+  /** Terisi bila transaksi dibatalkan. */
+  batal?: Pembatalan
 }
 
-export type TxInput = Omit<Tx, 'id'>
+/** Jejak pembatalan transaksi; asal transaksi/catatan bisa dipulihkan Owner. */
+export interface Pembatalan { oleh: string; waktu: string; alasan: string; asal: 'transaksi' | 'catatan' | 'invoice' | 'aset' | 'produksi' }
+
+export type TxInput = Omit<Tx, 'id' | 'ref' | 'batal'>
 
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
@@ -311,7 +318,7 @@ export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: nu
 export const buktiCatatUrl = (grup: number) => `/api/v1/catat/${grup}/bukti`
 export const simpanCatatanJurnal = (c: CatatanJurnal, grup?: number) =>
   api<CatatanJurnal & { grup: number; transaksi: number[] }>(grup ? `/catat/${grup}` : '/catat', { method: grup ? 'PUT' : 'POST', body: c })
-export const hapusCatatanJurnal = (grup: number) => api<void>(`/catat/${grup}`, { method: 'DELETE' })
+export const hapusCatatanJurnal = (grup: number, alasan: string) => api<void>(`/catat/${grup}`, { method: 'DELETE', body: { alasan } })
 
 export interface BreakEven {
   price: number
@@ -524,7 +531,10 @@ export const listTransactions = () => api<{ transactions: Tx[]; jenis: JenisInfo
 export type SavedTx = Tx & { warnings?: CashWarning[] }
 export const createTransaction = (t: TxInput) => api<SavedTx>('/transactions', { method: 'POST', body: t })
 export const updateTransaction = (id: number, t: TxInput) => api<SavedTx>(`/transactions/${id}`, { method: 'PUT', body: t })
-export const deleteTransaction = (id: number) => api<void>(`/transactions/${id}`, { method: 'DELETE' })
+/** Hapus = batalkan: nomornya tetap tercatat dengan alasan. */
+export const deleteTransaction = (id: number, alasan: string) => api<void>(`/transactions/${id}`, { method: 'DELETE', body: { alasan } })
+export const getTransaksiBatal = () => api<Tx[]>('/transactions/batal')
+export const pulihkanTransaksi = (id: number) => api<Tx[]>(`/transactions/${id}/pulihkan`, { method: 'POST' })
 
 export const simulatePrice = (period: string, i: PriceSimInput) =>
   api<PriceSim>(`/pricing/simulate?period=${period}`, {
@@ -905,7 +915,8 @@ export interface DiffAkun { tambah: Account[]; hapus: Account[]; ubah: Account[]
 
 export const getCoA = () => api<CoAInfo>('/coa')
 /** Akun buatan klien: jenisnya mengikuti akun induk, kode dibuat otomatis setelah induk. */
-export const tambahAkunCoA = (nama: string, induk: string) => api<{ kode: string; nama: string; induk: string }>('/coa/akun', { method: 'POST', body: { nama, induk } })
+export const tambahAkunCoA = (kode: string, nama: string, kelompok?: string) => api<{ kode: string; nama: string; induk: string }>('/coa/akun', { method: 'POST', body: { kode, nama, kelompok } })
+export const ubahNamaAkunCoA = (kode: string, nama: string) => api<unknown>(`/coa/akun/${kode}`, { method: 'PUT', body: { nama } })
 export const hapusAkunCoA = (kode: string) => api<void>(`/coa/akun/${kode}`, { method: 'DELETE' })
 export const CATATAN_AKUN_TAMBAHAN = 'Ditambahkan sendiri di Daftar Akun'
 export const perbaruiCoA = () => api<unknown>('/coa/perbarui', { method: 'POST' })
@@ -1948,7 +1959,7 @@ export interface UmurSaldo {
   per: string; piutang: boolean
   kelompok: { label: string; nilai: number; jumlah: number }[]
   pihak: { nama: string; nilai: number[]; total: number }[]
-  baris: { transaksi_id?: number; tanggal: string; pihak: string; keterangan: string; jenis: string; nilai: number; hari: number; kelompok: number }[]
+  baris: { transaksi_id?: number; tanggal: string; pihak: string; keterangan: string; jenis: string; nilai: number; hari: number; kelompok: number; ref?: string; no_bukti?: string }[]
   total: number
 }
 export const getUmurSaldo = (jenis: 'piutang' | 'utang', per: string) => api<UmurSaldo>(`/reports/umur?jenis=${jenis}&per=${per}`)

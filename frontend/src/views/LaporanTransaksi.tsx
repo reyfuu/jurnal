@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
-import { getLaporanTransaksi, laporanTransaksiXlsxUrl, type FilterTransaksi, type LaporanTransaksi as Data } from '@/lib/api'
+import { getLaporanTransaksi, getTransaksiBatal, laporanTransaksiXlsxUrl, pulihkanTransaksi, type FilterTransaksi, type LaporanTransaksi as Data, type Tx } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
@@ -16,12 +16,31 @@ const HALAMAN = 200
  * bayar, channel & kata kunci; total dan rekap per jenis. Disaring di server, jadi ekspor Excel
  * memuat baris yang persis sama dengan yang tampil.
  */
-export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaEkspor: boolean }) {
+export function LaporanTransaksi({ period, bisaEkspor, bisaPulihkan = false }: { period: string; bisaEkspor: boolean; bisaPulihkan?: boolean }) {
   const [f, setF] = useState<FilterTransaksi>(() => rentangBulan(period))
   const [cari, setCari] = useState('')
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
   const [batas, setBatas] = useState(HALAMAN)
+  // Transaksi yang dibatalkan: disembunyikan dulu; ditampilkan abu-abu & dicoret bila diminta.
+  const [lihatBatal, setLihatBatal] = useState(false)
+  const [batal, setBatal] = useState<Tx[]>([])
+  const [muatUlang, setMuatUlang] = useState(0)
+  useEffect(() => {
+    if (!lihatBatal) return
+    let hidup = true
+    getTransaksiBatal().then((d) => hidup && setBatal(d), (e: Error) => hidup && setError(e.message))
+    return () => { hidup = false }
+  }, [lihatBatal, muatUlang])
+  async function pulihkan(t: Tx) {
+    try {
+      await pulihkanTransaksi(t.id)
+      setMuatUlang((n) => n + 1)
+      setF((x) => ({ ...x })) // muat ulang laporan
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
 
   // Ganti periode laporan di atas = rentang ikut ke bulan itu.
   useEffect(() => { setF((x) => ({ ...x, ...rentangBulan(period) })) }, [period])
@@ -124,10 +143,13 @@ export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaE
             </div>
           )}
 
+          <label className="flex items-center gap-2 text-sm" style={{ justifySelf: 'start', margin: '4px 0 8px' }} htmlFor="lihat-batal">
+            <input id="lihat-batal" type="checkbox" checked={lihatBatal} onChange={(e) => setLihatBatal(e.target.checked)} /> Tampilkan yang batal
+          </label>
           <div className="card" style={{ padding: 0 }}>
             <div className="table-scroll"><table className="data-table tabular" style={{ minWidth: 980 }}>
               <thead><tr>
-                <th>Tanggal</th><th>No</th><th>Jenis</th><th>Keterangan</th><th>Pelanggan / Supplier</th><th>Channel</th><th>Status</th>
+                <th>Tanggal</th><th>No. Referensi</th><th>Jenis</th><th>Keterangan</th><th>Pelanggan / Supplier</th><th>Channel</th><th>Status</th>
                 <th style={{ textAlign: 'right' }}>Masuk</th><th style={{ textAlign: 'right' }}>Keluar</th>
               </tr></thead>
               <tbody>
@@ -136,11 +158,31 @@ export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaE
                   const masuk = arahJenis.get(t.jenis) === 'masuk'
                   return (
                     <tr key={t.id}>
-                      <td>{formatTanggal(t.tanggal)}</td><td className="text-muted-foreground">#{t.id}</td><td>{t.jenis}</td>
+                      <td>{formatTanggal(t.tanggal)}</td><td style={{ whiteSpace: 'nowrap', color: t.ref ? 'var(--text-brand)' : 'var(--text-muted)' }}>{t.ref ?? '—'}</td><td>{t.jenis}</td>
                       <td>{t.keterangan || t.item}</td><td>{t.pihak}</td><td>{t.channel}</td>
                       <td>{t.lunas ? <span className="pill-status pill-green">Lunas{t.tanggal_lunas && t.tanggal_lunas !== t.tanggal ? ` ${formatTanggal(t.tanggal_lunas)}` : ''}</span> : <span className="pill-status pill-amber">Belum lunas</span>}</td>
                       <td style={{ textAlign: 'right', color: GREEN }}>{masuk ? formatRp(t.nominal) : ''}</td>
                       <td style={{ textAlign: 'right', color: RED }}>{masuk ? '' : formatRp(t.nominal)}</td>
+                    </tr>
+                  )
+                })}
+                {lihatBatal && batal.filter((t) => t.tanggal >= f.dari && t.tanggal <= f.sampai).map((t) => {
+                  const masuk = arahJenis.get(t.jenis) === 'masuk'
+                  const coret = { textDecoration: 'line-through' } as const
+                  return (
+                    <tr key={'b' + t.id} style={{ color: 'var(--text-muted)', background: 'var(--bg-raised)' }}>
+                      <td style={coret}>{formatTanggal(t.tanggal)}</td><td style={{ ...coret, whiteSpace: 'nowrap' }}>{t.ref ?? '—'}</td>
+                      <td><span className="pill-status pill-red">Batal</span></td>
+                      <td style={{ whiteSpace: 'normal' }}>
+                        <span style={coret}>{t.keterangan || t.item}</span>
+                        <span className="block text-xs">Dibatalkan oleh {t.batal?.oleh}, {t.batal?.waktu} · Alasan: {t.batal?.alasan}</span>
+                      </td>
+                      <td style={coret}>{t.pihak}</td><td style={coret}>{t.channel}</td>
+                      <td>{bisaPulihkan && (t.batal?.asal === 'transaksi' || t.batal?.asal === 'catatan')
+                        ? <Button size="sm" variant="outline" onClick={() => void pulihkan(t)}>Pulihkan</Button>
+                        : <span className="text-xs">tidak dihitung</span>}</td>
+                      <td style={{ ...coret, textAlign: 'right' }}>{masuk ? formatRp(t.nominal) : ''}</td>
+                      <td style={{ ...coret, textAlign: 'right' }}>{masuk ? '' : formatRp(t.nominal)}</td>
                     </tr>
                   )
                 })}

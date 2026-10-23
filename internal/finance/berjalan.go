@@ -233,6 +233,9 @@ type BarisUmur struct {
 	Kelompok    int    `json:"kelompok"`
 	InvoiceID   int    `json:"invoice_id,omitempty"`
 	JatuhTempo  string `json:"jatuh_tempo,omitempty"`
+	// Ref: No. Referensi transaksinya; NoBukti: nomor nota / invoice pihak lain.
+	Ref     string `json:"ref,omitempty"`
+	NoBukti string `json:"no_bukti,omitempty"`
 }
 
 type PihakUmur struct {
@@ -300,7 +303,7 @@ func UmurSaldo(ob OpeningBalance, txs []Transaction, per string, piutang bool) U
 			perInvoice[t.InvoiceID] = len(baris)
 		}
 		baris = append(baris, BarisUmur{TransaksiID: t.ID, Tanggal: t.Tanggal, Pihak: cmp.Or(t.Pihak, "(tanpa nama)"), Keterangan: cmp.Or(t.Keterangan, t.Item),
-			Jenis: t.Jenis, Nilai: t.Nominal, InvoiceID: t.InvoiceID, JatuhTempo: t.JatuhTempo})
+			Jenis: t.Jenis, Nilai: t.Nominal, InvoiceID: t.InvoiceID, JatuhTempo: t.JatuhTempo, Ref: t.Ref, NoBukti: t.NoBukti})
 	}
 	for _, b := range baris {
 		tambah(b)

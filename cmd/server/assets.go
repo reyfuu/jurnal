@@ -54,7 +54,8 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return milikAset && t.ID == lama.TransaksiID })
 	if !finance.SumberBerTransaksi(a.SumberDana) {
 		if i >= 0 {
-			s.txs = slices.Delete(s.txs, i, i+1)
+			id := s.txs[i].ID
+			s.batalkanLocked(func(t finance.Transaction) bool { return t.ID == id }, "aset", "otomatis", "Aset "+a.Nama+" diubah: tidak lagi dibayar lewat transaksi")
 		}
 		a.TransaksiID = 0
 		return nil
@@ -80,12 +81,13 @@ func (s *tenant) sinkronTxAset(a *finance.Asset, lama *finance.Asset) error {
 	}
 	s.pakaiRekeningBawaanLocked(&t, lawanLama)
 	if i >= 0 {
-		t.ID = s.txs[i].ID
+		t.ID, t.Ref = s.txs[i].ID, s.txs[i].Ref
 		s.txs[i] = t
 	} else {
 		t.ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, t)
+		s.beriRefLocked()
 	}
 	a.TransaksiID = t.ID
 	return nil

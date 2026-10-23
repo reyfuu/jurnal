@@ -112,10 +112,14 @@ export function UmurPiutang({ bisaUbah, onChanged, navigate }: { bisaUbah: boole
           </div>
           <div className="table-scroll" style={{ opacity: hasil?.kunci === kunci ? 1 : 0.6 }}>
             <table className="data-table tabular" style={{ minWidth: 820 }}>
-              <thead><tr><th>Tanggal</th><th>Nama</th><th>Keterangan</th><th style={{ textAlign: 'right' }}>Umur</th><th style={{ textAlign: 'right' }}>Nilai</th>{bisaUbah && <th />}</tr></thead>
+              <thead><tr><th>No. Referensi</th><th>Tanggal</th><th>Nama</th><th>Keterangan</th><th style={{ textAlign: 'right' }}>Umur</th><th style={{ textAlign: 'right' }}>Nilai</th>{bisaUbah && <th />}</tr></thead>
               <tbody>
                 {d.baris.map((b, i) => (
                   <tr key={`${b.transaksi_id ?? 'awal'}-${i}`}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <span style={{ color: b.ref ? 'var(--text-brand)' : 'var(--text-muted)' }}>{b.ref ?? '—'}</span>
+                      {b.no_bukti && <span className="block text-xs text-muted-foreground">{b.no_bukti}</span>}
+                    </td>
                     <td>{formatTanggal(b.tanggal)}</td>
                     <td>{b.pihak}</td>
                     <td className="text-sm" style={{ whiteSpace: 'normal', maxWidth: 280 }}>{b.keterangan}{b.jenis && <span className="text-xs text-muted-foreground"> · {b.jenis}</span>}</td>

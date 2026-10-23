@@ -115,20 +115,25 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int,
 			return nil, err
 		}
 	}
+	ref := ""
+	if i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup && t.Ref != "" }); i >= 0 {
+		ref = s.txs[i].Ref // catatan diubah: No. Referensi tetap
+	}
 	s.txs = slices.DeleteFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == grup })
 	var ids []int
 	for _, t := range baru {
-		t.ID = s.nextTxID
+		t.ID, t.Ref = s.nextTxID, ref
 		s.nextTxID++
 		s.txs = append(s.txs, t)
 		ids = append(ids, t.ID)
 	}
+	s.beriRefLocked()
 	return ids, nil
 }
 
 func (s *tenant) grupBerikutLocked() int {
 	g := 0
-	for _, t := range s.txs {
+	for _, t := range append(slices.Clone(s.txs), s.txBatal...) { // nomor catatan batal tidak dipakai ulang
 		g = max(g, t.Grup)
 	}
 	return g + 1
@@ -232,10 +237,24 @@ func (s *tenant) handleDeleteCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "catatan tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	if _, err := s.simpanCatatLocked(grup, nil); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+	alasan, err := alasanBatal(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hapusBuktiLocked(grup)
+	if slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool { return g.Grup == grup }) {
+		http.Error(w, "catatan ini biaya lain produksi; ubah atau hapus lewat Produksi & Supplier → riwayat produksi", http.StatusConflict)
+		return
+	}
+	for _, t := range s.txs {
+		if t.Grup == grup {
+			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
+	}
+	// dibatalkan, bukan dihapus: nomor & foto nota tetap tersimpan sebagai riwayat
+	s.batalkanLocked(func(t finance.Transaction) bool { return t.Grup == grup }, "catatan", currentUser(r).Name, alasan)
 	w.WriteHeader(http.StatusNoContent)
 }

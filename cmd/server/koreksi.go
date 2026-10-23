@@ -149,6 +149,11 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 		switch {
 		case errors.Is(err, finance.ErrKoreksiBasi):
 			k.Status, basi = finance.KoreksiKedaluwarsa, true
+		case k.Jenis == finance.KoreksiHapus:
+			// hapus = batalkan: nomor & riwayatnya tetap tercatat
+			k.Status = finance.KoreksiDisetujui
+			id := k.TransaksiID
+			t.batalkanLocked(func(x finance.Transaction) bool { return x.ID == id }, "transaksi", u.Name, "Usulan koreksi konsultan disetujui: "+k.Alasan)
 		default:
 			k.Status, t.txs = finance.KoreksiDisetujui, txs
 		}

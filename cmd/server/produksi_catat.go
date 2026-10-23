@@ -178,6 +178,7 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 		s.nextTxID++
 		s.txs = append(s.txs, t)
 	}
+	s.beriRefLocked()
 	out.Transaksi = len(txs)
 	w.WriteHeader(http.StatusCreated)
 	writeJSON(w, out)

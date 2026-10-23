@@ -46,7 +46,8 @@ func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) e
 			if err := s.cekTerbukaLocked(tanggalTx(s.txs[i])...); err != nil {
 				return err
 			}
-			s.txs = slices.Delete(s.txs, i, i+1)
+			tid := s.txs[i].ID
+			s.batalkanLocked(func(x finance.Transaction) bool { return x.ID == tid }, "invoice", "otomatis", "Bagian invoice dihapus / diubah")
 		}
 		*id = 0
 		return nil
@@ -72,12 +73,13 @@ func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) e
 	}
 	s.pakaiRekeningBawaanLocked(&t, lama)
 	if i >= 0 {
-		t.ID = s.txs[i].ID
+		t.ID, t.Ref = s.txs[i].ID, s.txs[i].Ref
 		s.txs[i] = t
 	} else {
 		t.ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, t)
+		s.beriRefLocked()
 	}
 	*id = t.ID
 	return nil

@@ -333,7 +333,7 @@ func (s *tenant) handleDeleteGerak(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		s.txs = slices.DeleteFunc(s.txs, func(t finance.Transaction) bool { return t.Grup == g })
+		s.batalkanLocked(func(t finance.Transaction) bool { return t.Grup == g }, "produksi", currentUser(r).Name, "Dokumen produksi dihapus")
 	}
 	s.gerak = slices.Delete(s.gerak, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
