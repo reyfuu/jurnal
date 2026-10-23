@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
+import { CreditCard, KeyRound, Pencil, Trash2, UserCheck, UserX } from 'lucide-react'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { AksiLembar, LembarBawah } from '@/components/hp/LembarBawah'
+import { BarisRingkas } from '@/components/hp/BarisRingkas'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -28,6 +32,8 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus, bisaLangga
   const [hapus, setHapus] = useState<PenggunaKlien | null>(null)
   const [nonaktif, setNonaktif] = useState<PenggunaKlien | null>(null)
   const [reset, setReset] = useState<{ u: PenggunaKlien; pw?: string } | null>(null)
+  const hp = useHP()
+  const [aksi, setAksi] = useState<PenggunaKlien | null>(null) // lembar ⋯ di HP
   const muat = useCallback(() => getPenggunaKlien().then(setRows, (e: Error) => setError(e.message)), [])
   useEffect(() => { void muat() }, [muat])
 
@@ -47,17 +53,62 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus, bisaLangga
     }
   }
 
+  const pilihSaring = (
+    (['semua', 'aktif', 'nonaktif'] as Saring[]).map((s) => (
+      <button key={s} role="tab" className={hp ? 'kepala-hp-chip' + (saring === s ? ' aktif' : '') : 'tab-btn'} aria-selected={saring === s} onClick={() => setSaring(s)}>{s[0].toUpperCase() + s.slice(1)}</button>
+    ))
+  )
+  const errorPill = error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', whiteSpace: 'normal' }}>{error}</div>
+  const tutupAksi = () => setAksi(null)
+  // Aksi dari lembar ⋯: tutup lembarnya dulu, lalu buka dialog yang sama dengan versi laptop.
+  const lalu = (f: () => void) => () => { tutupAksi(); f() }
+
   return (
     <>
+      {hp ? (
+        <>
+          <KepalaHP judul="Pengguna Klien" cari={q} onCari={setQ} placeholderCari="Cari nama, email, no HP, usaha" />
+          <div className="saring-hp" role="tablist" aria-label="Saring status">{pilihSaring}</div>
+          {errorPill}
+          <div className="daftar-ringkas">
+            {tampil.map((u) => (
+              <BarisRingkas key={u.id} label={u.name} aktif={u.active} judul={u.name} sub={`${u.email} · ${u.usaha}`}
+                onUbah={bisaKelola ? () => setEdit(u) : undefined} onLainnya={() => setAksi(u)} />
+            ))}
+            {rows && tampil.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada pengguna yang cocok.</p>}
+            {!rows && <p className="text-sm text-muted-foreground">Memuat…</p>}
+          </div>
+          <LembarBawah buka={!!aksi} judul={aksi?.name ?? ''} onTutup={tutupAksi}>
+            {aksi && (
+              <>
+                <dl className="lembar-rinci">
+                  <dt>Email</dt><dd>{aksi.email}</dd>
+                  <dt>No HP</dt><dd className="tabular">{aksi.wa || '—'}</dd>
+                  <dt>Usaha</dt><dd>{aksi.usaha}{aksi.arsip && <span className="pill-status pill-red" style={{ marginLeft: 6, fontSize: 10 }}>diarsipkan</span>}</dd>
+                  <dt>Alamat</dt><dd>{[aksi.alamat, aksi.kota].filter(Boolean).join(', ') || '—'}</dd>
+                  <dt>Role</dt><dd>{aksi.role_label}</dd>
+                  <dt>Langganan</dt><dd><span className={'pill-status ' + STATUS_LG[aksi.langganan.status][0]}>{STATUS_LG[aksi.langganan.status][1]}</span>{aksi.langganan.sampai && <> s/d {formatTanggal(aksi.langganan.sampai)}</>}</dd>
+                  <dt>Status</dt><dd>{aksi.active ? 'Aktif' : 'Nonaktif'}</dd>
+                  <dt>Terakhir aktif</dt><dd>{formatRelatif(aksi.last_seen)}</dd>
+                </dl>
+                {bisaLangganan && !aksi.demo && !aksi.arsip && (
+                  <AksiLembar ikon={<CreditCard />} onClick={lalu(() => setLangganan(aksi))}>{aksi.langganan.status === 'habis' ? 'Buka semua fitur' : 'Atur langganan'}</AksiLembar>
+                )}
+                {bisaReset && <AksiLembar ikon={<KeyRound />} onClick={lalu(() => setReset({ u: aksi }))}>Reset password</AksiLembar>}
+                {bisaKelola && (aksi.active
+                  ? <AksiLembar ikon={<UserX />} onClick={lalu(() => setNonaktif(aksi))}>Nonaktifkan</AksiLembar>
+                  : <AksiLembar ikon={<UserCheck />} onClick={lalu(() => void setAktif(aksi, true).then(muat, (e: Error) => setError(e.message)))}>Aktifkan</AksiLembar>)}
+                {bisaHapus && <AksiLembar ikon={<Trash2 />} bahaya onClick={lalu(() => setHapus(aksi))}>Hapus permanen</AksiLembar>}
+              </>
+            )}
+          </LembarBawah>
+        </>
+      ) : (<>
       <PageHeader title="Pengguna Klien" subtitle={rows ? `${rows.length} akun pengguna di usaha yang bisa Anda lihat` : 'Memuat…'} />
-      {error && <div className="pill-status pill-red" role="alert" style={{ alignSelf: 'flex-start', whiteSpace: 'normal' }}>{error}</div>}
+      {errorPill}
       <div className="card" style={{ padding: 20 }}>
         <div className="flex flex-wrap items-center gap-3" style={{ marginBottom: 12 }}>
-          <div className="tabbar" role="tablist" aria-label="Saring status">
-            {(['semua', 'aktif', 'nonaktif'] as Saring[]).map((s) => (
-              <button key={s} role="tab" className="tab-btn" aria-selected={saring === s} onClick={() => setSaring(s)}>{s[0].toUpperCase() + s.slice(1)}</button>
-            ))}
-          </div>
+          <div className="tabbar" role="tablist" aria-label="Saring status">{pilihSaring}</div>
           <Input aria-label="Cari pengguna" placeholder="Cari nama, email, no HP, usaha" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280, marginLeft: 'auto' }} />
         </div>
         <div className="table-scroll">
@@ -98,6 +149,7 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus, bisaLangga
         </div>
         <p className="mt-3 text-xs text-muted-foreground">Nonaktifkan (soft delete) = pengguna tidak bisa masuk, data tetap, bisa diaktifkan lagi. Hapus (hard delete) = akun dihapus permanen; akun aktif dinonaktifkan dulu otomatis. Semua tindakan tercatat di audit log.</p>
       </div>
+      </>)}
 
       {langganan && (
         <LanggananDialog open klien={{ id: langganan.klien_id, nama: langganan.usaha }} onClose={() => setLangganan(null)}

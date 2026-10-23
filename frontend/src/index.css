@@ -1544,3 +1544,38 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
   .mutasi-hp-baris > div { display: flex; justify-content: space-between; gap: 8px; }
   .mutasi-hp-baris > div + div { color: var(--text-muted); margin-top: 2px; }
 }
+@layer components {
+  .daftar-ringkas { display: grid; gap: 6px; }
+  .baris-ringkas {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 6px 6px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-card);
+  }
+  .baris-ringkas-utama { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; text-align: left; min-height: 40px; }
+  .baris-ringkas-titik { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+  .baris-ringkas-titik.aktif { background: var(--accent-green); }
+  .baris-ringkas-teks { min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+  .baris-ringkas-teks > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .baris-ringkas-teks > span { font-size: 11.5px; color: var(--text-muted); }
+  .baris-ringkas .kepala-hp-ikon { width: 36px; height: 36px; }
+  .saring-hp { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-top: -8px; }
+}
+@layer components {
+  /* Tabel matriks (mis. Role & izin) di HP: digeser, kolom pertama menempel di kiri. */
+  @media (max-width: 760px) {
+    .tabel-matriks th:first-child,
+    .tabel-matriks td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: var(--bg-card);
+      box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.25);
+      white-space: normal;
+      min-width: 150px;
+    }
+  }
+}
