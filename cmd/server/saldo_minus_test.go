@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -91,9 +92,9 @@ func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 	}
 }
 
-// Peringatan menyebut sejak kapan & di bukti mana saldo terakhir kali berbalik minus, supaya jurnal
-// penyebabnya mudah dicari. Saldo yang sempat pulih lalu minus lagi menunjuk titik minus terakhir.
-func TestSaldoMinus_SejakTanggalDanNoBukti(t *testing.T) {
+// Peringatan menyebut SEMUA titik saldo berbalik minus (tanggal & No. Bukti) sejak awal pembukuan,
+// supaya seluruh jurnal penyebabnya bisa diperiksa sekaligus, tidak satu per satu mundur.
+func TestSaldoMinus_SemuaTitikMinus(t *testing.T) {
 	srv, qa := usahaBaru(t)
 	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
 		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
@@ -111,12 +112,13 @@ func TestSaldoMinus_SejakTanggalDanNoBukti(t *testing.T) {
 		}
 	}
 	jan := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
-	if len(jan) != 1 || jan[0].Sejak != "2026-01-06" || jan[0].Bukti != sewa[0].NoJurnal || !strings.Contains(jan[0].Pesan, sewa[0].NoJurnal) {
+	if len(jan) != 1 || !slices.Equal(jan[0].Titik, []titikMinus{{"2026-01-06", sewa[0].NoJurnal}}) || !strings.Contains(jan[0].Pesan, sewa[0].NoJurnal) {
 		t.Fatalf("januari: %+v (bukti sewa %s)", jan, sewa[0].NoJurnal)
 	}
 	feb := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-02")
-	if len(feb) != 1 || feb[0].Sejak != "2026-02-10" || feb[0].Bukti != sewa[1].NoJurnal {
-		t.Fatalf("februari harus menunjuk minus terakhir: %+v (bukti sewa %s)", feb, sewa[1].NoJurnal)
+	want := []titikMinus{{"2026-01-06", sewa[0].NoJurnal}, {"2026-02-10", sewa[1].NoJurnal}}
+	if len(feb) != 1 || !slices.Equal(feb[0].Titik, want) || !strings.Contains(feb[0].Pesan, sewa[0].NoJurnal) || !strings.Contains(feb[0].Pesan, sewa[1].NoJurnal) {
+		t.Fatalf("februari harus menyebut semua titik minus: %+v, mau %+v", feb, want)
 	}
 }
 

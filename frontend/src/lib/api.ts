@@ -1154,7 +1154,7 @@ export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (t
 export const saveOpening = (o: OpeningBalance, paksa = false) => api<OpeningInfo>('/opening' + (paksa ? '?paksa=1' : ''), { method: 'PUT', body: o })
 
 /** Saldo akun yang berlawanan dengan saldo normalnya (PSAK) dan stok minus, per periode. */
-export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string; sejak?: string; bukti?: string }
+export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string; titik?: { tanggal: string; bukti: string }[] }
 export const getSaldoMinus = (period: string) => api<SaldoMinus[]>(`/saldo-minus?period=${encodeURIComponent(period)}`)
 
 export const getKaryawan = () => api<KaryawanSummary>('/karyawan')
