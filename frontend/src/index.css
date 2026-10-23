@@ -1397,3 +1397,122 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     color: var(--text-violet);
   }
 }
+
+/* Komponen khusus HP: kepala ringkas (judul + cari + filter) & lembar bawah (bottom sheet). */
+@layer components {
+  .kepala-hp { margin: 2px 0 12px; }
+  .kepala-hp-baris { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+  .kepala-hp-judul {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kepala-hp-ikon {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    border: 1px solid var(--border-shell);
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+  .kepala-hp-lencana {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--navy-700);
+    color: var(--neutral-0);
+  }
+  .kepala-hp-cari {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px 0 10px;
+    border-radius: 10px;
+    border: 1.5px solid var(--text-brand, var(--navy-700));
+    background: var(--bg-card);
+    color: var(--text-muted);
+  }
+  .kepala-hp-cari input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: 15px; }
+  .kepala-hp-cari button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; }
+  .kepala-hp-chips { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
+  .kepala-hp-chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+    color: var(--text-primary);
+  }
+
+  .lembar-bawah-akar { position: fixed; inset: 0; z-index: 70; }
+  .lembar-bawah-latar { position: absolute; inset: 0; background: rgba(10, 14, 30, 0.45); animation: lembar-pudar 0.2s ease; }
+  .lembar-bawah {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 85dvh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 18px 18px 0 0;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-3);
+    padding: 8px 16px max(16px, env(safe-area-inset-bottom));
+    outline: none;
+    animation: lembar-naik 0.2s ease;
+  }
+  .lembar-bawah-pegangan { width: 40px; height: 4px; border-radius: 4px; margin: 0 auto 10px; background: var(--border-strong); }
+  .lembar-bawah-judul { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+  .lembar-bawah-isi { overflow-y: auto; overscroll-behavior: contain; }
+  .lembar-aksi {
+    width: 100%;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 14px;
+    text-align: left;
+    color: var(--text-primary);
+  }
+  .lembar-aksi:last-child { border-bottom: 0; }
+  .lembar-aksi svg { width: 18px; height: 18px; color: var(--text-muted); }
+  .lembar-aksi.bahaya, .lembar-aksi.bahaya svg { color: var(--text-danger); }
+  .lembar-aksi:disabled { opacity: 0.5; }
+  .lembar-rinci { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; padding: 4px 0 10px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 4px; }
+  .lembar-rinci dt { color: var(--text-muted); }
+  .lembar-rinci dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  @keyframes lembar-naik { from { transform: translateY(100%); } }
+  @keyframes lembar-pudar { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .lembar-bawah, .lembar-bawah-latar { animation: none; }
+  }
+}
