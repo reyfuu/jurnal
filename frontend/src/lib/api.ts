@@ -172,6 +172,7 @@ export interface Dashboard {
   }[]
   inventory: { sku: string; name: string; type: string; stock: string; cogs: number; sell_price: number; status: string }[]
   tax_report: {
+    entity_type: string // OP | Badan
     yearly_exemption: number
     total_gross: number
     total_taxable: number
@@ -300,6 +301,8 @@ export interface Tx {
   sumber?: 'mutasi' | 'foto'
   /** Nomor jurnal tetap JU-YYYYMM-NNNN, diberikan server. */
   no_jurnal?: string
+  /** Setor PPh Final / Setor PPN: masa (YYYY-MM) yang dilunasi; bawaan bulan sebelum tanggal setor. */
+  masa_pajak?: string
 }
 
 export type TxInput = Omit<Tx, 'id'>
@@ -1974,6 +1977,20 @@ export interface BagianBanding { kode: 'laba-rugi' | 'neraca' | 'arus-kas'; judu
 export interface Banding { kolom: { periode: string; label: string }[]; bagian: BagianBanding[] }
 export const MAKS_BANDING = 12
 export const getBanding = (periode: string[]) => api<Banding>(`/reports/banding?periode=${periode.join(',')}`)
+export type StatusRekon = 'cocok' | 'kurang' | 'lebih' | 'belum_jatuh_tempo' | 'nihil' | 'berjalan'
+export interface RekonBulan {
+  masa: string; bulan: string; omzet: number; omzet_kumulatif: number; dasar_pajak: number
+  pph_terutang: number; pph_disetor: number; selisih: number; jatuh_tempo: string; status: StatusRekon
+  pajak_lain?: number; ppn_keluaran?: number; ppn_disetor?: number
+}
+export interface Rekonsiliasi {
+  tahun: number; subjek: 'OP' | 'Badan'; bebas_op: number; tarif_bps: number; pkp: boolean; bulan: RekonBulan[]
+  total_omzet: number; total_terutang: number; total_disetor: number; perlu_dicek: number; peringatan?: string[]
+  /** terutang − disetor untuk masa yang sudah jatuh tempo; selesai: semua masa lewat jatuh tempo (angka SPT Tahunan) */
+  kurang_bayar: number; selesai: boolean
+}
+export const getRekonsiliasi = (tahun: number) => api<Rekonsiliasi>(`/reports/rekonsiliasi?tahun=${tahun}`)
+export const rekonsiliasiUrl = (tahun: number, format: 'xlsx' | 'pdf') => `/api/v1/reports/rekonsiliasi.${format}?tahun=${tahun}`
 export const bandingPdfUrl = (periode: string[]) => `/api/v1/reports/banding.pdf?periode=${periode.join(',')}`
 
 // --- Laporan produksi ---
