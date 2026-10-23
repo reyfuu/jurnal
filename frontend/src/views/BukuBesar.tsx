@@ -92,9 +92,17 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
           <span>Mutasi {formatRp(data.total_debit)}</span>
         </div>
         {error && <p className="pill-status pill-red" role="alert" style={{ marginBottom: 10 }}>{error}</p>}
-        {kelompok.length === 0 && (
-          <p className="text-sm text-muted-foreground">{kosong && !cari.trim() ? `Belum ada saldo awal maupun transaksi di ${data.period_label}.` : 'Tidak ada akun yang cocok.'}</p>
-        )}
+        {kelompok.length === 0 && (kosong && !cari.trim() ? (
+          <div className="kartu-hp">
+            <div className="kartu-hp-judul">Belum ada saldo awal maupun transaksi di {data.period_label}.</div>
+            <div className="kartu-hp-sub">Buku Besar terisi dari saldo awal dan transaksi. Isi saldo awal dulu, lalu catat transaksi (atau impor mutasi rekening).</div>
+            <div className="flex flex-wrap gap-2" style={{ marginTop: 10 }}>
+              {navigate && <Button size="sm" onClick={() => navigate('saldo-awal')}>Isi saldo awal</Button>}
+              {navigate && <Button size="sm" variant="outline" onClick={() => navigate('transaksi')}>Catat transaksi</Button>}
+              <Button size="sm" variant="outline" onClick={() => setSemua(true)}>Lihat semua akun (CoA)</Button>
+            </div>
+          </div>
+        ) : <p className="text-sm text-muted-foreground">Tidak ada akun yang cocok.</p>)}
         <div>{kelompok.map((g) => (
           <Fragment key={g.nama}>
             <div className="kelompok-hp">{g.nama}</div>

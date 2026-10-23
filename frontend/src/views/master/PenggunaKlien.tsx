@@ -78,6 +78,7 @@ export function PenggunaKlienView({ bisaKelola, bisaReset, bisaHapus, bisaLangga
             {rows && tampil.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada pengguna yang cocok.</p>}
             {!rows && <p className="text-sm text-muted-foreground">Memuat…</p>}
           </div>
+          <p className="text-xs text-muted-foreground">Nonaktifkan = tidak bisa masuk, data tetap, bisa diaktifkan lagi. Hapus permanen = akun dihapus; akun aktif dinonaktifkan dulu otomatis. Semua tindakan tercatat di audit log.</p>
           <LembarBawah buka={!!aksi} judul={aksi?.name ?? ''} onTutup={tutupAksi}>
             {aksi && (
               <>

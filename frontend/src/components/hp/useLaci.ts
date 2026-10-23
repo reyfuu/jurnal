@@ -17,7 +17,10 @@ export function useLaci() {
       lewatRiwayat.current = true
       setBukaState(true)
     } else if (lewatRiwayat.current) {
-      history.back() // popstate di bawah yang menutup
+      // Entri riwayat laci dikonsumsi sekarang juga: ketuk latar dua kali tidak mundur dua langkah.
+      lewatRiwayat.current = false
+      setBukaState(false)
+      history.back()
     } else {
       setBukaState(false)
     }

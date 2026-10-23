@@ -138,8 +138,8 @@ export function KlienList({ onBuka, bisaLihat, bisaLangganan = false, onLihat }:
         <div className="daftar-ringkas">
           {tampil.map((k) => (
             <BarisRingkas key={k.id} label={k.nama} onBuka={() => onBuka(k.id)} onLainnya={() => setAksi(k)}
-              judul={<>{k.nama} <StatusPill s={k.status} /></>}
-              sub={[k.owner_nama, k.kota, k.paket].filter(Boolean).join(' · ') || k.owner_email} />
+              judul={<>{k.nama} <StatusPill s={k.status} />{k.perlu_perhatian && <span className="pill-status pill-red" style={{ marginLeft: 4 }}>perhatian</span>}</>}
+              sub={k.perlu_perhatian && k.alasan ? k.alasan : [k.owner_nama, k.kota, k.paket].filter(Boolean).join(' · ') || k.owner_email} />
           ))}
           {rows && tampil.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada klien yang cocok.</p>}
           {!rows && <p className="text-sm text-muted-foreground">Memuat…</p>}

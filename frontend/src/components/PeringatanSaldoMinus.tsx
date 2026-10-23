@@ -21,10 +21,12 @@ export function PeringatanSaldoMinus({ period, versi }: { period: string; versi:
   const judul = <><AlertTriangle size={16} aria-hidden="true" /> Ada {daftar.length} saldo minus</>
   if (hp && !bukaHP) {
     return (
-      <button type="button" className="note-box warn flex w-full items-center gap-2" role="alert" aria-expanded={false}
-        style={{ marginTop: 0, marginBottom: 12, fontWeight: 700, textAlign: 'left' }} onClick={() => setBukaHP(true)}>
-        {judul}<ChevronDown size={16} aria-hidden="true" style={{ marginLeft: 'auto' }} />
-      </button>
+      <div role="alert">
+        <button type="button" className="note-box warn flex w-full items-center gap-2" aria-expanded={false}
+          style={{ marginTop: 0, marginBottom: 12, fontWeight: 700, textAlign: 'left' }} onClick={() => setBukaHP(true)}>
+          {judul}<ChevronDown size={16} aria-hidden="true" style={{ marginLeft: 'auto' }} />
+        </button>
+      </div>
     )
   }
   return (

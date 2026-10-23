@@ -187,6 +187,7 @@ export default function App() {
       : <Landing onMasuk={() => bukaAuth('masuk')} onDaftar={(a) => { setAwal(a); bukaAuth('daftar') }} />
   }
   async function onLogout() {
+    laci.tutupUntukPindah() // keluar dari laci HP: kunci gulir halaman dilepas, entri riwayat laci diganti di bawah
     await logout().catch(() => {})
     setSession({ status: 'anon' })
     setData(null)
@@ -281,7 +282,7 @@ export default function App() {
 
   return (
     <main>
-      <BarAtasHP onMenu={() => laci.setBuka(true)}>
+      <BarAtasHP onMenu={() => laci.setBuka(true)} terbuka={laci.buka}>
         {data && (
           <select className="bar-atas-periode tabular" aria-label="Periode laporan" value={period} onChange={(e) => changePeriod(e.target.value)} aria-busy={memuat}>
             {periods.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}

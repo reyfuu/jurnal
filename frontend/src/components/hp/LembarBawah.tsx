@@ -4,16 +4,26 @@ import { createPortal } from 'react-dom'
 /** Panel yang muncul dari bawah layar (HP): pilihan aksi atau filter. Ketuk latar / Escape menutup. */
 export function LembarBawah({ buka, judul, onTutup, children }: { buka: boolean; judul: ReactNode; onTutup: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null)
+  // onTutup lewat ref: pemanggil mengirim fungsi baru tiap render, dan effect di bawah tidak boleh
+  // berjalan ulang (fokus akan melompat dari isian ke panel setiap kali induk dirender ulang).
+  const tutup = useRef(onTutup)
+  useEffect(() => { tutup.current = onTutup })
   useEffect(() => {
     if (!buka) return
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onTutup() }
+    const kembaliKe = document.activeElement as HTMLElement | null
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup.current() }
     window.addEventListener('keydown', esc)
     const lama = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.body.classList.add('lembar-terbuka')
     panel.current?.focus()
-    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = lama; document.body.classList.remove('lembar-terbuka') }
-  }, [buka, onTutup])
+    return () => {
+      window.removeEventListener('keydown', esc)
+      document.body.style.overflow = lama
+      document.body.classList.remove('lembar-terbuka')
+      if (kembaliKe?.isConnected) kembaliKe.focus() // fokus kembali ke tombol pembuka (⋯ / filter)
+    }
+  }, [buka])
   if (!buka) return null
   return createPortal(
     <div className="lembar-bawah-akar">

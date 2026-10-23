@@ -78,7 +78,7 @@ export function PanelMaster({ me, onLogout, onLihat }: { me: Me; onLogout: () =>
 
   return (
     <main>
-      <BarAtasHP onMenu={() => laci.setBuka(true)}>
+      <BarAtasHP onMenu={() => laci.setBuka(true)} terbuka={laci.buka}>
         <span className="label-caps" style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Panel Master</span>
       </BarAtasHP>
       <div className="app-shell">
