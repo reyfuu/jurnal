@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +19,7 @@ import (
 	"pajak/internal/katalog"
 	"pajak/internal/master"
 	"pajak/internal/pengetahuan"
+	"pajak/internal/rag"
 )
 
 // Penyimpanan PostgreSQL (DATABASE_URL). Data tetap dilayani dari memori; Postgres adalah
@@ -41,6 +44,10 @@ func openDB(url string) (*sql.DB, error) {
 	if _, err := db.Exec(schemaSQL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("skema: %w", err)
+	}
+	if err := (rag.Store{DB: db}).EnsureSchema(context.Background()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("skema RAG: %w", err)
 	}
 	return db, nil
 }
@@ -351,25 +358,66 @@ func loadKatalogDB(db *sql.DB) (katalog.State, error) {
 	return st, nil // versi bawaan disegarkan di NewServer (segarkanBawaan)
 }
 
-// savePengetahuanDB menulis ulang artikel & sumber pengetahuan.
-// ponytail: tulis ulang semua baris tiap perubahan; isi PDF bisa ratusan KB per sumber —
-// pindah ke upsert per baris bila sumber melewati ~200 atau simpan terasa lambat.
-func savePengetahuanDB(db *sql.DB, st pengetahuan.State) error {
+// previous is supplied by the locked in-memory mutation; startup imports load it once.
+func savePengetahuanDB(db *sql.DB, st pengetahuan.State, previous ...pengetahuan.State) error {
+	var old pengetahuan.State
+	if len(previous) > 0 {
+		old = previous[0]
+	} else {
+		var err error
+		old, err = loadPengetahuanDB(db)
+		if err != nil {
+			return err
+		}
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM artikel; DELETE FROM sumber_pengetahuan`); err != nil {
+	if err := syncKnowledgeRows(tx, "artikel", st.Artikel, old.Artikel, func(a pengetahuan.Artikel) int { return a.ID }); err != nil {
 		return err
 	}
-	if err := insertRows(tx, "artikel", nil, st.Artikel); err != nil {
-		return err
-	}
-	if err := insertRows(tx, "sumber_pengetahuan", nil, st.Sumber); err != nil {
+	if err := syncKnowledgeRows(tx, "sumber_pengetahuan", st.Sumber, old.Sumber, func(a pengetahuan.Sumber) int { return a.ID }); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// Table and columns come only from the two internal struct types, never request input.
+func syncKnowledgeRows[T any](tx *sql.Tx, table string, rows, old []T, id func(T) int) error {
+	prior := make(map[int]T, len(old))
+	for _, r := range old {
+		prior[id(r)] = r
+	}
+	var assignments []string
+	typ := reflect.TypeFor[T]()
+	for i := 0; i < typ.NumField(); i++ {
+		col := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+		if col != "id" && col != "" && col != "-" {
+			assignments = append(assignments, col+"=EXCLUDED."+col)
+		}
+	}
+	for _, r := range rows {
+		before, exists := prior[id(r)]
+		delete(prior, id(r))
+		if exists && reflect.DeepEqual(before, r) {
+			continue
+		}
+		b, err := json.Marshal(r)
+		if err != nil {
+			return err
+		}
+		if _, err = tx.Exec(`INSERT INTO `+table+` SELECT * FROM jsonb_populate_record(NULL::`+table+`,$1) ON CONFLICT(id) DO UPDATE SET `+strings.Join(assignments, ","), b); err != nil {
+			return err
+		}
+	}
+	for key := range prior {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE id=$1`, key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func loadPengetahuanDB(db *sql.DB) (pengetahuan.State, error) {

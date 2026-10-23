@@ -49,7 +49,7 @@ func (s *Server) ubahPengetahuan(f func(st *pengetahuan.State) error) error {
 	var err error
 	switch {
 	case s.db != nil:
-		err = savePengetahuanDB(s.db, st)
+		err = savePengetahuanDB(s.db, st, s.pengetahuan)
 	case pengetahuanFile() != "":
 		err = writeFileAtomic(pengetahuanFile(), st)
 	}

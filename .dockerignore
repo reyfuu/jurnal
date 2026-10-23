@@ -3,3 +3,8 @@ graphify-out
 web/dist
 frontend/node_modules
 docs/peraturan
+.git
+.env
+data
+.installation-logs
+.playwright-cli

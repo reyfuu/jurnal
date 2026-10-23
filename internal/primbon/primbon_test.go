@@ -75,18 +75,20 @@ func TestMuatMenormalkanData(t *testing.T) {
 	}
 }
 
-func TestFacetSeluruhKatalog(t *testing.T) {
-	f := muat(t).Cari(Query{Kategori: []string{"KURS"}}).Facet
-	jumlah := func(opsi []Opsi, kode string) int {
-		for _, o := range opsi {
-			if o.Kode == kode {
-				return o.Jumlah
-			}
+func jumlahOpsi(opsi []Opsi, kode string) int {
+	for _, o := range opsi {
+		if o.Kode == kode {
+			return o.Jumlah
 		}
-		return -1
 	}
+	return -1
+}
+
+func TestFacetSeluruhKatalog(t *testing.T) {
+	f := muat(t).Cari(Query{Kategori: []string{"KURS"}}).FacetTotal
+	jumlah := jumlahOpsi
 	if jumlah(f.Kategori, "PPh") != 3 || jumlah(f.Kategori, "KUP") != 3 || jumlah(f.Kategori, "PPN") != 1 {
-		t.Errorf("facet kategori dihitung dari seluruh katalog, bukan hasil filter: %+v", f.Kategori)
+		t.Errorf("facet_total dihitung dari seluruh katalog, bukan hasil filter: %+v", f.Kategori)
 	}
 	if f.Kategori[0].Kode != "PPN" || f.Kategori[0].Label != "Pajak Pertambahan Nilai" {
 		t.Errorf("urutan & label kategori mengikuti daftar baku: %+v", f.Kategori[0])
@@ -99,6 +101,123 @@ func TestFacetSeluruhKatalog(t *testing.T) {
 	}
 	if f.TahunMin != 2021 || f.TahunMax != 2026 {
 		t.Errorf("rentang tahun: %d–%d", f.TahunMin, f.TahunMax)
+	}
+}
+
+// Facet mengikuti filter aktif: tiap grup dihitung dari hasil semua filter lain (kata kunci,
+// tahun, grup lain) tetapi bukan grup itu sendiri, supaya pilihan lain di grup yang sama tetap
+// terlihat jumlahnya dan pilihan yang berujung 0 hasil ketahuan sebelum dicentang.
+func TestFacetIkutFilterAktif(t *testing.T) {
+	d := muat(t)
+	f := d.Cari(Query{Kategori: []string{"PPh"}, Status: []string{"Berlaku"}}).Facet
+	// kategori: dari item Berlaku (a1 KUP+PPh, a3 PPh, a4 KUP, a7 KURS, a8 KUP)
+	if jumlahOpsi(f.Kategori, "PPh") != 2 || jumlahOpsi(f.Kategori, "KUP") != 3 || jumlahOpsi(f.Kategori, "KURS") != 1 || jumlahOpsi(f.Kategori, "PPN") != -1 {
+		t.Errorf("facet kategori dari item Berlaku: %+v", f.Kategori)
+	}
+	// status: dari item PPh (a1 Berlaku, a3 Berlaku, a6 Dicabut)
+	if jumlahOpsi(f.Status, "Berlaku") != 2 || jumlahOpsi(f.Status, "Dicabut") != 1 || jumlahOpsi(f.Status, "Diubah") != -1 {
+		t.Errorf("facet status dari item PPh: %+v", f.Status)
+	}
+	// jenis: dari item PPh & Berlaku (a1 PMK, a3 UU)
+	if jumlahOpsi(f.Jenis, "PMK") != 1 || jumlahOpsi(f.Jenis, "UU") != 1 || len(f.Jenis) != 2 {
+		t.Errorf("facet jenis dari item PPh & Berlaku: %+v", f.Jenis)
+	}
+	// kata kunci ikut menyaring facet
+	if f := d.Cari(Query{Q: "faktur"}).Facet; len(f.Kategori) != 1 || jumlahOpsi(f.Kategori, "PPN") != 1 {
+		t.Errorf("facet dengan kata kunci: %+v", f.Kategori)
+	}
+	// pilihan yang dicentang tetap dikirim walau jumlahnya 0, supaya bisa dilepas
+	f = d.Cari(Query{Q: "faktur", Kategori: []string{"KURS"}}).Facet
+	if jumlahOpsi(f.Kategori, "KURS") != 0 || f.Kategori[len(f.Kategori)-1].Label != "Kurs KMK" {
+		t.Errorf("pilihan aktif berjumlah 0 harus tetap ada: %+v", f.Kategori)
+	}
+	if f.TahunMin != 2021 || f.TahunMax != 2026 {
+		t.Errorf("rentang tahun facet tetap seluruh katalog: %d–%d", f.TahunMin, f.TahunMax)
+	}
+}
+
+// Urut relevan: kode persis paling atas, lalu kata di kode, lalu di judul; seri ikut terbaru.
+func TestCariUrutRelevan(t *testing.T) {
+	d := muat(t)
+	cases := []struct {
+		q    string
+		want []string
+	}{
+		{"pmk nomor 10 tahun 2024", []string{"a1"}},
+		{"pajak penghasilan", []string{"a6", "a3", "a1"}}, // a6 kedua kata di judul; a3 "perpajakan" di judul; a1 hanya lewat kategori
+		{"2024", []string{"a5", "a1"}},                    // sama-sama di kode → terbaru
+		{"PER-03/PJ/2022", []string{"a2"}},
+	}
+	for _, c := range cases {
+		if got := uuids(d.Cari(Query{Q: c.q, Urut: "relevan"}).Items); !slices.Equal(got, c.want) {
+			t.Errorf("%q: got %v, want %v", c.q, got, c.want)
+		}
+	}
+	// kode persis mengalahkan judul yang memuat semua kata
+	dir := t.TempDir()
+	csv := "uuid,kategori,kode,judul,jenis,tahun,file\n" +
+		"x1,PPh,PMK 99 2025,Tata cara PMK 168 2023 tentang tarif,PMK,2025,\n" +
+		"x2,PPh,PMK 168 2023,Tarif pemotongan PPh 21,PMK,2023,\n"
+	if err := os.WriteFile(filepath.Join(dir, "index.csv"), []byte(csv), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d2, err := Muat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := uuids(d2.Cari(Query{Q: "pmk 168 2023", Urut: "relevan"}).Items); !slices.Equal(got, []string{"x2", "x1"}) {
+		t.Errorf("kode persis harus di atas: %v", got)
+	}
+	if got := uuids(d2.Cari(Query{Q: "pmk 168 2023"}).Items); !slices.Equal(got, []string{"x1", "x2"}) {
+		t.Errorf("tanpa urut relevan tetap terbaru: %v", got)
+	}
+}
+
+// Singkatan topik: "pph 21" berarti "Pajak Penghasilan Pasal 21" di judul, bukan peraturan
+// bernomor 21 yang kebetulan berkategori PPh (mis. PP 21/2024 tentang Tapera).
+func TestCariUrutRelevanSingkatan(t *testing.T) {
+	dir := t.TempDir()
+	csv := "uuid,kategori,kode,judul,jenis,tahun,file\n" +
+		"y1,PPh,PP Nomor 21 Tahun 2024,Perubahan atas PP tentang Penyelenggaraan Tabungan Perumahan Rakyat,PP,2024,\n" +
+		"y2,PPh,PMK Nomor 6 Tahun 2023,Pajak Penghasilan Pasal 21 atas Penghasilan Peserta Pemagangan,PMK,2023,\n" +
+		"y3,PPN,PMK Nomor 21 Tahun 2022,Pajak Pertambahan Nilai atas Penyerahan Listrik,PMK,2022,\n"
+	if err := os.WriteFile(filepath.Join(dir, "index.csv"), []byte(csv), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Muat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := uuids(d.Cari(Query{Q: "pph 21", Urut: "relevan"}).Items); !slices.Equal(got, []string{"y2", "y1"}) {
+		t.Errorf("pph 21: %v", got)
+	}
+	if got := uuids(d.Cari(Query{Q: "ppn", Urut: "relevan"}).Items); !slices.Equal(got, []string{"y3"}) {
+		t.Errorf("ppn: %v", got)
+	}
+}
+
+// 1.512 peraturan (ukuran katalog sungguhan) dengan kata kunci, filter, facet, dan urut relevan.
+func BenchmarkCari1512(b *testing.B) {
+	dir := b.TempDir()
+	var sb strings.Builder
+	sb.WriteString("uuid,kategori,kode,judul,jenis,tahun,status,file\n")
+	kat := []string{"PPh", "PPN", "KUP", "PBB;PPh", "UMKM;PPh"}
+	st := []string{"Berlaku", "Diubah", "Dicabut"}
+	for i := range 1512 {
+		fmt.Fprintf(&sb, "u%04d,%s,PMK %d Tahun %d,Tata cara pemotongan pajak penghasilan pasal %d dan perubahannya,PMK,%d,%s,\n",
+			i, kat[i%len(kat)], i, 1990+i%36, i%30, 1990+i%36, st[i%len(st)])
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.csv"), []byte(sb.String()), 0o600); err != nil {
+		b.Fatal(err)
+	}
+	d, err := Muat(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	q := Query{Q: "pajak penghasilan 21", Kategori: []string{"PPh"}, Status: []string{"Berlaku"}, Urut: "relevan"}
+	b.ReportAllocs()
+	for b.Loop() {
+		d.Cari(q)
 	}
 }
 

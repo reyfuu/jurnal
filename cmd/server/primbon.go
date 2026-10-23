@@ -168,6 +168,9 @@ func (s *Server) ubahPrimbon(uid int, f func(u *primbonPengguna), query string, 
 func (s *Server) primbonRoutes() {
 	g := func(h http.HandlerFunc) http.HandlerFunc { return s.guard("primbon-pajak", s.wajibLangganan(h)) }
 	m := s.mux
+	m.HandleFunc("GET /api/v1/primbon/rag/status", g(s.handleRAGStatus))
+	m.HandleFunc("GET /api/v1/primbon/rag/cari", g(s.handleRAGSearch))
+	m.HandleFunc("POST /api/v1/primbon/rag/tanya", g(s.handleRAGQuestion))
 	m.HandleFunc("GET /api/v1/primbon/peraturan", g(s.handlePrimbonCari))
 	m.HandleFunc("GET /api/v1/primbon/peraturan/{uuid}", g(s.handlePrimbonDetail))
 	m.HandleFunc("GET /api/v1/primbon/peraturan/{uuid}/berkas", g(s.handlePrimbonBerkas))

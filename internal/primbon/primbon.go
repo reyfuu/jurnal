@@ -32,14 +32,19 @@ type Peraturan struct {
 	JenisLabel string   `json:"jenis_label"`
 	Kategori   []string `json:"kategori"`
 	// KategoriLabel: label tiap kategori, urutan sama dengan Kategori.
-	KategoriLabel []string `json:"kategori_label"`
-	Status        string   `json:"status,omitempty"`
-	Tahun         int      `json:"tahun,omitempty"`
-	Ditetapkan    string   `json:"ditetapkan,omitempty"` // YYYY-MM-DD
-	Diundangkan   string   `json:"diundangkan,omitempty"`
-	Berlaku       string   `json:"berlaku,omitempty"`
-	SumberLN      string   `json:"sumber_ln,omitempty"`
-	Halaman       int      `json:"halaman,omitempty"`
+	KategoriLabel    []string `json:"kategori_label"`
+	Status           string   `json:"status,omitempty"`
+	Tag              []string `json:"tag,omitempty"`
+	Perubahan        string   `json:"perubahan,omitempty"`
+	StatusPada       string   `json:"status_pada,omitempty"`
+	DiverifikasiPada string   `json:"diverifikasi_pada,omitempty"`
+	SumberVerifikasi string   `json:"sumber_verifikasi,omitempty"`
+	Tahun            int      `json:"tahun,omitempty"`
+	Ditetapkan       string   `json:"ditetapkan,omitempty"` // YYYY-MM-DD
+	Diundangkan      string   `json:"diundangkan,omitempty"`
+	Berlaku          string   `json:"berlaku,omitempty"`
+	SumberLN         string   `json:"sumber_ln,omitempty"`
+	Halaman          int      `json:"halaman,omitempty"`
 	// Format naskah di server: pdf | htm; kosong = belum tersedia (tim masih mengunduh).
 	Format   string `json:"format,omitempty"`
 	Lampiran bool   `json:"lampiran,omitempty"` // naskah HTML punya lampiran PDF terpisah
@@ -47,8 +52,10 @@ type Peraturan struct {
 	// SumberURL: halaman resmi (JDIH Kemenkeu / pajak.go.id / JDIH BPK).
 	SumberURL string `json:"sumber_url,omitempty"`
 
-	file string // relatif terhadap folder katalog
-	teks string // huruf kecil, untuk pencarian
+	file   string // relatif terhadap folder katalog
+	teks   string // huruf kecil, untuk pencarian
+	kodeL  string // kode huruf kecil, untuk urut relevan
+	judulL string // judul huruf kecil, untuk urut relevan
 }
 
 type Opsi struct {
@@ -57,7 +64,9 @@ type Opsi struct {
 	Jumlah int    `json:"jumlah"`
 }
 
-// Facet: pilihan filter beserta jumlahnya, dihitung dari seluruh katalog.
+// Facet: pilihan filter beserta jumlahnya. Di Hasil.Facet jumlah tiap grup dihitung dari hasil
+// semua filter lain (bukan grup itu sendiri); di Hasil.FacetTotal dari seluruh katalog.
+// TahunMin/TahunMax selalu seluruh katalog.
 type Facet struct {
 	Kategori []Opsi `json:"kategori"`
 	Jenis    []Opsi `json:"jenis"`
@@ -70,7 +79,7 @@ type Query struct {
 	Q                       string
 	Kategori, Jenis, Status []string // OR di dalam grup, AND antar grup
 	Dari, Sampai            int      // tahun; 0 = tanpa batas
-	Urut                    string   // terbaru (bawaan) | terlama | abjad
+	Urut                    string   // terbaru (bawaan) | terlama | abjad | relevan
 	Halaman                 int
 }
 
@@ -79,7 +88,8 @@ type Hasil struct {
 	Total        int         `json:"total"`
 	Halaman      int         `json:"halaman"`
 	TotalHalaman int         `json:"total_halaman"`
-	Facet        Facet       `json:"facet"`
+	Facet        Facet       `json:"facet"`       // mengikuti filter aktif
+	FacetTotal   Facet       `json:"facet_total"` // seluruh katalog
 }
 
 // Data: satu muatan katalog, tidak berubah setelah dimuat (aman dibaca bersamaan).
@@ -190,6 +200,10 @@ func ada(path string) bool {
 
 // Muat membaca dir/index.csv dan memeriksa naskah mana yang sudah ada di disk.
 func Muat(dir string) (*Data, error) {
+	metadata, err := ReadMetadata(dir)
+	if err != nil {
+		return nil, err
+	}
 	f, err := os.Open(filepath.Join(dir, "index.csv"))
 	if err != nil {
 		return nil, err
@@ -263,12 +277,24 @@ func Muat(dir string) (*Data, error) {
 			p.Lampiran = p.Format == "htm" && ada(filepath.Join(dir, lampiranDari(file)))
 		}
 		p.JenisLabel = label(jenisBaku, p.Jenis)
+		if m, ok := metadata[p.UUID]; ok {
+			p.Tag, p.Perubahan, p.StatusPada = m.Tag, m.Perubahan, m.StatusPada
+			p.DiverifikasiPada, p.SumberVerifikasi = m.DiverifikasiPada, m.SumberVerifikasi
+			if m.MulaiBerlaku != "" {
+				p.Berlaku = m.MulaiBerlaku
+			}
+			if m.Status != "" {
+				p.Status = m.Status
+			}
+		}
 		teks := []string{p.Kode, p.Judul, p.Jenis, p.JenisLabel, strconv.Itoa(p.Tahun)}
+		teks = append(teks, p.Tag...)
 		for _, k := range p.Kategori { // "pph 21" menemukan judul "Pajak Penghasilan Pasal 21"
 			p.KategoriLabel = append(p.KategoriLabel, label(kategoriBaku, k))
 			teks = append(teks, k, label(kategoriBaku, k))
 		}
 		p.teks = strings.ToLower(strings.Join(teks, " "))
+		p.kodeL, p.judulL = strings.ToLower(p.Kode), strings.ToLower(p.Judul)
 		d.index[p.UUID] = len(d.list)
 		d.list = append(d.list, p)
 	}
@@ -375,29 +401,129 @@ func (d *Data) Berkas(uuid string, lampiran bool) (string, bool) {
 
 func (d *Data) Cari(q Query) Hasil {
 	kata := strings.Fields(strings.ToLower(q.Q))
-	items := []Peraturan{}
+	frasa := strings.Join(kata, " ")
+	relevan := q.Urut == "relevan" && len(kata) > 0
+	panjang := frasaPanjang(kata)
+	type calon struct {
+		p    Peraturan
+		skor int
+	}
+	items := []calon{}
+	// Facet per grup: item yang lolos semua saringan lain kecuali grup itu sendiri.
+	kat, jen, sta := map[string]int{}, map[string]int{}, map[string]int{}
 	for _, p := range d.list {
-		switch {
-		case len(q.Kategori) > 0 && !slices.ContainsFunc(p.Kategori, func(k string) bool { return slices.Contains(q.Kategori, k) }),
-			len(q.Jenis) > 0 && !slices.Contains(q.Jenis, p.Jenis),
-			len(q.Status) > 0 && !slices.Contains(q.Status, p.Status),
-			q.Dari > 0 && p.Tahun < q.Dari,
-			q.Sampai > 0 && (p.Tahun == 0 || p.Tahun > q.Sampai),
-			!semuaKata(p.teks, kata):
+		if (q.Dari > 0 && p.Tahun < q.Dari) || (q.Sampai > 0 && (p.Tahun == 0 || p.Tahun > q.Sampai)) || !semuaKata(p.teks, kata) {
 			continue
 		}
-		items = append(items, p)
+		okKat := len(q.Kategori) == 0 || slices.ContainsFunc(p.Kategori, func(k string) bool { return slices.Contains(q.Kategori, k) })
+		okJen := len(q.Jenis) == 0 || slices.Contains(q.Jenis, p.Jenis)
+		okSta := len(q.Status) == 0 || slices.Contains(q.Status, p.Status)
+		if okJen && okSta {
+			for _, k := range p.Kategori {
+				kat[k]++
+			}
+		}
+		if okKat && okSta {
+			jen[p.Jenis]++
+		}
+		if okKat && okJen && p.Status != "" {
+			sta[p.Status]++
+		}
+		if okKat && okJen && okSta {
+			c := calon{p: p}
+			if relevan {
+				c.skor = skor(p, frasa, panjang, kata)
+			}
+			items = append(items, c)
+		}
 	}
-	switch q.Urut {
-	case "terlama":
-		slices.SortStableFunc(items, terlama)
-	case "abjad":
-		slices.SortStableFunc(items, abjad)
+	switch {
+	case relevan: // seri tetap urut terbaru (urutan d.list)
+		slices.SortStableFunc(items, func(a, b calon) int { return cmp.Compare(b.skor, a.skor) })
+	case q.Urut == "terlama":
+		slices.SortStableFunc(items, func(a, b calon) int { return terlama(a.p, b.p) })
+	case q.Urut == "abjad":
+		slices.SortStableFunc(items, func(a, b calon) int { return abjad(a.p, b.p) })
 	}
-	h := Hasil{Total: len(items), TotalHalaman: max(1, (len(items)+PerHalaman-1)/PerHalaman), Facet: d.facet}
+	h := Hasil{Total: len(items), TotalHalaman: max(1, (len(items)+PerHalaman-1)/PerHalaman), FacetTotal: d.facet}
+	h.Facet = Facet{
+		Kategori: denganPilihan(opsiDari(kategoriBaku, kat), kategoriBaku, q.Kategori),
+		Jenis:    denganPilihan(opsiDari(jenisBaku, jen), jenisBaku, q.Jenis),
+		Status:   denganPilihan(opsiDari(statusBaku, sta), statusBaku, q.Status),
+		TahunMin: d.facet.TahunMin, TahunMax: d.facet.TahunMax,
+	}
 	h.Halaman = min(max(q.Halaman, 1), h.TotalHalaman)
-	h.Items = items[min((h.Halaman-1)*PerHalaman, len(items)):min(h.Halaman*PerHalaman, len(items))]
+	h.Items = []Peraturan{}
+	for _, c := range items[min((h.Halaman-1)*PerHalaman, len(items)):min(h.Halaman*PerHalaman, len(items))] {
+		h.Items = append(h.Items, c.p)
+	}
 	return h
+}
+
+// skor relevansi: nomor persis paling atas, lalu nomor berawalan kata kunci, frasa utuh di
+// judul, lalu tiap kata yang ada di nomor (paling berat), di judul, atau hanya di kategori/tag.
+func skor(p Peraturan, frasa, panjang string, kata []string) int {
+	s := 0
+	switch {
+	case p.kodeL == frasa:
+		s += 1000
+	case strings.HasPrefix(p.kodeL, frasa):
+		s += 400
+	}
+	if len(kata) > 1 && (strings.Contains(p.judulL, frasa) || strings.Contains(p.judulL, panjang)) {
+		s += 60
+	}
+	for _, k := range kata {
+		switch {
+		case cocok(p.kodeL, k):
+			s += 30
+		case cocok(p.judulL, k), singkatan[k] != "" && strings.Contains(p.judulL, singkatan[k]):
+			s += 10
+		default:
+			s++
+		}
+	}
+	return s
+}
+
+// singkatan topik yang lazim diketik pengguna, dan bentuk panjangnya di judul peraturan.
+var singkatan = map[string]string{
+	"pph":   "pajak penghasilan",
+	"ppn":   "pajak pertambahan nilai",
+	"ppnbm": "pajak penjualan atas barang mewah",
+	"pbb":   "pajak bumi dan bangunan",
+	"kup":   "ketentuan umum dan tata cara perpajakan",
+	"bphtb": "bea perolehan hak atas tanah dan bangunan",
+	"npwp":  "nomor pokok wajib pajak",
+	"pkp":   "pengusaha kena pajak",
+}
+
+// frasaPanjang: "pph 21" → "pajak penghasilan pasal 21" (pasal disisipkan sebelum angka
+// sesudah singkatan PPh, sesuai penulisan judul).
+func frasaPanjang(kata []string) string {
+	out := make([]string, 0, len(kata)+1)
+	for i, k := range kata {
+		if v, ok := singkatan[k]; ok {
+			out = append(out, v)
+			if k == "pph" && i+1 < len(kata) && strings.TrimFunc(kata[i+1], unicode.IsDigit) == "" {
+				out = append(out, "pasal")
+			}
+			continue
+		}
+		out = append(out, k)
+	}
+	return strings.Join(out, " ")
+}
+
+// denganPilihan: pilihan yang sedang dicentang tetap ada (jumlah 0) walau tidak ada hasilnya,
+// supaya pengguna bisa melepasnya.
+func denganPilihan(opsi, baku []Opsi, pilih []string) []Opsi {
+	for _, k := range pilih {
+		if !slices.ContainsFunc(opsi, func(o Opsi) bool { return o.Kode == k }) {
+			opsi = append(opsi, Opsi{Kode: k, Label: label(baku, k)})
+		}
+	}
+	return opsi
 }
 
 func semuaKata(teks string, kata []string) bool {
@@ -433,10 +559,11 @@ func digit(c byte) bool { return '0' <= c && c <= '9' }
 // Katalog: folder katalog yang dimuat ulang otomatis bila index.csv berubah, supaya tim
 // cukup menyalin naskah + index.csv baru ke server tanpa restart.
 type Katalog struct {
-	dir  string
-	mu   sync.Mutex
-	mod  time.Time
-	data *Data
+	dir         string
+	mu          sync.Mutex
+	mod         time.Time
+	metadataMod time.Time
+	data        *Data
 }
 
 func Buka(dir string) *Katalog { return &Katalog{dir: dir} }
@@ -445,6 +572,10 @@ func Buka(dir string) *Katalog { return &Katalog{dir: dir} }
 // tetap dipakai.
 func (k *Katalog) Data() (*Data, error) {
 	fi, err := os.Stat(filepath.Join(k.dir, "index.csv"))
+	var metadataMod time.Time
+	if m, e := os.Stat(filepath.Join(k.dir, "metadata.json")); e == nil {
+		metadataMod = m.ModTime()
+	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if err != nil {
@@ -453,9 +584,8 @@ func (k *Katalog) Data() (*Data, error) {
 		}
 		return nil, err
 	}
-	if k.data == nil || !fi.ModTime().Equal(k.mod) {
+	if k.data == nil || !fi.ModTime().Equal(k.mod) || !metadataMod.Equal(k.metadataMod) {
 		d, err := Muat(k.dir)
-		k.mod = fi.ModTime()
 		if err != nil {
 			if k.data != nil {
 				return k.data, nil
@@ -463,6 +593,7 @@ func (k *Katalog) Data() (*Data, error) {
 			return nil, err
 		}
 		k.data = d
+		k.mod, k.metadataMod = fi.ModTime(), metadataMod
 	}
 	return k.data, nil
 }

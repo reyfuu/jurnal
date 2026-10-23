@@ -83,5 +83,7 @@ deploy.sh        build image Docker dan jalankan container + PostgreSQL
 
 - [HANDOFF.md](HANDOFF.md): riwayat fase, keputusan, dan status terkini.
 - [DESIGN.md](DESIGN.md): sistem desain dan brand.
+- [docs/RAG.md](docs/RAG.md): impor regulasi bertahap, indeks pencarian PostgreSQL, API RAG, dan kompresi PDF di worker terpisah.
+- [docs/PRIMBON-METADATA.md](docs/PRIMBON-METADATA.md): tag dan status peraturan melalui metadata kecil; naskah tetap di VPS.
 - [agent.md](agent.md) dan [AGENTS.md](AGENTS.md): aturan kerja untuk agen AI di repo ini.
 - [docs/](docs/): dokumen produk (BRD, FRD, PRD, TRD) dan `docs/accounting-platform/`.
