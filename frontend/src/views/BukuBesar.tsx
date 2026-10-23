@@ -154,6 +154,9 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
                       {g.akun.map((a) => {
                         const terbuka = buka.has(a.kode)
                         const bisaBuka = a.baris.length > 0
+                        // Saldo berlawanan dengan saldo normal = tanda salah catat (kecuali laba/rugi).
+                        const salah = (n: number) => n < 0 && !a.boleh_minus
+                        const bermasalah = salah(a.saldo_awal) || salah(a.saldo_akhir) || a.baris.some((b) => salah(b.saldo))
                         return (
                           <Fragment key={a.kode}>
                             <tr style={{ cursor: bisaBuka ? 'pointer' : 'default' }} onClick={() => bisaBuka && toggle(a.kode)}>
@@ -164,29 +167,40 @@ export function BukuBesar({ period, bisaEkspor, navigate }: { period: string; bi
                                     </button>
                                   : <span style={{ paddingLeft: 18 }}>{a.kode}</span>}
                               </td>
-                              <td>{a.nama}{bisaBuka && <span className="text-xs text-muted-foreground"> · {a.baris.length} mutasi</span>}</td>
-                              <td style={{ textAlign: 'right' }}>{formatRp(a.saldo_awal)}</td>
+                              <td>
+                                {a.nama}{bisaBuka && <span className="text-xs text-muted-foreground"> · {a.baris.length} mutasi</span>}
+                                {bermasalah && <span className="pill-status pill-red" style={{ marginLeft: 8 }}>saldo minus</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', color: salah(a.saldo_awal) ? RED : undefined }}>{formatRp(a.saldo_awal)}</td>
                               <td style={{ textAlign: 'right' }}>{a.debit ? formatRp(a.debit) : '–'}</td>
                               <td style={{ textAlign: 'right' }}>{a.kredit ? formatRp(a.kredit) : '–'}</td>
-                              <td style={{ textAlign: 'right', fontWeight: 600, color: a.saldo_akhir < 0 ? RED : undefined }}>{formatRp(a.saldo_akhir)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600, color: salah(a.saldo_akhir) ? RED : undefined }}>{formatRp(a.saldo_akhir)}</td>
                             </tr>
                             {terbuka && (
                               <tr>
                                 <td colSpan={6} style={{ padding: '4px 12px 14px 36px', background: 'var(--bg-raised)' }}>
                                   <table className="data-table tabular" style={{ marginTop: 0 }}>
-                                    <thead><tr><th style={{ width: 110 }}>Tanggal</th><th>Keterangan</th><th style={{ textAlign: 'right' }}>Debit</th><th style={{ textAlign: 'right' }}>Kredit</th><th style={{ textAlign: 'right' }}>Saldo</th></tr></thead>
+                                    <thead><tr><th style={{ width: 110 }}>Tanggal</th><th style={{ width: 140 }}>No. Bukti</th><th>Keterangan</th><th style={{ textAlign: 'right' }}>Debit</th><th style={{ textAlign: 'right' }}>Kredit</th><th style={{ textAlign: 'right' }}>Saldo</th></tr></thead>
                                     <tbody>
-                                      <tr><td /><td className="text-muted-foreground">Saldo awal</td><td /><td /><td style={{ textAlign: 'right' }}>{formatRp(a.saldo_awal)}</td></tr>
-                                      {a.baris.map((b, i) => (
-                                        <tr key={i}>
-                                          <td>{formatTanggal(b.tanggal)}</td>
-                                          <td>{b.keterangan}{b.tx_id ? <span className="text-xs text-muted-foreground"> · #{b.tx_id}</span> : null}</td>
-                                          <td style={{ textAlign: 'right' }}>{b.debit ? formatRp(b.debit) : ''}</td>
-                                          <td style={{ textAlign: 'right' }}>{b.kredit ? formatRp(b.kredit) : ''}</td>
-                                          <td style={{ textAlign: 'right' }}>{formatRp(b.saldo)}</td>
-                                        </tr>
-                                      ))}
-                                      <tr style={{ fontWeight: 600 }}><td /><td>Saldo akhir</td><td style={{ textAlign: 'right' }}>{formatRp(a.debit)}</td><td style={{ textAlign: 'right' }}>{formatRp(a.kredit)}</td><td style={{ textAlign: 'right' }}>{formatRp(a.saldo_akhir)}</td></tr>
+                                      <tr><td /><td /><td className="text-muted-foreground">Saldo awal</td><td /><td /><td style={{ textAlign: 'right', color: salah(a.saldo_awal) ? RED : undefined }}>{formatRp(a.saldo_awal)}</td></tr>
+                                      {a.baris.map((b, i) => {
+                                        // Baris tempat saldo berbalik minus: titik awal mencari jurnal yang salah.
+                                        const mulaiMinus = salah(b.saldo) && !salah(i ? a.baris[i - 1].saldo : a.saldo_awal)
+                                        return (
+                                          <tr key={i} style={mulaiMinus ? { background: 'var(--accent-red-soft)' } : undefined}>
+                                            <td>{formatTanggal(b.tanggal)}</td>
+                                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{b.bukti}</td>
+                                            <td>
+                                              {b.keterangan}
+                                              {mulaiMinus && <span className="pill-status pill-red" style={{ marginLeft: 8 }}>mulai minus</span>}
+                                            </td>
+                                            <td style={{ textAlign: 'right' }}>{b.debit ? formatRp(b.debit) : ''}</td>
+                                            <td style={{ textAlign: 'right' }}>{b.kredit ? formatRp(b.kredit) : ''}</td>
+                                            <td style={{ textAlign: 'right', color: salah(b.saldo) ? RED : undefined }}>{formatRp(b.saldo)}</td>
+                                          </tr>
+                                        )
+                                      })}
+                                      <tr style={{ fontWeight: 600 }}><td /><td /><td>Saldo akhir</td><td style={{ textAlign: 'right' }}>{formatRp(a.debit)}</td><td style={{ textAlign: 'right' }}>{formatRp(a.kredit)}</td><td style={{ textAlign: 'right' }}>{formatRp(a.saldo_akhir)}</td></tr>
                                     </tbody>
                                   </table>
                                 </td>

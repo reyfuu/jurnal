@@ -1107,10 +1107,11 @@ export async function importOnboarding(file: File, commit: boolean): Promise<Onb
   return res.json()
 }
 
-export interface BarisBukuBesar { tanggal: string; tx_id?: number; keterangan: string; debit: number; kredit: number; saldo: number }
+export interface BarisBukuBesar { tanggal: string; bukti: string; tx_id?: number; keterangan: string; debit: number; kredit: number; saldo: number }
 export interface AkunBukuBesar {
   kode: string; nama: string; kelompok: string; normal: 'debit' | 'kredit'
   saldo_awal: number; debit: number; kredit: number; saldo_akhir: number; baris: BarisBukuBesar[]
+  boleh_minus?: boolean // laba/rugi: saldo minus wajar, tidak ditandai salah
 }
 export interface BukuBesar {
   supported: boolean; period: string; period_label: string; dari: string; sampai: string
@@ -1153,7 +1154,7 @@ export const getOpening = (tanggal?: string) => api<OpeningInfo>('/opening' + (t
 export const saveOpening = (o: OpeningBalance, paksa = false) => api<OpeningInfo>('/opening' + (paksa ? '?paksa=1' : ''), { method: 'PUT', body: o })
 
 /** Saldo akun yang berlawanan dengan saldo normalnya (PSAK) dan stok minus, per periode. */
-export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string }
+export interface SaldoMinus { jenis: 'akun' | 'stok'; kode?: string; nama: string; normal?: 'debit' | 'kredit'; nilai: number; satuan?: string; pesan: string; sejak?: string; bukti?: string }
 export const getSaldoMinus = (period: string) => api<SaldoMinus[]>(`/saldo-minus?period=${encodeURIComponent(period)}`)
 
 export const getKaryawan = () => api<KaryawanSummary>('/karyawan')

@@ -18,6 +18,7 @@ import (
 
 type barisBukuBesar struct {
 	Tanggal    string `json:"tanggal"`
+	Bukti      string `json:"bukti"` // No. Bukti yang sama dengan Jurnal Umum
 	TxID       int    `json:"tx_id,omitempty"`
 	Keterangan string `json:"keterangan"`
 	Debit      int64  `json:"debit"`
@@ -35,6 +36,8 @@ type akunBukuBesar struct {
 	Kredit     int64            `json:"kredit"`
 	SaldoAkhir int64            `json:"saldo_akhir"`
 	Baris      []barisBukuBesar `json:"baris"`
+	// BolehMinus: saldo minus akun ini wajar (laba/rugi), jadi tidak ditandai salah.
+	BolehMinus bool `json:"boleh_minus,omitempty"`
 }
 
 type bukuBesarResp struct {
@@ -66,6 +69,7 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 	var urutan []coa.Account
 	akunMap := map[string]*akunBukuBesar{}
 	pengisi := map[string]bool{} // akun nol yang ditambahkan, belum pernah muncul di neraca saldo
+	nb := s.penomoranBukti()
 	for bulan := dari[:7]; bulan <= sampai[:7]; bulan = bulanBerikut(bulan) {
 		j, ok := s.jurnalPeriode(bulan)
 		if !ok {
@@ -81,7 +85,7 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 		for _, b := range j.tb {
 			if a := akunMap[b.Kode]; a == nil || (pengisi[b.Kode] && a.Debit == 0 && a.Kredit == 0 && a.SaldoAwal == 0) {
 				delete(pengisi, b.Kode)
-				a := &akunBukuBesar{Kode: b.Kode, Nama: b.Nama, Kelompok: b.Kelompok, Normal: b.Normal, Baris: []barisBukuBesar{}}
+				a := &akunBukuBesar{Kode: b.Kode, Nama: b.Nama, Kelompok: b.Kelompok, Normal: b.Normal, Baris: []barisBukuBesar{}, BolehMinus: bolehMinus(b.Subtype, b.Kode)}
 				// Akun yang baru muncul di bulan berikutnya: saldo awalnya dari bulan itu (0
 				// sebelum ada mutasi apa pun).
 				a.SaldoAwal = tandaNormal(b.Normal) * j.saldoAwal[b.Kode]
@@ -93,13 +97,19 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 		// tanpa saldo" menampilkan seluruh CoA, termasuk usaha yang belum punya transaksi.
 		for _, a := range j.active {
 			if akunMap[a.Kode] == nil {
-				akunMap[a.Kode] = &akunBukuBesar{Kode: a.Kode, Nama: a.Nama, Kelompok: a.Kelompok, Normal: a.Normal, Baris: []barisBukuBesar{}}
+				akunMap[a.Kode] = &akunBukuBesar{Kode: a.Kode, Nama: a.Nama, Kelompok: a.Kelompok, Normal: a.Normal, Baris: []barisBukuBesar{}, BolehMinus: bolehMinus(a.Subtype, a.Kode)}
 				pengisi[a.Kode] = true
 			}
 		}
-		entri := slices.Clone(j.entri)
-		slices.SortStableFunc(entri, func(x, y entriJurnal) int { return cmp.Compare(x.Tanggal, y.Tanggal) })
-		for _, e := range entri {
+		// Nomor bukti dihitung dari urutan asli j.entri (sama dengan Jurnal Umum), baru diurutkan.
+		grup, bukti := nb.kelompokkan(j.entri, bulan)
+		urut := make([]int, len(j.entri))
+		for i := range urut {
+			urut[i] = i
+		}
+		slices.SortStableFunc(urut, func(x, y int) int { return cmp.Compare(j.entri[x].Tanggal, j.entri[y].Tanggal) })
+		for _, x := range urut {
+			e := j.entri[x]
 			a := akunMap[e.Kode]
 			if a == nil {
 				continue
@@ -118,7 +128,7 @@ func (s *tenant) bukuBesar(dari, sampai, akun string) bukuBesarResp {
 			a.Kredit += e.Kredit
 			out.TotalDebit += e.Debit
 			out.TotalKredit += e.Kredit
-			a.Baris = append(a.Baris, barisBukuBesar{Tanggal: e.Tanggal, TxID: e.TxID, Keterangan: e.Ket, Debit: e.Debit, Kredit: e.Kredit, Saldo: a.SaldoAkhir})
+			a.Baris = append(a.Baris, barisBukuBesar{Tanggal: e.Tanggal, Bukti: bukti[grup[x]], TxID: e.TxID, Keterangan: e.Ket, Debit: e.Debit, Kredit: e.Kredit, Saldo: a.SaldoAkhir})
 		}
 	}
 	out.Seimbang = out.TotalDebit == out.TotalKredit
@@ -173,17 +183,17 @@ func (s *tenant) handleBukuBesarXlsx(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ringkas := [][]string{{"Kode", "Akun", "Kelompok", "Saldo Awal", "Debit", "Kredit", "Saldo Akhir"}}
-	rinci := [][]string{{"Kode", "Akun", "Tanggal", "Keterangan", "Debit", "Kredit", "Saldo"}}
+	rinci := [][]string{{"Kode", "Akun", "Tanggal", "No. Bukti", "Keterangan", "Debit", "Kredit", "Saldo"}}
 	for _, a := range bb.Akun {
 		ringkas = append(ringkas, []string{a.Kode, a.Nama, string(a.Kelompok), rp(a.SaldoAwal), rp(a.Debit), rp(a.Kredit), rp(a.SaldoAkhir)})
 		if len(a.Baris) == 0 && a.SaldoAwal == 0 {
 			continue
 		}
-		rinci = append(rinci, []string{a.Kode, a.Nama, dari, "Saldo awal", "", "", rp(a.SaldoAwal)})
+		rinci = append(rinci, []string{a.Kode, a.Nama, dari, "", "Saldo awal", "", "", rp(a.SaldoAwal)})
 		for _, b := range a.Baris {
-			rinci = append(rinci, []string{a.Kode, a.Nama, b.Tanggal, b.Keterangan, rp(b.Debit), rp(b.Kredit), rp(b.Saldo)})
+			rinci = append(rinci, []string{a.Kode, a.Nama, b.Tanggal, b.Bukti, b.Keterangan, rp(b.Debit), rp(b.Kredit), rp(b.Saldo)})
 		}
-		rinci = append(rinci, []string{a.Kode, a.Nama, "", "Saldo akhir", rp(a.Debit), rp(a.Kredit), rp(a.SaldoAkhir)}, []string{})
+		rinci = append(rinci, []string{a.Kode, a.Nama, "", "", "Saldo akhir", rp(a.Debit), rp(a.Kredit), rp(a.SaldoAkhir)}, []string{})
 	}
 	ringkas = append(ringkas, []string{"", "TOTAL MUTASI", "", "", rp(bb.TotalDebit), rp(bb.TotalKredit), ""})
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

@@ -22,6 +22,10 @@ type saldoMinus struct {
 	Nilai  int64  `json:"nilai"`            // rupiah (akun) atau jumlah per seribu (stok), positif
 	Satuan string `json:"satuan,omitempty"`
 	Pesan  string `json:"pesan"`
+	// Sejak & Bukti: tanggal dan No. Bukti saat saldo akun terakhir kali berbalik minus ("SA" =
+	// sudah minus sejak saldo awal), titik awal mencari jurnal yang salah.
+	Sejak string `json:"sejak,omitempty"`
+	Bukti string `json:"bukti,omitempty"`
 }
 
 // subtypeBolehMinus: laba (rugi) berjalan dan laba (rugi) ditahan boleh minus (rugi) tanpa
@@ -29,20 +33,34 @@ type saldoMinus struct {
 // subtype-nya juga retained, tetapi saldonya minus berarti isian saldo awal yang salah.
 var subtypeBolehMinus = []string{"current_earnings", "retained", "retained_earnings"}
 
+func bolehMinus(subtype, kode string) bool {
+	return slices.Contains(subtypeBolehMinus, subtype) && kode != coa.KodeSelisihSaldoAwal
+}
+
 func (s *tenant) saldoMinus(period string) []saldoMinus {
 	out := []saldoMinus{}
 	if j, ok := s.jurnalPeriode(period); ok {
 		for _, b := range j.tb {
-			if b.Saldo >= 0 || slices.Contains(subtypeBolehMinus, b.Subtype) && b.Kode != coa.KodeSelisihSaldoAwal {
+			if b.Saldo >= 0 || bolehMinus(b.Subtype, b.Kode) {
 				continue
 			}
 			normal, lawan := "debit", "kredit"
 			if b.Normal == coa.Kredit {
 				normal, lawan = "kredit", "debit"
 			}
-			out = append(out, saldoMinus{Jenis: "akun", Kode: b.Kode, Nama: b.Nama, Normal: normal, Nilai: -b.Saldo,
+			m := saldoMinus{Jenis: "akun", Kode: b.Kode, Nama: b.Nama, Normal: normal, Nilai: -b.Saldo,
 				Pesan: "Saldo " + b.Kode + " " + b.Nama + " " + finance.FormatRupiahPenuh(-b.Saldo) + " di sisi " + lawan +
-					", padahal saldo normalnya " + normal + ". Periksa transaksi atau saldo awalnya."})
+					", padahal saldo normalnya " + normal + "."}
+			m.Sejak, m.Bukti = s.mulaiMinus(b.Kode, period)
+			switch {
+			case m.Bukti == "SA":
+				m.Pesan += " Sudah minus sejak saldo awal " + finance.FormatTanggalID(m.Sejak) + ": periksa isian saldo awalnya."
+			case m.Bukti != "":
+				m.Pesan += " Mulai minus " + finance.FormatTanggalID(m.Sejak) + " di No. Bukti " + m.Bukti + ": periksa jurnal itu dan transaksi sebelumnya."
+			default:
+				m.Pesan += " Periksa transaksi atau saldo awalnya."
+			}
+			out = append(out, m)
 		}
 	}
 	k, stok := s.kartu()
@@ -53,6 +71,38 @@ func (s *tenant) saldoMinus(period string) []saldoMinus {
 		}
 	}
 	return out
+}
+
+// mulaiMinus: tanggal & No. Bukti saat saldo akun terakhir kali berbalik minus, ditelusuri lewat
+// Buku Besar dari awal pembukuan sampai akhir periode ("SA" = minus sejak saldo awal).
+func (s *tenant) mulaiMinus(kode, period string) (sejak, bukti string) {
+	t, err := time.Parse("2006-01", period)
+	if err != nil {
+		return "", ""
+	}
+	s.mu.RLock()
+	mulai := s.bukuAwalLocked().Tanggal
+	s.mu.RUnlock()
+	akhir := t.AddDate(0, 1, -1).Format(time.DateOnly)
+	if mulai > akhir {
+		return "", ""
+	}
+	bb := s.bukuBesar(mulai, akhir, kode)
+	if len(bb.Akun) != 1 {
+		return "", ""
+	}
+	a := bb.Akun[0]
+	if a.SaldoAwal < 0 {
+		sejak, bukti = mulai, "SA"
+	}
+	prev := a.SaldoAwal
+	for _, b := range a.Baris {
+		if b.Saldo < 0 && prev >= 0 {
+			sejak, bukti = b.Tanggal, b.Bukti
+		}
+		prev = b.Saldo
+	}
+	return sejak, bukti
 }
 
 func (s *tenant) handleSaldoMinus(w http.ResponseWriter, r *http.Request) {

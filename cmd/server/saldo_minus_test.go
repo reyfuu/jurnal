@@ -91,6 +91,53 @@ func TestSaldoMinus_HanyaYangBerlawananDenganSaldoNormal(t *testing.T) {
 	}
 }
 
+// Peringatan menyebut sejak kapan & di bukti mana saldo terakhir kali berbalik minus, supaya jurnal
+// penyebabnya mudah dicari. Saldo yang sempat pulih lalu minus lagi menunjuk titik minus terakhir.
+func TestSaldoMinus_SejakTanggalDanNoBukti(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	var sewa []finance.Transaction
+	for _, tx := range []string{
+		`{"tanggal":"2026-01-05","jenis":"Penjualan","nominal":500000,"lunas":true}`,
+		`{"tanggal":"2026-01-06","jenis":"Sewa Tempat","nominal":4000000,"lunas":true}`, // minus 2,5 jt
+		`{"tanggal":"2026-02-02","jenis":"Penjualan","nominal":5000000,"lunas":true}`,   // pulih +2,5 jt
+		`{"tanggal":"2026-02-10","jenis":"Sewa Tempat","nominal":4000000,"lunas":true}`, // minus lagi 1,5 jt
+	} {
+		x := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", tx)
+		if x.Jenis == "Sewa Tempat" {
+			sewa = append(sewa, x)
+		}
+	}
+	jan := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-01")
+	if len(jan) != 1 || jan[0].Sejak != "2026-01-06" || jan[0].Bukti != sewa[0].NoJurnal || !strings.Contains(jan[0].Pesan, sewa[0].NoJurnal) {
+		t.Fatalf("januari: %+v (bukti sewa %s)", jan, sewa[0].NoJurnal)
+	}
+	feb := getJSON[[]saldoMinus](t, srv, qa, "/api/v1/saldo-minus?period=2026-02")
+	if len(feb) != 1 || feb[0].Sejak != "2026-02-10" || feb[0].Bukti != sewa[1].NoJurnal {
+		t.Fatalf("februari harus menunjuk minus terakhir: %+v (bukti sewa %s)", feb, sewa[1].NoJurnal)
+	}
+}
+
+// Buku Besar menandai akun yang boleh minus (laba ditahan) dengan aturan yang sama dengan
+// peringatan, supaya tampilan hanya memerahkan saldo yang memang salah.
+func TestBukuBesar_BolehMinusSamaDenganPeringatan(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	body := `{"tanggal":"2026-01-01","rincian":[{"nama":"Bank","kategori":"kas","nominal":1000000},` +
+		`{"nama":"Modal Pemilik","kategori":"modal","nominal":3000000},{"nama":"Laba Ditahan","kategori":"laba_ditahan","nominal":-1000000}]}`
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening?paksa=1", body); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	boleh := map[string]bool{}
+	for _, a := range getJSON[bukuBesarResp](t, srv, qa, "/api/v1/reports/buku-besar?period=2026-01").Akun {
+		boleh[a.Kode] = a.BolehMinus
+	}
+	if !boleh["3201"] || boleh[coa.KodeSelisihSaldoAwal] || boleh["1102"] {
+		t.Fatalf("boleh minus: 3201=%v 3299=%v 1102=%v", boleh["3201"], boleh[coa.KodeSelisihSaldoAwal], boleh["1102"])
+	}
+}
+
 // Checklist tester No 23: laba ditahan minus (rugi tahun lalu) tidak diperingatkan, tetapi
 // 3299 penampung selisih saldo awal yang minus tetap diperingatkan karena berarti salah isi.
 func TestSaldoMinus_LabaDitahanBolehMinus_SelisihSaldoAwalTidak(t *testing.T) {

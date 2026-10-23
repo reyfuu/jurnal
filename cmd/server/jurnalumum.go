@@ -23,7 +23,7 @@ type barisJurnalUmum struct {
 }
 
 type entriJurnalUmum struct {
-	Bukti      string            `json:"bukti"` // SA saldo awal, TRX-id transaksi, BYR-id pelunasan, JU-yyyymm-n entri sistem
+	Bukti      string            `json:"bukti"` // SA saldo awal, JU-yyyymm-n transaksi, BYR-id pelunasan, SIS-yyyymm-n entri sistem
 	Tanggal    string            `json:"tanggal"`
 	TxID       int               `json:"tx_id,omitempty"`
 	Keterangan string            `json:"keterangan"`
@@ -50,12 +50,8 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 	out := jurnalUmumResp{PeriodLabel: labelRentang(dari, sampai), Dari: dari, Sampai: sampai, Entri: []entriJurnalUmum{}, Pilihan: []pilihanAkun{}}
 	s.mu.RLock()
 	mulai := s.bukuAwalLocked().Tanggal
-	noJurnal := make(map[int]string, len(s.txs)) // nomor jurnal tetap per transaksi
-	grupTx := make(map[int]int, len(s.txs))      // transaksi satu catatan Catat → satu bukti
-	for _, t := range s.txs {
-		noJurnal[t.ID], grupTx[t.ID] = t.NoJurnal, t.Grup
-	}
 	s.mu.RUnlock()
+	nb := s.penomoranBukti()
 	q = strings.ToLower(strings.TrimSpace(q))
 	for bulan := dari[:7]; bulan <= sampai[:7]; bulan = bulanBerikut(bulan) {
 		j, ok := s.jurnalPeriode(bulan)
@@ -83,35 +79,12 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 			}
 			bulanIni = append(bulanIni, e)
 		}
-		// Baris jurnal satu transaksi / entri sistem bersebelahan di j.entri; dikelompokkan per
-		// (transaksi, tanggal, keterangan), jadi pelunasan bulan berikutnya jadi bukti sendiri.
-		type kunci struct {
-			tx      int
-			tanggal string
-			ket     string
-		}
-		indeks := map[kunci]int{}
-		nSistem := 0
-		for _, l := range j.entri {
-			k := kunci{l.TxID, l.Tanggal, l.Ket}
-			if g := grupTx[l.TxID]; g > 0 && !strings.HasPrefix(l.Ket, "Pelunasan") {
-				k.tx, k.ket = -g, "" // baris semua transaksi satu catatan digabung jadi satu jurnal
-			}
-			i, ada := indeks[k]
-			if !ada {
-				e := entriJurnalUmum{Tanggal: l.Tanggal, TxID: l.TxID, Keterangan: l.Ket}
-				switch {
-				case l.TxID == 0:
-					nSistem++
-					e.Bukti = fmt.Sprintf("SIS-%s-%d", strings.ReplaceAll(bulan, "-", ""), nSistem) // entri sistem; JU- untuk transaksi
-				case strings.HasPrefix(l.Ket, "Pelunasan"):
-					e.Bukti = "BYR-" + strconv.Itoa(l.TxID)
-				default:
-					e.Bukti = cmp.Or(noJurnal[l.TxID], "TRX-"+strconv.Itoa(l.TxID))
-				}
-				i = len(bulanIni)
-				indeks[k] = i
-				bulanIni = append(bulanIni, e)
+		grup, bukti := nb.kelompokkan(j.entri, bulan)
+		awal := len(bulanIni) // setelah bukti saldo awal
+		for x, l := range j.entri {
+			i := awal + grup[x]
+			if i == len(bulanIni) {
+				bulanIni = append(bulanIni, entriJurnalUmum{Bukti: bukti[grup[x]], Tanggal: l.Tanggal, TxID: l.TxID, Keterangan: l.Ket})
 			}
 			// akun & sisi yang sama dalam satu bukti (mis. Kas dari beberapa transaksi satu catatan) digabung
 			bs := bulanIni[i].Baris
@@ -138,6 +111,61 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 	}
 	out.Seimbang = out.TotalDebit == out.TotalKredit
 	return out
+}
+
+// penomoranBukti: nomor jurnal tetap & grup catatan per transaksi, dasar No. Bukti yang sama di
+// Jurnal Umum dan Buku Besar.
+type penomoranBukti struct {
+	noJurnal map[int]string // nomor jurnal tetap per transaksi
+	grupTx   map[int]int    // transaksi satu catatan Catat → satu bukti
+}
+
+func (s *tenant) penomoranBukti() penomoranBukti {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	nb := penomoranBukti{noJurnal: make(map[int]string, len(s.txs)), grupTx: make(map[int]int, len(s.txs))}
+	for _, t := range s.txs {
+		nb.noJurnal[t.ID], nb.grupTx[t.ID] = t.NoJurnal, t.Grup
+	}
+	return nb
+}
+
+// kelompokkan: baris jurnal satu transaksi / entri sistem bersebelahan di entri; dikelompokkan per
+// (transaksi, tanggal, keterangan), jadi pelunasan bulan berikutnya jadi bukti sendiri. grup[i] =
+// nomor urut bukti baris entri[i] (urut kemunculan), bukti[g] = No. Bukti-nya.
+func (nb penomoranBukti) kelompokkan(entri []entriJurnal, bulan string) (grup []int, bukti []string) {
+	type kunci struct {
+		tx      int
+		tanggal string
+		ket     string
+	}
+	indeks := map[kunci]int{}
+	grup = make([]int, len(entri))
+	nSistem := 0
+	for x, l := range entri {
+		k := kunci{l.TxID, l.Tanggal, l.Ket}
+		if g := nb.grupTx[l.TxID]; g > 0 && !strings.HasPrefix(l.Ket, "Pelunasan") {
+			k.tx, k.ket = -g, "" // baris semua transaksi satu catatan digabung jadi satu jurnal
+		}
+		i, ada := indeks[k]
+		if !ada {
+			var b string
+			switch {
+			case l.TxID == 0:
+				nSistem++
+				b = fmt.Sprintf("SIS-%s-%d", strings.ReplaceAll(bulan, "-", ""), nSistem) // entri sistem; JU- untuk transaksi
+			case strings.HasPrefix(l.Ket, "Pelunasan"):
+				b = "BYR-" + strconv.Itoa(l.TxID)
+			default:
+				b = cmp.Or(nb.noJurnal[l.TxID], "TRX-"+strconv.Itoa(l.TxID))
+			}
+			i = len(bukti)
+			indeks[k] = i
+			bukti = append(bukti, b)
+		}
+		grup[x] = i
+	}
+	return grup, bukti
 }
 
 func cocokJurnal(e entriJurnalUmum, akun, q string) bool {
