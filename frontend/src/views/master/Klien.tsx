@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowLeft, Eye } from 'lucide-react'
+import { ArrowLeft, ChevronRight, CreditCard, Eye } from 'lucide-react'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { AksiLembar, LembarBawah } from '@/components/hp/LembarBawah'
+import { BarisRingkas } from '@/components/hp/BarisRingkas'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -110,6 +114,60 @@ export function KlienList({ onBuka, bisaLihat, bisaLangganan = false, onLihat }:
     (filter === 'arsip' ? !!k.arsip : !k.arsip) &&
     (filter === 'semua' || filter === 'arsip' || (filter === 'perhatian' ? k.perlu_perhatian : k.status === filter)) &&
     [k.nama, k.owner_nama, k.owner_email, k.kota].join(' ').toLowerCase().includes(q.trim().toLowerCase())), [rows, filter, q])
+  const hp = useHP()
+  const [aksi, setAksi] = useState<KlienRow | null>(null) // lembar ⋯ di HP
+  const lalu = (f: () => void) => () => { setAksi(null); f() }
+  const dialog = (
+    <>
+      {lihat && <LihatDialog open onClose={() => setLihat(null)} klien={lihat} tiket={[]} onMulai={onLihat} />}
+      {langganan && <LanggananDialog open onClose={() => setLangganan(null)} klien={langganan} onSaved={() => { setLangganan(null); void muat() }} />}
+    </>
+  )
+
+  if (hp) {
+    // HP: satu baris per usaha; ketuk = detail klien, ⋯ = rincian & aksi lain.
+    return (
+      <>
+        <KepalaHP judul="Klien" cari={q} onCari={setQ} placeholderCari="Cari usaha, owner, kota" />
+        <div className="saring-hp" role="tablist" aria-label="Saring status">
+          {FILTER.map(([f, l]) => (
+            <button key={f} role="tab" className={'kepala-hp-chip' + (filter === f ? ' aktif' : '')} aria-selected={filter === f} onClick={() => setFilter(f)}>{l}</button>
+          ))}
+        </div>
+        <Gagal error={error} />
+        <div className="daftar-ringkas">
+          {tampil.map((k) => (
+            <BarisRingkas key={k.id} label={k.nama} onBuka={() => onBuka(k.id)} onLainnya={() => setAksi(k)}
+              judul={<>{k.nama} <StatusPill s={k.status} />{k.perlu_perhatian && <span className="pill-status pill-red" style={{ marginLeft: 4 }}>perhatian</span>}</>}
+              sub={k.perlu_perhatian && k.alasan ? k.alasan : [k.owner_nama, k.kota, k.paket].filter(Boolean).join(' · ') || k.owner_email} />
+          ))}
+          {rows && tampil.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada klien yang cocok.</p>}
+          {!rows && <p className="text-sm text-muted-foreground">Memuat…</p>}
+        </div>
+        <LembarBawah buka={!!aksi} judul={aksi?.nama ?? ''} onTutup={() => setAksi(null)}>
+          {aksi && (
+            <>
+              <dl className="lembar-rinci">
+                <dt>Owner</dt><dd>{[aksi.owner_nama, aksi.owner_email].filter(Boolean).join(' · ')}</dd>
+                <dt>Usaha</dt><dd>{[aksi.kota, aksi.jenis, aksi.pkp && 'PKP'].filter(Boolean).join(' · ') || '—'}{aksi.demo && ' · contoh'}{aksi.arsip && ' · diarsipkan'}</dd>
+                <dt>Paket</dt><dd>{aksi.paket ?? '—'} · <StatusPill s={aksi.status} /></dd>
+                <dt>Berlaku s/d</dt><dd className="tabular">{formatTanggal(aksi.sampai)}</dd>
+                <dt>Terakhir aktif</dt><dd>{formatRelatif(aksi.terakhir_aktif)}</dd>
+                <dt>Transaksi bulan ini</dt><dd className="tabular">{aksi.transaksi_bulan_ini.toLocaleString('id-ID')}</dd>
+                <dt>Profil</dt><dd>{aksi.onboarding ? 'Lengkap' : 'Belum'}</dd>
+                <dt>Ditangani</dt><dd>{aksi.penangan.length ? aksi.penangan.map((p) => p.nama).join(', ') : 'Belum ada'}</dd>
+              </dl>
+              <AksiLembar ikon={<ChevronRight />} onClick={lalu(() => onBuka(aksi.id))}>Buka detail klien</AksiLembar>
+              {bisaLangganan && !aksi.demo && !aksi.arsip && <AksiLembar ikon={<CreditCard />} onClick={lalu(() => setLangganan(aksi))}>Atur langganan</AksiLembar>}
+              {bisaLihat && !aksi.arsip && <AksiLembar ikon={<Eye />} onClick={lalu(() => setLihat(aksi))}>Lihat sebagai klien</AksiLembar>}
+            </>
+          )}
+        </LembarBawah>
+        {dialog}
+      </>
+    )
+  }
+
   return (
     <>
       <PageHeader title="Klien" subtitle={rows ? `${rows.length} usaha yang bisa Anda lihat` : 'Memuat…'} />
@@ -173,8 +231,7 @@ export function KlienList({ onBuka, bisaLihat, bisaLangganan = false, onLihat }:
           </table>
         </div>
       </div>
-      {lihat && <LihatDialog open onClose={() => setLihat(null)} klien={lihat} tiket={[]} onMulai={onLihat} />}
-      {langganan && <LanggananDialog open onClose={() => setLangganan(null)} klien={langganan} onSaved={() => { setLangganan(null); void muat() }} />}
+      {dialog}
     </>
   )
 }

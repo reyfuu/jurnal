@@ -262,7 +262,7 @@ function LabaRugi({ r, cf, nm }: { r: IncomeStatement; cf: CashFlow; nm: Nama })
             const takDilacak = h ? r.cogs - h.hpp_jual + h.selisih_opname + h.koreksi : 0
             const rows = rapikanBaris([
               { kunci: 'omzet', label: nm('omzet', 'Omzet (penjualan kotor)'), nilai: r.omzet, gaya: 'baris', berhuruf: true, wajib: true },
-              { kunci: 'potongan', label: nm('potongan', 'Potongan channel / aplikasi'), nilai: -r.channel_fees, gaya: 'baris', sifat: 'kontra', berhuruf: true },
+              { kunci: 'potongan', label: nm('potongan', 'Potongan channel / aplikasi'), nilai: -r.channel_fees, gaya: 'baris', sifat: 'pengurang', berhuruf: true }, // akun beban 6108, bukan kontra
               { kunci: 'penjualan_bersih', label: 'Penjualan bersih', nilai: r.net_sales, gaya: 'total', berhuruf: true, suku: ['omzet', '-potongan'] },
               { kunci: 'hpp', label: nm('hpp', h ? 'HPP (modal barang terjual)' : 'HPP (bahan baku)'), nilai: -r.cogs, gaya: 'baris', sifat: 'pengurang', berhuruf: true },
               ...(h ? [

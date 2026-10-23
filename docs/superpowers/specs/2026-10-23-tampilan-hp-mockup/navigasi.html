@@ -1,0 +1,84 @@
+<style>
+  .phones { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+  .phone { width: 300px; height: 600px; border: 10px solid #111; border-radius: 34px; overflow: hidden; position: relative; background: #f3f5f9; font-family: system-ui, sans-serif; color: #1b2340; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .bar { background: #222c5c; color: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+  .logo { font-weight: 800; font-size: 15px; } .logo b { color: #f6c445; }
+  .burger { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.12); display: grid; place-items: center; font-size: 16px; }
+  .per { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.14); padding: 5px 9px; border-radius: 999px; }
+  .body { padding: 14px; }
+  .h { font-weight: 800; font-size: 20px; margin: 4px 0 10px; }
+  .card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.06); font-size: 12px; }
+  .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi .card { margin: 0; } .kpi b { display: block; font-size: 15px; margin-top: 3px; }
+  .drawer { position: absolute; inset: 0 70px 0 0; background: #222c5c; color: #dfe4ff; padding: 14px; font-size: 13px; box-shadow: 8px 0 30px rgba(0,0,0,.35); }
+  .scrim { position: absolute; inset: 0; background: rgba(10,14,30,.45); }
+  .grp { font-size: 10px; letter-spacing: .08em; color: #8f9bd0; margin: 14px 0 6px; }
+  .it { padding: 8px 10px; border-radius: 8px; } .it.on { background: rgba(255,255,255,.14); color: #fff; font-weight: 700; }
+  .tabs { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #e3e6ef; display: grid; grid-template-columns: repeat(5, 1fr); text-align: center; font-size: 10px; padding: 7px 0 10px; }
+  .tabs div span { display: block; font-size: 18px; line-height: 22px; }
+  .tabs .on { color: #222c5c; font-weight: 800; }
+  .plus span { width: 40px; height: 40px; margin: -20px auto 2px; border-radius: 50%; background: #f6c445; color: #222c5c; display: grid !important; place-items: center; font-weight: 900; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+  .cap { text-align: center; font-size: 12px; color: #667; margin-top: 8px; max-width: 300px; }
+</style>
+
+<h2>Menu di HP: mana yang lebih enak dipakai?</h2>
+<p class="subtitle">Sekarang semua menu dijejer ke samping di atas layar, jadi sebagian besar menu tersembunyi dan bagian atasnya makan banyak tempat. Dua pilihan pengganti:</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tombol menu ☰ di kiri atas</h3>
+      <p>Bar atas tipis: logo, periode, tombol ☰. Ketuk ☰ → menu lengkap meluncur dari kiri, susunannya sama persis dengan sidebar di laptop. Ditutup dengan ketuk di luar atau geser ke kiri.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tab di bawah layar + ☰ untuk sisanya</h3>
+      <p>Seperti aplikasi bank/e-wallet: 4 menu yang paling sering dipakai selalu ada di bawah (terjangkau jempol), tombol + kuning untuk catat cepat, dan "Lainnya" membuka menu lengkap seperti pilihan A.</p>
+    </div>
+  </div>
+</div>
+
+<div class="phones" style="margin-top: 22px">
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="burger">☰</div><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="body">
+        <div class="h">Dashboard</div>
+        <div class="kpi"><div class="card">Omzet<b>Rp92 jt</b></div><div class="card">Laba<b>Rp20 jt</b></div></div>
+        <div class="card" style="margin-top:10px">Grafik penjualan…</div>
+      </div>
+      <div class="scrim"></div>
+      <div class="drawer">
+        <div class="logo" style="color:#fff">Master<b>Pajak AI</b></div>
+        <div class="grp">RINGKASAN</div><div class="it on">Dashboard</div>
+        <div class="grp">CATAT HARIAN</div><div class="it">Transaksi</div><div class="it">Stok &amp; Gudang</div>
+        <div class="grp">LAPORAN</div><div class="it">Laporan Keuangan</div><div class="it">Buku Besar</div><div class="it">Jurnal Umum</div>
+        <div class="grp">LAINNYA</div><div class="it">Pajak ▸</div><div class="it">Pengaturan ▸</div>
+      </div>
+    </div>
+    <div class="cap"><b>A</b> — menu terbuka (layar tertutup gelap di belakangnya)</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><div class="logo">Master<b>Pajak AI</b></div><div class="per">Agu 2026 ▾</div></div>
+      <div class="body">
+        <div class="h">Buku Besar</div>
+        <div class="card">Ringkasan akun…</div>
+        <div class="card">Kas Besar · saldo minus</div>
+        <div class="card">Piutang Usaha</div>
+      </div>
+      <div class="tabs">
+        <div><span>▦</span>Dashboard</div>
+        <div><span>⇄</span>Transaksi</div>
+        <div class="plus"><span>+</span>Catat</div>
+        <div class="on"><span>▤</span>Laporan</div>
+        <div><span>☰</span>Lainnya</div>
+      </div>
+    </div>
+    <div class="cap"><b>B</b> — tab bawah selalu terlihat; "Laporan" membuka daftar laporan</div>
+  </div>
+</div>

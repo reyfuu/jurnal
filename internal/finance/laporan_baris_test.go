@@ -188,7 +188,7 @@ func TestRenderLaporanPDF(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := buf.String()
-	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", `Laba \(rugi\) bersih tahun berjalan`, "36.000", `\(10.000\)`} {
+	for _, mau := range []string{"%PDF-1.4", "Kedai Senja", "Laporan Laba Rugi", "Neraca", "Agustus 2026", `Laba \(rugi\) bersih tahun berjalan`, "36.000", "10.000"} {
 		if !strings.Contains(s, mau) {
 			t.Errorf("PDF tidak memuat %q", mau)
 		}
@@ -242,8 +242,8 @@ func TestLabelPeriode(t *testing.T) {
 	}
 }
 
-// PDF laba rugi: baris berhuruf dengan rumus di baris jumlah; beban hitam tanpa kurung, akun
-// kontra (potongan) dalam kurung hitam; penyusutan & amortisasi = beban, tanpa kurung.
+// PDF laba rugi: baris berhuruf dengan rumus di baris jumlah; beban hitam tanpa kurung, termasuk
+// potongan channel (akun 6108 Beban Marketplace, bukan kontra penjualan) dan penyusutan & amortisasi.
 func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
 	b := BagianLabaRugi(contohLabaRugi())
 	rumus := map[string]string{}
@@ -262,12 +262,12 @@ func TestPDFLabaRugi_HurufRumusDanKurung(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := buf.String()
-	for _, mau := range []string{`Laba \(rugi\) kotor   \(E = C - D\)`, `\(10.000\)`, "5.000", "30.000", "15.000"} { // potongan: kontra; penyusutan: beban
+	for _, mau := range []string{`Laba \(rugi\) kotor   \(E = C - D\)`, "10.000", "5.000", "30.000", "15.000"} {
 		if !strings.Contains(s, mau) {
 			t.Errorf("PDF tidak memuat %q", mau)
 		}
 	}
-	for _, tidak := range []string{`\(30.000\)`, `\(15.000\)`, `\(20.000\)`, `\(5.000\)`} { // HPP, beban, total beban, penyusutan: tanpa kurung
+	for _, tidak := range []string{`\(10.000\)`, `\(30.000\)`, `\(15.000\)`, `\(20.000\)`, `\(5.000\)`} { // potongan, HPP, beban, total beban, penyusutan: tanpa kurung
 		if strings.Contains(s, tidak) {
 			t.Errorf("beban tidak boleh dalam kurung: %q", tidak)
 		}
