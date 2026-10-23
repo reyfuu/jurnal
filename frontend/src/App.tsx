@@ -413,7 +413,8 @@ export default function App() {
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':
-        return <PajakUMKM d={d} />
+        return <PajakUMKM d={d} period={period} pro={me!.langganan.pro} bisaEkspor={!me!.lihat} bisaCatat={!me!.lihat && canSee('transaksi')}
+          onLangganan={canSee('langganan') ? () => navigate('langganan') : undefined} />
       case 'kalkulator-pajak':
         return <KalkulatorPajak profile={business?.profile ?? null} />
       case 'perencanaan-pajak':

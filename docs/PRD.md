@@ -111,5 +111,6 @@ Master Pajak membantu pemilik UMKM melihat kesehatan bisnis secara utuh—bukan 
 - **Fase B**: persistensi SQLite (data tidak hilang saat deploy); KPI dashboard dihitung murni dari transaksi.
 - **Fase C**: CoA otomatis dengan template **perdagangan, jasa, manufaktur**; transaksi dipetakan ke akun otomatis dan koreksi user diingat; Laba Rugi & Neraca per template; ekspor PDF/Excel; stok per transaksi dan peringatan stok minus.
 - **Fase D**: role **Client** (pelanggan B2B melihat tagihannya sendiri); upload bukti/nota dengan kompresi otomatis (foto, PDF, Excel).
+- **Rekonsiliasi bulanan vs tahunan PPh Final (paket Pro)**: selesai Okt 2026. Setoran per masa (jenis Setor PPh Final + masa pajak) dibandingkan dengan PPh terutang menurut pembukuan; kurang/lebih bayar untuk SPT Tahunan; unduh Excel/PDF; butir Tutup Buku.
 - **Fase E**: ekspor XML Coretax: rekap PPh Final 0,5%, e-Bupot PPh 21/23, e-Faktur PPN (format diverifikasi terhadap template resmi DJP).
 

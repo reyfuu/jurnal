@@ -71,6 +71,7 @@ type tutupBukuResp struct {
 }
 
 func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
+	pro := s.langgananStatus(time.Now()).Pro || u.Role == auth.MP
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rep := s.reportLocked(period)
@@ -157,6 +158,10 @@ func (s *tenant) ringkasTutup(period string, u auth.User) tutupBukuResp {
 		if k.Status == "selisih" {
 			out.Cek = append(out.Cek, cekTutup{Kode: "saldo_" + k.Kode, Judul: "Saldo awal cocok: " + k.Judul, View: k.View, Status: "peringatan", Detail: k.Pesan})
 		}
+	}
+
+	if pro && len(period) == 7 {
+		out.Cek = append(out.Cek, s.cekPPhFinalLocked(period))
 	}
 
 	c = cekTutup{Kode: "neraca", Judul: "Neraca seimbang", View: "laporan-keuangan", Status: "ok", Detail: "Aktiva = Pasiva."}

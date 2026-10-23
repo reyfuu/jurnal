@@ -43,6 +43,9 @@ var JenisList = []Jenis{
 	// PPN keluaran (usaha PKP): dipungut dari pembeli bersama invoice, lalu disetor ke negara.
 	{"PPN Keluaran", "masuk", "ppn"},
 	{"Setor PPN", "keluar", "setor_ppn"},
+	// PPh Final 0,5% (PP 55/2022) yang disetor sendiri; beban pajak seperti "Pajak & Izin",
+	// dipisah supaya bisa direkonsiliasi per masa (lihat RekonsiliasiTahun).
+	{JenisSetorPPhFinal, "keluar", "biaya"},
 }
 
 const (
@@ -99,11 +102,14 @@ type Transaction struct {
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
 	QtyStok int64 `json:"qty_stok,omitempty"`
+	// MasaPajak: masa (YYYY-MM) yang dilunasi setoran pajak (Setor PPh Final / Setor PPN);
+	// bawaan bulan sebelum tanggal setor. Kosong untuk jenis lain.
+	MasaPajak string `json:"masa_pajak,omitempty"`
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.
 func Validate(t *Transaction) error {
-	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas, &t.Akun, &t.NoBukti, &t.Lawan, &t.Sumber} {
+	for _, s := range []*string{&t.Tanggal, &t.Jenis, &t.Keterangan, &t.Item, &t.Channel, &t.Pihak, &t.TanggalLunas, &t.Akun, &t.NoBukti, &t.Lawan, &t.Sumber, &t.MasaPajak} {
 		*s = strings.TrimSpace(*s)
 	}
 	if _, err := time.Parse(time.DateOnly, t.Tanggal); err != nil {
@@ -117,6 +123,9 @@ func Validate(t *Transaction) error {
 	}
 	if t.Nominal <= 0 {
 		return errors.New("nominal harus lebih dari 0")
+	}
+	if err := rapikanMasa(t); err != nil {
+		return err
 	}
 	if t.Qty < 0 {
 		return errors.New("jumlah tidak boleh negatif")

@@ -48,7 +48,7 @@ const BANDING: [string, [string, string], [string, string], ReactNode][] = [
   ['Perlu paham debit, kredit, tutup buku', ['x', 'Ya'], ['y', 'Tidak'], 'Tidak'],
   ['Input dari foto nota via WhatsApp', ['x', 'Tidak'], ['m', 'Anda kirim berkas'], <>Ya, dibaca AI <SegeraHadir /></>],
   ['PKP dan Non-PKP dibedakan otomatis', ['m', 'Diatur manual'], ['y', 'Ya'], <>Otomatis <SegeraHadir /></>],
-  ['Rekonsiliasi bulanan vs tahunan', ['m', 'Manual'], ['m', 'Tergantung jasa'], <>Otomatis <SegeraHadir /></>],
+  ['Rekonsiliasi bulanan vs tahunan', ['m', 'Manual'], ['m', 'Tergantung jasa'], 'Otomatis (paket Pro)'],
   ['File XML siap Coretax', ['m', 'Tergantung'], ['y', 'Ya'], <>Ya <SegeraHadir /></>],
   ['Diawasi ahli pajak', ['x', 'Tidak'], ['y', 'Ya'], 'Ya, termasuk eks petugas DJP'],
 ]
@@ -58,7 +58,7 @@ const DAPAT: [string, boolean?][] = [
   ['Data marketplace, kasir, dan bank dalam satu pembukuan'],
   ['Perlakuan PKP dan Non-PKP otomatis', SEGERA],
   ['Laba Rugi, Neraca, Arus Kas, Penyusutan'],
-  ['Rekonsiliasi bulanan vs tahunan', SEGERA],
+  ['Rekonsiliasi bulanan vs tahunan (paket Pro)'],
   ['Ekspor XML siap unggah ke Coretax', SEGERA],
   ['Konsultan Pajak AI di dalam aplikasi'],
   ['Zoom mingguan bersama tim ahli'],
@@ -67,7 +67,7 @@ const DAPAT: [string, boolean?][] = [
 const FAQ: [string, ReactNode][] = [
   ['Saya tidak paham akuntansi. Apakah tetap bisa memakai MasterPajak AI?', 'Bisa. MasterPajak AI dibuat supaya Anda tidak perlu memahami debit, kredit, rekonsiliasi, atau tutup buku. Anda cukup memasukkan data, misalnya mencatat transaksi atau mengimpor mutasi bank, dan AI yang menyusun pembukuannya. Foto nota via WhatsApp segera hadir.'],
   ['Apakah MasterPajak AI menggantikan software akuntansi saya?', 'Ya, MasterPajak AI dirancang sebagai pengganti software akuntansi konvensional. Pembukuan, laporan keuangan, dan pajak ada di satu platform.'],
-  ['Bedanya dengan Coretax DJP?', 'Coretax adalah tempat melapor. MasterPajak AI menyiapkan datanya: membukukan dan menghitung pajak. Rekonsiliasi otomatis dan ekspor file XML siap unggah ke Coretax segera hadir.'],
+  ['Bedanya dengan Coretax DJP?', 'Coretax adalah tempat melapor. MasterPajak AI menyiapkan datanya: membukukan dan menghitung pajak. Rekonsiliasi setoran bulanan vs tahunan sudah tersedia di paket Pro; ekspor file XML siap unggah ke Coretax segera hadir.'],
   ['Siapa yang mengawasi hasil hitungannya?', 'Ahli pajak dan mantan petugas DJP berpengalaman lebih dari 20 tahun dalam tim MasterPajak AI. Untuk keputusan penting, Anda tetap disarankan mengecek dasar hukumnya.'],
   ['Bagaimana kalau ada aturan pajak baru?', 'Tim ahli kami mengadakan Zoom mingguan untuk membahas pembaruan aturan pajak dan menjawab pertanyaan komunitas.'],
   ['Pembayarannya lewat apa?', 'Pembayaran diproses oleh Midtrans: virtual account bank, QRIS, e-wallet, atau kartu.'],
@@ -199,20 +199,20 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
               <div className="lp-chrome" aria-hidden="true"><i /><i /><i /><span>Rekonsiliasi bulanan vs tahunan · contoh tampilan</span></div>
               <div className="overflow-x-auto p-[22px]">
                 <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
-                  <b className="font-heading text-[17px] font-semibold">Laporan bulanan vs SPT Tahunan <SegeraHadir /></b>
+                  <b className="font-heading text-[17px] font-semibold">Setoran bulanan vs pembukuan (SPT Tahunan)</b>
                   <span className="lp-tag warn">1 selisih perlu dicek</span>
                 </div>
                 <table className="lp-table">
-                  <thead><tr><th>Masa</th><th>Sumber</th><th className="n">Laporan bulanan</th><th className="n">Pembukuan</th><th>Status</th></tr></thead>
+                  <thead><tr><th>Masa</th><th className="n">Omzet pembukuan</th><th className="n">PPh terutang</th><th className="n">Sudah disetor</th><th>Status</th></tr></thead>
                   <tbody>
                     {[
-                      ['Juli', 'Nota WhatsApp + bank', '412.500.000', '412.500.000', ''],
-                      ['Agustus', 'Marketplace + bank', '438.200.000', '438.200.000', ''],
-                      ['September', 'Marketplace + kasir', '451.000.000', '466.750.000', 'Selisih Rp15.750.000'],
-                      ['Oktober', 'Nota WhatsApp + bank', '429.900.000', '429.900.000', ''],
-                    ].map(([masa, sumber, bulanan, buku, selisih]) => (
+                      ['Juli', '412.500.000', '2.062.500', '2.062.500', ''],
+                      ['Agustus', '438.200.000', '2.191.000', '2.191.000', ''],
+                      ['September', '466.750.000', '2.333.750', '2.255.000', 'Kurang Rp78.750'],
+                      ['Oktober', '429.900.000', '2.149.500', '2.149.500', ''],
+                    ].map(([masa, omzet, terutang, setor, selisih]) => (
                       <tr key={masa} className={selisih ? 'flag' : undefined}>
-                        <td>{masa}</td><td>{sumber}</td><td className="n">Rp {bulanan}</td><td className="n">Rp {buku}</td>
+                        <td>{masa}</td><td className="n">Rp {omzet}</td><td className="n">Rp {terutang}</td><td className="n">Rp {setor}</td>
                         <td>{selisih ? <span className="lp-tag warn">{selisih}</span> : <span className="lp-tag ok">Cocok</span>}</td>
                       </tr>
                     ))}
@@ -220,7 +220,7 @@ export function Landing({ onMasuk, onDaftar }: { onMasuk: () => void; onDaftar: 
                 </table>
               </div>
             </div>
-            <p className="mt-4 text-center text-sm text-[var(--text-muted)]">Selisih antara laporan bulanan dan tahunan ditandai sejak awal, sebelum menjadi alasan datangnya SP2DK. Angka di atas ilustrasi.</p>
+            <p className="mt-4 text-center text-sm text-[var(--text-muted)]">Setoran PPh Final tiap bulan dicocokkan dengan pembukuan. Selisihnya ditandai sejak awal, sebelum menjadi kurang bayar di SPT Tahunan atau alasan datangnya SP2DK. Tersedia di paket Pro; angka di atas ilustrasi.</p>
           </div>
         </section>
 
