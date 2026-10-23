@@ -1470,7 +1470,8 @@ html.dark .sidebar .nav-item.active { background: var(--navy-700); } /* tetap te
     color: var(--text-primary);
   }
 
-  .lembar-bawah-akar { position: fixed; inset: 0; z-index: 70; }
+  .lembar-bawah-akar { position: fixed; inset: 0; z-index: 45; } /* di atas bar atas (40), di bawah popup Select & dialog (50) */
+  body.lembar-terbuka .ai-fab { visibility: hidden; }
   .lembar-bawah-latar { position: absolute; inset: 0; background: rgba(10, 14, 30, 0.45); animation: lembar-pudar 0.2s ease; }
   .lembar-bawah {
     position: absolute;

@@ -6,6 +6,9 @@ import { getLaporanTransaksi, laporanTransaksiXlsxUrl, type FilterTransaksi, typ
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
 import { pilihanCepat, rentangBulan } from '@/lib/rentang'
+import { useHP } from '@/lib/hp'
+import { KepalaHP } from '@/components/hp/KepalaHP'
+import { LembarBawah } from '@/components/hp/LembarBawah'
 
 const GREEN = 'var(--accent-green)'
 const RED = 'var(--text-danger)'
@@ -22,6 +25,8 @@ export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaE
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
   const [batas, setBatas] = useState(HALAMAN)
+  const hp = useHP()
+  const [bukaFilter, setBukaFilter] = useState(false)
 
   // Ganti periode laporan di atas = rentang ikut ke bulan itu.
   useEffect(() => { setF((x) => ({ ...x, ...rentangBulan(period) })) }, [period])
@@ -41,15 +46,9 @@ export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaE
   const arahJenis = useMemo(() => new Map((data?.jenis_pilihan ?? []).map((j) => [j.nama, j.arah])), [data])
   const selisih = (data?.total_masuk ?? 0) - (data?.total_keluar ?? 0)
 
-  return (
+  const bisaUnduh = bisaEkspor && !!data && data.jumlah > 0
+  const filterIsi = (
     <>
-      <PageHeader title="Laporan Transaksi" subtitle="Semua transaksi dalam rentang tanggal yang Anda pilih, lengkap dengan filter dan rekap per jenis">
-        {bisaEkspor && data && data.jumlah > 0 && (
-          <Button variant="outline" onClick={() => void ekspor(laporanTransaksiXlsxUrl(f))}><FileSpreadsheet aria-hidden="true" /> Ekspor Excel</Button>
-        )}
-      </PageHeader>
-
-      <div className="card" style={{ padding: 16, marginBottom: 14 }}>
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1"><span className="kpi-label">Dari tanggal</span>
             <input className="input-field" type="date" value={f.dari} max={f.sampai} onChange={(e) => e.target.value && ubah({ dari: e.target.value })} /></label>
@@ -83,10 +82,47 @@ export function LaporanTransaksi({ period, bisaEkspor }: { period: string; bisaE
                 {data.channel.map((c) => <option key={c} value={c}>{c}</option>)}
               </select></label>
           )}
-          <label className="grid gap-1" style={{ flex: '1 1 200px' }}><span className="kpi-label">Cari</span>
-            <input className="input-field" placeholder="keterangan, barang, pelanggan / supplier" value={cari} onChange={(e) => setCari(e.target.value)} /></label>
+          {!hp && (
+            <label className="grid gap-1" style={{ flex: '1 1 200px' }}><span className="kpi-label">Cari</span>
+              <input className="input-field" placeholder="keterangan, barang, pelanggan / supplier" value={cari} onChange={(e) => setCari(e.target.value)} /></label>
+          )}
         </div>
-      </div>
+    </>
+  )
+  const bulanIni = rentangBulan(period)
+  // HP: filter aktif sebagai label yang bisa dihapus.
+  const chipFilter = [
+    ...(f.dari !== bulanIni.dari || f.sampai !== bulanIni.sampai ? [{ label: `${formatTanggal(f.dari)} – ${formatTanggal(f.sampai)}`, onHapus: () => ubah(bulanIni) }] : []),
+    ...(f.jenis ? [{ label: f.jenis, onHapus: () => ubah({ jenis: '' }) }] : []),
+    ...(f.arah ? [{ label: f.arah === 'masuk' ? 'Uang masuk' : 'Uang keluar', onHapus: () => ubah({ arah: '' }) }] : []),
+    ...(f.status ? [{ label: f.status === 'lunas' ? 'Lunas' : 'Belum lunas', onHapus: () => ubah({ status: '' }) }] : []),
+    ...(f.channel ? [{ label: f.channel, onHapus: () => ubah({ channel: '' }) }] : []),
+  ]
+
+  return (
+    <>
+      {hp ? (
+        <>
+          <KepalaHP judul="Laporan Transaksi" cari={cari} onCari={setCari} placeholderCari="Keterangan, barang, pelanggan / supplier"
+            jumlahFilter={chipFilter.length} onFilter={() => setBukaFilter(true)} chips={chipFilter}
+            aksi={bisaUnduh && <button type="button" className="kepala-hp-ikon" aria-label="Ekspor Excel" onClick={() => void ekspor(laporanTransaksiXlsxUrl(f))}><FileSpreadsheet size={16} aria-hidden="true" /></button>} />
+          <LembarBawah buka={bukaFilter} judul="Filter" onTutup={() => setBukaFilter(false)}>
+            <div className="grid gap-2" style={{ paddingTop: 4 }}>
+              {filterIsi}
+              <Button style={{ marginTop: 6 }} onClick={() => setBukaFilter(false)}>Selesai</Button>
+            </div>
+          </LembarBawah>
+        </>
+      ) : (
+        <>
+          <PageHeader title="Laporan Transaksi" subtitle="Semua transaksi dalam rentang tanggal yang Anda pilih, lengkap dengan filter dan rekap per jenis">
+            {bisaUnduh && (
+              <Button variant="outline" onClick={() => void ekspor(laporanTransaksiXlsxUrl(f))}><FileSpreadsheet aria-hidden="true" /> Ekspor Excel</Button>
+            )}
+          </PageHeader>
+          <div className="card" style={{ padding: 16, marginBottom: 14 }}>{filterIsi}</div>
+        </>
+      )}
 
       {error && <p className="pill-status pill-red" role="alert" style={{ whiteSpace: 'normal' }}>{error}</p>}
       {!data ? <p className="workspace-subtitle">Memuat transaksi…</p> : (

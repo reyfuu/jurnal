@@ -10,8 +10,9 @@ export function LembarBawah({ buka, judul, onTutup, children }: { buka: boolean;
     window.addEventListener('keydown', esc)
     const lama = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('lembar-terbuka')
     panel.current?.focus()
-    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = lama }
+    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = lama; document.body.classList.remove('lembar-terbuka') }
   }, [buka, onTutup])
   if (!buka) return null
   return createPortal(
