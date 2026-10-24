@@ -163,3 +163,22 @@ func TestJournalBerjalan_PembelianKeAkunBarang(t *testing.T) {
 		}
 	}
 }
+
+// Opname lebih: Dr akun barang / Cr HPP. Baris bernilai 0 tidak menghasilkan jurnal.
+func TestJurnalKartu_OpnameLebihDanNilaiNol(t *testing.T) {
+	peta := PetaDari(Manufaktur)
+	hpp := peta.Kode(PeranHPP)
+	lines := JurnalKartu([]finance.BarisKartu{
+		{Tanggal: "2026-01-20", StokID: 2, Jenis: finance.KartuOpname, GerakID: 3, Nilai: 2_500},
+	}, "2026-01-01", "2026-01-31", akunUji, peta)
+	if len(lines) != 2 || lines[0].Kode != "1302" || lines[0].Debit != 2_500 || lines[1].Kode != hpp || lines[1].Kredit != 2_500 {
+		t.Errorf("opname lebih: %+v", lines)
+	}
+	nol := JurnalKartu([]finance.BarisKartu{
+		{Tanggal: "2026-01-12", StokID: 4, Jenis: finance.KartuJual, TransaksiID: 9},
+		{Tanggal: "2026-01-20", StokID: 2, Jenis: finance.KartuOpname, GerakID: 3},
+	}, "2026-01-01", "2026-01-31", akunUji, peta)
+	if len(nol) != 0 {
+		t.Errorf("baris bernilai 0 harus tanpa jurnal: %+v", nol)
+	}
+}

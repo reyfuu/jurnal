@@ -146,6 +146,10 @@ func (nb penomoranBukti) kelompokkan(entri []entriJurnal, bulan string) (grup []
 	nSistem := 0
 	for x, l := range entri {
 		k := kunci{l.TxID, l.Tanggal, l.Ket}
+		if l.TxID != 0 {
+			// HPP penjualan perpetual ("HPP — <ket transaksi>") satu bukti dengan penjualannya
+			k.ket = strings.TrimPrefix(k.ket, ketHPP)
+		}
 		if g := nb.grupTx[l.TxID]; g > 0 && !strings.HasPrefix(l.Ket, "Pelunasan") {
 			k.tx, k.ket = -g, "" // baris semua transaksi satu catatan digabung jadi satu jurnal
 		}
@@ -169,6 +173,9 @@ func (nb penomoranBukti) kelompokkan(entri []entriJurnal, bulan string) (grup []
 	}
 	return grup, bukti
 }
+
+// ketHPP: awalan keterangan baris HPP penjualan perpetual (lihat jurnalPeriode).
+const ketHPP = "HPP — "
 
 func cocokJurnal(e entriJurnalUmum, akun, q string) bool {
 	if akun != "" && !slices.ContainsFunc(e.Baris, func(b barisJurnalUmum) bool { return b.Kode == akun }) {

@@ -345,22 +345,40 @@ func TestPersediaanAkun_PerpetualAlurManufaktur(t *testing.T) {
 			t.Errorf("penyesuaian sisa harus 0: %+v", e)
 		}
 	}
-	var hpp bool
-	for _, e := range tn.jurnalUmum("2026-01-01", "2026-01-31", "", "").Entri {
-		for _, b := range e.Baris {
-			if b.Kode == "5101" && b.Debit == 32_000 {
-				hpp = true
-				if e.Tanggal != "2026-01-15" || e.TxID != jual.ID || !strings.HasPrefix(e.Keterangan, "HPP — Penjualan") {
-					t.Errorf("entri HPP: tanggal %s tx %d ket %q", e.Tanggal, e.TxID, e.Keterangan)
-				}
-			}
+	// Penjualan & HPP-nya satu bukti gabungan: baris penjualan dulu, keterangan = penjualan.
+	var entriJual []entriJurnalUmum
+	ju := tn.jurnalUmum("2026-01-01", "2026-01-31", "", "")
+	for _, e := range ju.Entri {
+		if e.TxID == jual.ID {
+			entriJual = append(entriJual, e)
 		}
 		if strings.HasPrefix(e.Keterangan, "Produksi") && (e.Debit != e.Kredit || !strings.HasPrefix(e.Bukti, "SIS-")) {
 			t.Errorf("entri produksi %+v", e)
 		}
 	}
-	if !hpp {
-		t.Errorf("Jurnal Umum tanpa baris HPP 32.000")
+	if len(entriJual) != 1 {
+		t.Fatalf("penjualan harus satu entri Jurnal Umum, dapat %d: %+v", len(entriJual), entriJual)
+	}
+	ej := entriJual[0]
+	var nBukti int
+	for _, e := range ju.Entri {
+		if e.Bukti == ej.Bukti {
+			nBukti++
+		}
+	}
+	punya := map[string]barisJurnalUmum{}
+	for _, b := range ej.Baris {
+		punya[b.Kode] = b
+	}
+	if nBukti != 1 || ej.Tanggal != "2026-01-15" || ej.Debit != ej.Kredit || ej.Keterangan != "Penjualan — Kaos ke toko" ||
+		punya["5101"].Debit != 32_000 || punya["1305"].Kredit != 32_000 || punya["4101"].Kredit != 100_000 {
+		t.Errorf("entri penjualan (bukti %s ×%d): %+v", ej.Bukti, nBukti, ej)
+	}
+	// Buku Besar tetap memberi label HPP pada baris 5101.
+	for _, e := range j.entri {
+		if e.Kode == "5101" && e.TxID == jual.ID && e.Ket != "HPP — Penjualan — Kaos ke toko" {
+			t.Errorf("ket baris HPP %q", e.Ket)
+		}
 	}
 	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
 	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {

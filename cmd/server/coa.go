@@ -121,7 +121,7 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		for _, l := range coa.JurnalKartuKet(k.Baris, period+"-01", finance.AkhirBulan(period), akunOf, peta) {
 			ket := l.Ket
 			if l.TxID != 0 && ketTx[l.TxID] != "" {
-				ket = "HPP — " + ketTx[l.TxID]
+				ket = ketHPP + ketTx[l.TxID]
 			}
 			j.entri = append(j.entri, entriJurnal{l.Line, ket})
 		}
