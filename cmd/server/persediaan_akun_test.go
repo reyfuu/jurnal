@@ -283,3 +283,118 @@ func TestPersediaanAkun_SebelumKartuSama(t *testing.T) {
 		neracaSaldoSeimbang(t, c)
 	}
 }
+
+const manufakturPerpetual = `{"nama_usaha":"Konveksi Senja","jenis_usaha":"manufaktur","bentuk_usaha":"op","ptkp":"K/1","pkp":false,"metode_persediaan":"perpetual"}`
+
+func usahaManufakturPerpetual(t *testing.T) (*Server, *http.Cookie) {
+	t.Helper()
+	srv, qa := usahaManufaktur(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", manufakturPerpetual); rec.Code != http.StatusOK {
+		t.Fatalf("profil perpetual: %d %s", rec.Code, rec.Body)
+	}
+	return srv, qa
+}
+
+const ketPenyesuaian = "Penyesuaian persediaan ke nilai kartu stok"
+
+// Perpetual: pembelian, produksi bertahap, dan penjualan dijurnal di tanggal kejadiannya ke akun
+// barangnya, jadi penyesuaian sisa akhir bulan nol untuk semua akun.
+func TestPersediaanAkun_PerpetualAlurManufaktur(t *testing.T) {
+	srv, qa := usahaManufakturPerpetual(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	potongan := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Potongan","kategori":"Barang Setengah Jadi","satuan":"pcs"}`)
+	kaos := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[`+
+		`{"stok_id":`+itoa(kain.ID)+`,"fisik":1000,"harga_unit":10000},`+
+		`{"stok_id":`+itoa(potongan.ID)+`,"fisik":0,"harga_unit":0},`+
+		`{"stok_id":`+itoa(kaos.ID)+`,"fisik":0,"harga_unit":0}]}`)
+	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-03","jenis":"Beli Bahan / Stok","nominal":100000,"lunas":true,"stok_id":`+itoa(kain.ID)+`,"qty_stok":10000}`)
+	pPotongan := buat[finance.Produk](t, srv, qa, "/api/v1/produksi/produk", `{"nama":"Potongan","satuan":"pcs","hasil_per_batch":10,"bahan":[{"stok_id":`+itoa(kain.ID)+`,"takaran":6000}]}`)
+	pKaos := buat[finance.Produk](t, srv, qa, "/api/v1/produksi/produk", `{"nama":"Kaos","satuan":"pcs","hasil_per_batch":10,"bahan":[{"stok_id":`+itoa(potongan.ID)+`,"takaran":10000}]}`)
+	// Biaya lain diberi akun barang hasil (1303) seperti Task 6 kelak membuatnya otomatis.
+	for _, body := range []string{
+		`{"tanggal":"2026-01-05","produk":[{"produk_id":` + itoa(pPotongan.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":6000}],` +
+			`"biaya":[{"keterangan":"Upah potong","akun":"1303","nominal":20000}]}]}`,
+		`{"tanggal":"2026-01-08","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(potongan.ID) + `,"qty":10000}]}]}`,
+	} {
+		if rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body); rec.Code != http.StatusCreated {
+			t.Fatalf("catat produksi: %d %s", rec.Code, rec.Body)
+		}
+	}
+	jual := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-15","jenis":"Penjualan","nominal":100000,"lunas":true,"keterangan":"Kaos ke toko","stok_id":`+itoa(kaos.ID)+`,"qty_stok":4000}`)
+
+	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	tn := tenantByEmail(t, srv, qa)
+	all, _, _ := tn.coaAkun()
+	tn.mu.RLock()
+	target := tn.kartuLocked().NilaiPerAkun("2026-01-31", tn.akunStokLocked(all, coa.PetaDari(all)))
+	tn.mu.RUnlock()
+	for kode, mau := range map[string]int64{"1301": 50_000, "1303": 0, "1305": 48_000} {
+		if target[kode] != mau {
+			t.Errorf("kartu %s = %d, harus %d", kode, target[kode], mau)
+		}
+		if got := saldoAkun(c, kode); got != target[kode] {
+			t.Errorf("saldo %s = %d, harus = kartu %d", kode, got, target[kode])
+		}
+	}
+	j, _ := tn.jurnalPeriode("2026-01")
+	for _, e := range j.entri {
+		if e.Ket == ketPenyesuaian {
+			t.Errorf("penyesuaian sisa harus 0: %+v", e)
+		}
+	}
+	var hpp bool
+	for _, e := range tn.jurnalUmum("2026-01-01", "2026-01-31", "", "").Entri {
+		for _, b := range e.Baris {
+			if b.Kode == "5101" && b.Debit == 32_000 {
+				hpp = true
+				if e.Tanggal != "2026-01-15" || e.TxID != jual.ID || !strings.HasPrefix(e.Keterangan, "HPP — Penjualan") {
+					t.Errorf("entri HPP: tanggal %s tx %d ket %q", e.Tanggal, e.TxID, e.Keterangan)
+				}
+			}
+		}
+		if strings.HasPrefix(e.Keterangan, "Produksi") && (e.Debit != e.Kredit || !strings.HasPrefix(e.Bukti, "SIS-")) {
+			t.Errorf("entri produksi %+v", e)
+		}
+	}
+	if !hpp {
+		t.Errorf("Jurnal Umum tanpa baris HPP 32.000")
+	}
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
+		t.Errorf("laba CoA %+v ≠ ringkas %d", c.IncomeStatement, is.NetProfit)
+	}
+	if c.BalanceSheet == nil || !c.BalanceSheet.Seimbang {
+		t.Errorf("neraca CoA tidak seimbang")
+	}
+	neracaSaldoSeimbang(t, c)
+}
+
+// Perpetual: pembelian tanpa barang masuk akun peran persediaan, lalu disapu penyesuaian sisa ke
+// HPP; total persediaan tetap = kartu (Review Focus 4).
+func TestPersediaanAkun_PerpetualBeliTanpaBarang(t *testing.T) {
+	srv, qa := usahaManufakturPerpetual(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+itoa(kain.ID)+`,"fisik":1000,"harga_unit":10000}]}`)
+	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-10","jenis":"Beli Bahan / Stok","nominal":100000,"lunas":true}`)
+
+	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	tn := tenantByEmail(t, srv, qa)
+	tn.mu.RLock()
+	akhir := tn.kartuLocked().Periode("2026-01").PersediaanAkhir
+	tn.mu.RUnlock()
+	if got := totalPersediaan(c); got != akhir || akhir != 10_000 {
+		t.Errorf("total akun persediaan %d, kartu %d (harus 10.000)", got, akhir)
+	}
+	if got := saldoAkun(c, "5101"); got != 100_000 {
+		t.Errorf("HPP 5101 = %d, harus 100.000 (pembelian tanpa barang disapu)", got)
+	}
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
+		t.Errorf("laba CoA %+v ≠ ringkas %d", c.IncomeStatement, is.NetProfit)
+	}
+	neracaSaldoSeimbang(t, c)
+}

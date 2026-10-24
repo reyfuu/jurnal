@@ -124,8 +124,9 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []
 // JournalBerjalan: jurnal satu periode untuk buku berjalan. Transaksi bulan ini dijurnal ke
 // kas bila sudah lunas sampai akhir bulan, selain itu ke piutang (1201) / utang (2101);
 // transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
-// atau Dr Utang / Cr Kas) di tanggal bayar.
-func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta) []Line {
+// atau Dr Utang / Cr Kas) di tanggal bayar. akunStok: akun persediaan per barang; perpetual,
+// pembelian barang tanpa akun pilihan didebit ke akun barangnya. nil = akun peran persediaan.
+func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta, akunStok func(stokID int) string) []Line {
 	piutang, utang := peta.Kode(PeranPiutang), peta.Kode(PeranUtangUsaha)
 	akhir := period + "-31"
 	var out []Line
@@ -150,6 +151,11 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 				}
 			}
 			akun := AccountFor(t, p, peta)
+			if akunStok != nil && perpetual(p) && t.Jenis == finance.JenisBeliStok && t.StokID > 0 && t.Akun == "" {
+				if k := akunStok(t.StokID); k != "" {
+					akun = k
+				}
+			}
 			if masuk {
 				out = append(out, Line{t.ID, t.Tanggal, lawan, t.Nominal, 0}, Line{t.ID, t.Tanggal, akun, 0, t.Nominal})
 			} else {

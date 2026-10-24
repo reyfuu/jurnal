@@ -99,12 +99,32 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		ketTx[t.ID] = ket
 	}
-	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta) {
+	k := s.kartuLocked()
+	sp := k.Periode(period)
+	akunOf := s.akunStokLocked(all, peta)
+	// Perpetual dengan kartu stok aktif: pembelian barang langsung ke akun persediaan barangnya.
+	var akunBeli func(int) string
+	if sp.Aktif {
+		akunBeli = akunOf
+	}
+	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta, akunBeli) {
 		ket := ketTx[l.TxID]
 		if bulanTx[l.TxID] < period {
 			ket = "Pelunasan: " + ket // transaksi bulan lalu yang dibayar bulan ini
 		}
 		j.entri = append(j.entri, entriJurnal{l, ket})
+	}
+	// Perpetual dengan kartu stok aktif: penjualan, produksi, dan stok opname dijurnal di tanggal
+	// kejadiannya ke akun barangnya; penyesuaian sisa di bawah hanya menyapu sisanya (pembelian
+	// tanpa barang, koreksi stok minus, biaya lain yang tidak berakun barang hasil).
+	if sp.Aktif && p.MetodePersediaan == "perpetual" {
+		for _, l := range coa.JurnalKartuKet(k.Baris, period+"-01", finance.AkhirBulan(period), akunOf, peta) {
+			ket := l.Ket
+			if l.TxID != 0 && ketTx[l.TxID] != "" {
+				ket = "HPP — " + ketTx[l.TxID]
+			}
+			j.entri = append(j.entri, entriJurnal{l.Line, ket})
+		}
 	}
 	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr Piutang, atau Dr Utang / Cr Kas.
 	kas, piutang, utang := peta.Kode(coa.PeranKas), peta.Kode(coa.PeranPiutang), peta.Kode(coa.PeranUtangUsaha)
@@ -147,10 +167,11 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 			kasAwal -= v
 		}
 	}
-	k := s.kartuLocked()
-	sp := k.Periode(period)
-	akunOf := s.akunStokLocked(all, peta)
 	persediaanAwal := s.persediaanAwalPerAkunLocked(period, all, peta)
+	var target map[string]int64 // nilai kartu per akun di akhir bulan
+	if sp.Aktif {
+		target = k.NilaiPerAkun(period+"-31", akunOf)
+	}
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
@@ -174,7 +195,6 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	// nilai kartu, jadi persediaan tidak terhitung dua kali.
 	if sp.Aktif {
 		j.kartuAktif = true
-		target := k.NilaiPerAkun(period+"-31", akunOf)
 		saldo := map[string]int64{}
 		for _, b := range j.tb {
 			if b.Subtype == "inventory" {
