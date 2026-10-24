@@ -20,8 +20,8 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
   const [q, setQ] = React.useState("")
   const [active, setActive] = React.useState(0)
   const listId = React.useId()
-  const shown = filterOptions(options, q)
   const selected = options.includes(value) ? value : ""
+  const shown = filterOptions(options, q, MAX_SHOWN, selected)
 
   function pick(v: string) {
     onChange(v)
@@ -48,7 +48,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
     <PopoverPrimitive.Root open={open} onOpenChange={(o) => {
       setOpen(o)
       setQ("")
-      setActive(Math.max(0, filterOptions(options, "").indexOf(selected))) // buka di pilihan saat ini
+      setActive(Math.max(0, filterOptions(options, "", MAX_SHOWN, selected).indexOf(selected))) // buka di pilihan saat ini
     }}>
       <PopoverPrimitive.Trigger asChild disabled={disabled}>
         <button
@@ -96,7 +96,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(o)}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm data-active:bg-accent data-active:text-accent-foreground"
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm data-active:bg-accent data-active:text-accent-foreground aria-selected:bg-primary/10 aria-selected:font-semibold aria-selected:ring-1 aria-selected:ring-primary/40"
               >
                 <span>{o}</span>
                 {o === selected && <CheckIcon className="size-4" aria-hidden="true" />}
