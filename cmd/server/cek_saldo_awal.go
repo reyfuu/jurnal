@@ -91,13 +91,10 @@ func barisPersediaanAkun(per map[string]int64, all []coa.Account, label string) 
 	return out
 }
 
-// akunCekLocked: akun CoA usaha untuk pemeriksaan saldo awal (CoA dagang bawaan bila usaha
-// belum punya template, seperti akunSaldoAwal). s.mu dipegang.
+// akunCekLocked: akun CoA usaha untuk pemeriksaan saldo awal, termasuk akun tambahan klien
+// (mis. persediaan turunan 1301), sama dengan daftar di layar Saldo Awal. s.mu dipegang.
 func (s *tenant) akunCekLocked() ([]coa.Account, coa.Peta) {
-	all := s.coaTemplateLocked()
-	if len(all) == 0 {
-		all = coa.Master
-	}
+	all := s.akunLocked()
 	return all, coa.PetaDari(all)
 }
 

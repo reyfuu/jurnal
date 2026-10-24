@@ -18,6 +18,8 @@ const AMBER = 'var(--accent-amber)'
 // Sama dengan ketSelisihSaldoAwal di server.
 const DRAFT_SALDO = 'saldo-awal'
 const KET_PAKSA = 'selisih saldo awal yang disimpan walau belum seimbang'
+// persKunci: baris persediaan terkunci dari daftar barang (tidak ada di draft lama).
+type DraftSaldo = { tanggal: string; baris: SaldoAkun[]; persKunci?: boolean }
 
 // Baris layar: _k kunci baris; _baru = ditambah pengguna (dapat saran kategori & kode);
 // _katManual / _kodeAuto menjaga pilihan pengguna tidak tertimpa saran.
@@ -122,8 +124,12 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     // Persediaan per akun dari daftar barang (baris terkunci) selama saldo awal / draft belum
     // memuat persediaan bernilai; baris persediaan kosong bawaan template diganti baris itu.
     const tersimpan = o ? (o.rincian?.length ? o.rincian : [{ kategori: 'persediaan', nominal: o.persediaan }]) : []
-    const draft = bacaDraft<{ tanggal: string; baris: SaldoAkun[] }>(DRAFT_SALDO)
-    const kunci = persediaanTerkunci(info.persediaan_akun, tersimpan) && persediaanTerkunci(info.persediaan_akun, draft?.baris ?? [])
+    const draft = bacaDraft<DraftSaldo>(DRAFT_SALDO)
+    // Draft menyimpan status kunci, supaya baris persediaan manual tambahan pengguna tidak membuat
+    // baris terkunci hilang saat dipulihkan; draft lama tanpa status itu memakai tebakan isinya.
+    const kunci = !!draft?.baris?.length && typeof draft.persKunci === 'boolean'
+      ? draft.persKunci && !!info.persediaan_akun?.length
+      : persediaanTerkunci(info.persediaan_akun, tersimpan) && persediaanTerkunci(info.persediaan_akun, draft?.baris ?? [])
     const tanpaPersKosong = (r: SaldoAkun) => !kunci || r.kategori !== 'persediaan' || !!r.nominal
     setPersKunci(kunci)
     const rows = awal.filter((r) => r.kategori !== 'aset_tetap' && r.keterangan !== KET_PAKSA && tanpaPersKosong(r)).map((r) => jadiBaris({ ...r }))
@@ -145,7 +151,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setError('')
   }
 
-  useSimpanDraft(baris ? DRAFT_SALDO : null, useMemo(() => (baris ? { tanggal, baris: baris.map(bersih) } : null), [tanggal, baris]))
+  useSimpanDraft(baris ? DRAFT_SALDO : null, useMemo((): DraftSaldo | null => (baris ? { tanggal, baris: baris.map(bersih), persKunci } : null), [tanggal, baris, persKunci]))
 
   const ubah = (k: number, patch: Partial<Baris>) => setBaris((bs) => bs && bs.map((b) => (b._k === k ? { ...b, ...patch } : b)))
 
