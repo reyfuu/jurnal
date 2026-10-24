@@ -10,7 +10,7 @@ import {
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
-import { urutSaldo } from '@/lib/saldoAwal'
+import { sisipkanUrutKode, urutSaldo } from '@/lib/saldoAwal'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -90,12 +90,11 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const sisi = (id: string) => kategori.find((k) => k.id === id)?.sisi
   const asetRows: SaldoAkun[] = ((editing ? asetEdit : info?.aset_tetap) ?? [])
   const nbv = asetRows.reduce((t, r) => t + r.nominal, 0)
-  // Baris aset tetap disisipkan sesudah harta lain, sebelum kewajiban.
+  // Baris aset tetap disisipkan di antara baris harta menurut kodenya (15xx sebelum 17xx), sebelum kewajiban.
   const biasa = baris ?? []
   const pos = biasa.findIndex((b) => b.kategori && sisi(b.kategori) !== 'harta')
   const tampil: (Baris | (SaldoAkun & { _k: -1 }))[] = [
-    ...biasa.slice(0, pos < 0 ? biasa.length : pos),
-    ...asetRows.map((r) => ({ ...r, _k: -1 as const })),
+    ...sisipkanUrutKode(biasa.slice(0, pos < 0 ? biasa.length : pos), asetRows.map((r) => ({ ...r, _k: -1 as const }))),
     ...(pos < 0 ? [] : biasa.slice(pos)),
   ]
   const jumlah = (s: string) => tampil.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
