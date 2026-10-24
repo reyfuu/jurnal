@@ -62,9 +62,9 @@ func (s *Server) umurRoutes() {
 
 // lunasiTxLocked menandai transaksi belum lunas sebagai lunas pada tanggal; transaksi invoice
 // melunasi invoice-nya (DPP & PPN bersama). lawan: rekening pelunasan (impor mutasi: rekening
-// mutasinya, menggantikan Lawan yang ada); "" = Lawan yang ada atau rekening bawaan. Pelunasan
-// invoice belum memakai lawan (rekeningnya diatur sinkronisasi invoice). kode = status HTTP bila
-// gagal. s.mu dipegang.
+// mutasinya, menggantikan Lawan yang ada); "" = Lawan yang ada atau rekening bawaan. Untuk
+// transaksi invoice lawan disimpan di invoice (RekeningLunas) dan dipakai DPP & PPN-nya lewat
+// sinkronisasi invoice. kode = status HTTP bila gagal. s.mu dipegang.
 func (s *tenant) lunasiTxLocked(id int, tanggal, lawan string) (finance.Transaction, int, error) {
 	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
 	if i < 0 {
@@ -82,7 +82,7 @@ func (s *tenant) lunasiTxLocked(id int, tanggal, lawan string) (finance.Transact
 	}
 	if t.InvoiceID != 0 {
 		// Piutang dari invoice: invoice ikut lunas, transaksi DPP & PPN-nya lunas bersama.
-		if err := s.lunasiInvoiceLocked(t.InvoiceID, tanggal); err != nil {
+		if err := s.lunasiInvoiceLocked(t.InvoiceID, tanggal, lawan); err != nil {
 			return t, http.StatusConflict, err
 		}
 		if j := slices.IndexFunc(s.txs, func(x finance.Transaction) bool { return x.ID == id }); j >= 0 {

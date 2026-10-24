@@ -525,3 +525,5 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_pelanggan_id INT NOT NULL DEFA
 -- transactions.bukan_barang (field omitempty -> NULL lewat jsonb_populate_recordset).
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stok_id INT;
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS bukan_barang BOOLEAN;
+-- Rekening pelunasan invoice (impor mutasi): nullable, field omitempty.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS rekening_lunas TEXT;

@@ -130,6 +130,7 @@ func (s *tenant) tambahInvoiceLocked(inv *finance.Invoice) error {
 	inv.ID = s.nextInvoiceID
 	inv.Dibukukan = true
 	inv.TransaksiID, inv.TransaksiPPNID, inv.NoJurnal = 0, 0, ""
+	inv.RekeningLunas = "" // diatur server (pelunasan lewat impor mutasi)
 	txs, nextTx := s.txs, s.nextTxID
 	if err := s.sinkronInvoiceLocked(inv); err != nil {
 		s.txs, s.nextTxID = txs, nextTx // transaksi DPP yang sempat dibuat ikut dibatalkan
@@ -247,6 +248,10 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	// Draft belum pernah terbit, jadi belum mungkin dicatat manual: begitu dikirim langsung dibukukan.
 	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan || lama.Status == finance.StatusDraft
 	inv.TransaksiID, inv.TransaksiPPNID, inv.NoJurnal = lama.TransaksiID, lama.TransaksiPPNID, lama.NoJurnal
+	inv.RekeningLunas = "" // rekening pelunasan diatur server; tetap selama invoice masih lunas
+	if inv.Status == finance.StatusLunas {
+		inv.RekeningLunas = lama.RekeningLunas
+	}
 	// Invoice lama yang hanya dilunasi / dikirim ulang tanpa mengubah baris & tanggal tidak dicek.
 	berubah := lama.Status == finance.StatusDraft || lama.Tanggal != inv.Tanggal || !slices.Equal(lama.Items, inv.Items)
 	if berubah && inv.Dibukukan {

@@ -17,7 +17,7 @@ func TestInvoice_BarangPenjualan(t *testing.T) {
 		{Deskripsi: "Jahit", Qty: 1, HargaSatuan: 50_000, BukanBarang: true},
 	}}
 	rinci, jasa := inv.BarangPenjualan()
-	want := []finance.RincianBarang{{StokID: 1, QtyStok: 3000, Nilai: 57_143}, {StokID: 2, QtyStok: 2000, Nilai: 95_237}}
+	want := []finance.RincianBarang{{StokID: 1, QtyStok: 3000, Nilai: 57_143}, {StokID: 2, QtyStok: 2000, Nilai: 95_238}}
 	if jasa || !slices.Equal(rinci, want) {
 		t.Fatalf("rincian %+v bukan barang %v, harus %+v", rinci, jasa, want)
 	}
@@ -52,5 +52,40 @@ func TestValidateInvoice_BarangDanJasaBersamaan(t *testing.T) {
 	inv.Items[1].BukanBarang, inv.Items[1].StokID = false, -1
 	if err := finance.ValidateInvoice(&inv); err == nil {
 		t.Error("stok_id negatif harus ditolak")
+	}
+}
+
+// Pembagian diskon cara sisa terbesar (Hamilton): Σ bagian = diskon dan tidak ada baris yang
+// nilainya negatif, juga bila sisa pembulatan lebih dari satu rupiah.
+func TestInvoice_BarangPenjualanDiskonTidakNegatif(t *testing.T) {
+	inv := finance.Invoice{DiskonRp: 8, Items: []finance.InvoiceItem{
+		{Qty: 1, HargaSatuan: 3, StokID: 1}, {Qty: 1, HargaSatuan: 3, StokID: 2}, {Qty: 1, HargaSatuan: 3, StokID: 3}}}
+	r, _ := inv.BarangPenjualan()
+	var sum int64
+	for _, b := range r {
+		if b.Nilai < 0 {
+			t.Errorf("nilai negatif: %+v", r)
+		}
+		sum += b.Nilai
+	}
+	if sum != inv.Totals().DPP || sum != 1 {
+		t.Errorf("Σ nilai %d, DPP %d: %+v", sum, inv.Totals().DPP, r)
+	}
+	// Banyak baris kecil + satu besar: semua tetap ≥ 0 dan Σ = DPP.
+	besar := finance.Invoice{DiskonRp: 997}
+	for range 9 {
+		besar.Items = append(besar.Items, finance.InvoiceItem{Qty: 1, HargaSatuan: 1, StokID: 1})
+	}
+	besar.Items = append(besar.Items, finance.InvoiceItem{Qty: 1, HargaSatuan: 991, StokID: 2})
+	r, _ = besar.BarangPenjualan()
+	sum = 0
+	for _, b := range r {
+		if b.Nilai < 0 {
+			t.Errorf("nilai negatif: %+v", r)
+		}
+		sum += b.Nilai
+	}
+	if sum != besar.Totals().DPP {
+		t.Errorf("Σ nilai %d, DPP %d", sum, besar.Totals().DPP)
 	}
 }

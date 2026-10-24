@@ -95,13 +95,13 @@ func TestInvoice_RincianIkutItemDanDiskon(t *testing.T) {
 		`{"deskripsi":"Jasa jahit","qty":1,"harga_satuan":50000,"bukan_barang":true}]`
 	inv := kirimInvoice(t, srv, qa, http.MethodPost, "/api/v1/invoice", invoiceBody("INV-R-1", "terkirim", items, 10_000), http.StatusCreated)
 	tx := txTenant(t, srv, qa, inv.TransaksiID)
-	// Subtotal 210.000, diskon 10.000 → bagian 2.857 / 4.761 (+2 sisa ke baris terbesar) / 2.380.
-	want := []finance.RincianBarang{{StokID: kain.ID, QtyStok: 3000, Nilai: 57_143}, {StokID: kaos.ID, QtyStok: 2000, Nilai: 95_237}}
+	// Subtotal 210.000, diskon 10.000 → bagian 2.857 / 4.761+1 / 2.380+1 (sisa terbesar: pecahan .904 & .952).
+	want := []finance.RincianBarang{{StokID: kain.ID, QtyStok: 3000, Nilai: 57_143}, {StokID: kaos.ID, QtyStok: 2000, Nilai: 95_238}}
 	if tx.Nominal != 200_000 || tx.BukanBarang || !slices.Equal(tx.Rincian, want) {
 		t.Fatalf("transaksi invoice: nominal %d bukan barang %v rincian %+v (harus %+v)", tx.Nominal, tx.BukanBarang, tx.Rincian, want)
 	}
-	if sum := tx.Rincian[0].Nilai + tx.Rincian[1].Nilai; sum != 200_000-47_620 {
-		t.Errorf("Σ nilai rincian %d, harus DPP − bagian jasa = %d", sum, 200_000-47_620)
+	if sum := tx.Rincian[0].Nilai + tx.Rincian[1].Nilai; sum != 200_000-47_619 {
+		t.Errorf("Σ nilai rincian %d, harus DPP − bagian jasa = %d", sum, 200_000-47_619)
 	}
 	if a, b := saldoKartu(t, srv, qa, kain.ID), saldoKartu(t, srv, qa, kaos.ID); a != 7000 || b != 8000 {
 		t.Errorf("kartu Kain %d, Kaos %d (harus 7 & 8)", a, b)
@@ -289,5 +289,103 @@ func TestImportInvoice_PratinjauTidakMemulaiKartu(t *testing.T) {
 	kirim("?commit=1")
 	if n := jumlahGerakAwal(t, srv, qa); n != 1 {
 		t.Errorf("impor memulai kartu: %d stok awal", n)
+	}
+}
+
+func invoiceTenant(t *testing.T, srv *Server, qa *http.Cookie, id int) finance.Invoice {
+	t.Helper()
+	tn := tenantByEmail(t, srv, qa)
+	tn.mu.RLock()
+	defer tn.mu.RUnlock()
+	i := slices.IndexFunc(tn.invoices, func(x finance.Invoice) bool { return x.ID == id })
+	if i < 0 {
+		t.Fatalf("invoice %d tidak ada", id)
+	}
+	return tn.invoices[i]
+}
+
+// Invoice dilunasi lewat impor mutasi: rekening mutasinya disimpan di invoice (RekeningLunas) dan
+// dipakai transaksi DPP & PPN-nya, juga setelah invoice disinkron ulang. Status kembali belum
+// lunas mengosongkannya.
+func TestInvoice_LunasLewatMutasiPakaiRekening(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	items := `[{"deskripsi":"Kopi","qty":2,"harga_satuan":20000}]`
+	inv := kirimInvoice(t, srv, qa, http.MethodPost, "/api/v1/invoice", invoiceBody("INV-RK-1", "terkirim", items, 0), http.StatusCreated)
+	h := unggahMutasi(t, srv, qa, "Tanggal;Keterangan;Debet;Kredit\n15/01/2026;TRSF CR PT PEMBELI;;40.000\n")
+	r := h.Rows[0]
+	if r.Mirip == nil || r.Mirip.ID != inv.TransaksiID || !r.Mirip.BelumLunas {
+		t.Fatalf("baris harus cocok dengan piutang invoice: %+v", r.Mirip)
+	}
+	r.Pilih, r.Lunasi = true, inv.TransaksiID
+	if code, res, body := commitMutasiRekening(t, srv, qa, "1112", r); code != http.StatusOK || res.Dilunasi != 1 {
+		t.Fatalf("lunasi: %d %s", code, body)
+	}
+	if got := invoiceTenant(t, srv, qa, inv.ID); got.Status != finance.StatusLunas || got.RekeningLunas != "1112" {
+		t.Fatalf("invoice setelah dilunasi mutasi: status %q rekening %q", got.Status, got.RekeningLunas)
+	}
+	if tx := txTenant(t, srv, qa, inv.TransaksiID); !tx.Lunas || tx.Lawan != "1112" {
+		t.Fatalf("transaksi DPP: lunas %v lawan %q", tx.Lunas, tx.Lawan)
+	}
+	// Sinkron ulang dari form (form tidak mengirim rekening_lunas): rekening tetap.
+	lunas := strings.Replace(invoiceBody("INV-RK-1", "lunas", items, 0), `"ppn_bps":0`, `"ppn_bps":0,"tanggal_lunas":"2026-01-15","catatan":"ubah catatan"`, 1)
+	kirimInvoice(t, srv, qa, http.MethodPut, "/api/v1/invoice/"+itoa(inv.ID), lunas, http.StatusOK)
+	if tx := txTenant(t, srv, qa, inv.TransaksiID); tx.Lawan != "1112" {
+		t.Errorf("setelah sinkron ulang lawan %q, harus tetap 1112", tx.Lawan)
+	}
+	if s := saldoPerAkun(t, srv, qa, "2026-01"); s["1112"] != 40_000 {
+		t.Errorf("saldo rekening 1112: %d", s["1112"])
+	}
+	kirimInvoice(t, srv, qa, http.MethodPut, "/api/v1/invoice/"+itoa(inv.ID), invoiceBody("INV-RK-1", "terkirim", items, 0), http.StatusOK)
+	if got := invoiceTenant(t, srv, qa, inv.ID); got.RekeningLunas != "" {
+		t.Errorf("belum lunas lagi: rekening %q harus kosong", got.RekeningLunas)
+	}
+}
+
+// Pelunasan invoice dari Piutang & Utang yang gagal di langkah PPN tidak meninggalkan transaksi
+// DPP yang sudah terlanjur lunas.
+func TestInvoice_LunasiGagalPPNDipulihkan(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", strings.Replace(manufakturPeriodik, `"pkp":false`, `"pkp":true`, 1)); rec.Code != http.StatusOK {
+		t.Fatalf("profil PKP: %d %s", rec.Code, rec.Body)
+	}
+	body := strings.Replace(invoiceBody("INV-G-1", "terkirim", `[{"deskripsi":"Kopi","qty":1,"harga_satuan":100000}]`, 0), `"ppn_bps":0`, `"ppn_bps":1100`, 1)
+	inv := kirimInvoice(t, srv, qa, http.MethodPost, "/api/v1/invoice", body, http.StatusCreated)
+	if inv.TransaksiPPNID == 0 {
+		t.Fatalf("invoice PKP tanpa transaksi PPN: %+v", inv)
+	}
+	tn := tenantByEmail(t, srv, qa)
+	tn.mu.Lock() // transaksi PPN-nya terlanjur di bulan yang sudah ditutup
+	for i := range tn.txs {
+		if tn.txs[i].ID == inv.TransaksiPPNID {
+			tn.txs[i].Tanggal = "2025-12-10"
+		}
+	}
+	tn.tutupBuku = "2025-12"
+	tn.mu.Unlock()
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/transactions/"+itoa(inv.TransaksiID)+"/lunas", `{"tanggal":"2026-01-20"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("lunasi harus gagal: %d %s", rec.Code, rec.Body)
+	}
+	if tx := txTenant(t, srv, qa, inv.TransaksiID); tx.Lunas {
+		t.Errorf("transaksi DPP tertinggal lunas: %+v", tx)
+	}
+	if got := invoiceTenant(t, srv, qa, inv.ID); got.Status != finance.StatusTerkirim {
+		t.Errorf("invoice berubah status: %q", got.Status)
+	}
+}
+
+// Invoice ber-DPP 0 (mis. barang gratis, atau diskon sebesar subtotal) tidak membuat transaksi
+// Penjualan, jadi kartu stok tidak bergerak. Perilaku saat ini, sengaja didokumentasikan.
+func TestInvoice_DPPNolTidakMenggerakkanKartu(t *testing.T) {
+	srv, qa, kain := perpetualKartuMulai(t, "2026-01-01")
+	for _, b := range []string{
+		invoiceBody("INV-0-1", "terkirim", `[{"deskripsi":"Kain gratis","qty":2,"harga_satuan":0,"stok_id":`+itoa(kain.ID)+`}]`, 0),
+		invoiceBody("INV-0-2", "terkirim", `[{"deskripsi":"Kain","qty":2,"harga_satuan":5000,"stok_id":`+itoa(kain.ID)+`}]`, 10_000),
+	} {
+		if inv := kirimInvoice(t, srv, qa, http.MethodPost, "/api/v1/invoice", b, http.StatusCreated); inv.TransaksiID != 0 {
+			t.Errorf("invoice DPP 0 membuat transaksi %d", inv.TransaksiID)
+		}
+	}
+	if q := saldoKartu(t, srv, qa, kain.ID); q != 10_000 {
+		t.Errorf("kartu Kain %d, harus tetap 10 m", q)
 	}
 }

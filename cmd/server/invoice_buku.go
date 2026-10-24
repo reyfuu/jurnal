@@ -26,12 +26,20 @@ func (s *tenant) sinkronInvoiceLocked(inv *finance.Invoice) error {
 	tot := inv.Totals()
 	aktif := inv.Status != finance.StatusDraft
 	lunas := inv.Status == finance.StatusLunas
+	// Rekening pelunasan dari impor mutasi; kosong = Lawan transaksi yang ada atau rekening bawaan.
+	lawan := ""
+	if lunas {
+		lawan = inv.RekeningLunas
+	}
 	jual := finance.Transaction{
 		Tanggal: inv.Tanggal, Jenis: "Penjualan", Nominal: tot.DPP, Keterangan: "Invoice " + inv.Nomor,
 		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
+		Lawan: lawan,
 	}
 	jual.Rincian, jual.BukanBarang = inv.BarangPenjualan()
 	var awal *finance.GerakStok
+	// DPP 0 (barang gratis / diskon sebesar subtotal): tidak ada transaksi Penjualan, jadi barangnya
+	// juga tidak menggerakkan kartu stok (perilaku saat ini; TestInvoice_DPPNolTidakMenggerakkanKartu).
 	if aktif && tot.DPP > 0 {
 		var err error
 		if awal, err = s.cekStokInvoiceLocked(inv.TransaksiID, jual); err != nil {
@@ -44,6 +52,7 @@ func (s *tenant) sinkronInvoiceLocked(inv *finance.Invoice) error {
 	if err := s.jagaTxInvoiceLocked(&inv.TransaksiPPNID, aktif && tot.PPN > 0, finance.Transaction{
 		Tanggal: inv.Tanggal, Jenis: "PPN Keluaran", Nominal: tot.PPN, Keterangan: "PPN invoice " + inv.Nomor,
 		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
+		Lawan: lawan,
 	}); err != nil {
 		return err
 	}
@@ -125,15 +134,22 @@ func (s *tenant) jagaTxInvoiceLocked(id *int, ada bool, t finance.Transaction) e
 }
 
 // lunasiInvoiceLocked: transaksi invoice dilunasi dari Piutang & Utang → invoice lunas pada
-// tanggal itu dan transaksi pasangannya (DPP / PPN) ikut lunas.
-func (s *tenant) lunasiInvoiceLocked(invoiceID int, tanggal string) error {
+// tanggal itu dan transaksi pasangannya (DPP / PPN) ikut lunas. lawan: rekening pelunasan (impor
+// mutasi), disimpan di invoice supaya sinkron berikutnya tetap memakainya; "" = tidak diubah.
+// Gagal (mis. langkah PPN) = transaksi dipulihkan, invoice tidak berubah.
+func (s *tenant) lunasiInvoiceLocked(invoiceID int, tanggal, lawan string) error {
 	i := slices.IndexFunc(s.invoices, func(x finance.Invoice) bool { return x.ID == invoiceID })
 	if i < 0 {
 		return nil
 	}
 	inv := s.invoices[i]
 	inv.Status, inv.TanggalLunas = finance.StatusLunas, tanggal
+	if lawan != "" {
+		inv.RekeningLunas = lawan
+	}
+	txs, nextTx := slices.Clone(s.txs), s.nextTxID
 	if err := s.sinkronInvoiceLocked(&inv); err != nil {
+		s.txs, s.nextTxID = txs, nextTx
 		return err
 	}
 	s.invoices[i] = inv
