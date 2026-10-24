@@ -41,7 +41,7 @@ func (s *tenant) handleLunasi(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.PathValue("id"))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	t, kode, err := s.lunasiTxLocked(id, b.Tanggal)
+	t, kode, err := s.lunasiTxLocked(id, b.Tanggal, "")
 	if err != nil {
 		http.Error(w, err.Error(), kode)
 		return
@@ -61,8 +61,11 @@ func (s *Server) umurRoutes() {
 }
 
 // lunasiTxLocked menandai transaksi belum lunas sebagai lunas pada tanggal; transaksi invoice
-// melunasi invoice-nya (DPP & PPN bersama). kode = status HTTP bila gagal. s.mu dipegang.
-func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, int, error) {
+// melunasi invoice-nya (DPP & PPN bersama). lawan: rekening pelunasan (impor mutasi: rekening
+// mutasinya, menggantikan Lawan yang ada); "" = Lawan yang ada atau rekening bawaan. Pelunasan
+// invoice belum memakai lawan (rekeningnya diatur sinkronisasi invoice). kode = status HTTP bila
+// gagal. s.mu dipegang.
+func (s *tenant) lunasiTxLocked(id int, tanggal, lawan string) (finance.Transaction, int, error) {
 	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id })
 	if i < 0 {
 		return finance.Transaction{}, http.StatusNotFound, errors.New("transaksi tidak ditemukan")
@@ -87,6 +90,9 @@ func (s *tenant) lunasiTxLocked(id int, tanggal string) (finance.Transaction, in
 		}
 	}
 	t.Lunas = true
+	if lawan != "" {
+		t.Lawan = lawan
+	}
 	s.pakaiRekeningBawaanLocked(&t, "") // dilunasi lewat Bank kecuali rekeningnya sudah dipilih
 	if tanggal != t.Tanggal {
 		t.TanggalLunas = tanggal

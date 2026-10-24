@@ -7,10 +7,11 @@ export type AksiMutasi = 'lewati' | 'lunasi' | 'pindah' | 'baru'
 
 type BarisAksi = { pilih: boolean; lunasi?: number; pindah?: number }
 
-/** Akun bayar transaksi yang cocok boleh dipindah ke rekening: transaksi lunas biasa (bukan
- *  invoice, catatan multi-akun, atau Pindah Dana) yang akun bayarnya berbeda (aturan server sama). */
+/** Akun bayar transaksi yang cocok boleh dipindah ke rekening: transaksi lunas (bukan invoice,
+ *  biaya lain produksi, channel khusus, atau Pindah Dana) yang akun bayarnya berbeda (aturan
+ *  server sama). Catatan Catat cepat boleh. */
 export const bolehPindah = (m: Mirip | undefined, rekening: string) =>
-  !!m && !!rekening && !m.belum_lunas && !m.invoice_id && !m.grup && m.jenis !== 'Pindah Dana' && m.lawan !== rekening
+  !!m && !!rekening && !m.belum_lunas && !m.invoice_id && !m.produksi && !m.khusus && m.jenis !== 'Pindah Dana' && m.lawan !== rekening
 
 export const aksiMutasi = (r: BarisAksi): AksiMutasi => (!r.pilih ? 'lewati' : r.lunasi ? 'lunasi' : r.pindah ? 'pindah' : 'baru')
 

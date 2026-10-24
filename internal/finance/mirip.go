@@ -30,10 +30,15 @@ type Mirip struct {
 	// BelumLunas: transaksi masih piutang/utang — mutasi ini bisa dicatat sebagai pelunasannya.
 	BelumLunas bool `json:"belum_lunas"`
 	// Lawan: rekening kas/bank transaksi itu (Transaction.Lawan; pratinjau mutasi di server
-	// mengisinya dengan akun bayar efektif). Grup: transaksi bagian catatan jurnal multi-akun.
-	// Keduanya dipakai menawarkan "sama — pindah akun bayar" di impor mutasi.
-	Lawan string `json:"lawan,omitempty"`
-	Grup  int    `json:"grup,omitempty"`
+	// mengisinya dengan akun bayar efektif). Grup: catatan jurnal (Catat cepat) atau biaya lain
+	// produksi tempat transaksi itu berada (Transaction.Grup). Produksi / Khusus diisi pratinjau
+	// mutasi di server: transaksi biaya lain produksi / ber-channel khusus (marketplace, B2B) yang
+	// akun bayarnya tidak bisa dipindah dari impor mutasi. Dipakai menawarkan "sama — pindah akun
+	// bayar".
+	Lawan    string `json:"lawan,omitempty"`
+	Grup     int    `json:"grup,omitempty"`
+	Produksi bool   `json:"produksi,omitempty"`
+	Khusus   bool   `json:"khusus,omitempty"`
 }
 
 func selisihHari(a, b string) int {

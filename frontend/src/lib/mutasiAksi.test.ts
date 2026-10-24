@@ -11,7 +11,9 @@ describe('aksi baris mutasi yang diduga sudah tercatat', () => {
     expect(bolehPindah(kas, '1102')).toBe(false) // sudah di rekening ini
     expect(bolehPindah(kas, '')).toBe(false) // rekening belum dimuat
     expect(bolehPindah({ ...kas, invoice_id: 3 }, '1111')).toBe(false)
-    expect(bolehPindah({ ...kas, grup: 4 }, '1111')).toBe(false)
+    expect(bolehPindah({ ...kas, grup: 4 }, '1111')).toBe(true) // catatan Catat cepat
+    expect(bolehPindah({ ...kas, grup: 4, produksi: true }, '1111')).toBe(false)
+    expect(bolehPindah({ ...kas, khusus: true }, '1111')).toBe(false)
     expect(bolehPindah({ ...kas, belum_lunas: true }, '1111')).toBe(false) // itu pelunasan
     expect(bolehPindah({ ...kas, jenis: 'Pindah Dana' }, '1111')).toBe(false)
     expect(bolehPindah(undefined, '1111')).toBe(false)

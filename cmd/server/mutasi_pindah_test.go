@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -157,5 +158,121 @@ func TestMutasi_TransaksiBaruPakaiRekeningTerpilih(t *testing.T) {
 	}
 	if s := saldoPerAkun(t, srv, qa, "2026-01"); s["1112"] != -10000 || s["1111"] != -10000 {
 		t.Errorf("saldo payroll %d operasional %d", s["1112"], s["1111"])
+	}
+}
+
+// Catat cepat dibayar dari Kas Besar: akun bayarnya boleh dipindah; catatan yang dibuka ulang
+// menunjukkan baris rekening 1111.
+func TestMutasi_PindahCatatCepatKas(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/catat", `{"tanggal":"2026-01-10","keterangan":"Listrik","baris":[{"akun":"6190","debit":500000},{"akun":"1102","kredit":500000}]}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("catat: %d %s", rec.Code, rec.Body)
+	}
+	var c catatResp
+	_ = json.Unmarshal(rec.Body.Bytes(), &c)
+	sebelum := saldoPerAkun(t, srv, qa, "2026-01")
+	h := unggahMutasi(t, srv, qa, csvListrik)
+	m := h.Rows[0].Mirip
+	if m == nil || m.Grup != c.Grup || m.Lawan != "1102" || m.Produksi || m.Khusus {
+		t.Fatalf("baris harus cocok dengan catatan (lawan 1102): %+v", m)
+	}
+	r := h.Rows[0]
+	r.Pilih, r.Pindah = true, m.ID
+	if code, res, body := commitMutasiRekening(t, srv, qa, "1111", r); code != http.StatusOK || res.Dipindah != 1 || len(res.Errors) != 0 {
+		t.Fatalf("commit: %d %s", code, body)
+	}
+	if got := txsOf(t, srv, qa); len(got) != 1 || got[0].Lawan != "1111" || got[0].Grup != c.Grup {
+		t.Fatalf("transaksi sesudah pindah: %+v", got)
+	}
+	g := getJSON[catatResp](t, srv, qa, "/api/v1/catat/"+strconv.Itoa(c.Grup))
+	ada := false
+	for _, b := range g.Baris {
+		ada = ada || (b.Akun == "1111" && b.Kredit == 500000)
+		if b.Akun == "1102" {
+			t.Errorf("baris Kas Besar masih ada: %+v", g.Baris)
+		}
+	}
+	if !ada {
+		t.Errorf("catatan tanpa baris 1111: %+v", g.Baris)
+	}
+	sesudah := saldoPerAkun(t, srv, qa, "2026-01")
+	if sesudah["1102"]-sebelum["1102"] != 500000 || sesudah["1111"]-sebelum["1111"] != -500000 {
+		t.Errorf("saldo kas %d→%d, bank %d→%d", sebelum["1102"], sesudah["1102"], sebelum["1111"], sesudah["1111"])
+	}
+}
+
+// Biaya lain produksi diubah lewat riwayat produksi, bukan dari impor mutasi.
+func TestMutasi_PindahBiayaProduksiDitolak(t *testing.T) {
+	srv, qa, kain, pKaos := siapProduksiKaos(t)
+	body := `{"tanggal":"2026-01-05","bayar_dari":"1102","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":10000}],` +
+		`"biaya":[{"keterangan":"Upah jahit","nominal":20000}]}]}`
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body); rec.Code != http.StatusCreated {
+		t.Fatalf("catat produksi: %d %s", rec.Code, rec.Body)
+	}
+	biaya := txBiayaProduksi(t, srv, qa)
+	if len(biaya) != 1 || biaya[0].Lawan != "1102" {
+		t.Fatalf("biaya produksi: %+v", biaya)
+	}
+	h := unggahMutasi(t, srv, qa, "Tanggal;Keterangan;Debet;Kredit\n06/01/2026;TRSF UPAH JAHIT;20.000;\n")
+	m := h.Rows[0].Mirip
+	if m == nil || m.ID != biaya[0].ID || !m.Produksi {
+		t.Fatalf("baris harus cocok dengan biaya produksi: %+v", m)
+	}
+	r := h.Rows[0]
+	r.Pilih, r.Pindah = true, m.ID
+	code, _, resp := commitMutasiRekening(t, srv, qa, "1111", r)
+	if code != http.StatusBadRequest || !strings.Contains(resp, errBiayaProduksi.Error()) {
+		t.Fatalf("pindah biaya produksi: %d %s", code, resp)
+	}
+	if got := txBiayaProduksi(t, srv, qa); got[0].Lawan != "1102" {
+		t.Errorf("biaya produksi ikut dipindah: %+v", got)
+	}
+}
+
+// Channel marketplace / B2B: uangnya di akun channel, pindah ditolak (dan disembunyikan di UI).
+func TestMutasi_PindahChannelKhususDitolak(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	jual := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", `{"tanggal":"2026-01-10","jenis":"Pendapatan Lain","nominal":300000,"lunas":true,"channel":"GoFood"}`)
+	h := unggahMutasi(t, srv, qa, "Tanggal;Keterangan;Debet;Kredit\n11/01/2026;TRSF CR GOFOOD;;300.000\n")
+	m := h.Rows[0].Mirip
+	if m == nil || m.ID != jual.ID || !m.Khusus {
+		t.Fatalf("baris harus cocok dengan transaksi GoFood: %+v", m)
+	}
+	r := h.Rows[0]
+	r.Pilih, r.Pindah = true, m.ID
+	code, _, resp := commitMutasiRekening(t, srv, qa, "1111", r)
+	if code != http.StatusBadRequest || !strings.Contains(resp, "lewat channel GoFood") {
+		t.Fatalf("pindah channel khusus: %d %s", code, resp)
+	}
+}
+
+// Pelunasan lewat mutasi memakai rekening mutasi; ID yang sama di dua baris hanya dipindah sekali.
+func TestMutasi_LunasiPakaiRekeningTerpilih(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	utang := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", `{"tanggal":"2026-01-10","jenis":"Biaya Lain","nominal":500000,"lunas":false}`)
+	h := unggahMutasi(t, srv, qa, "Tanggal;Keterangan;Debet;Kredit\n15/01/2026;BAYAR TAGIHAN;500.000;\n")
+	if m := h.Rows[0].Mirip; m == nil || m.ID != utang.ID || !m.BelumLunas {
+		t.Fatalf("baris harus cocok dengan utang: %+v", m)
+	}
+	r := h.Rows[0]
+	r.Pilih, r.Lunasi = true, utang.ID
+	if code, res, body := commitMutasiRekening(t, srv, qa, "1112", r); code != http.StatusOK || res.Dilunasi != 1 {
+		t.Fatalf("lunasi: %d %s", code, body)
+	}
+	if got := txsOf(t, srv, qa); len(got) != 1 || !got[0].Lunas || got[0].Lawan != "1112" {
+		t.Fatalf("pelunasan: %+v", got)
+	}
+	if s := saldoPerAkun(t, srv, qa, "2026-01"); s["1112"] != -500000 || s["1111"] != 0 {
+		t.Errorf("saldo payroll %d operasional %d", s["1112"], s["1111"])
+	}
+
+	manual := catatLama(t, srv, qa, `{"tanggal":"2026-01-20","jenis":"Biaya Lain","nominal":70000,"lunas":true}`)
+	a := finance.MutasiRow{Baris: 2, Tanggal: "2026-01-21", Jenis: "Biaya Lain", Nominal: 70000, Arah: "keluar", Pilih: true, Pindah: manual.ID}
+	b := a
+	b.Baris = 3
+	code, res, body := commitMutasiRekening(t, srv, qa, "1111", a, b)
+	if code != http.StatusOK || res.Dipindah != 1 || len(res.Errors) != 1 || res.Errors[0].Baris != 3 {
+		t.Fatalf("pindah dobel: %d %s", code, body)
 	}
 }

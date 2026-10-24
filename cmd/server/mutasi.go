@@ -30,6 +30,8 @@ import (
 // dibaca ulang, koreksi pengguna akan hilang dan tebakan mesin yang dibukukan — padahal
 // seluruh gunanya langkah pratinjau justru supaya tebakan itu bisa diperbaiki.
 
+var errBiayaProduksi = errors.New("catatan ini biaya lain produksi; ubah lewat Produksi & Supplier → riwayat produksi")
+
 var errPDFTanpaBaris = errors.New("tidak ada baris transaksi di PDF ini. Pastikan ini PDF mutasi / rekening koran (baris transaksi diawali tanggal), atau pakai mutasi .xlsx / .csv")
 
 // maxUnggahMutasi: PDF hasil scan jauh lebih besar dari e-statement biasa.
@@ -189,6 +191,12 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request, scan baca
 		awal = s.opening.Tanggal
 	}
 	peta := coa.PetaDari(s.akunLocked())
+	produksi := map[int]bool{}
+	for _, g := range s.gerak {
+		if g.Grup != 0 {
+			produksi[g.Grup] = true
+		}
+	}
 	s.mu.RUnlock()
 	h := finance.ParseMutasi(rows, tahun, existing)
 	// Akun bayar efektif transaksi yang cocok (Lawan kosong = aturan channel / Kas), supaya klien
@@ -197,6 +205,8 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request, scan baca
 		if m := h.Rows[i].Mirip; m != nil && !m.BelumLunas {
 			if j := slices.IndexFunc(existing, func(t finance.Transaction) bool { return t.ID == m.ID }); j >= 0 {
 				m.Lawan = coa.AkunBayar(existing[j], peta)
+				m.Produksi = existing[j].Grup != 0 && produksi[existing[j].Grup]
+				m.Khusus = coa.ChannelKhusus(existing[j].Channel)
 			}
 		}
 	}
@@ -279,6 +289,10 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	// Pindah akun bayar diperiksa dulu (tanpa mengubah apa pun), diterapkan sesudah cek stok.
 	var dipindah []int
 	for _, r := range pindah {
+		if slices.Contains(dipindah, r.Pindah) {
+			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: "transaksi #" + strconv.Itoa(r.Pindah) + " sudah dipindah oleh baris lain; baris ini dilewati"})
+			continue
+		}
 		if err := s.cekPindahMutasiLocked(r, rekening); err != nil {
 			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: err.Error()})
 			continue
@@ -324,7 +338,7 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: "transaksi #" + strconv.Itoa(r.Lunasi) + " tidak cocok lagi untuk dilunasi (nominal/arah beda atau sudah lunas); baris ini dilewati"})
 			continue
 		}
-		if _, _, err := s.lunasiTxLocked(r.Lunasi, r.Tanggal); err != nil {
+		if _, _, err := s.lunasiTxLocked(r.Lunasi, r.Tanggal, rekening); err != nil {
 			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: err.Error()})
 			continue
 		}
@@ -364,8 +378,10 @@ func (s *tenant) rekeningMutasiLocked(kode string) (string, error) {
 	return kode, nil
 }
 
-// cekPindahMutasiLocked: nil bila akun bayar transaksi r.Pindah boleh dipindah ke rekening: masih cocok (CariMirip, sudah lunas), bukan transaksi invoice / catatan
-// multi-akun / Pindah Dana, dan bulannya belum ditutup. Tidak mengubah apa pun. s.mu dipegang.
+// cekPindahMutasiLocked: nil bila akun bayar transaksi r.Pindah boleh dipindah ke rekening:
+// masih cocok (CariMirip, sudah lunas), bukan transaksi invoice / biaya lain produksi / Pindah
+// Dana / ber-channel khusus, dan bulannya belum ditutup. Catatan Catat cepat (Grup) boleh: baris
+// rekeningnya ikut berganti saat catatan dibuka ulang. Tidak mengubah apa pun. s.mu dipegang.
 func (s *tenant) cekPindahMutasiLocked(r finance.MutasiRow, rekening string) error {
 	id := strconv.Itoa(r.Pindah)
 	if rekening == "" {
@@ -376,14 +392,20 @@ func (s *tenant) cekPindahMutasiLocked(r finance.MutasiRow, rekening string) err
 		return errors.New("transaksi #" + id + " tidak cocok lagi dengan baris ini (nominal/arah/tanggal beda atau belum lunas); baris ini dilewati")
 	}
 	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == r.Pindah })
+	if i < 0 {
+		return errors.New("transaksi #" + id + " tidak ditemukan; baris ini dilewati")
+	}
 	t := s.txs[i]
 	switch {
 	case t.InvoiceID != 0:
 		return errTxInvoice
-	case t.Grup != 0:
-		return errTxGrup
+	case t.Grup != 0 && slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool { return g.Grup == t.Grup }):
+		return errBiayaProduksi
 	case t.Jenis == finance.JenisPindahDana:
 		return errors.New("transaksi #" + id + " adalah Pindah Dana; ubah rekeningnya lewat menu Transaksi")
+	case coa.ChannelKhusus(t.Channel):
+		// pakaiRekeningBawaanLocked mengosongkan Lawan channel ini saat diubah: pindah akan hilang.
+		return errors.New("transaksi #" + id + " lewat channel " + t.Channel + "; uangnya tercatat di akun channel itu, bukan di rekening mutasi")
 	}
 	if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
 		return err

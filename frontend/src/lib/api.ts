@@ -1402,8 +1402,9 @@ export interface MutasiRow {
 export interface Mirip {
   id: number; invoice_id?: number; tanggal: string; jenis: string; keterangan?: string; pihak?: string
   nominal: number; sumber?: 'mutasi' | 'foto'; belum_lunas: boolean
-  /** Akun kas/bank tempat transaksi itu dibayar; grup = bagian catatan jurnal multi-akun. */
-  lawan?: string; grup?: number
+  /** Akun kas/bank tempat transaksi itu dibayar; grup = catatan jurnal / biaya produksinya;
+   *  produksi = biaya lain produksi, khusus = channel marketplace / B2B (akun bayar tak bisa dipindah). */
+  lawan?: string; grup?: number; produksi?: boolean; khusus?: boolean
 }
 export const cariMirip = (tanggal: string, nominal: number, arah: 'masuk' | 'keluar', kecualiGrup?: number) =>
   api<Mirip[]>(`/transactions/mirip?tanggal=${tanggal}&nominal=${nominal}&arah=${arah}${kecualiGrup ? `&kecuali_grup=${kecualiGrup}` : ''}`)
