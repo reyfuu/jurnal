@@ -60,7 +60,7 @@
 
 - [ ] **Step 1: Tes** `TestBarisBarang_DataLamaJadiSatuBaris` (StokID 3, QtyStok 2000, Nominal 50.000 → `[{3,2000,50000}]`), `TestNormalkanBarang` (hasil `BarisBarang()` sebelum = sesudah normalisasi; Review Focus 1), `TestValidate_Rincian` (tabel: rincian+stok_id → galat; qty 0 → galat; Σ nilai 120.000 > Nominal 100.000 → galat; rincian pada "Gaji & Upah" → galat; bukan_barang + rincian → galat; dua baris 60.000+40.000 Nominal 100.000 → sah), `TestStok_TidakBolehHapusBarangDiRincian` (server: barang hanya muncul di `rincian` transaksi → DELETE 409), dan tambah `rincian`/`bukan_barang` ke `TestPostgresSimpanMuatSemuaField`.
 - [ ] **Step 2:** `go test ./internal/finance ./cmd/server -run 'BarisBarang|Validate_Rincian|TidakBolehHapusBarangDiRincian|PostgresSimpanMuat'` → FAIL
-- [ ] **Step 3:** Implementasi; `validStok` memeriksa setiap baris `BarisBarang()`; `stokDipakai` juga; `schema.sql`: `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rincian JSONB`, `... bukan_barang BOOLEAN NOT NULL DEFAULT false`.
+- [ ] **Step 3:** Implementasi; `validStok` memeriksa setiap baris `BarisBarang()`; `stokDipakai` juga; `schema.sql`: `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rincian JSONB`, `... bukan_barang BOOLEAN` (nullable: tag omitempty + jsonb_populate_recordset menghasilkan NULL, bukan DEFAULT).
 - [ ] **Step 4:** `go test ./internal/... ./cmd/server` → PASS; `cd frontend && npx tsc -b`
 - [ ] **Step 5: Commit** `feat(transaksi): rincian barang & tanda bukan barang`
 
@@ -193,7 +193,7 @@
 - Aturan wajib (perpetual, tanggal ≥ mulai kartu, saat status bukan draft): tiap item harus `StokID` atau `BukanBarang`; galat 400 `"baris N: pilih barang atau tandai Bukan barang (jasa)"`. Invoice lama yang sudah dibukukan dan tidak diubah tidak diblokir saat sinkron.
 - Impor invoice: kolom opsional `barang` (SKU/nama) per baris item; `jasa` = bukan barang.
 - UI: tiap baris item mendapat select barang (+ `"+ Barang baru"` via `BarangBaruDialog`) dan pilihan `"Bukan barang (jasa)"`; memilih barang mengisi deskripsi, satuan, harga jual bila masih kosong.
-- Postgres: `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stok_id INT`, `... bukan_barang BOOLEAN NOT NULL DEFAULT false`.
+- Postgres: `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stok_id INT`, `... bukan_barang BOOLEAN` (nullable: tag omitempty + jsonb_populate_recordset menghasilkan NULL, bukan DEFAULT).
 
 - [ ] **Step 1: Tes** `TestInvoice_PerpetualItemWajibBarang`, `TestInvoice_RincianIkutItemDanDiskon` (2 item barang + 1 jasa, diskon Rp10.000 → rincian 2 baris, Σ nilai = DPP − nilai jasa setelah diskon proporsional), `TestInvoice_UbahItemKartuIkut` (Review Focus 3), `TestInvoice_LamaTanpaBarangTetapSinkron`, `TestParseInvoiceFile_KolomBarang`, pgstore round-trip item `stok_id`.
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** → PASS (+ tsc/vitest/oxlint)
