@@ -7,12 +7,23 @@ import { formatRp } from '@/lib/format'
 
 type Periode = 'bulanan' | 'tahunan'
 
-// Isi tiap tingkat (sama dengan landing page). Fitur bertanda segera = belum bisa dipakai;
-// semua paket saat ini membuka seluruh aplikasi.
-const TINGKAT: { id: string; nama: string; populer?: boolean; fitur: [string, segera?: boolean][] }[] = [
-  { id: 'starter', nama: 'Starter', fitur: [['Foto nota via WhatsApp jadi jurnal', true], ['4 laporan keuangan otomatis'], ['Konsultan Pajak AI'], ['Zoom mingguan bersama tim ahli']] },
-  { id: 'pro', nama: 'Pro', populer: true, fitur: [['Semua fitur Starter'], ['Pajak masukan otomatis jadi kredit pajak', true], ['Rekonsiliasi bulanan vs tahunan'], ['Ekspor XML siap Coretax', true]] },
-  { id: 'premium', nama: 'Premium Master', fitur: [['Semua fitur Pro'], ['Akses webinar eksklusif'], ['Pembahasan SP2DK dan ekualisasi'], ['Pendampingan pemeriksaan dan audit']] },
+// Isi tiap tingkat (sama dengan landing page). Fitur bertanda segera = belum bisa dipakai.
+// Rekonsiliasi ada di daftar Pro karena server membatasinya untuk Pro/VIP (lihat pro di billing.go).
+const TINGKAT: { id: string; nama: string; untuk: string; populer?: boolean; fitur: [string, segera?: boolean][] }[] = [
+  {
+    id: 'starter', nama: 'Starter', untuk: 'Untuk usaha dengan omzet di bawah Rp4,8 miliar per tahun, belum PKP',
+    fitur: [['Foto nota via sistem jadi jurnal', true], ['4 laporan otomatis: keuangan, laba rugi, neraca, jurnal penutup'], ['Kalkulator pajak & kalkulator UMKM'],
+      ['Konsultan Pajak AI untuk konsultasi ringan'], ['Masukan keuangan & perpajakan dari AI'], ['Ekspor XML siap Coretax', true]],
+  },
+  {
+    id: 'pro', nama: 'Pro', populer: true, untuk: 'Untuk usaha dengan omzet di atas Rp4,8 miliar per tahun, sudah PKP',
+    fitur: [['Semua fitur Starter'], ['Kelas Zoom tiap minggu dengan materi yang telah ditentukan'], ['Pajak masukan otomatis jadi kredit pajak', true], ['Rekonsiliasi bulanan vs tahunan']],
+  },
+  {
+    id: 'premium', nama: 'VIP', untuk: 'Untuk bisnis yang sedang tumbuh dan butuh bantuan menyelesaikan masalah pajak',
+    fitur: [['Semua fitur Pro'], ['Akses webinar Zoom eksklusif'], ['Zoom konsultasi berkelompok dengan konsultan ex petugas DJP, sharing masalah pajak'],
+      ['Pembahasan SP2DK dan ekualisasi'], ['Pendampingan pemeriksaan dan audit']],
+  },
 ]
 
 const periodeDari = (p: Paket): Periode => (p.hari >= 365 ? 'tahunan' : 'bulanan')
@@ -62,10 +73,11 @@ export function PaketHarga({ paket, onPilih, label, busy, disabled, pilihan }: {
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[var(--yellow-500)] px-3 py-1 text-xs font-bold text-[var(--navy-900)]">Paling populer</span>
               )}
               <h3 className="font-heading text-[19px] font-semibold">{t.nama}</h3>
+              <p className="text-sm leading-normal text-[var(--text-secondary)] @3xl:min-h-[4.5em]">{t.untuk}</p>
               {p.harga_normal ? (
                 <div className="text-base font-medium text-[var(--text-secondary)] line-through decoration-[var(--error)] decoration-2">{formatRp(p.harga_normal)}</div>
               ) : null}
-              <div className="font-heading text-4xl font-bold leading-none text-[var(--text-brand)] tabular">
+              <div className="font-heading whitespace-nowrap text-[clamp(26px,2.6vw,31px)] font-bold leading-[1.1] tracking-[-0.01em] text-[var(--text-brand)] tabular">
                 {formatRp(p.harga)} <small className="font-sans text-sm font-medium text-[var(--text-secondary)]">/ {periode === 'bulanan' ? 'bulan' : 'tahun'}</small>
               </div>
               <p className="-mt-1.5 min-h-[1.4em] text-[13px] text-[var(--text-muted)]">{alt}</p>

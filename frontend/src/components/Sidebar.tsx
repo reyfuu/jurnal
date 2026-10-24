@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, Lock, LogOut, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { BEBAS_TERKUNCI, MENU_INDUK, NAV, NAV_CATAT, NAV_COBA } from '@/lib/nav'
+import { BEBAS_TERKUNCI, bolehView, MENU_INDUK, NAV, NAV_CATAT, NAV_COBA } from '@/lib/nav'
 import type { Dashboard, Me, View } from '@/lib/api'
 
 interface Props {
@@ -44,7 +44,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci, onCa
 
         <nav className="sidebar-nav">
         {(terkunci ? [NAV_COBA, ...NAV] : NAV).map((g) => {
-          const items = g.items.filter((i) => me.views.includes(i.view) || (terkunci && g === NAV_COBA))
+          const items = g.items.filter((i) => bolehView(me.views, i.view) || (terkunci && g === NAV_COBA))
           if (items.length === 0) return null
           // Grup satu menu (Ringkasan) & menu coba gratis tampil langsung, tanpa kepala grup.
           const GrupIcon = (g as { icon?: LucideIcon }).icon

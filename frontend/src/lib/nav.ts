@@ -1,7 +1,7 @@
 import {
   ArrowLeftRight, BookOpen, CalendarCheck, Gift, MessageSquareText, Sparkles, Bug, FileCheck2, Library, CreditCard, Building2, ChartColumn, Database, Factory, FileText, Files, LayoutGrid, LibraryBig, Package,
   Landmark, ListFilter, NotebookPen, Settings, BookOpenText, NotebookText, Receipt, Shield, SlidersVertical, SquarePercent, Target, Upload, UserCog, Users, type LucideIcon,
-  ArrowDownLeft, ArrowUpRight, ClipboardCheck, HandCoins, ShoppingCart,
+  ArrowDownLeft, ArrowUpRight, ClipboardCheck, Contact, HandCoins, ShoppingCart,
 } from 'lucide-react'
 import type { View } from './api'
 
@@ -28,8 +28,15 @@ export const NAV: { group: string; icon?: LucideIcon; items: { view: View; label
       { view: 'produksi-supplier', label: 'Produksi & Supplier', icon: Factory },
     ],
   },
-  // Satu menu Tagihan (checklist No 13): halaman bertab Invoice · Piutang & Utang · Pelanggan.
-  { group: 'Tagihan', items: [{ view: 'invoice', label: 'Tagihan', icon: Receipt }] },
+  {
+    group: 'Tagihan',
+    icon: Receipt,
+    items: [
+      { view: 'invoice', label: 'Invoice', icon: Receipt },
+      { view: 'piutang-utang', label: 'Piutang & Utang', icon: HandCoins },
+      { view: 'pelanggan', label: 'Pelanggan', icon: Contact },
+    ],
+  },
   {
     group: 'Laporan',
     icon: FileText,
@@ -82,7 +89,11 @@ export const VIEW_LABEL = {
 } as Record<View, string>
 
 /** View yang tampil sebagai tab menu lain: sorot menu induknya di sidebar. */
-export const MENU_INDUK: Partial<Record<View, View>> = { 'piutang-utang': 'invoice' }
+export const MENU_INDUK: Partial<Record<View, View>> = {}
+
+/** Halaman tanpa izin sendiri: izinnya ikut halaman lain (Pelanggan = izin Invoice). */
+export const IZIN_VIEW: Partial<Record<View, View>> = { pelanggan: 'invoice' }
+export const bolehView = (views: readonly View[], v: View) => views.includes(IZIN_VIEW[v] ?? v)
 
 /** Catat cepat (dulu tombol "+ Catat"): tampil di sidebar grup Catat Harian. Tiap pilihan membuka
  *  halaman tujuan langsung dengan formulirnya (aksi). */
