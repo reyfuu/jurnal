@@ -42,18 +42,23 @@ func (s *tenant) stokByID(id int) (finance.StokItem, bool) {
 // validStok: barang yang dipilih di transaksi harus ada. s.mu dipegang pemanggil atau tidak
 // sama sekali — cukup baca singkat.
 func (s *tenant) validStok(t finance.Transaction) bool {
-	if t.StokID == 0 {
+	baris := t.BarisBarang()
+	if len(baris) == 0 {
 		return true
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.stokByID(t.StokID)
-	return ok
+	for _, b := range baris {
+		if _, ok := s.stokByID(b.StokID); !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // stokDipakai: barang yang sudah punya riwayat tidak boleh dihapus (kartunya jadi yatim).
 func (s *tenant) stokDipakai(id int) bool {
-	if slices.ContainsFunc(s.txs, func(t finance.Transaction) bool { return t.StokID == id }) {
+	if slices.ContainsFunc(s.txs, func(t finance.Transaction) bool { return slices.ContainsFunc(t.BarisBarang(), func(b finance.RincianBarang) bool { return b.StokID == id }) }) {
 		return true
 	}
 	return slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool {

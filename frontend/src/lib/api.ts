@@ -275,6 +275,9 @@ export interface JenisInfo {
 }
 
 /** Transaksi bertanggal (sumber semua laporan). */
+/** Satu baris barang dalam transaksi; qty_stok per seribu satuan, nilai = bagian dari nominal. */
+export type RincianBarang = { stok_id: number; qty_stok: number; nilai?: number }
+
 export interface Tx {
   id: number
   tanggal: string
@@ -294,6 +297,10 @@ export interface Tx {
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
+  /** Beberapa barang dalam satu transaksi (menggantikan stok_id/qty_stok tunggal). */
+  rincian?: RincianBarang[]
+  /** Penjualan/pembelian yang memang bukan barang persediaan (mis. jasa). */
+  bukan_barang?: boolean
   /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
   grup?: number
   no_bukti?: string
