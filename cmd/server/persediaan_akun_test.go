@@ -2,10 +2,12 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"pajak/internal/coa"
 	"pajak/internal/finance"
+	"pajak/internal/xlsx"
 )
 
 const manufakturPeriodik = `{"nama_usaha":"Konveksi Senja","jenis_usaha":"manufaktur","bentuk_usaha":"op","ptkp":"K/1","pkp":false,"metode_persediaan":"periodik"}`
@@ -83,6 +85,22 @@ func TestPersediaanAkun_PeriodikDuaAkun(t *testing.T) {
 	}
 	neracaSaldoSeimbang(t, c)
 
+	// Ekspor Excel: persediaan awal = jumlah semua akun, jadi tanpa kode akun peran.
+	rec := do(srv, qa, http.MethodGet, "/api/v1/reports/coa.xlsx?period=2026-01", "")
+	rows, err := xlsx.Read(rec.Body.Bytes())
+	if rec.Code != http.StatusOK || err != nil {
+		t.Fatalf("ekspor xlsx: %d %v", rec.Code, err)
+	}
+	var awalXlsx []string
+	for _, r := range rows {
+		if len(r) >= 3 && strings.HasPrefix(r[1], "Persediaan Awal") {
+			awalXlsx = r
+		}
+	}
+	if len(awalXlsx) < 3 || awalXlsx[0] != "" || awalXlsx[1] != "Persediaan Awal (semua akun)" || awalXlsx[2] != "300000" {
+		t.Errorf("baris persediaan awal xlsx: %q", awalXlsx)
+	}
+
 	// Bulan berikutnya: saldo awal per akun dibawa dari kartu, tanpa penyesuaian baru.
 	feb := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-02")
 	if saldoAkun(feb, "1301") != 150_000 || saldoAkun(feb, "1305") != 200_000 {
@@ -112,6 +130,18 @@ func TestPersediaanAkun_DobelTertutup(t *testing.T) {
 	if got := saldoAkun(c, "1302"); got != 0 {
 		t.Errorf("1302 harus ditutup ke nilai kartu (0), dapat %d", got)
 	}
+	// Rincian HPP menunjukkan persediaan awal & pembelian sebenarnya.
+	if is := c.IncomeStatement; is != nil {
+		var pembelian int64
+		for _, l := range is.HPPLines {
+			if l.Kode == "5102" {
+				pembelian = l.Jumlah
+			}
+		}
+		if is.PersediaanAwal != 100_000 || is.PersediaanAkhir != 100_000 || pembelian != 300_000 || is.HPP != 300_000 {
+			t.Errorf("rincian HPP: awal %d pembelian %d akhir %d hpp %d", is.PersediaanAwal, pembelian, is.PersediaanAkhir, is.HPP)
+		}
+	}
 	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
 	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
 		t.Errorf("laba CoA %+v ≠ ringkas %d", c.IncomeStatement, is.NetProfit)
@@ -120,6 +150,40 @@ func TestPersediaanAkun_DobelTertutup(t *testing.T) {
 		t.Errorf("neraca CoA tidak seimbang")
 	}
 	neracaSaldoSeimbang(t, c)
+}
+
+// Penyesuaian persediaan bertanggal hari terakhir bulan dan tampil paling akhir di Jurnal Umum.
+func TestPersediaanAkun_PenyesuaianAkhirBulan(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+itoa(kain.ID)+`,"fisik":10000,"harga_unit":10000}]}`)
+	for _, tgl := range []string{"2026-01-05", "2026-02-05"} {
+		buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+			`{"tanggal":"`+tgl+`","jenis":"Beli Bahan / Stok","nominal":50000,"lunas":true,"stok_id":`+itoa(kain.ID)+`,"qty_stok":5000}`)
+	}
+	tn := tenantByEmail(t, srv, qa)
+	for _, k := range []struct{ period, dari, akhir string }{{"2026-01", "2026-01-01", "2026-01-31"}, {"2026-02", "2026-02-01", "2026-02-28"}} {
+		j, ok := tn.jurnalPeriode(k.period)
+		if !ok {
+			t.Fatalf("%s: jurnal tidak ada", k.period)
+		}
+		var ada bool
+		for _, e := range j.entri {
+			if e.Ket == "Penyesuaian persediaan ke nilai kartu stok" {
+				ada = true
+				if e.Tanggal != k.akhir {
+					t.Errorf("%s: tanggal penyesuaian %s, harus %s", k.period, e.Tanggal, k.akhir)
+				}
+			}
+		}
+		if !ada {
+			t.Fatalf("%s: tidak ada jurnal penyesuaian", k.period)
+		}
+		ju := tn.jurnalUmum(k.dari, k.akhir, "", "")
+		if n := len(ju.Entri); n == 0 || ju.Entri[n-1].Keterangan != "Penyesuaian persediaan ke nilai kartu stok" || ju.Entri[n-1].Tanggal != k.akhir {
+			t.Errorf("%s: penyesuaian harus entri terakhir Jurnal Umum: %+v", k.period, ju.Entri)
+		}
+	}
 }
 
 // Saldo awal per akun tanpa kartu: baris persediaan saldo awal berkode akun persediaan masuk ke

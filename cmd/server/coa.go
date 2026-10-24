@@ -191,15 +191,22 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		for kd := range saldo {
 			kode[kd] = true
 		}
+		for kd := range persediaanAwal {
+			kode[kd] = true
+		}
+		// penyesuaian = perubahan bersih akun persediaan bulan ini (akhir kartu − saldo awal),
+		// bukan jumlah selisih: persediaan yang terisi transaksi tanpa barang tetap tampil
+		// sebagai pembelian, dan persediaan awal di laba rugi = saldo awal sebenarnya.
 		disesuaikan := false
+		tanggal := finance.AkhirBulan(period) // hari terakhir bulan: urut paling akhir di jurnal
 		for _, kd := range slices.Sorted(maps.Keys(kode)) {
+			j.penyesuaian += target[kd] - persediaanAwal[kd]
 			selisih := target[kd] - saldo[kd]
 			if selisih == 0 {
 				continue
 			}
-			j.penyesuaian += selisih
 			disesuaikan = true
-			for _, l := range coa.PenyesuaianPersediaan(period+"-28", kd, selisih, p, peta) {
+			for _, l := range coa.PenyesuaianPersediaan(tanggal, kd, selisih, p, peta) {
 				j.entri = append(j.entri, entriJurnal{l, "Penyesuaian persediaan ke nilai kartu stok"})
 			}
 		}
@@ -224,7 +231,7 @@ func (s *tenant) persediaanAwalPerAkunLocked(period string, all []coa.Account, p
 		out[peran] += 0                              // akun peran selalu tampil, seperti sebelumnya
 		for _, b := range k.Baris {
 			if b.Jenis == finance.KartuAwal && b.Tanggal >= period+"-01" && b.Tanggal <= period+"-31" {
-				out[akunOf(b.StokID)] += b.Nilai
+				out[cmp.Or(akunOf(b.StokID), peran)] += b.Nilai
 			}
 		}
 		return out
@@ -287,8 +294,13 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rep := s.buildCoAReport(r)
-	all, _, _ := s.coaAkun()
-	kodePersediaan := coa.PetaDari(all).Kode(coa.PeranPersediaan)
+	all, active, _ := s.coaAkun()
+	// Persediaan awal/akhir = jumlah semua akun persediaan; kode akun hanya ditulis bila usaha
+	// ini memang punya satu akun persediaan.
+	kodePersediaan, namaAwal, namaAkhir := coa.PetaDari(all).Kode(coa.PeranPersediaan), "Persediaan Awal", "Persediaan Akhir"
+	if len(coa.AkunPersediaan(active)) > 1 {
+		kodePersediaan, namaAwal, namaAkhir = "", "Persediaan Awal (semua akun)", "Persediaan Akhir (semua akun)"
+	}
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)
 		return
@@ -304,11 +316,11 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	add("Pendapatan Usaha", is.Pendapatan)
 	lr = append(lr, []string{"", "Penjualan Bersih", rp(is.PenjualanBersih)})
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{kodePersediaan, "Persediaan Awal", rp(is.PersediaanAwal)})
+		lr = append(lr, []string{kodePersediaan, namaAwal, rp(is.PersediaanAwal)})
 	}
 	add("Harga Pokok Penjualan", is.HPPLines)
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{kodePersediaan, "Persediaan Akhir", rp(-is.PersediaanAkhir)})
+		lr = append(lr, []string{kodePersediaan, namaAkhir, rp(-is.PersediaanAkhir)})
 	}
 	lr = append(lr, []string{"", "Harga Pokok Penjualan", rp(is.HPP)}, []string{"", "Laba (Rugi) Kotor", rp(is.LabaKotor)})
 	add("Beban Operasional", is.BebanOperasional)

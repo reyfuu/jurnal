@@ -62,7 +62,9 @@ func IncomeStatement(tb []Balance, p finance.BusinessProfile, peta Peta) IncomeS
 }
 
 // IncomeStatementKartu: seperti IncomeStatement; bila kartu aktif, neraca saldo sudah memuat
-// jurnal PenyesuaianPersediaan sejumlah penyesuaian (akun persediaan = nilai kartu stok).
+// jurnal PenyesuaianPersediaan (akun persediaan = nilai kartu stok). penyesuaian = perubahan
+// bersih akun persediaan pada periode itu (persediaan akhir − persediaan awal), sehingga
+// persediaan awal = akhir − penyesuaian dan pembelian di HPP = pembelian sebenarnya.
 // Persediaan awal/akhir = jumlah semua akun persediaan (subtype inventory), bukan hanya akun peran.
 func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, penyesuaian int64, peta Peta) IncomeStatementResult {
 	persediaan, pembelian := peta.Kode(PeranPersediaan), peta.Kode(PeranPembelian)
