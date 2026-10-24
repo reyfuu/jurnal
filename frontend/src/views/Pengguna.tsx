@@ -1,6 +1,6 @@
 import { Check, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { NAV } from '@/lib/nav'
+import { IZIN_VIEW, NAV } from '@/lib/nav'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,8 +17,7 @@ const ROLE_ORDER: Role[] = ['owner', 'admin', 'kasir']
 const ROLE_PILL: Record<Role, string> = { owner: 'pill-brand', admin: 'pill-green', kasir: 'pill-status-muted', mp: 'pill-status-muted', lihat: 'pill-status-muted' }
 // Izin di luar menu sidebar (dicek server lewat guard yang sama).
 const EXTRA_PERMISSIONS = [{ view: 'transaksi-kelola', label: 'Ubah & hapus transaksi' }] as const
-// Menu Tagihan berisi dua izin terpisah (tab Invoice dan Piutang & Utang): tampil sebagai dua baris.
-const TAB_TAGIHAN = [{ view: 'invoice', label: 'Tagihan · Invoice' }, { view: 'piutang-utang', label: 'Tagihan · Piutang & Utang' }] as const
+// Menu yang izinnya ikut menu lain (mis. Pelanggan = Invoice) tidak punya baris sendiri.
 
 const EMPTY: UserInput = { name: '', email: '', role: 'kasir', active: true, password: '' }
 
@@ -154,7 +153,7 @@ export function Pengguna({ currentUserId }: { currentUserId: number }) {
               </tr>
             </thead>
             <tbody>
-              {[...NAV.flatMap((g) => g.items).flatMap((i): { view: View; label: string }[] => (i.view === 'invoice' ? [...TAB_TAGIHAN] : [i])), ...EXTRA_PERMISSIONS].map((item) => (
+              {[...NAV.flatMap((g) => g.items).filter((i) => !IZIN_VIEW[i.view]).map((i): { view: View; label: string } => (i.view === 'invoice' ? { ...i, label: 'Invoice & Pelanggan' } : i)), ...EXTRA_PERMISSIONS].map((item) => (
                 <tr key={item.view}>
                   <td>{item.label}</td>
                   {ROLE_ORDER.map((r) => (
