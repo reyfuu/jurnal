@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"maps"
 	"net/http"
 	"strings"
@@ -46,6 +47,26 @@ func TestJurnalUmum_SeimbangDanCocokBukuBesar(t *testing.T) {
 	for b, c := range tx {
 		if c != 1 {
 			t.Errorf("%s muncul %d kali", b, c)
+		}
+	}
+}
+
+// Usaha baru tanpa saldo awal & transaksi: Jurnal Umum tidak boleh mengirim bukti tanpa baris
+// (baris: null membuat halaman Jurnal Umum crash jadi layar kosong).
+func TestJurnalUmum_UsahaBaruTanpaBarisKosong(t *testing.T) {
+	srv, qa := usahaBaru(t)
+	var ju struct {
+		Entri []struct {
+			Bukti string
+			Baris *[]barisJurnalUmum `json:"baris"`
+		} `json:"entri"`
+	}
+	if err := json.Unmarshal(do(srv, qa, http.MethodGet, "/api/v1/reports/jurnal?period=2026-10", "").Body.Bytes(), &ju); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range ju.Entri {
+		if e.Baris == nil || len(*e.Baris) == 0 {
+			t.Errorf("bukti %s tanpa baris (null/kosong) dikirim ke halaman", e.Bukti)
 		}
 	}
 }

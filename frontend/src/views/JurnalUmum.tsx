@@ -75,7 +75,7 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
           <div className="kartu-hp tabular" key={`${e.bukti}|${e.tx_id ?? ''}|${e.tanggal}|${e.keterangan}`}>
             <div className="kartu-hp-judul"><span>{e.bukti}</span><span className="text-xs text-muted-foreground" style={{ fontWeight: 400 }}>{formatTanggal(e.tanggal)}</span></div>
             <div className="kartu-hp-sub" style={{ marginBottom: 6 }}>{e.keterangan}</div>
-            {e.baris.map((b, i) => (
+            {(e.baris ?? []).map((b, i) => (
               // akun kredit menjorok, sesuai kebiasaan penulisan jurnal
               <div key={i} className={'jurnal-hp-baris' + (b.kredit ? ' kredit' : '')}>
                 <span>{b.kode} {b.nama}</span><span>{formatRp(b.debit || b.kredit)}</span>
@@ -163,7 +163,7 @@ export function JurnalUmum({ period, bisaEkspor, navigate }: { period: string; b
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{e.bukti}</td>
                         <td colSpan={4} style={{ whiteSpace: 'normal' }}>{e.keterangan}</td>
                       </tr>
-                      {e.baris.map((b, i) => (
+                      {(e.baris ?? []).map((b, i) => (
                         <tr key={i}>
                           <td /><td />
                           {/* Akun kredit menjorok, sesuai kebiasaan penulisan jurnal. */}

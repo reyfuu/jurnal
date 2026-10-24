@@ -77,7 +77,9 @@ func (s *tenant) jurnalUmum(dari, sampai, akun, q string) jurnalUmumResp {
 					e.Baris = append(e.Baris, barisJurnalUmum{Kode: a.Kode, Nama: a.Nama, Kredit: -v})
 				}
 			}
-			bulanIni = append(bulanIni, e)
+			if len(e.Baris) > 0 { // belum ada saldo awal (usaha baru): tidak ada bukti SA kosong
+				bulanIni = append(bulanIni, e)
+			}
 		}
 		grup, bukti := nb.kelompokkan(j.entri, bulan)
 		awal := len(bulanIni) // setelah bukti saldo awal
