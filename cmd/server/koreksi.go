@@ -58,6 +58,13 @@ func (s *Server) handleUsulKoreksi(w http.ResponseWriter, r *http.Request) {
 	}
 	u := currentUser(r)
 	t.mu.Lock()
+	if k.Usulan != nil { // dicek lagi saat disetujui (barang bisa dihapus selama usulan menunggu)
+		if err := t.cekAdaBarangLocked(*k.Usulan); err != nil {
+			t.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	if err := finance.SiapkanKoreksi(&k, t.txs); err != nil {
 		t.mu.Unlock()
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -141,7 +148,8 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		// Usulan ubah tunduk pada aturan wajib barang yang sama dengan formulir transaksi.
+		// Usulan ubah tunduk pada aturan wajib barang yang sama dengan formulir transaksi,
+		// termasuk barang rinciannya masih ada (sebelum apa pun diubah / kartu dimulai).
 		if k.Jenis == finance.KoreksiUbah && k.Usulan != nil {
 			if err := t.cekBarangLocked(*k.Usulan); err != nil {
 				t.mu.Unlock()

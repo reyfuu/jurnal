@@ -33,9 +33,27 @@ func (s *tenant) mulaiKartuStokLocked() string {
 	return mulai
 }
 
-// cekBarangLocked: aturan wajib barang untuk satu transaksi usulan. s.mu dipegang.
+var errBarangTidakAda = errors.New("barang yang dipilih tidak ada di Stok & Gudang")
+
+// cekAdaBarangLocked: setiap barang di rincian masih ada di daftar barang. Dicek di bawah kunci
+// tepat sebelum simpan, karena barang bisa dihapus sesudah cek awal (formulir, Catat, usulan
+// koreksi yang menunggu persetujuan). s.mu dipegang.
+func (s *tenant) cekAdaBarangLocked(t finance.Transaction) error {
+	for _, b := range t.BarisBarang() {
+		if _, ok := s.stokByID(b.StokID); !ok {
+			return errBarangTidakAda
+		}
+	}
+	return nil
+}
+
+// cekBarangLocked: barang di rincian harus ada (semua metode), lalu aturan wajib barang untuk
+// satu transaksi usulan. s.mu dipegang.
 // Berlaku juga bila daftar barang masih kosong: barang ditambah dulu, atau tandai jasa.
 func (s *tenant) cekBarangLocked(t finance.Transaction) error {
+	if err := s.cekAdaBarangLocked(t); err != nil {
+		return err
+	}
 	if !s.perpetualLocked() || (t.Jenis != finance.JenisJual && t.Jenis != finance.JenisBeliStok) {
 		return nil
 	}

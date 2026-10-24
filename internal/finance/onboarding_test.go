@@ -568,3 +568,18 @@ func TestOnboardingTemplate_StatusDiAtas(t *testing.T) {
 		}
 	}
 }
+
+// Kolom Barang & jumlah_barang sheet Transaksi ikut terbaca (dicocokkan server ke daftar barang).
+func TestParseOnboarding_TransaksiMembawaKolomBarang(t *testing.T) {
+	d := finance.ParseOnboarding([]finance.ImportSheet{{Nama: "Transaksi", Rows: [][]string{
+		{"Tanggal", "Jenis", "Nominal", "Keterangan", "Barang", "jumlah_barang"},
+		{"2026-02-01", "Penjualan", "100000", "jual kain", "Kain", "2,5"},
+	}}})
+	if len(d.Transaksi) != 1 || len(d.BarisTransaksi) != 1 {
+		t.Fatalf("baris: %d transaksi, %d baris", len(d.Transaksi), len(d.BarisTransaksi))
+	}
+	b := d.BarisTransaksi[0]
+	if b.Sheet != "Transaksi" || b.Baris != 2 || b.BarangTeks != "Kain" || !b.AdaJumlah || b.JumlahBarang != 2500 || b.Tx.Keterangan != "jual kain" {
+		t.Fatalf("baris barang: %+v", b)
+	}
+}

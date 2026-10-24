@@ -199,6 +199,9 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction, oleh st
 func (s *tenant) cekBarangCatatLocked(grup int, baru []finance.Transaction) (*finance.GerakStok, int, error) {
 	var awal *finance.GerakStok
 	for _, t := range baru {
+		if err := s.cekAdaBarangLocked(t); err != nil { // dicek ulang di bawah kunci (susunTxCatat di luar kunci)
+			return nil, http.StatusBadRequest, err
+		}
 		if err := s.cekBarangLocked(t); err != nil {
 			if len(txBerbarang(baru)) > 1 { // rincian hanya bisa ditempel ke satu transaksi
 				return nil, http.StatusBadRequest, errPecahCatat

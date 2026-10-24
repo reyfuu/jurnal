@@ -29,25 +29,62 @@ func kolomTabel(t *testing.T, tabel string) map[string]bool {
 			out[f[0]] = true
 		}
 	}
-	for _, m := range regexp.MustCompile(`ALTER TABLE ` + tabel + ` ADD COLUMN IF NOT EXISTS (\w+)`).FindAllStringSubmatch(sql, -1) {
+	for _, m := range regexp.MustCompile(`ALTER TABLE `+tabel+` ADD COLUMN IF NOT EXISTS (\w+)`).FindAllStringSubmatch(sql, -1) {
 		out[m[1]] = true
 	}
 	return out
 }
 
+// fieldJSON: nama field JSON struct, termasuk field struct yang di-embed tanpa tag (mis.
+// invoiceItemRow meng-embed finance.InvoiceItem: field-nya jadi kolom invoice_items).
+func fieldJSON(ty reflect.Type) map[string]string {
+	out := map[string]string{}
+	for i := range ty.NumField() {
+		f := ty.Field(i)
+		tag := f.Tag.Get("json")
+		if f.Anonymous && tag == "" {
+			for k, v := range fieldJSON(f.Type) {
+				out[k] = v
+			}
+			continue
+		}
+		nama, _, _ := strings.Cut(tag, ",")
+		if nama == "" || nama == "-" || !f.IsExported() {
+			continue
+		}
+		out[nama] = f.Name
+	}
+	return out
+}
+
 // Setiap field JSON struct yang disimpan per kolom harus punya kolomnya; kalau tidak,
-// jsonb_populate_recordset membuangnya diam-diam saat simpan ke Postgres.
+// jsonb_populate_recordset membuangnya diam-diam saat simpan ke Postgres. Tabel & tipe sama
+// dengan saveTenantDB (pgstore.go).
 func TestSchema_SetiapFieldPunyaKolom(t *testing.T) {
-	for tabel, v := range map[string]any{"stok": finance.StokItem{}, "transactions": finance.Transaction{}} {
-		kolom := kolomTabel(t, tabel)
-		ty := reflect.TypeOf(v)
-		for i := range ty.NumField() {
-			nama, _, _ := strings.Cut(ty.Field(i).Tag.Get("json"), ",")
-			if nama == "" || nama == "-" {
+	for _, c := range []struct {
+		tabel string
+		v     any
+		// bukanKolom: field yang sengaja tidak punya kolom karena pgstore menyimpannya di
+		// tempat lain (alasan per field).
+		bukanKolom map[string]string
+	}{
+		{"stok", finance.StokItem{}, nil},
+		{"transactions", finance.Transaction{}, nil},
+		{"invoices", finance.Invoice{}, map[string]string{
+			"items": "baris faktur disimpan per baris di invoice_items (saveTenantDB → invoiceItemRow)",
+		}},
+		{"invoice_items", invoiceItemRow{}, nil},
+	} {
+		kolom := kolomTabel(t, c.tabel)
+		for nama, field := range fieldJSON(reflect.TypeOf(c.v)) {
+			if _, ok := c.bukanKolom[nama]; ok {
+				if kolom[nama] {
+					t.Errorf("tabel %s kini punya kolom %q: hapus pengecualiannya", c.tabel, nama)
+				}
 				continue
 			}
 			if !kolom[nama] {
-				t.Errorf("tabel %s tidak punya kolom %q untuk field %s", tabel, nama, ty.Field(i).Name)
+				t.Errorf("tabel %s tidak punya kolom %q untuk field %s", c.tabel, nama, field)
 			}
 		}
 	}
