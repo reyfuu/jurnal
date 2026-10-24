@@ -312,10 +312,9 @@ func TestPersediaanAkun_PerpetualAlurManufaktur(t *testing.T) {
 		`{"tanggal":"2026-01-03","jenis":"Beli Bahan / Stok","nominal":100000,"lunas":true,"stok_id":`+itoa(kain.ID)+`,"qty_stok":10000}`)
 	pPotongan := buat[finance.Produk](t, srv, qa, "/api/v1/produksi/produk", `{"nama":"Potongan","satuan":"pcs","hasil_per_batch":10,"bahan":[{"stok_id":`+itoa(kain.ID)+`,"takaran":6000}]}`)
 	pKaos := buat[finance.Produk](t, srv, qa, "/api/v1/produksi/produk", `{"nama":"Kaos","satuan":"pcs","hasil_per_batch":10,"bahan":[{"stok_id":`+itoa(potongan.ID)+`,"takaran":10000}]}`)
-	// Biaya lain diberi akun barang hasil (1303) seperti Task 6 kelak membuatnya otomatis.
 	for _, body := range []string{
 		`{"tanggal":"2026-01-05","produk":[{"produk_id":` + itoa(pPotongan.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":6000}],` +
-			`"biaya":[{"keterangan":"Upah potong","akun":"1303","nominal":20000}]}]}`,
+			`"biaya":[{"keterangan":"Upah potong","nominal":20000}]}]}`,
 		`{"tanggal":"2026-01-08","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(potongan.ID) + `,"qty":10000}]}]}`,
 	} {
 		if rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body); rec.Code != http.StatusCreated {

@@ -71,6 +71,11 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 		bayar = a.Kode
 	}
 	akunBiaya := coa.AutoAccount("Beli Bahan / Stok", p, peta)
+	perpetual := p.MetodePersediaan == "perpetual"
+	punyaPersediaan := map[string]bool{}
+	for _, a := range coa.AkunPersediaan(all) {
+		punyaPersediaan[a.Kode] = true
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,6 +120,14 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, prod.Nama+": "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		// Perpetual: biaya lain tanpa akun masuk ke akun persediaan barang hasil pertama dokumen ini.
+		akunDefault := akunBiaya
+		if perpetual {
+			if h := slices.IndexFunc(g.Baris, func(b finance.BarisGerak) bool { return b.Qty > 0 }); h >= 0 {
+				akunDefault = s.akunStokLocked(all, peta)(g.Baris[h].StokID)
+			}
+		}
+		ada := false
 		for _, b := range pr.Biaya {
 			if b.Nominal == 0 {
 				continue // baris biaya kosong
@@ -123,13 +136,15 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "biaya lain tidak boleh minus", http.StatusBadRequest)
 				return
 			}
-			akun := akunBiaya
+			akun, kapitalisasi := akunDefault, true
 			if b.Akun != "" {
 				if _, ok := coa.Find(all, b.Akun); !ok {
 					http.Error(w, "akun biaya "+b.Akun+" tidak ada di daftar akun", http.StatusBadRequest)
 					return
 				}
 				akun = b.Akun
+				// Akun beban pilihan pengguna tetap beban; hanya akun persediaan yang menambah nilai barang.
+				kapitalisasi = punyaPersediaan[b.Akun] || !perpetual
 			}
 			t := finance.Transaction{Tanggal: req.Tanggal, Jenis: finance.JenisBeliStok, Nominal: b.Nominal, Akun: akun, Lunas: true, Lawan: bayar,
 				Keterangan: "Biaya produksi " + prod.Nama + ": " + strings.TrimSpace(b.Keterangan), Grup: grup}
@@ -141,10 +156,15 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}
-			g.Biaya += t.Nominal
+			if kapitalisasi {
+				g.Biaya += t.Nominal
+			}
 			txs = append(txs, t)
+			ada = true
 		}
-		if g.Biaya > 0 {
+		// Grup menautkan dokumen dengan transaksi biayanya (juga yang tidak dikapitalisasi), supaya
+		// hapus dokumen ikut menghapus biayanya dan Catat tetap satu bukti.
+		if ada {
 			g.Grup = grup
 			grup++
 		}

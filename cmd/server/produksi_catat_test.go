@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"pajak/internal/finance"
@@ -52,5 +53,89 @@ func TestCatatProduksi_LangsungTanpaKartuStok(t *testing.T) {
 	}
 	if is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01"); is.COGS != 0 || is.TotalOpex != 0 {
 		t.Fatalf("biaya lain harus ikut terhapus: %+v", is)
+	}
+}
+
+// siapProduksiKaos: manufaktur perpetual dengan Kain 100 m @10.000 dan produk Kaos (10 pcs per batch, 1 m kain per pcs).
+func siapProduksiKaos(t *testing.T) (*Server, *http.Cookie, finance.StokItem, finance.Produk) {
+	t.Helper()
+	srv, qa := usahaManufakturPerpetual(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	kaos := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[`+
+		`{"stok_id":`+itoa(kain.ID)+`,"fisik":100000,"harga_unit":10000},`+
+		`{"stok_id":`+itoa(kaos.ID)+`,"fisik":0,"harga_unit":0}]}`)
+	pKaos := buat[finance.Produk](t, srv, qa, "/api/v1/produksi/produk", `{"nama":"Kaos","satuan":"pcs","hasil_per_batch":10,"bahan":[{"stok_id":`+itoa(kain.ID)+`,"takaran":10000}]}`)
+	return srv, qa, kain, pKaos
+}
+
+func txBiayaProduksi(t *testing.T, srv *Server, qa *http.Cookie) []finance.Transaction {
+	t.Helper()
+	var out []finance.Transaction
+	for _, x := range getJSON[txListResp](t, srv, qa, "/api/v1/transactions").Transactions {
+		if strings.HasPrefix(x.Keterangan, "Biaya produksi") {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+// Perpetual: biaya lain tanpa akun masuk ke akun persediaan barang hasil dan menambah nilainya.
+func TestCatatProduksi_BiayaKeAkunHasil(t *testing.T) {
+	srv, qa, kain, pKaos := siapProduksiKaos(t)
+	body := `{"tanggal":"2026-01-05","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":10000}],` +
+		`"biaya":[{"keterangan":"Upah jahit","nominal":20000}]}]}`
+	rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("catat produksi: %d %s", rec.Code, rec.Body)
+	}
+	var out produksiCatatResp
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	if len(out.Gerak) != 1 || out.Gerak[0].Biaya != 20_000 {
+		t.Fatalf("g.Biaya harus 20000: %+v", out)
+	}
+	txs := txBiayaProduksi(t, srv, qa)
+	if len(txs) != 1 || txs[0].Akun != "1305" {
+		t.Fatalf("transaksi biaya harus berakun 1305: %+v", txs)
+	}
+}
+
+// Akun beban pilihan pengguna tetap beban: tidak dikapitalisasi ke nilai barang hasil.
+func TestCatatProduksi_BiayaAkunBebanTidakDikapitalisasi(t *testing.T) {
+	srv, qa, kain, pKaos := siapProduksiKaos(t)
+	body := `{"tanggal":"2026-01-05","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":10000}],` +
+		`"biaya":[{"keterangan":"Upah jahit","akun":"5103","nominal":15000}]}]}`
+	rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("catat produksi: %d %s", rec.Code, rec.Body)
+	}
+	var out produksiCatatResp
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	if len(out.Gerak) != 1 || out.Gerak[0].Biaya != 0 || out.Transaksi != 1 {
+		t.Fatalf("g.Biaya harus 0: %+v", out)
+	}
+	txs := txBiayaProduksi(t, srv, qa)
+	if len(txs) != 1 || txs[0].Akun != "5103" {
+		t.Fatalf("transaksi biaya harus berakun 5103: %+v", txs)
+	}
+	// Nilai Kaos = bahan saja: 10 m x 10.000.
+	var nilai int64
+	for _, it := range getJSON[finance.StokSummary](t, srv, qa, "/api/v1/stok").Items {
+		if it.Nama == "Kaos" {
+			nilai = it.Nilai
+		}
+	}
+	if nilai != 100_000 {
+		t.Fatalf("nilai Kaos %d, mau 100000 (bahan saja)", nilai)
+	}
+	// Transaksi beban tetap satu grup dengan dokumen produksinya: hapus dokumen ikut menghapus biaya.
+	if out.Gerak[0].Grup == 0 || txs[0].Grup != out.Gerak[0].Grup {
+		t.Fatalf("grup dokumen %d, grup transaksi %d", out.Gerak[0].Grup, txs[0].Grup)
+	}
+	if rec := do(srv, qa, http.MethodDelete, "/api/v1/stok/gerak/"+itoa(out.Gerak[0].ID), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("hapus produksi: %d %s", rec.Code, rec.Body)
+	}
+	if len(txBiayaProduksi(t, srv, qa)) != 0 {
+		t.Fatal("biaya beban harus ikut terhapus")
 	}
 }
