@@ -433,8 +433,10 @@ CREATE TABLE IF NOT EXISTS mp_pengaturan (
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS stok_id INT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS qty_stok BIGINT;
 -- Rincian barang (Okt 2026): beberapa barang per transaksi (JSONB) + tanda bukan barang.
+-- bukan_barang sengaja nullable: field omitempty hilang dari JSON, dan jsonb_populate_recordset
+-- mengisinya NULL (tanpa DEFAULT kolom); NOT NULL akan menggagalkan setiap simpan.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rincian JSONB;
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS bukan_barang BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS bukan_barang BOOLEAN;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_gerak_id INT NOT NULL DEFAULT 1;
 CREATE TABLE IF NOT EXISTS gerak_stok (
 	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,

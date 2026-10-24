@@ -103,7 +103,11 @@ func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 func tanpaNomor(t Transaction) Transaction { t.NoJurnal = ""; return t }
 
 // sama: kesamaan isi transaksi (Rincian berupa irisan, jadi tak bisa dibandingkan dengan ==).
-func sama(a, b Transaction) bool { return reflect.DeepEqual(a, b) }
+func sama(a, b Transaction) bool {
+	ra, rb := a.Rincian, b.Rincian
+	a.Rincian, b.Rincian = nil, nil // nil dan kosong dianggap sama
+	return slices.Equal(ra, rb) && reflect.DeepEqual(a, b)
+}
 
 // DampakKoreksi: laba bersih satu bulan sebelum & sesudah koreksi diterapkan (tanpa penyusutan
 // dari register aset, yang tidak ikut berubah).

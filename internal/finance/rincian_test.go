@@ -79,3 +79,20 @@ func TestValidate_Rincian(t *testing.T) {
 		}
 	}
 }
+
+func TestSama_RincianNilSamaDenganKosong(t *testing.T) {
+	a := Transaction{ID: 1, Nominal: 5}
+	b := a
+	b.Rincian = []RincianBarang{}
+	if !sama(a, b) {
+		t.Error("nil dan kosong harus dianggap sama")
+	}
+	b.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1}}
+	if sama(a, b) {
+		t.Error("rincian berbeda harus tidak sama")
+	}
+	v := Transaction{Tanggal: "2026-01-05", Jenis: JenisJual, Nominal: 5, Rincian: []RincianBarang{}}
+	if err := Validate(&v); err != nil || v.Rincian != nil {
+		t.Errorf("Validate harus menormalkan rincian kosong ke nil: %v %#v", err, v.Rincian)
+	}
+}

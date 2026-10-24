@@ -169,6 +169,9 @@ func Validate(t *Transaction) error {
 	if t.Qty < 0 {
 		return errors.New("jumlah tidak boleh negatif")
 	}
+	if len(t.Rincian) == 0 {
+		t.Rincian = nil
+	}
 	if len(t.Rincian) > 0 && t.StokID != 0 {
 		return errors.New("pilih satu cara: barang tunggal atau rincian barang")
 	}
