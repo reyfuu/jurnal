@@ -1203,6 +1203,8 @@ export interface StokItem {
   stok_min: number
   harga_pokok: number
   harga_jual: number
+  /** Kode akun persediaan CoA; kosong = ditebak server dari kategori. */
+  akun?: string
 }
 
 export type StokInput = Omit<StokItem, 'id'>
@@ -1216,10 +1218,16 @@ export interface StokRow extends StokItem {
   jumlah_mili: number
   dilacak: boolean
   minus: boolean
+  /** Akun persediaan yang berlaku (pilihan, atau tebakan dari kategori). */
+  akun_efektif: string
 }
+
+export interface PilihanAkunStok { kode: string; nama: string }
 
 export interface StokSummary {
   items: StokRow[] | null
+  /** Akun persediaan aktif di CoA usaha, untuk pilihan kategori barang. */
+  pilihan_akun: PilihanAkunStok[]
   total_item: number
   nilai_persediaan: number
   menipis: number

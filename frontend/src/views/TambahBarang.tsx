@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createStok, type StokInput } from '@/lib/api'
+import { createStok, type PilihanAkunStok, type StokInput } from '@/lib/api'
 import { angka } from '@/lib/angka'
 import { buatSKU } from '@/lib/sku'
 
@@ -10,11 +10,14 @@ import { buatSKU } from '@/lib/sku'
 
 type Baris = StokInput & { _k: number; skuManual?: boolean }
 let urut = 0
-const kosong = (): Baris => ({ _k: ++urut, sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0 })
-const KATEGORI = ['Bahan Baku', 'Bahan Penolong', 'Produk Jadi', 'Kemasan', 'Barang']
+const kosong = (akun?: string): Baris => ({ _k: ++urut, sku: '', nama: '', kategori: 'Bahan Baku', akun, jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0 })
 
-export function TambahBarangBanyak({ skuTerpakai, namaTerpakai = [], onBatal, onSelesai }: { skuTerpakai: string[]; namaTerpakai?: string[]; onBatal: () => void; onSelesai: (jumlah: number) => void }) {
-  const [baris, setBaris] = useState<Baris[]>(() => [kosong(), kosong(), kosong()])
+/** Akun persediaan awal barang baru: Bahan Baku bila ada, kalau tidak yang pertama. */
+export const akunAwalBarang = (pilihan: PilihanAkunStok[]) => (pilihan.find((p) => /bahan baku/i.test(p.nama)) ?? pilihan[0])?.kode
+
+
+export function TambahBarangBanyak({ pilihanAkun = [], skuTerpakai, namaTerpakai = [], onBatal, onSelesai }: { pilihanAkun?: PilihanAkunStok[]; skuTerpakai: string[]; namaTerpakai?: string[]; onBatal: () => void; onSelesai: (jumlah: number) => void }) {
+  const [baris, setBaris] = useState<Baris[]>(() => [kosong(akunAwalBarang(pilihanAkun)), kosong(akunAwalBarang(pilihanAkun)), kosong(akunAwalBarang(pilihanAkun))])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const terisi = baris.filter((b) => b.nama.trim())
@@ -71,13 +74,12 @@ export function TambahBarangBanyak({ skuTerpakai, namaTerpakai = [], onBatal, on
           <div className="chart-title">Tambah barang</div>
           <div className="chart-subtitle">Isi beberapa barang sekaligus. SKU terisi otomatis dari nama, boleh diganti sendiri.</div>
         </div>
-        <Button type="button" size="sm" onClick={() => setBaris((bs) => [...bs, kosong()])}><Plus aria-hidden="true" /> Baris</Button>
+        <Button type="button" size="sm" onClick={() => setBaris((bs) => [...bs, kosong(akunAwalBarang(pilihanAkun))])}><Plus aria-hidden="true" /> Baris</Button>
       </div>
-      <datalist id="tb-kategori">{KATEGORI.map((k) => <option key={k} value={k} />)}</datalist>
       <div className="table-scroll">
         <table className="data-table tabular" style={{ minWidth: 980 }}>
           <thead>
-            <tr><th style={{ width: 120 }}>SKU</th><th>Nama barang</th><th style={{ width: 140 }}>Kategori</th><th style={{ width: 90 }}>Satuan</th>
+            <tr><th style={{ width: 120 }}>SKU</th><th>Nama barang</th><th style={{ width: 140 }}>Kategori (akun persediaan)</th><th style={{ width: 90 }}>Satuan</th>
               <th style={{ textAlign: 'right', width: 100 }}>Jumlah</th><th style={{ textAlign: 'right', width: 100 }}>Stok min.</th>
               <th style={{ textAlign: 'right', width: 130 }}>Harga pokok</th><th style={{ textAlign: 'right', width: 130 }}>Harga jual</th><th style={{ width: 40 }} /></tr>
           </thead>
@@ -87,7 +89,13 @@ export function TambahBarangBanyak({ skuTerpakai, namaTerpakai = [], onBatal, on
                 <td><input className="input-field" aria-label={`SKU baris ${i + 1}`} placeholder="otomatis" value={b.sku}
                   onChange={(e) => ubah(b._k, { sku: e.target.value.toUpperCase(), skuManual: e.target.value.trim() !== '' })} /></td>
                 <td><input className="input-field" aria-label={`Nama barang baris ${i + 1}`} placeholder="mis. Singkong kupas" value={b.nama} onChange={(e) => ubah(b._k, { nama: e.target.value })} /></td>
-                <td><input className="input-field" list="tb-kategori" aria-label={`Kategori baris ${i + 1}`} value={b.kategori} onChange={(e) => ubah(b._k, { kategori: e.target.value })} /></td>
+                <td>
+                  <select className="input-field" aria-label={`Kategori baris ${i + 1}`} value={b.akun ?? ''}
+                    onChange={(e) => ubah(b._k, { akun: e.target.value, kategori: pilihanAkun.find((p) => p.kode === e.target.value)?.nama ?? b.kategori })}>
+                    {pilihanAkun.length === 0 && <option value="">{b.kategori}</option>}
+                    {pilihanAkun.map((p) => <option key={p.kode} value={p.kode}>{p.kode} · {p.nama}</option>)}
+                  </select>
+                </td>
                 <td><input className="input-field" aria-label={`Satuan baris ${i + 1}`} value={b.satuan} onChange={(e) => ubah(b._k, { satuan: e.target.value })} /></td>
                 <td><input className="input-field tabular" style={{ textAlign: 'right' }} aria-label={`Jumlah baris ${i + 1}`} {...angka(b.jumlah, (n) => ubah(b._k, { jumlah: n }))} /></td>
                 <td><input className="input-field tabular" style={{ textAlign: 'right' }} aria-label={`Stok minimum baris ${i + 1}`} {...angka(b.stok_min, (n) => ubah(b._k, { stok_min: n }))} /></td>

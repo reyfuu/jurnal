@@ -6,7 +6,7 @@ import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MutasiStokPanel, RiwayatGerakPanel } from '@/views/KartuStok'
 import { StokOpnamePanel } from '@/views/StokOpname'
-import { TambahBarangBanyak } from '@/views/TambahBarang'
+import { TambahBarangBanyak, akunAwalBarang } from '@/views/TambahBarang'
 import { ThUrut } from '@/components/ThUrut'
 import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
 import { useGulirKeForm } from '@/lib/gulir'
@@ -15,7 +15,7 @@ import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
   STOK_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
-  type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
+  type PilihanAkunStok, type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -37,8 +37,8 @@ const aksiBtn = { width: 'auto', padding: '4px 8px', fontSize: 12 } as const
 const toTagihanInput = ({ nomor, pihak, jenis, jatuh_tempo, nominal, lunas, keterangan }: TagihanRow): TagihanInput =>
   ({ nomor, pihak, jenis, jatuh_tempo, nominal, lunas, keterangan })
 
-const toStokInput = ({ sku, nama, kategori, jumlah, satuan, stok_min, harga_pokok, harga_jual }: StokRow): StokInput =>
-  ({ sku, nama, kategori, jumlah, satuan, stok_min, harga_pokok, harga_jual })
+const toStokInput = ({ sku, nama, kategori, jumlah, satuan, stok_min, harga_pokok, harga_jual, akun_efektif }: StokRow): StokInput =>
+  ({ sku, nama, kategori, jumlah, satuan, stok_min, harga_pokok, harga_jual, akun: akun_efektif })
 
 /**
  * Tombol Ubah & Hapus di tiap baris, sama bentuknya di kedua halaman.
@@ -313,7 +313,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
     pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId); setTambahBanyak(s.tambahBanyak) },
     isi: (isian) => {
       setError(''); setPada(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
-      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, ...isian }
+      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, akun: akunAwalBarang(pilihanAkun), ...isian }
       // SKU otomatis dari nama, sama seperti tabel Tambah barang
       if (!b.sku) b.sku = buatSKU(b.nama, new Set((data?.items ?? []).map((x) => x.sku.toUpperCase()).filter(Boolean)))
       setForm(b)
@@ -355,6 +355,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
 
   const list = data.items ?? []
   const mulai = data.mulai
+  const pilihanAkun: PilihanAkunStok[] = data?.pilihan_akun ?? []
   const editDilacak = editId !== null && !!list.find((x) => x.id === editId)?.dilacak
   const selesaiDialog = () => { setDialog(null); muat() }
   const kategoris = [...new Set(list.map((it) => it.kategori))].sort()
@@ -464,7 +465,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
         {/* Form tambah / ubah muncul di sini, tepat di atas tabel, dan halaman bergeser ke sini. */}
         <div ref={formRef} style={{ scrollMarginTop: 16 }}>
           {tambahBanyak && (
-            <TambahBarangBanyak skuTerpakai={list.map((x) => x.sku).filter(Boolean)} namaTerpakai={list.map((x) => x.nama)} onBatal={() => setTambahBanyak(false)}
+            <TambahBarangBanyak pilihanAkun={pilihanAkun} skuTerpakai={list.map((x) => x.sku).filter(Boolean)} namaTerpakai={list.map((x) => x.nama)} onBatal={() => setTambahBanyak(false)}
               onSelesai={(n) => { setTambahBanyak(false); setPesan(`${n} barang ditambahkan.`); muat() }} />
           )}
         {form && (
@@ -480,13 +481,16 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                 <span className="kpi-label">Nama Barang</span>
                 <input className="input-field" required value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
               </label>
-              <label>
-                <span className="kpi-label">Kategori</span>
-                <input className="input-field" list="stok-kategori" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} />
-                <datalist id="stok-kategori">
-                  {['Bahan Baku', 'Produk Jadi', 'Kemasan', 'Barang'].map((k) => <option key={k} value={k} />)}
-                </datalist>
-              </label>
+              {pilihanAkun.length > 1 && (
+                <label>
+                  <span className="kpi-label">Kategori (akun persediaan)</span>
+                  <select className="input-field" value={form.akun ?? ''}
+                    onChange={(e) => setForm({ ...form, akun: e.target.value, kategori: pilihanAkun.find((p) => p.kode === e.target.value)?.nama ?? form.kategori })}>
+                    {!pilihanAkun.some((p) => p.kode === form.akun) && <option value={form.akun ?? ''}>{form.kategori}</option>}
+                    {pilihanAkun.map((p) => <option key={p.kode} value={p.kode}>{p.kode} · {p.nama}</option>)}
+                  </select>
+                </label>
+              )}
               <label title={editDilacak ? 'Jumlah mengikuti kartu stok; ubah lewat stok opname' : undefined}>
                 <span className="kpi-label">Jumlah{editDilacak ? ' (dari kartu stok)' : ''}</span>
                 <input
