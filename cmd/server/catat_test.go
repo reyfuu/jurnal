@@ -318,3 +318,36 @@ func TestCatat_OpsiTandaiAkunBerbarang(t *testing.T) {
 		t.Fatalf("tanda akun: beli %+v, jual %+v, kas %+v", tanda[beli], tanda[jual], tanda[kas])
 	}
 }
+
+// Fix round 1 (R5): pembelian dua barang beda akun persediaan lewat Catat cepat (akun baris =
+// akun persediaan bawaan) didebit per akun barangnya; tidak ada penyesuaian akhir bulan untuknya.
+func TestCatat_BeliDuaBarangBedaAkunPersediaan(t *testing.T) {
+	srv, qa, kain, benang := kainBenangPerpetual(t)
+	_, beli, kas, _ := akunCatatBawaan(t, srv, qa)
+	c := buat[catatResp](t, srv, qa, "/api/v1/catat", `{"tanggal":"2026-01-05","baris":[{"akun":"`+beli+`","debit":40000},{"akun":"`+kas+`","kredit":40000}],`+
+		`"rincian":[{"stok_id":`+itoa(kain.ID)+`,"qty_stok":3000,"nilai":30000},{"stok_id":`+itoa(benang.ID)+`,"qty_stok":2000,"nilai":10000}],"item":"Kain, Benang"}`)
+	if got := txsOf(t, srv, qa); len(got) != 1 || got[0].Item != "Kain, Benang" {
+		t.Errorf("item transaksi catat = %+v, mau nama barang terpilih", got)
+	}
+	r := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	if got := saldoAkun(r, "1301"); got != 10_000+30_000 {
+		t.Errorf("saldo 1301 = %d, harus 40.000", got)
+	}
+	if got := saldoAkun(r, "1302"); got != 5_000+10_000 {
+		t.Errorf("saldo 1302 = %d, harus 15.000", got)
+	}
+	tn := tenantByEmail(t, srv, qa)
+	j, _ := tn.jurnalPeriode("2026-01")
+	dr := map[string]int64{}
+	for _, e := range j.entri {
+		if e.Ket == ketPenyesuaian && (e.Kode == "1301" || e.Kode == "1302") {
+			t.Errorf("penyesuaian akhir bulan untuk %s: %+v", e.Kode, e.Line)
+		}
+		if e.TxID == c.Transaksi[0] && e.Debit > 0 {
+			dr[e.Kode] += e.Debit
+		}
+	}
+	if dr["1301"] != 30_000 || dr["1302"] != 10_000 || len(dr) != 2 {
+		t.Errorf("debit pembelian per akun %+v, mau 1301 30.000 & 1302 10.000", dr)
+	}
+}

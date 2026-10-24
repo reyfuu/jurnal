@@ -322,6 +322,8 @@ export interface CatatanJurnal {
   tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string
   /** barang untuk satu-satunya transaksi Penjualan / Beli Bahan / Stok catatan ini */
   rincian?: RincianBarang[]; bukan_barang?: boolean
+  /** nama barang terpilih, disimpan sebagai item transaksi berbarangnya (sama dengan form Transaksi) */
+  item?: string
 }
 /** Jejak foto nota yang menjadi bukti catatan: kapan dibaca AI, siapa yang menyimpan. */
 export interface FotoNota { dibaca_pada: string; disimpan_oleh: string; disimpan_pada: string; yakin?: string }

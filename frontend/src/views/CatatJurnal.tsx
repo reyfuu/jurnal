@@ -7,7 +7,7 @@ import {
 } from '@/lib/api'
 import { PilihRincianBarang } from '@/components/PilihRincianBarang'
 import { barisBerbarang, PESAN_PECAH_CATAT, rincianDariNota } from '@/lib/catatBarang'
-import { berbarang, bodyRincian, rincianDariTx, rincianSah, wajibBarang, type NilaiRincian } from '@/lib/rincian'
+import { barisTerpilih, berbarang, bodyRincian, rincianDariTx, rincianSah, wajibBarang, type NilaiRincian } from '@/lib/rincian'
 import { angka } from '@/lib/angka'
 import { bacaDraft, hapusDraft, useSimpanDraft } from '@/lib/draft'
 import { formatRp, formatTanggal } from '@/lib/format'
@@ -85,7 +85,8 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan, perpetual
   const [versiRincian, setVersiRincian] = useState(0) // naik saat diisi dari luar → pemilih barang dimuat ulang
   const [tidakCocok, setTidakCocok] = useState<string[]>([]) // barang di nota yang tidak ada di daftar
   const isiRincian = (v: NilaiRincian) => { setRincianAsli(v); setVersiRincian((n) => n + 1) }
-  const muatBarang = () => getPilihanBarang().then((b) => { setBarang(b); return b }, () => barang)
+  // gagal muat: daftar kosong (pemilih tetap memakai state terakhir), bukan salinan state lama
+  const muatBarang = () => getPilihanBarang().then((b) => { setBarang(b); return b }, () => ({ mulai: '', barang: [] as PilihanBarang[] }))
 
   useEffect(() => {
     let hidup = true
@@ -193,7 +194,9 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan, perpetual
       const isi = baris.filter((b) => b.debit || b.kredit).map(({ akun, debit, kredit, jatuh_tempo }) => ({ akun, keterangan: '', debit, kredit, jatuh_tempo }))
       // dari foto: tandai sumbernya (cek dobel); catatan baru juga menyimpan fotonya sebagai bukti
       const b = satuBarang ? bodyRincian(rincian, satuBarang.jenis) : { rincian: undefined, bukan_barang: bolehBarang && rincian.bukan_barang }
-      await simpanCatatanJurnal({ ...kepala, baris: isi, rincian: b.rincian, bukan_barang: b.bukan_barang || undefined, ...(nota ? { sumber: 'foto' as const } : {}), ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
+      // nama barang terpilih jadi item transaksinya, sama dengan form Transaksi
+      const item = (b.rincian ?? []).map((r) => barang.barang.find((x) => x.id === r.stok_id)?.nama).filter(Boolean).join(', ')
+      await simpanCatatanJurnal({ ...kepala, baris: isi, rincian: b.rincian, bukan_barang: b.bukan_barang || undefined, item: item || undefined, ...(nota ? { sumber: 'foto' as const } : {}), ...(!grup && nota ? { bukti: nota.bukti } : {}) }, grup)
       setMirip(null)
       setYakinBeda(false)
       if (draftKey) hapusDraft(draftKey)
@@ -367,6 +370,11 @@ export function CatatJurnal({ jenisAwal, grup, onKembali, onTersimpan, perpetual
                 <PilihRincianBarang key={versiRincian} id="catat-barang" jenis={satuBarang.jenis} nominal={satuBarang.nominal}
                   value={rincian} onChange={setRincianAsli} barang={barang.barang} wajib={wajib} bolehBarangBaru={bolehBarangBaru}
                   onBarangBaru={(b) => setBarang((x) => ({ ...x, barang: [...x.barang, b] }))} />
+                {!rincian.bukan_barang && barisTerpilih(rincian.rincian).length > 0 && (
+                  <p className="text-xs text-muted-foreground" style={{ margin: 0 }}>{!barang.mulai
+                    ? perpetual ? 'Kartu stok belum dimulai: dimulai otomatis dari daftar barang pada tanggal transaksi ini.' : 'Kartu stok belum dimulai, jadi stok belum bergerak.'
+                    : kepala.tanggal < barang.mulai ? `Tanggal ini sebelum titik nol stok (${barang.mulai}), jadi stok tidak bergerak.` : 'Stok & HPP ikut bergerak.'}</p>
+                )}
                 {tidakCocok.length > 0 && !rincian.bukan_barang && (
                   <p className="text-xs" role="status" style={{ color: 'var(--text-warn)', margin: 0 }}>
                     Belum ada di daftar barang: {tidakCocok.join(', ')}.{bolehBarangBaru ? ' Tambahkan lewat pilihan "+ Barang baru" di atas, lalu isi jumlahnya.' : ''}

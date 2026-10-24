@@ -32,6 +32,8 @@ type catatReq struct {
 	// yang dihasilkan catatan ini (persediaan per akun tahap 2; wajib di perpetual).
 	Rincian     []finance.RincianBarang `json:"rincian,omitempty"`
 	BukanBarang bool                    `json:"bukan_barang,omitempty"`
+	// Item: nama barang terpilih (diisi klien seperti form Transaksi), untuk transaksi berbarang itu.
+	Item string `json:"item,omitempty"`
 }
 
 var errPecahCatat = errors.New("catatan ini berisi lebih dari satu penjualan/pembelian barang; pecah jadi beberapa catatan")
@@ -118,6 +120,7 @@ func (s *tenant) susunTxCatat(c catatReq, grup int) ([]finance.Transaction, erro
 			return nil, errors.New("barang hanya untuk catatan penjualan atau pembelian bahan / stok")
 		case 1:
 			txs[barang[0]].Rincian = slices.Clone(c.Rincian)
+			txs[barang[0]].Item = c.Item
 		default:
 			return nil, errPecahCatat
 		}

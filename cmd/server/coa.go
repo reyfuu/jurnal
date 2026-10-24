@@ -107,7 +107,12 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 	if sp.Aktif {
 		akunBeli = akunOf
 	}
-	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta, akunBeli) {
+	// Akun pilihan persediaan (mis. dari Catat cepat) juga dipecah per akun barang.
+	akunPersediaan := map[string]bool{}
+	for _, a := range coa.AkunPersediaan(all) {
+		akunPersediaan[a.Kode] = true
+	}
+	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta, akunBeli, func(kode string) bool { return akunPersediaan[kode] }) {
 		ket := ketTx[l.TxID]
 		if bulanTx[l.TxID] < period {
 			ket = "Pelunasan: " + ket // transaksi bulan lalu yang dibayar bulan ini
