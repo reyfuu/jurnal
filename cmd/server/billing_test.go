@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -66,11 +68,14 @@ func TestBayarDuluSetelahOnboarding(t *testing.T) {
 }
 
 // fakeMidtrans: Snap & Status API palsu; status order bisa diatur dari test, opsional dengan
-// jumlah bayar ("settlement:990000.00"); bawaan harga Starter Bulanan.
-func fakeMidtrans(t *testing.T, status map[string]string) {
+// jumlah bayar ("settlement:990000.00"); bawaan harga Starter Bulanan. Mengembalikan jumlah
+// panggilan Snap.
+func fakeMidtrans(t *testing.T, status map[string]string) *atomic.Int32 {
 	t.Helper()
+	snap := &atomic.Int32{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/snap/v1/transactions" {
+			snap.Add(1)
 			_, _ = w.Write([]byte(`{"token":"tok-uji","redirect_url":"https://bayar"}`))
 			return
 		}
@@ -87,6 +92,72 @@ func fakeMidtrans(t *testing.T, status map[string]string) {
 	t.Setenv("MIDTRANS_SERVER_KEY", "SK-uji")
 	t.Setenv("MIDTRANS_SNAP_URL", srv.URL)
 	t.Setenv("MIDTRANS_API_URL", srv.URL)
+	return snap
+}
+
+func checkout(t *testing.T, srv *Server, c *http.Cookie, paket string) string {
+	t.Helper()
+	var co struct {
+		OrderID string `json:"order_id"`
+		Token   string `json:"token"`
+	}
+	rec := do(srv, c, http.MethodPost, "/api/v1/billing/checkout", `{"paket":"`+paket+`"}`)
+	_ = json.NewDecoder(rec.Body).Decode(&co)
+	if rec.Code != http.StatusOK || co.OrderID == "" || co.Token == "" {
+		t.Fatalf("checkout %s: %d %+v", paket, rec.Code, co)
+	}
+	return co.OrderID
+}
+
+// Checkout idempoten: paket sama yang masih pending memakai order & token Snap yang sama.
+func TestCheckoutIdempoten(t *testing.T) {
+	snap := fakeMidtrans(t, map[string]string{})
+	srv := NewServer()
+	qa := register(t, srv, registerBody)
+	tn := tenantByEmail(t, srv, qa)
+
+	a := checkout(t, srv, qa, "starter-bulanan")
+	if b := checkout(t, srv, qa, "starter-bulanan"); b != a || snap.Load() != 1 || len(tn.langganan.Orders) != 1 {
+		t.Fatalf("klik ulang: order %s vs %s, snap %d, orders %d", a, b, snap.Load(), len(tn.langganan.Orders))
+	}
+	if c := checkout(t, srv, qa, "pro-bulanan"); c == a || len(tn.langganan.Orders) != 2 {
+		t.Fatalf("paket lain harus order baru: %s, orders %d", c, len(tn.langganan.Orders))
+	}
+	tn.langganan.Orders[0].Waktu = time.Now().Add(-snapBerlaku - time.Minute)
+	if d := checkout(t, srv, qa, "starter-bulanan"); d == a {
+		t.Fatal("order pending kedaluwarsa harus diganti order baru")
+	}
+	tn.langganan.Orders[len(tn.langganan.Orders)-1].Status = "gagal"
+	n := len(tn.langganan.Orders)
+	checkout(t, srv, qa, "starter-bulanan")
+	if len(tn.langganan.Orders) != n+1 {
+		t.Fatal("order gagal tidak boleh dipakai ulang")
+	}
+
+	var b struct{ Orders []order }
+	_ = json.NewDecoder(do(srv, qa, http.MethodGet, "/api/v1/billing", "").Body).Decode(&b)
+	for _, o := range b.Orders {
+		if o.SnapToken != "" || o.RedirectURL != "" {
+			t.Fatalf("token Snap bocor ke GET /billing: %+v", o)
+		}
+	}
+}
+
+// Dua checkout bersamaan (klik ganda / dua tab) tetap satu order.
+func TestCheckoutBersamaan(t *testing.T) {
+	snap := fakeMidtrans(t, map[string]string{})
+	srv := NewServer()
+	qa := register(t, srv, registerBody)
+	var wg sync.WaitGroup
+	ids := make([]string, 5)
+	for i := range ids {
+		wg.Add(1)
+		go func() { defer wg.Done(); ids[i] = checkout(t, srv, qa, "starter-bulanan") }()
+	}
+	wg.Wait()
+	if n := len(tenantByEmail(t, srv, qa).langganan.Orders); n != 1 || snap.Load() != 1 {
+		t.Fatalf("checkout bersamaan: %d order, snap %d, ids %v", n, snap.Load(), ids)
+	}
 }
 
 func notify(srv *Server, orderID, signature string) int {

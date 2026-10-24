@@ -80,7 +80,14 @@ type order struct {
 	Status      string    `json:"status"` // pending | lunas | gagal
 	Waktu       time.Time `json:"waktu"`
 	DibayarPada time.Time `json:"dibayar_pada,omitzero"` // saat lunas; awal masa garansi
+	// Token Snap disimpan supaya checkout ulang paket yang sama memakai transaksi yang sama
+	// (lihat handleCheckout). Tidak dikirim ke GET /billing.
+	SnapToken   string `json:"snap_token,omitempty"`
+	RedirectURL string `json:"redirect_url,omitempty"`
 }
+
+// snapBerlaku: masa berlaku token Snap bawaan Midtrans; order pending lebih tua dibuat ulang.
+const snapBerlaku = 24 * time.Hour
 
 type langganan struct {
 	TrialSampai time.Time `json:"trial_sampai"`
@@ -269,6 +276,9 @@ func (s *Server) handleBilling(w http.ResponseWriter, r *http.Request) {
 	orders := append([]order{}, t.langganan.Orders...) // bukan nil: JSON [] supaya frontend aman
 	garansi := statusGaransi(t.langganan, time.Now())
 	t.mu.RUnlock()
+	for i := range orders {
+		orders[i].SnapToken, orders[i].RedirectURL = "", ""
+	}
 	slices.Reverse(orders) // terbaru dulu
 	writeJSON(w, map[string]any{
 		"langganan":  t.langgananStatus(time.Now()),
@@ -298,6 +308,23 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, t := currentUser(r), s.tenantOf(r)
+	// Idempoten: klik ganda, retry, atau tab lain untuk paket yang sama memakai order pending
+	// yang masih berlaku, supaya tidak ada dua transaksi yang bisa dibayar dua kali.
+	t.checkoutMu.Lock()
+	defer t.checkoutMu.Unlock()
+	t.mu.RLock()
+	i := slices.IndexFunc(t.langganan.Orders, func(o order) bool {
+		return o.Status == "pending" && o.Paket == p.ID && o.SnapToken != "" && time.Since(o.Waktu) < snapBerlaku
+	})
+	var lama order
+	if i >= 0 {
+		lama = t.langganan.Orders[i]
+	}
+	t.mu.RUnlock()
+	if i >= 0 {
+		writeJSON(w, map[string]any{"order_id": lama.ID, "token": lama.SnapToken, "redirect_url": lama.RedirectURL})
+		return
+	}
 	o := order{ID: fmt.Sprintf("LB-%d-%d", t.id, time.Now().UnixNano()), Paket: p.ID, Jumlah: p.Harga, Status: "pending", Waktu: time.Now()}
 	snap, err := mt.CreateSnap(r.Context(), midtrans.SnapRequest{
 		OrderID: o.ID, Amount: p.Harga, Name: u.Name, Email: u.Email,
@@ -308,6 +335,7 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "gagal menghubungi Midtrans, coba lagi", http.StatusBadGateway)
 		return
 	}
+	o.SnapToken, o.RedirectURL = snap.Token, snap.RedirectURL
 	t.mu.Lock()
 	t.langganan.Orders = append(t.langganan.Orders, o)
 	t.mu.Unlock()

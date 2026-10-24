@@ -214,6 +214,8 @@ CREATE TABLE IF NOT EXISTS billing_orders (
 
 -- Garansi 7 hari (Okt 2026): waktu lunas per order; ekspor pertama & klaim per usaha.
 ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS dibayar_pada TIMESTAMPTZ;
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS snap_token TEXT;
+ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS redirect_url TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ekspor_pertama TIMESTAMPTZ;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS garansi_diklaim TIMESTAMPTZ;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS garansi_alasan TEXT;
