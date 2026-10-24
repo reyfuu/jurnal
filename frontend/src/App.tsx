@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { BEBAS_TERKUNCI, VIEW_LABEL } from '@/lib/nav'
+import { BEBAS_TERKUNCI, bolehView, VIEW_LABEL } from '@/lib/nav'
 import { FiturTerkunci } from '@/components/FiturTerkunci'
 import { CatatanKlienView, PengingatCatatan, TulisCatatanTombol } from '@/components/CatatanKonsultan'
 import { PengingatJadwalBanner } from '@/components/PengingatJadwal'
@@ -15,7 +15,7 @@ import { DaftarAkun } from '@/views/DaftarAkun'
 import { Dashboard } from '@/views/Dashboard'
 import { Login, type AwalDaftar } from '@/views/Login'
 import { AturPassword } from '@/views/LupaPassword'
-import { TagihanTabs } from '@/views/Tagihan'
+import { HalamanPelanggan } from '@/views/Tagihan'
 import { LaporanKeuangan } from '@/views/Reports'
 import { UmurPiutang } from '@/views/UmurPiutang'
 import { TutupBuku } from '@/views/TutupBuku'
@@ -122,7 +122,7 @@ export default function App() {
     // atau Laporan AI bila belum berlangganan.
     const rute = bacaRute(window.location.hash)
     const habis = m.langganan.status === 'habis'
-    const boleh = habis ? ['laporan-ai', 'alat-gratis'].includes(rute.view) : m.views.includes(rute.view as View) || rute.view === 'catatan'
+    const boleh = habis ? ['laporan-ai', 'alat-gratis'].includes(rute.view) : bolehView(m.views, rute.view as View) || rute.view === 'catatan'
     setView(boleh ? (rute.view as View) : habis ? 'laporan-ai' : m.views[0])
     getBusiness().then(setBusiness, fail)
     // Butuh sesi: jangan dipanggil sebelum login.
@@ -205,7 +205,7 @@ export default function App() {
   if (me.views.includes('panel-master')) return <PanelMaster me={me} onLogout={onLogout} onLihat={gantiMode} />
   if (!business) return error ? <p className="workspace-subtitle" role="alert" style={{ padding: 24 }}>{error}</p> : null
 
-  const canSee = (v: View) => me.views.includes(v)
+  const canSee = (v: View) => bolehView(me.views, v)
   const terkunci = me.langganan.status === 'habis'
   // ganti = mengganti entri riwayat saat ini (dipakai saat pindah dari laci menu HP); true bila pindah halaman.
   const navigate = (v: View, tab?: string, ganti = false): boolean => {
@@ -420,7 +420,7 @@ export default function App() {
         )
       case 'umur-piutang':
       case 'piutang-utang':
-        return <TagihanTabs view="piutang-utang" boleh={canSee} onPilih={navigate}><UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} /></TagihanTabs>
+        return <UmurPiutang bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onChanged={() => void reload(me!, period)} navigate={navigate} />
       case 'tutup-buku':
         return <TutupBuku periods={periods} period={period} bisaUbah={!me!.lihat && canSee('transaksi-kelola')} onBuka={navigate} onChanged={() => void reload(me!, period)} />
       case 'laporan-penjualan':
@@ -434,7 +434,9 @@ export default function App() {
       case 'produksi-supplier':
         return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'invoice':
-        return <TagihanTabs view="invoice" boleh={canSee} onPilih={navigate}><InvoiceView isiAI={sinyalAI} /></TagihanTabs>
+        return <InvoiceView isiAI={sinyalAI} />
+      case 'pelanggan':
+        return <HalamanPelanggan />
       case 'simulasi-harga':
         return <SimulasiHarga period={period} />
       case 'pajak-umkm':

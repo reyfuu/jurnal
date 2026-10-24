@@ -15,6 +15,7 @@ export type View =
   | 'primbon-pajak' // katalog peraturan resmi (khusus pelanggan)
   | 'laporan-ai' | 'alat-gratis' // menu mode terkunci (belum berlangganan), hanya di frontend
   | 'catatan' // catatan konsultan untuk klien, hanya di frontend
+  | 'pelanggan' // halaman Pelanggan, hanya di frontend; izinnya = invoice
 
 export type Role = 'owner' | 'admin' | 'kasir' | 'mp' | 'lihat'
 
