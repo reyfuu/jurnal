@@ -96,7 +96,7 @@ function Combobox({ id, value, onChange, options, placeholder = "Pilih", searchP
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(o)}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm data-active:bg-accent data-active:text-accent-foreground aria-selected:bg-primary/10 aria-selected:font-semibold aria-selected:ring-1 aria-selected:ring-primary/40"
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm data-active:bg-accent data-active:text-accent-foreground"
               >
                 <span>{o}</span>
                 {o === selected && <CheckIcon className="size-4" aria-hidden="true" />}
