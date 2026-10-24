@@ -286,6 +286,7 @@ const STATUS_CLS: Record<StokRow['status'], string> = {
 /** isiAI: isian dari Tanya AI untuk barang baru (bisa diurungkan). */
 export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolean; aksi?: string; isiAI?: SinyalAI }) {
   const [data, setData] = useState<StokSummary | null>(null)
+  const pilihanAkun: PilihanAkunStok[] = data?.pilihan_akun ?? []
   // aksi dari tombol + Catat / Langkah memulai: stok awal & opname langsung ke tab Stok opname.
   const [tab, setTab] = useState<'daftar' | 'opname' | 'mutasi' | 'riwayat'>(() => (aksi === 'mulai' || aksi === 'opname' ? 'opname' : 'daftar'))
   const [dialog, setDialog] = useState<'beli' | null>(() => (bisaUbah && aksi === 'beli' ? 'beli' : null))
@@ -355,7 +356,6 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
 
   const list = data.items ?? []
   const mulai = data.mulai
-  const pilihanAkun: PilihanAkunStok[] = data?.pilihan_akun ?? []
   const editDilacak = editId !== null && !!list.find((x) => x.id === editId)?.dilacak
   const selesaiDialog = () => { setDialog(null); muat() }
   const kategoris = [...new Set(list.map((it) => it.kategori))].sort()
