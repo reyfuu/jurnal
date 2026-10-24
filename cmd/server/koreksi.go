@@ -149,6 +149,15 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 				return
 			}
 		}
+		// Keadaan sesudah koreksi (ubah atau hapus) tidak boleh membuat stok minus. Usulan basi
+		// ditangani di bawah (tidak diterapkan).
+		if txs, err := finance.TerapkanKoreksi(t.txs, *k); err == nil {
+			if err := t.cekTanpaMinusLocked(txs, t.tambahGerakUsulan(t.stokAwalKoreksiLocked(*k))); err != nil {
+				t.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
 	}
 	k.Catatan, k.DiputuskanOleh, k.DiputuskanPada = clip(strings.TrimSpace(req.Catatan), 500), u.Name, now
 	basi := false
@@ -159,13 +168,11 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 			k.Status, basi = finance.KoreksiKedaluwarsa, true
 		default:
 			// usulan berbarang pertama memulai kartu stok, sama seperti formulir transaksi
-			if k.Jenis == finance.KoreksiUbah && k.Usulan != nil {
-				if awal := t.stokAwalTxLocked(*k.Usulan); awal != nil {
-					if err := t.simpanStokAwalLocked(awal, u.Name, now); err != nil {
-						t.mu.Unlock()
-						http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
-						return
-					}
+			if awal := t.stokAwalKoreksiLocked(*k); awal != nil {
+				if err := t.simpanStokAwalLocked(awal, u.Name, now); err != nil {
+					t.mu.Unlock()
+					http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+					return
 				}
 			}
 			k.Status, t.txs = finance.KoreksiDisetujui, txs
@@ -210,4 +217,12 @@ func (t *tenant) koreksiMenunggu() int {
 		}
 	}
 	return n
+}
+
+// stokAwalKoreksiLocked: usulan stok awal otomatis untuk koreksi ubah berbarang; nil bila tidak perlu.
+func (s *tenant) stokAwalKoreksiLocked(k finance.Koreksi) *finance.GerakStok {
+	if k.Jenis != finance.KoreksiUbah || k.Usulan == nil {
+		return nil
+	}
+	return s.stokAwalTxLocked(*k.Usulan)
 }

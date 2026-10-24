@@ -1114,16 +1114,30 @@ func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Trans
 	return t, ok
 }
 
-// cekSimpanTxLocked: aturan simpan transaksi dari formulir — periode/saldo awal (409) lalu wajib
-// barang (400). Mengembalikan usulan stok awal otomatis (nil bila tidak perlu). s.mu dipegang.
-func (s *tenant) cekSimpanTxLocked(t finance.Transaction) (*finance.GerakStok, int, error) {
+// cekSimpanTxLocked: aturan simpan transaksi dari formulir — periode/saldo awal (409), wajib
+// barang (400), lalu stok tidak minus pada keadaan usulan (409). ganti = indeks transaksi yang
+// diubah, -1 untuk transaksi baru. Mengembalikan usulan stok awal otomatis (nil bila tidak
+// perlu). s.mu dipegang.
+func (s *tenant) cekSimpanTxLocked(t finance.Transaction, ganti int) (*finance.GerakStok, int, error) {
 	if err := s.cekTxLocked(t); err != nil {
 		return nil, http.StatusConflict, err
 	}
 	if err := s.cekBarangLocked(t); err != nil {
 		return nil, http.StatusBadRequest, err
 	}
-	return s.stokAwalTxLocked(t), 0, nil
+	awal := s.stokAwalTxLocked(t)
+	txs := slices.Clone(s.txs)
+	if ganti >= 0 {
+		t.ID = txs[ganti].ID
+		txs[ganti] = t
+	} else {
+		t.ID = s.nextTxID
+		txs = append(txs, t)
+	}
+	if err := s.cekTanpaMinusLocked(txs, s.tambahGerakUsulan(awal)); err != nil {
+		return nil, http.StatusConflict, err
+	}
+	return awal, 0, nil
 }
 
 // txResp: transaksi tersimpan + peringatan kas minus di bulan transaksi (tidak memblokir simpan).
@@ -1144,7 +1158,7 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.mu.Lock()
-	awal, kode, err := s.cekSimpanTxLocked(t)
+	awal, kode, err := s.cekSimpanTxLocked(t, -1)
 	if err != nil {
 		s.mu.Unlock()
 		http.Error(w, err.Error(), kode)
@@ -1198,7 +1212,7 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	awal, kode, err := s.cekSimpanTxLocked(t)
+	awal, kode, err := s.cekSimpanTxLocked(t, i)
 	if err != nil {
 		http.Error(w, err.Error(), kode)
 		return
@@ -1240,6 +1254,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	// kehilangan pasangan kas/utangnya, jadi harus lewat menu Aset.
 	if j := slices.IndexFunc(s.assets, func(a finance.Asset) bool { return a.TransaksiID == s.txs[i].ID }); j >= 0 {
 		http.Error(w, "transaksi ini adalah pembelian aset \""+s.assets[j].Nama+"\"; ubah atau hapus dari menu Aset supaya neraca tetap seimbang", http.StatusConflict)
+		return
+	}
+	if err := s.cekTanpaMinusLocked(slices.Delete(slices.Clone(s.txs), i, i+1), s.gerak); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.txs = slices.Delete(s.txs, i, i+1)
