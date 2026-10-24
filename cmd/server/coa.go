@@ -3,7 +3,9 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -145,7 +147,10 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 			kasAwal -= v
 		}
 	}
-	sp := s.kartuLocked().Periode(period)
+	k := s.kartuLocked()
+	sp := k.Periode(period)
+	akunOf := s.akunStokLocked(all, peta)
+	persediaanAwal := s.persediaanAwalPerAkunLocked(period, all, peta)
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
@@ -161,26 +166,84 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		j.entri = append(j.entri, entriJurnal{susut[i], ket}, entriJurnal{susut[i+1], ket})
 	}
-	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, persediaanAwal, opening.Payables, opening.Loans,
 		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
 	j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
-	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.
+	// Kartu stok: sesuaikan tiap akun persediaan ke nilai kartu barang-barangnya di akhir bulan;
+	// selisihnya masuk HPP. Akun persediaan yang terisi transaksi tanpa barang ikut ditutup ke
+	// nilai kartu, jadi persediaan tidak terhitung dua kali.
 	if sp.Aktif {
 		j.kartuAktif = true
-		var saldoPersediaan int64
+		target := k.NilaiPerAkun(period+"-31", akunOf)
+		saldo := map[string]int64{}
 		for _, b := range j.tb {
-			if b.Kode == peta.Kode(coa.PeranPersediaan) {
-				saldoPersediaan = b.Saldo
+			if b.Subtype == "inventory" {
+				saldo[b.Kode] = b.Saldo
 			}
 		}
-		if j.penyesuaian = sp.PersediaanAkhir - saldoPersediaan; j.penyesuaian != 0 {
-			for _, l := range coa.PenyesuaianPersediaan(period+"-28", j.penyesuaian, p, peta) {
+		kode := map[string]bool{}
+		for _, a := range coa.AkunPersediaan(active) {
+			kode[a.Kode] = true
+		}
+		for kd := range target {
+			kode[kd] = true
+		}
+		for kd := range saldo {
+			kode[kd] = true
+		}
+		disesuaikan := false
+		for _, kd := range slices.Sorted(maps.Keys(kode)) {
+			selisih := target[kd] - saldo[kd]
+			if selisih == 0 {
+				continue
+			}
+			j.penyesuaian += selisih
+			disesuaikan = true
+			for _, l := range coa.PenyesuaianPersediaan(period+"-28", kd, selisih, p, peta) {
 				j.entri = append(j.entri, entriJurnal{l, "Penyesuaian persediaan ke nilai kartu stok"})
 			}
+		}
+		if disesuaikan {
 			j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 		}
 	}
 	return j, true
+}
+
+// persediaanAwalPerAkunLocked: saldo awal persediaan per akun pada awal periode. Kartu aktif:
+// nilai kartu per akun di akhir bulan lalu, ditambah baris stok awal (titik nol / barang baru)
+// bulan ini — sama dengan PersediaanAwal kartu. Selain itu baris persediaan saldo awal
+// berkode akun persediaan masuk ke akunnya, sisanya ke akun peran. Jumlahnya selalu sama
+// dengan openingFor(period).Inventory. Pemanggil memegang s.mu.
+func (s *tenant) persediaanAwalPerAkunLocked(period string, all []coa.Account, peta coa.Peta) map[string]int64 {
+	peran := peta.Kode(coa.PeranPersediaan)
+	k := s.kartuLocked()
+	if k.Periode(period).Aktif {
+		akunOf := s.akunStokLocked(all, peta)
+		out := k.NilaiPerAkun(period+"-00", akunOf) // semua baris sebelum tanggal 1
+		out[peran] += 0                              // akun peran selalu tampil, seperti sebelumnya
+		for _, b := range k.Baris {
+			if b.Jenis == finance.KartuAwal && b.Tanggal >= period+"-01" && b.Tanggal <= period+"-31" {
+				out[akunOf(b.StokID)] += b.Nilai
+			}
+		}
+		return out
+	}
+	ob := s.bukuAwalLocked()
+	punya := map[string]bool{}
+	for _, a := range coa.AkunPersediaan(all) {
+		punya[a.Kode] = true
+	}
+	out := map[string]int64{}
+	sisa := ob.Persediaan
+	for _, r := range ob.Rincian {
+		if r.Kategori == finance.KatPersediaan && punya[r.Kode] && r.Kode != peran {
+			out[r.Kode] += r.Nominal
+			sisa -= r.Nominal
+		}
+	}
+	out[peran] += sisa
+	return out
 }
 
 // kodeModal: akun modal usaha ini (sama dengan pilihan jurnal otomatis).

@@ -62,9 +62,16 @@ func IncomeStatement(tb []Balance, p finance.BusinessProfile, peta Peta) IncomeS
 }
 
 // IncomeStatementKartu: seperti IncomeStatement; bila kartu aktif, neraca saldo sudah memuat
-// jurnal PenyesuaianPersediaan sebesar penyesuaian (1301 = persediaan akhir kartu stok).
+// jurnal PenyesuaianPersediaan sejumlah penyesuaian (akun persediaan = nilai kartu stok).
+// Persediaan awal/akhir = jumlah semua akun persediaan (subtype inventory), bukan hanya akun peran.
 func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, penyesuaian int64, peta Peta) IncomeStatementResult {
 	persediaan, pembelian := peta.Kode(PeranPersediaan), peta.Kode(PeranPembelian)
+	var saldoPersediaan int64
+	for _, b := range tb {
+		if b.Subtype == "inventory" {
+			saldoPersediaan += b.Saldo
+		}
+	}
 	r := IncomeStatementResult{Metode: "periodik"}
 	r.Pendapatan, r.PenjualanBersih = linesOf(tb, PendapatanUsaha)
 	var hppLines int64
@@ -81,11 +88,7 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 	case kartu:
 		// Penyesuaian dicatat ke 5102; ditampilkan kembali sebagai persediaan awal/akhir supaya
 		// baris Pembelian tetap menunjukkan pembelian sebenarnya.
-		for _, b := range tb {
-			if b.Kode == persediaan {
-				r.PersediaanAkhir = b.Saldo
-			}
-		}
+		r.PersediaanAkhir = saldoPersediaan
 		r.PersediaanAwal = r.PersediaanAkhir - penyesuaian
 		for i := range r.HPPLines {
 			if r.HPPLines[i].Kode == pembelian {
@@ -97,11 +100,7 @@ func IncomeStatementKartu(tb []Balance, p finance.BusinessProfile, kartu bool, p
 		r.Catatan = append(r.Catatan, "Metode periodik: persediaan awal & akhir dari kartu stok (rata-rata bergerak).")
 	default:
 		// ponytail: persediaan akhir = awal sampai stok opname/kartu stok dicatat di aplikasi.
-		for _, b := range tb {
-			if b.Kode == persediaan {
-				r.PersediaanAwal, r.PersediaanAkhir = b.Saldo, b.Saldo
-			}
-		}
+		r.PersediaanAwal, r.PersediaanAkhir = saldoPersediaan, saldoPersediaan
 		r.HPP = r.PersediaanAwal + hppLines - r.PersediaanAkhir
 		r.Catatan = append(r.Catatan, "Metode periodik: persediaan akhir sementara disamakan dengan persediaan awal sampai stok opname dicatat.")
 	}
