@@ -46,6 +46,10 @@ type MutasiRow struct {
 	Lunasi int `json:"lunasi,omitempty"`
 	// Pilih dipakai saat commit: baris yang tidak dipilih tidak dibukukan.
 	Pilih bool `json:"pilih"`
+	// Rincian / BukanBarang: barang baris Penjualan / Beli Bahan / Stok, dipilih di pratinjau
+	// (wajib di perpetual, lihat cekBarangLocked di server). Diabaikan untuk jenis lain.
+	Rincian     []RincianBarang `json:"rincian,omitempty"`
+	BukanBarang bool            `json:"bukan_barang,omitempty"`
 }
 
 // MutasiGrup: rekap per jenis untuk diperiksa sebelum submit.
@@ -506,7 +510,15 @@ func rekapMutasi(rows []MutasiRow) []MutasiGrup {
 // MutasiKeTransaksi mengubah baris yang sudah diperiksa jadi transaksi. Baris yang tidak
 // dipilih dilewati; baris yang jenisnya tidak dikenal dilaporkan dan tidak dibukukan.
 func MutasiKeTransaksi(rows []MutasiRow) ([]Transaction, []ImportError) {
+	out, _, errs := MutasiKeTransaksiBaris(rows)
+	return out, errs
+}
+
+// MutasiKeTransaksiBaris: seperti MutasiKeTransaksi, ditambah nomor baris berkas tiap transaksi
+// (sejajar indeks), supaya galat sesudahnya (mis. wajib barang) bisa ditunjuk per baris.
+func MutasiKeTransaksiBaris(rows []MutasiRow) ([]Transaction, []int, []ImportError) {
 	var out []Transaction
+	var baris []int
 	var errs []ImportError
 	for _, r := range rows {
 		if !r.Pilih || r.Lunasi != 0 {
@@ -515,6 +527,9 @@ func MutasiKeTransaksi(rows []MutasiRow) ([]Transaction, []ImportError) {
 		t := Transaction{
 			Tanggal: r.Tanggal, Jenis: r.Jenis, Nominal: r.Nominal,
 			Keterangan: r.Keterangan, Lunas: true, Channel: "Mutasi Bank", Sumber: "mutasi",
+		}
+		if t.Jenis == JenisJual || t.Jenis == JenisBeliStok { // jenis diganti sesudah barang dipilih: barangnya dibuang
+			t.Rincian, t.BukanBarang = slices.Clone(r.Rincian), r.BukanBarang
 		}
 		if err := Validate(&t); err != nil {
 			errs = append(errs, ImportError{Baris: r.Baris, Pesan: err.Error()})
@@ -527,8 +542,9 @@ func MutasiKeTransaksi(rows []MutasiRow) ([]Transaction, []ImportError) {
 			continue
 		}
 		out = append(out, t)
+		baris = append(baris, r.Baris)
 	}
-	return out, errs
+	return out, baris, errs
 }
 
 // --- bantuan AI untuk baris yang tidak dikenali kata kunci ---

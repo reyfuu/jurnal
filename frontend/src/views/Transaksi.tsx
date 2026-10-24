@@ -553,6 +553,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, per
       <ImportDialog open={importing} onOpenChange={setImporting} onImported={() => Promise.all([refresh(), onChanged()]).then(() => {})} />
       <MutasiDialog
         open={imporMutasi} onOpenChange={setImporMutasi} jenis={jenis}
+        perpetual={perpetual} bolehBarangBaru={bolehBarangBaru && !lihat}
         onImported={() => { void Promise.all([refresh(), onChanged()]) }}
       />
     </>

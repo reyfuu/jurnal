@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"pajak/internal/ai"
 	"pajak/internal/finance"
@@ -233,23 +234,49 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "data baris mutasi tidak valid", http.StatusBadRequest)
 		return
 	}
-	txs, errs := finance.MutasiKeTransaksi(req.Rows)
+	txs, baris, errs := finance.MutasiKeTransaksiBaris(req.Rows)
+	txs, baris, errs = s.saringBarangMutasi(txs, baris, errs, func(t finance.Transaction) error {
+		if !s.validStok(t) { // validStok mengunci sendiri: dicek sebelum s.mu.Lock
+			return errors.New("barang yang dipilih tidak ada di Stok & Gudang")
+		}
+		return nil
+	})
 	var lunasi []finance.MutasiRow
 	for _, r := range req.Rows {
 		if r.Pilih && r.Lunasi != 0 {
 			lunasi = append(lunasi, r)
 		}
 	}
-	if len(txs) == 0 && len(lunasi) == 0 {
-		// Tidak ada yang bisa dibukukan: laporkan kenapa, jangan balas "berhasil 0".
-		http.Error(w, pesanGagalMutasi(errs), http.StatusBadRequest)
-		return
-	}
 	s.mu.Lock()
 	for _, t := range txs {
 		if err := s.cekTxLocked(t); err != nil {
 			s.mu.Unlock()
 			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+	}
+	// Wajib barang: galat per baris, baris lain tetap dibukukan.
+	txs, _, errs = s.saringBarangMutasi(txs, baris, errs, s.cekBarangLocked)
+	slices.SortStableFunc(errs, func(a, b finance.ImportError) int { return a.Baris - b.Baris })
+	if len(txs) == 0 && len(lunasi) == 0 {
+		s.mu.Unlock()
+		// Tidak ada yang bisa dibukukan: laporkan kenapa, jangan balas "berhasil 0".
+		http.Error(w, pesanGagalMutasi(errs), http.StatusBadRequest)
+		return
+	}
+	// Stok tidak minus dicek atas seluruh transaksi baru sekaligus (kartu yang belum dimulai
+	// dimulai di tanggal baris berbarang paling awal). Gagal = 409 dan tidak ada yang disimpan,
+	// termasuk baris tanpa barang dan pelunasan: menyimpan sebagian akan bergantung urutan baris.
+	awal, err := s.cekStokImporLocked(txs)
+	if err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if awal != nil { // hanya bila ada baris berbarang yang akan tersimpan
+		if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+			s.mu.Unlock()
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -280,6 +307,22 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
+}
+
+// saringBarangMutasi: rapikan barang tiap transaksi mutasi dan buang yang ditolak cek (galatnya
+// masuk errs dengan nomor baris berkasnya). baris sejajar txs.
+func (s *tenant) saringBarangMutasi(txs []finance.Transaction, baris []int, errs []finance.ImportError, cek func(finance.Transaction) error) ([]finance.Transaction, []int, []finance.ImportError) {
+	var okTx []finance.Transaction
+	var okBaris []int
+	for i, t := range txs {
+		finance.NormalkanBarang(&t)
+		if err := cek(t); err != nil {
+			errs = append(errs, finance.ImportError{Baris: baris[i], Pesan: err.Error()})
+			continue
+		}
+		okTx, okBaris = append(okTx, t), append(okBaris, baris[i])
+	}
+	return okTx, okBaris, errs
 }
 
 func pesanGagalMutasi(errs []finance.ImportError) string {

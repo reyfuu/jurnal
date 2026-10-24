@@ -1391,6 +1391,9 @@ export interface MutasiRow {
   /** Diisi ID transaksi: baris dicatat sebagai pelunasan transaksi itu, bukan transaksi baru. */
   lunasi?: number
   pilih: boolean
+  /** Barang baris Penjualan / Beli Bahan / Stok (wajib di perpetual), atau tanda jasa. */
+  rincian?: RincianBarang[]
+  bukan_barang?: boolean
 }
 
 /** Transaksi yang kemungkinan sama dengan uang masuk/keluar tertentu (cegah jurnal dobel). */
