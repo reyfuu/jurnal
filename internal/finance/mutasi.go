@@ -44,6 +44,10 @@ type MutasiRow struct {
 	// Lunasi: baris ini dicatat sebagai pelunasan transaksi belum lunas (Mirip.BelumLunas),
 	// bukan transaksi baru. Diisi ID transaksinya.
 	Lunasi int `json:"lunasi,omitempty"`
+	// Pindah: baris ini sama dengan transaksi lunas yang sudah ada (Mirip) dan membuktikan uangnya
+	// bergerak di rekening yang diimpor: akun bayar (Lawan) transaksi itu dipindah ke rekening
+	// tersebut, tanpa transaksi baru. Diisi ID transaksinya.
+	Pindah int `json:"pindah,omitempty"`
 	// Pilih dipakai saat commit: baris yang tidak dipilih tidak dibukukan.
 	Pilih bool `json:"pilih"`
 	// Rincian / BukanBarang: barang baris Penjualan / Beli Bahan / Stok, dipilih di pratinjau
@@ -521,8 +525,8 @@ func MutasiKeTransaksiBaris(rows []MutasiRow) ([]Transaction, []int, []ImportErr
 	var baris []int
 	var errs []ImportError
 	for _, r := range rows {
-		if !r.Pilih || r.Lunasi != 0 {
-			continue // pelunasan transaksi lama dicatat terpisah (lihat Lunasi)
+		if !r.Pilih || r.Lunasi != 0 || r.Pindah != 0 {
+			continue // pelunasan & pindah akun bayar transaksi lama dicatat terpisah (lihat Lunasi, Pindah)
 		}
 		t := Transaction{
 			Tanggal: r.Tanggal, Jenis: r.Jenis, Nominal: r.Nominal,

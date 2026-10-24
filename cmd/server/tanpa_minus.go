@@ -124,11 +124,6 @@ func batasSaldoLama(k finance.KartuStok) func(id int, tanggal string) int64 {
 	}
 }
 
-// galatStokKurang: pesan untuk baris k.Baris[i] yang membuat minus.
-//   - baris keluar: "stok <nama> tidak cukup pada <tanggal>: tersedia <qty> <satuan>, dibutuhkan
-//     <qty> <satuan>". Baris keluar barang yang sama dari sumber yang sama di tanggal itu
-//     (mis. dua baris rincian satu penjualan) dijumlah; tersedia = saldo sebelum baris pertamanya.
-//   - baris masuk (saldo tetap minus): "stok <nama> jadi minus pada <tanggal>: saldo <qty> <satuan>".
 // galatMinus: pesan stok minus + transaksi asal baris pelanggarnya (0 bila dari dokumen stok),
 // supaya pemanggil impor bisa menunjuk nomor baris berkasnya.
 type galatMinus struct {
@@ -138,6 +133,11 @@ type galatMinus struct {
 
 func (e *galatMinus) Error() string { return e.pesan }
 
+// galatStokKurang: pesan untuk baris k.Baris[i] yang membuat minus.
+//   - baris keluar: "stok <nama> tidak cukup pada <tanggal>: tersedia <qty> <satuan>, dibutuhkan
+//     <qty> <satuan>". Baris keluar barang yang sama dari sumber yang sama di tanggal itu
+//     (mis. dua baris rincian satu penjualan) dijumlah; tersedia = saldo sebelum baris pertamanya.
+//   - baris masuk (saldo tetap minus): "stok <nama> jadi minus pada <tanggal>: saldo <qty> <satuan>".
 func (s *tenant) galatStokKurang(k finance.KartuStok, i int) error {
 	b := k.Baris[i]
 	it, _ := s.stokByID(b.StokID)

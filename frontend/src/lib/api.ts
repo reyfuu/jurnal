@@ -1390,6 +1390,8 @@ export interface MutasiRow {
   mirip?: Mirip
   /** Diisi ID transaksi: baris dicatat sebagai pelunasan transaksi itu, bukan transaksi baru. */
   lunasi?: number
+  /** Diisi ID transaksi lunas yang sama: akun bayarnya dipindah ke rekening mutasi ini, tanpa transaksi baru. */
+  pindah?: number
   pilih: boolean
   /** Barang baris Penjualan / Beli Bahan / Stok (wajib di perpetual), atau tanda jasa. */
   rincian?: RincianBarang[]
@@ -1400,6 +1402,8 @@ export interface MutasiRow {
 export interface Mirip {
   id: number; invoice_id?: number; tanggal: string; jenis: string; keterangan?: string; pihak?: string
   nominal: number; sumber?: 'mutasi' | 'foto'; belum_lunas: boolean
+  /** Akun kas/bank tempat transaksi itu dibayar; grup = bagian catatan jurnal multi-akun. */
+  lawan?: string; grup?: number
 }
 export const cariMirip = (tanggal: string, nominal: number, arah: 'masuk' | 'keluar', kecualiGrup?: number) =>
   api<Mirip[]>(`/transactions/mirip?tanggal=${tanggal}&nominal=${nominal}&arah=${arah}${kecualiGrup ? `&kecuali_grup=${kecualiGrup}` : ''}`)
@@ -1433,6 +1437,8 @@ export interface MutasiCommitResult {
   disimpan: number
   /** Baris yang dicatat sebagai pelunasan transaksi belum lunas yang sudah ada. */
   dilunasi: number
+  /** Transaksi lama yang akun bayarnya dipindah ke rekening mutasi ini. */
+  dipindah: number
   errors: ImportError[] | null
   contoh: Tx[] | null
 }
@@ -1449,9 +1455,10 @@ export async function previewMutasi(file: File, tahun?: number, sandi?: string):
   return res.json()
 }
 
-/** Langkah 2: simpan baris yang sudah diperiksa — termasuk koreksi jenisnya. */
-export const commitMutasi = (rows: MutasiRow[]) =>
-  api<MutasiCommitResult>('/transactions/mutasi/commit', { method: 'POST', body: { rows } })
+/** Langkah 2: simpan baris yang sudah diperiksa — termasuk koreksi jenisnya. rekening: kode akun
+ *  kas/bank mutasi ini (kosong = rekening bawaan). */
+export const commitMutasi = (rows: MutasiRow[], rekening?: string) =>
+  api<MutasiCommitResult>('/transactions/mutasi/commit', { method: 'POST', body: { rows, rekening: rekening || undefined } })
 
 // --- Produksi & Supplier: resep (BOM) dan HPP per produk ---
 

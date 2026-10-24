@@ -59,3 +59,26 @@ func TestCariMirip_PindahDanaDuaArah(t *testing.T) {
 		t.Fatalf("nominal beda: %+v", m)
 	}
 }
+
+// Mirip membawa akun bayar, grup, dan invoice transaksi lunas (dipakai "sama — pindah akun bayar"),
+// dan baris mutasi Pindah tidak menjadi transaksi baru.
+func TestCariMirip_LawanGrupInvoice(t *testing.T) {
+	txs := []Transaction{
+		{ID: 1, Tanggal: "2026-10-10", Jenis: "Biaya Lain", Nominal: 50_000, Lunas: true, Lawan: "1102"},
+		{ID: 2, Tanggal: "2026-10-10", Jenis: "Biaya Lain", Nominal: 60_000, Lunas: true, Lawan: "1111", Grup: 3},
+		{ID: 3, Tanggal: "2026-10-10", Jenis: "Penjualan", Nominal: 70_000, Lunas: true, InvoiceID: 9},
+	}
+	if m := CariMirip(txs, "2026-10-11", 50_000, "keluar", nil); len(m) != 1 || m[0].Lawan != "1102" || m[0].Grup != 0 || m[0].InvoiceID != 0 {
+		t.Errorf("manual: %+v", m)
+	}
+	if m := CariMirip(txs, "2026-10-11", 60_000, "keluar", nil); len(m) != 1 || m[0].Grup != 3 {
+		t.Errorf("grup: %+v", m)
+	}
+	if m := CariMirip(txs, "2026-10-11", 70_000, "masuk", nil); len(m) != 1 || m[0].InvoiceID != 9 || m[0].BelumLunas {
+		t.Errorf("invoice lunas: %+v", m)
+	}
+	out, _ := MutasiKeTransaksi([]MutasiRow{{Baris: 2, Tanggal: "2026-10-11", Jenis: "Biaya Lain", Nominal: 50_000, Arah: "keluar", Pilih: true, Pindah: 1}})
+	if len(out) != 0 {
+		t.Errorf("baris pindah jadi transaksi baru: %+v", out)
+	}
+}

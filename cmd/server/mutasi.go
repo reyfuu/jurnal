@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"pajak/internal/ai"
+	"pajak/internal/coa"
 	"pajak/internal/finance"
 	"pajak/internal/xlsx"
 )
@@ -187,8 +188,18 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request, scan baca
 	if s.opening != nil {
 		awal = s.opening.Tanggal
 	}
+	peta := coa.PetaDari(s.akunLocked())
 	s.mu.RUnlock()
 	h := finance.ParseMutasi(rows, tahun, existing)
+	// Akun bayar efektif transaksi yang cocok (Lawan kosong = aturan channel / Kas), supaya klien
+	// bisa menawarkan "pindah akun bayar" hanya bila berbeda dari rekening mutasi ini.
+	for i := range h.Rows {
+		if m := h.Rows[i].Mirip; m != nil && !m.BelumLunas {
+			if j := slices.IndexFunc(existing, func(t finance.Transaction) bool { return t.ID == m.ID }); j >= 0 {
+				m.Lawan = coa.AkunBayar(existing[j], peta)
+			}
+		}
+	}
 	// Baris yang pasti ditolak saat disimpan tidak dicentang, supaya baris lainnya tetap bisa
 	// dibukukan (simpan menolak seluruh kiriman bila ada satu baris yang terkunci).
 	var nAwal, nTutup int
@@ -218,12 +229,17 @@ func (s *tenant) mutasiPreview(w http.ResponseWriter, r *http.Request, scan baca
 
 type mutasiCommitReq struct {
 	Rows []finance.MutasiRow `json:"rows"`
+	// Rekening: kode akun kas/bank mutasi ini (kosong = rekening bawaan). Transaksi baru dicatat
+	// di rekening ini, dan baris "sama — pindah" memindah akun bayar transaksinya ke sini.
+	Rekening string `json:"rekening,omitempty"`
 }
 
 type mutasiCommitResp struct {
 	Disimpan int `json:"disimpan"`
 	// Dilunasi: baris yang dicatat sebagai pelunasan transaksi belum lunas yang sudah ada.
-	Dilunasi int                   `json:"dilunasi"`
+	Dilunasi int `json:"dilunasi"`
+	// Dipindah: transaksi lama yang akun bayarnya dipindah ke rekening mutasi ini (MutasiRow.Pindah).
+	Dipindah int                   `json:"dipindah"`
 	Errors   []finance.ImportError `json:"errors"`
 	Contoh   []finance.Transaction `json:"contoh"`
 }
@@ -235,13 +251,22 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txs, baris, errs := finance.MutasiKeTransaksiBaris(req.Rows)
-	var lunasi []finance.MutasiRow
+	var lunasi, pindah []finance.MutasiRow
 	for _, r := range req.Rows {
-		if r.Pilih && r.Lunasi != 0 {
+		switch {
+		case r.Pilih && r.Lunasi != 0:
 			lunasi = append(lunasi, r)
+		case r.Pilih && r.Pindah != 0:
+			pindah = append(pindah, r)
 		}
 	}
 	s.mu.Lock()
+	rekening, err := s.rekeningMutasiLocked(req.Rekening)
+	if err != nil {
+		s.mu.Unlock()
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	for _, t := range txs {
 		if err := s.cekTxLocked(t); err != nil {
 			s.mu.Unlock()
@@ -251,8 +276,17 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	// Barang harus ada & wajib barang: galat per baris, baris lain tetap dibukukan.
 	txs, baris, errs = s.saringBarangMutasi(txs, baris, errs)
+	// Pindah akun bayar diperiksa dulu (tanpa mengubah apa pun), diterapkan sesudah cek stok.
+	var dipindah []int
+	for _, r := range pindah {
+		if err := s.cekPindahMutasiLocked(r, rekening); err != nil {
+			errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: err.Error()})
+			continue
+		}
+		dipindah = append(dipindah, r.Pindah)
+	}
 	urutGalat(errs)
-	if len(txs) == 0 && len(lunasi) == 0 {
+	if len(txs) == 0 && len(lunasi) == 0 && len(dipindah) == 0 {
 		s.mu.Unlock()
 		// Tidak ada yang bisa dibukukan: laporkan kenapa, jangan balas "berhasil 0".
 		http.Error(w, pesanGagalMutasi(errs), http.StatusBadRequest)
@@ -261,6 +295,7 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	// Stok tidak minus dicek atas seluruh transaksi baru sekaligus (kartu yang belum dimulai
 	// dimulai di tanggal baris berbarang paling awal). Gagal = 409 dan tidak ada yang disimpan,
 	// termasuk baris tanpa barang dan pelunasan: menyimpan sebagian akan bergantung urutan baris.
+	// Pindah akun bayar tidak mengubah kartu stok, jadi tidak ikut cek ini.
 	awal, err := s.cekStokImporLocked(txs)
 	if err != nil {
 		pesan := err.Error()
@@ -295,7 +330,13 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		}
 		dilunasi++
 	}
+	for _, id := range dipindah { // dicari ulang: pelunasan di atas bisa menggeser s.txs
+		if i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == id }); i >= 0 {
+			s.txs[i].Lawan = rekening
+		}
+	}
 	for i := range txs {
+		txs[i].Lawan = rekening // kosong (CoA tanpa bank) → rekening bawaan / aturan channel
 		s.pakaiRekeningBawaanLocked(&txs[i], "")
 		txs[i].ID = s.nextTxID
 		s.nextTxID++
@@ -307,7 +348,47 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	urutGalat(errs) // galat pelunasan menyusul sesudah galat barang
-	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
+	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Dipindah: len(dipindah), Errors: errs, Contoh: txs[:min(5, len(txs))]})
+}
+
+// rekeningMutasiLocked: kode rekening mutasi yang dipilih, divalidasi seperti BayarDari produksi
+// (harus akun kas/bank/e-wallet); kosong = rekening bawaan. s.mu dipegang.
+func (s *tenant) rekeningMutasiLocked(kode string) (string, error) {
+	if kode == "" {
+		return s.rekeningBawaanLocked(), nil
+	}
+	all := s.akunLocked()
+	if a, ok := coa.Find(all, kode); !ok || coa.JenisLawan(a, coa.PetaDari(all)) != coa.LawanRekening {
+		return "", errors.New("rekening mutasi harus akun Kas / Bank")
+	}
+	return kode, nil
+}
+
+// cekPindahMutasiLocked: nil bila akun bayar transaksi r.Pindah boleh dipindah ke rekening: masih cocok (CariMirip, sudah lunas), bukan transaksi invoice / catatan
+// multi-akun / Pindah Dana, dan bulannya belum ditutup. Tidak mengubah apa pun. s.mu dipegang.
+func (s *tenant) cekPindahMutasiLocked(r finance.MutasiRow, rekening string) error {
+	id := strconv.Itoa(r.Pindah)
+	if rekening == "" {
+		return errors.New("usaha belum punya akun Bank; pilih rekening mutasi dulu")
+	}
+	m := finance.CariMirip(s.txs, r.Tanggal, r.Nominal, r.Arah, nil)
+	if !slices.ContainsFunc(m, func(x finance.Mirip) bool { return x.ID == r.Pindah && !x.BelumLunas }) {
+		return errors.New("transaksi #" + id + " tidak cocok lagi dengan baris ini (nominal/arah/tanggal beda atau belum lunas); baris ini dilewati")
+	}
+	i := slices.IndexFunc(s.txs, func(t finance.Transaction) bool { return t.ID == r.Pindah })
+	t := s.txs[i]
+	switch {
+	case t.InvoiceID != 0:
+		return errTxInvoice
+	case t.Grup != 0:
+		return errTxGrup
+	case t.Jenis == finance.JenisPindahDana:
+		return errors.New("transaksi #" + id + " adalah Pindah Dana; ubah rekeningnya lewat menu Transaksi")
+	}
+	if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
+		return err
+	}
+	return nil
 }
 
 func urutGalat(errs []finance.ImportError) {
