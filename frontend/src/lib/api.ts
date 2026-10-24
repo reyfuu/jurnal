@@ -318,10 +318,15 @@ export type TxInput = Omit<Tx, 'id'>
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
 /** bukti: token dari bacaNota; fotonya disimpan sebagai bukti catatan baru. */
-export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string }
+export interface CatatanJurnal {
+  tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string
+  /** barang untuk satu-satunya transaksi Penjualan / Beli Bahan / Stok catatan ini */
+  rincian?: RincianBarang[]; bukan_barang?: boolean
+}
 /** Jejak foto nota yang menjadi bukti catatan: kapan dibaca AI, siapa yang menyimpan. */
 export interface FotoNota { dibaca_pada: string; disimpan_oleh: string; disimpan_pada: string; yakin?: string }
-export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
+/** beli_barang: di debit jadi Beli Bahan / Stok; jual_barang: di kredit jadi Penjualan (membawa barang). */
+export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang'; beli_barang?: boolean; jual_barang?: boolean }
 export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
 export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
 export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number; foto_nota?: FotoNota }>(`/catat/${grup}`)

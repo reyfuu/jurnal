@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"pajak/internal/coa"
 	"pajak/internal/finance"
@@ -27,6 +28,23 @@ type catatReq struct {
 	Sumber string `json:"sumber,omitempty"`
 	// Bukti: token dari baca foto nota; fotonya disimpan sebagai bukti catatan baru (bukti_nota.go).
 	Bukti string `json:"bukti,omitempty"`
+	// Rincian / BukanBarang: barang untuk satu-satunya transaksi Penjualan / Beli Bahan / Stok
+	// yang dihasilkan catatan ini (persediaan per akun tahap 2; wajib di perpetual).
+	Rincian     []finance.RincianBarang `json:"rincian,omitempty"`
+	BukanBarang bool                    `json:"bukan_barang,omitempty"`
+}
+
+var errPecahCatat = errors.New("catatan ini berisi lebih dari satu penjualan/pembelian barang; pecah jadi beberapa catatan")
+
+// txBerbarang: indeks transaksi yang boleh membawa barang (Penjualan, Beli Bahan / Stok).
+func txBerbarang(txs []finance.Transaction) []int {
+	var out []int
+	for i, t := range txs {
+		if t.Jenis == finance.JenisJual || t.Jenis == finance.JenisBeliStok {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 type catatResp struct {
@@ -42,6 +60,10 @@ type akunCatat struct {
 	Nama     string `json:"nama"`
 	Kelompok string `json:"kelompok"`
 	Lawan    string `json:"lawan,omitempty"` // rekening | piutang | utang
+	// BeliBarang / JualBarang: akun ini di debit menjadi Beli Bahan / Stok, di kredit menjadi
+	// Penjualan; layar Catat cepat lalu menampilkan pemilih barang.
+	BeliBarang bool `json:"beli_barang,omitempty"`
+	JualBarang bool `json:"jual_barang,omitempty"`
 }
 
 // handleOpsiCatat: daftar akun untuk baris jurnal dan akun bawaan tiap jenis Catat cepat.
@@ -54,7 +76,13 @@ func (s *tenant) handleOpsiCatat(w http.ResponseWriter, _ *http.Request) {
 	}{Akun: []akunCatat{}, Bawaan: map[string]string{
 		"kas": peta.Kode(coa.PeranKas), "bank": peta.Kode(coa.PeranBank), "piutang": peta.Kode(coa.PeranPiutang), "utang": peta.Kode(coa.PeranUtangUsaha)}}
 	for _, a := range active {
-		out.Akun = append(out.Akun, akunCatat{a.Kode, a.Nama, string(a.Kelompok), coa.JenisLawan(a, peta)})
+		x := akunCatat{Kode: a.Kode, Nama: a.Nama, Kelompok: string(a.Kelompok), Lawan: coa.JenisLawan(a, peta)}
+		if x.Lawan == "" {
+			jd, _ := coa.JenisUntukAkun(a, false, p, peta)
+			jk, _ := coa.JenisUntukAkun(a, true, p, peta)
+			x.BeliBarang, x.JualBarang = jd == finance.JenisBeliStok, jk == finance.JenisJual
+		}
+		out.Akun = append(out.Akun, x)
 	}
 	for _, j := range finance.JenisList {
 		out.Bawaan[j.Nama] = coa.AutoAccount(j.Nama, p, peta)
@@ -83,6 +111,20 @@ func (s *tenant) susunTxCatat(c catatReq, grup int) ([]finance.Transaction, erro
 	if err != nil {
 		return nil, err
 	}
+	barang := txBerbarang(txs)
+	if len(c.Rincian) > 0 {
+		switch len(barang) {
+		case 0:
+			return nil, errors.New("barang hanya untuk catatan penjualan atau pembelian bahan / stok")
+		case 1:
+			txs[barang[0]].Rincian = slices.Clone(c.Rincian)
+		default:
+			return nil, errPecahCatat
+		}
+	}
+	for _, i := range barang {
+		txs[i].BukanBarang = c.BukanBarang
+	}
 	for i := range txs {
 		t := &txs[i]
 		t.Tanggal, t.Pihak, t.NoBukti, t.Grup = c.Tanggal, c.Pihak, c.NoBukti, grup
@@ -95,25 +137,40 @@ func (s *tenant) susunTxCatat(c catatReq, grup int) ([]finance.Transaction, erro
 		if err := finance.Validate(t); err != nil {
 			return nil, err
 		}
+		if !s.validStok(*t) {
+			return nil, errors.New("barang yang dipilih tidak ada di Stok & Gudang")
+		}
+		finance.NormalkanBarang(t)
 	}
 	return txs, nil
 }
 
-// simpanCatatLocked mengganti transaksi grup (lama boleh kosong) dengan yang baru. s.mu dipegang.
-func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int, error) {
+// simpanCatatLocked mengganti transaksi grup (lama boleh kosong) dengan yang baru. Galat: kode
+// HTTP + pesan (periode 409, wajib barang 400, stok minus 409). oleh: pencatat stok awal otomatis.
+// s.mu dipegang.
+func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction, oleh string) ([]int, int, error) {
 	if slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool { return g.Grup == grup }) {
-		return nil, errors.New("catatan ini biaya lain produksi; ubah atau hapus lewat Produksi & Supplier → riwayat produksi")
+		return nil, http.StatusConflict, errors.New("catatan ini biaya lain produksi; ubah atau hapus lewat Produksi & Supplier → riwayat produksi")
 	}
 	for _, t := range s.txs {
 		if t.Grup == grup {
 			if err := s.cekTerbukaLocked(tanggalTx(t)...); err != nil {
-				return nil, err
+				return nil, http.StatusConflict, err
 			}
 		}
 	}
 	for _, t := range baru {
 		if err := s.cekTxLocked(t); err != nil {
-			return nil, err
+			return nil, http.StatusConflict, err
+		}
+	}
+	awal, kode, err := s.cekBarangCatatLocked(grup, baru)
+	if err != nil {
+		return nil, kode, err
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, oleh, time.Now().UTC()); err != nil {
+			return nil, http.StatusInternalServerError, errors.New("gagal menyimpan metode nilai stok")
 		}
 	}
 	nomor := "" // catatan yang diubah tetap memakai nomor jurnalnya
@@ -129,7 +186,38 @@ func (s *tenant) simpanCatatLocked(grup int, baru []finance.Transaction) ([]int,
 		s.txs = append(s.txs, t)
 		ids = append(ids, t.ID)
 	}
-	return ids, nil
+	return ids, 0, nil
+}
+
+// cekBarangCatatLocked: wajib barang per transaksi (400) lalu stok tidak minus (409) pada keadaan
+// usulan: transaksi grup lama diganti yang baru. Dasar pembanding = keadaan sekarang + stok awal
+// otomatis (bila kartu dimulai oleh catatan ini), tanpa transaksi baru (lihat cekSimpanTxLocked).
+// Mengembalikan usulan stok awal otomatis (nil bila tidak perlu). s.mu dipegang.
+func (s *tenant) cekBarangCatatLocked(grup int, baru []finance.Transaction) (*finance.GerakStok, int, error) {
+	var awal *finance.GerakStok
+	for _, t := range baru {
+		if err := s.cekBarangLocked(t); err != nil {
+			if len(txBerbarang(baru)) > 1 { // rincian hanya bisa ditempel ke satu transaksi
+				return nil, http.StatusBadRequest, errPecahCatat
+			}
+			return nil, http.StatusBadRequest, err
+		}
+		if awal == nil {
+			awal = s.stokAwalTxLocked(t)
+		}
+	}
+	txs := slices.DeleteFunc(slices.Clone(s.txs), func(t finance.Transaction) bool { return t.Grup == grup })
+	id := s.nextTxID
+	for _, t := range baru {
+		t.ID = id
+		id++
+		txs = append(txs, t)
+	}
+	gerak := s.tambahGerakUsulan(awal)
+	if err := s.cekTanpaMinusDariLocked(s.txs, gerak, txs, gerak); err != nil {
+		return nil, http.StatusConflict, err
+	}
+	return awal, 0, nil
 }
 
 func (s *tenant) grupBerikutLocked() int {
@@ -156,9 +244,9 @@ func (s *tenant) handleCreateCatat(w http.ResponseWriter, r *http.Request) {
 	for i := range txs {
 		txs[i].Grup = grup
 	}
-	ids, err := s.simpanCatatLocked(grup, txs)
+	ids, kode, err := s.simpanCatatLocked(grup, txs, currentUser(r).Name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), kode)
 		return
 	}
 	foto := s.lampirkanBuktiLocked(r, grup, c.Bukti)
@@ -193,6 +281,7 @@ func (s *tenant) handleGetCatat(w http.ResponseWriter, r *http.Request) {
 	for _, t := range txs {
 		out.Transaksi = append(out.Transaksi, t.ID)
 	}
+	out.Rincian, out.BukanBarang = barangCatat(txs)
 	s.mu.RLock()
 	if m, ok := s.buktiLocked(grup); ok {
 		out.FotoNota = m.info()
@@ -218,9 +307,9 @@ func (s *tenant) handleUpdateCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "catatan tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	ids, err := s.simpanCatatLocked(grup, txs)
+	ids, kode, err := s.simpanCatatLocked(grup, txs, currentUser(r).Name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), kode)
 		return
 	}
 	out := catatResp{catatReq: c, Grup: grup, Transaksi: ids, NoJurnal: s.nomorTxLocked(ids[0])}
@@ -238,10 +327,24 @@ func (s *tenant) handleDeleteCatat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "catatan tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	if _, err := s.simpanCatatLocked(grup, nil); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+	if _, kode, err := s.simpanCatatLocked(grup, nil, currentUser(r).Name); err != nil {
+		http.Error(w, err.Error(), kode)
 		return
 	}
 	s.hapusBuktiLocked(grup)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// barangCatat: rincian & tanda jasa catatan untuk layar ubah (transaksi berbarang grup itu).
+// Data lama stok_id tunggal tampil sebagai rincian satu baris.
+func barangCatat(txs []finance.Transaction) ([]finance.RincianBarang, bool) {
+	barang := txBerbarang(txs)
+	jasa := len(barang) > 0
+	for _, i := range barang {
+		if b := txs[i].BarisBarang(); len(b) > 0 {
+			return b, false
+		}
+		jasa = jasa && txs[i].BukanBarang
+	}
+	return nil, jasa
 }

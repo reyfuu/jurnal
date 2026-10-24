@@ -187,6 +187,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, per
       <>
         <PageHeader title="Catat transaksi" subtitle="Isi baris jurnal (akun, debit / kredit), atau isi dari foto nota." />
         <CatatJurnal key={`${halaman.jenis}|${halaman.grup ?? ''}`} jenisAwal={halaman.jenis} grup={halaman.grup}
+          perpetual={perpetual} bolehBarangBaru={bolehBarangBaru && !lihat}
           onKembali={() => setHalaman(null)}
           onTersimpan={async (pesan, tanggal) => {
             setTerkirim(pesan)
