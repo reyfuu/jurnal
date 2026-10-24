@@ -15,15 +15,15 @@ type ImportError struct {
 	Pesan string `json:"pesan"`
 }
 
-var importHeaders = []string{"Tanggal", "Jenis", "Nominal", "Keterangan", "Produk / Bahan", "Jumlah", "Channel", "Pelanggan / Supplier", "Status Bayar", "Tanggal Lunas"}
+var importHeaders = []string{"Tanggal", "Jenis", "Nominal", "Keterangan", "Produk / Bahan", "Jumlah", "Channel", "Pelanggan / Supplier", "Status Bayar", "Tanggal Lunas", "Barang", "jumlah_barang"}
 
 // TemplateRows: header + contoh untuk template Excel; contohnya harus lolos ParseImport.
 func TemplateRows() [][]string {
 	return [][]string{
 		importHeaders,
-		{"2026-08-01", "Penjualan", "1250000", "Rekap kasir", "Es Kopi Susu", "50", "Dine-in", "", "Lunas", ""},
-		{"2026-08-02", "Beli Bahan / Stok", "850000", "Belanja susu", "Fresh Milk 1L", "40", "", "Toko Susu Segar", "Belum Lunas", ""},
-		{"2026-08-28", "Gaji & Upah", "12500000", "Gaji barista", "", "", "", "", "Lunas", ""},
+		{"2026-08-01", "Penjualan", "1250000", "Rekap kasir", "Es Kopi Susu", "50", "Dine-in", "", "Lunas", "", "Es Kopi Susu", "50"},
+		{"2026-08-02", "Beli Bahan / Stok", "850000", "Belanja susu", "Fresh Milk 1L", "40", "", "Toko Susu Segar", "Belum Lunas", "", "Fresh Milk 1L", "40"},
+		{"2026-08-28", "Gaji & Upah", "12500000", "Gaji barista", "", "", "", "", "Lunas", "", "", ""},
 	}
 }
 
@@ -94,6 +94,14 @@ func findJenis(s string) (string, bool) {
 
 // column menebak arti header; urutan cek penting ("tanggal lunas" sebelum "tanggal", "nominal" sebelum "jumlah").
 func column(h string) string {
+	// Kolom barang hanya dikenali dari header persis template ("Barang", "jumlah_barang") supaya
+	// berkas lama dengan header seperti "Nama Barang" / "Jumlah Barang" tetap terbaca seperti dulu.
+	switch strings.ToLower(strings.TrimSpace(h)) {
+	case "barang":
+		return "barang"
+	case "jumlah_barang":
+		return "jumlah_barang"
+	}
 	h = norm(h)
 	switch {
 	case strings.Contains(h, "tanggal") && strings.Contains(h, "lunas"):
@@ -156,8 +164,66 @@ func parseRupiah(s string) (int64, bool) {
 	return n, err == nil && s != ""
 }
 
+// ImportRow: satu baris sheet yang lolos baca, dengan teks kolom barang apa adanya. Pencocokan ke
+// daftar barang dilakukan server. JumlahBarang per seribu satuan (TakaranSkala); AdaJumlah = sel
+// jumlah barang terisi.
+type ImportRow struct {
+	Baris        int // nomor baris Excel (1-based), sama dengan ImportError.Baris
+	Tx           Transaction
+	BarangTeks   string
+	JumlahBarang int64
+	AdaJumlah    bool
+}
+
+// JasaTeks: isi kolom barang yang berarti transaksi ini bukan barang persediaan (BukanBarang).
+func JasaTeks(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "jasa") }
+
+var (
+	ribuanTitik = regexp.MustCompile(`^\d{1,3}(\.\d{3})+$`)
+	desimalKoma = regexp.MustCompile(`^(\d+|\d{1,3}(\.\d{3})+),(\d{1,3})$`)
+	desimalTtk  = regexp.MustCompile(`^\d+\.\d{1,3}$`)
+	hanyaAngka  = regexp.MustCompile(`^\d+$`)
+)
+
+// parseJumlahBarang membaca jumlah desimal menjadi per seribu (TakaranSkala), aturan sama dengan
+// parseRupiah: bila ada "," maka "," adalah desimal dan "." pemisah ribuan ("1.250,5" = 1250,5);
+// bila hanya "." maka ribuan jika berpola 1-3 angka lalu kelompok tiga angka ("1.250" = 1250),
+// selain itu desimal ("2.5", "1.25" dari sel angka Excel). Campuran gaya "1,250.5" ditolak.
+// Maksimum tiga angka desimal; harus lebih dari 0.
+func parseJumlahBarang(s string) (int64, bool) {
+	s = strings.ReplaceAll(strings.TrimSpace(s), " ", "")
+	switch {
+	case hanyaAngka.MatchString(s):
+	case ribuanTitik.MatchString(s):
+		s = strings.ReplaceAll(s, ".", "")
+	case desimalKoma.MatchString(s):
+		s = strings.Replace(strings.ReplaceAll(s, ".", ""), ",", ".", 1)
+	case desimalTtk.MatchString(s):
+	default:
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || f <= 0 || f > 1e12 {
+		return 0, false
+	}
+	q := int64(math.Round(f * TakaranSkala))
+	return q, q > 0
+}
+
 // ParseImport mengubah baris sheet menjadi transaksi valid; baris bermasalah dilaporkan, tidak ikut.
+// Kolom barang (opsional) diabaikan di sini; pakai ParseImportBaris untuk membawanya.
 func ParseImport(rows [][]string) ([]Transaction, []ImportError) {
+	baris, errs := ParseImportBaris(rows)
+	var txs []Transaction
+	for _, r := range baris {
+		txs = append(txs, r.Tx)
+	}
+	return txs, errs
+}
+
+// ParseImportBaris: seperti ParseImport tetapi membawa nomor baris dan teks kolom barang &
+// jumlah barang (opsional) untuk dicocokkan server.
+func ParseImportBaris(rows [][]string) ([]ImportRow, []ImportError) {
 	headerAt, cols := -1, map[string]int{}
 	for i := 0; i < len(rows) && i < 10 && headerAt < 0; i++ {
 		m := map[string]int{}
@@ -180,7 +246,7 @@ func ParseImport(rows [][]string) ([]Transaction, []ImportError) {
 		return nil, []ImportError{{0, "header tidak ditemukan: butuh kolom Tanggal, Jenis, dan Nominal (pakai template)"}}
 	}
 
-	var txs []Transaction
+	var out []ImportRow
 	var errs []ImportError
 	for i := headerAt + 1; i < len(rows); i++ {
 		row := rows[i]
@@ -225,11 +291,20 @@ func ParseImport(rows [][]string) ([]Transaction, []ImportError) {
 				continue
 			}
 		}
+		r := ImportRow{Baris: i + 1, BarangTeks: get("barang")}
+		if q := get("jumlah_barang"); q != "" {
+			if r.JumlahBarang, ok = parseJumlahBarang(q); !ok {
+				fail("jumlah barang %q bukan angka lebih dari 0 (maksimal 3 desimal)", q)
+				continue
+			}
+			r.AdaJumlah = true
+		}
 		if err := Validate(&t); err != nil {
 			fail("%s", err)
 			continue
 		}
-		txs = append(txs, t)
+		r.Tx = t
+		out = append(out, r)
 	}
-	return txs, errs
+	return out, errs
 }

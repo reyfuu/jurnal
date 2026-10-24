@@ -96,6 +96,7 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Susun semua dokumen & transaksi dulu; baru disimpan bila semuanya sah.
+	nStok, nextStok := len(s.stok), s.nextStokID // barang jadi baru dibatalkan bila stok kurang
 	var gerak []finance.GerakStok
 	var txs []finance.Transaction
 	grup := s.grupBerikutLocked()
@@ -172,19 +173,28 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 	}
 
 	oleh, kini := currentUser(r).Name, time.Now().UTC()
+	var awal *finance.GerakStok
 	if !mulai {
 		// Kartu stok belum dimulai: daftar barang hari ini jadi stok awal (titik nol).
-		awal := finance.GerakStok{Tanggal: req.Tanggal, Jenis: finance.GerakAwal, Keterangan: "Stok awal otomatis dari daftar barang (produksi pertama)"}
-		for _, it := range s.stok {
-			awal.Baris = append(awal.Baris, finance.BarisGerak{StokID: it.ID, Fisik: max(0, it.Jumlah) * finance.TakaranSkala, HargaUnit: it.HargaPokok})
-		}
-		if err := s.kunciMetodeStokLocked(); err != nil {
+		g := s.stokAwalDariDaftarLocked(req.Tanggal, "Stok awal otomatis dari daftar barang (produksi pertama)")
+		awal = &g
+	}
+	// Keadaan usulan (stok awal otomatis, semua dokumen produksi, biaya lain) tidak boleh minus.
+	usulan := []*finance.GerakStok{awal}
+	for i := range gerak {
+		usulan = append(usulan, &gerak[i])
+	}
+	// Dasar = keadaan sekarang + stok awal otomatis (bila ada), tanpa dokumen produksi ini.
+	if err := s.cekTanpaMinusDariLocked(s.txs, s.tambahGerakUsulan(awal), append(slices.Clone(s.txs), txs...), s.tambahGerakUsulan(usulan...)); err != nil {
+		s.stok, s.nextStokID = s.stok[:nStok], nextStok
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, oleh, kini); err != nil {
 			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 			return
 		}
-		awal.ID, awal.Oleh, awal.Dibuat = s.nextGerakID, oleh, kini
-		s.nextGerakID++
-		s.gerak = append(s.gerak, awal)
 		out.StokAwal = true
 	}
 	for _, g := range gerak {

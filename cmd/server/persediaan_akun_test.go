@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -395,8 +396,8 @@ func TestPersediaanAkun_PerpetualBeliTanpaBarang(t *testing.T) {
 	srv, qa := usahaManufakturPerpetual(t)
 	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
 	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+itoa(kain.ID)+`,"fisik":1000,"harga_unit":10000}]}`)
-	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
-		`{"tanggal":"2026-01-10","jenis":"Beli Bahan / Stok","nominal":100000,"lunas":true}`)
+	// Data lama sebelum aturan wajib barang: kini POST tanpa barang ditolak, jadi ditaruh langsung.
+	seedTx(t, srv, qa, finance.Transaction{Tanggal: "2026-01-10", Jenis: finance.JenisBeliStok, Nominal: 100000, Lunas: true})
 
 	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
 	tn := tenantByEmail(t, srv, qa)
@@ -456,4 +457,122 @@ func TestListStokBersamaanDenganUbah(t *testing.T) {
 		}
 	}
 	<-done
+}
+
+// kainBenangPerpetual: usaha manufaktur perpetual dengan Kain (1301) & Benang (1302), kartu
+// dimulai 1 Januari: Kain 1 m @10.000, Benang 1 m @5.000.
+func kainBenangPerpetual(t *testing.T) (*Server, *http.Cookie, finance.StokItem, finance.StokItem) {
+	t.Helper()
+	srv, qa := usahaManufakturPerpetual(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	benang := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Benang","kategori":"Bahan Penolong","satuan":"m"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[`+
+		`{"stok_id":`+itoa(kain.ID)+`,"fisik":1000,"harga_unit":10000},`+
+		`{"stok_id":`+itoa(benang.ID)+`,"fisik":1000,"harga_unit":5000}]}`)
+	return srv, qa, kain, benang
+}
+
+// Perpetual: satu pembelian dua barang beda akun + ongkir. Tiap baris didebit ke akun barangnya;
+// sisa (ongkir) ke akun bawaan pembelian tanpa barang, lalu tersapu penyesuaian ke HPP.
+func TestPersediaanAkun_PerpetualBeliDuaAkun(t *testing.T) {
+	srv, qa, kain, benang := kainBenangPerpetual(t)
+	beli := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-05","jenis":"Beli Bahan / Stok","nominal":40000,"lunas":true,"keterangan":"Kain, benang & ongkir","rincian":[`+
+			`{"stok_id":`+itoa(kain.ID)+`,"qty_stok":3000,"nilai":30000},{"stok_id":`+itoa(benang.ID)+`,"qty_stok":1000,"nilai":5000}]}`)
+
+	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	if got := saldoAkun(c, "1301"); got != 10_000+30_000 {
+		t.Errorf("saldo 1301 = %d, harus 40.000", got)
+	}
+	if got := saldoAkun(c, "1302"); got != 5_000+5_000 {
+		t.Errorf("saldo 1302 = %d, harus 10.000", got)
+	}
+	if got := totalPersediaan(c); got != 50_000 {
+		t.Errorf("total persediaan %d, harus 50.000", got)
+	}
+	if got := saldoAkun(c, "5101"); got != 5_000 {
+		t.Errorf("HPP 5101 = %d, harus 5.000 (ongkir tersapu)", got)
+	}
+	// Jurnal pembelian: Dr per akun barang + sisa ke akun bawaan; Cr satu baris sebesar Nominal.
+	tn := tenantByEmail(t, srv, qa)
+	j, _ := tn.jurnalPeriode("2026-01")
+	all, _, p := tn.coaAkun()
+	peta := coa.PetaDari(all)
+	bawaan := coa.AutoAccount(finance.JenisBeliStok, p, peta) // akun pembelian tanpa barang
+	var dr, cr []coa.Line
+	for _, e := range j.entri {
+		if e.TxID != beli.ID {
+			continue
+		}
+		l := e.Line
+		l.TxID, l.Tanggal = 0, ""
+		if l.Debit > 0 {
+			dr = append(dr, l)
+		} else {
+			cr = append(cr, l)
+		}
+	}
+	mauDr := []coa.Line{{Kode: "1301", Debit: 30_000}, {Kode: "1302", Debit: 5_000}, {Kode: bawaan, Debit: 5_000}}
+	if !slices.Equal(dr, mauDr) || len(cr) != 1 || cr[0].Kredit != 40_000 {
+		t.Errorf("jurnal pembelian Dr %+v Cr %+v; harus Dr %+v, Cr satu baris 40.000", dr, cr, mauDr)
+	}
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
+		t.Errorf("laba CoA %+v ≠ ringkas %d", c.IncomeStatement, is.NetProfit)
+	}
+	neracaSaldoSeimbang(t, c)
+}
+
+// Perpetual: satu penjualan dua barang → dua baris HPP dalam satu entri Jurnal Umum.
+func TestPersediaanAkun_PenjualanDuaBarang(t *testing.T) {
+	srv, qa, kain, benang := kainBenangPerpetual(t)
+	jual := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-10","jenis":"Penjualan","nominal":50000,"lunas":true,"keterangan":"Kain & benang","rincian":[`+
+			`{"stok_id":`+itoa(kain.ID)+`,"qty_stok":1000,"nilai":40000},{"stok_id":`+itoa(benang.ID)+`,"qty_stok":1000,"nilai":10000}]}`)
+
+	tn := tenantByEmail(t, srv, qa)
+	var entri []entriJurnalUmum
+	ju := tn.jurnalUmum("2026-01-01", "2026-01-31", "", "")
+	for _, e := range ju.Entri {
+		if e.TxID == jual.ID {
+			entri = append(entri, e)
+		}
+	}
+	if len(entri) != 1 {
+		t.Fatalf("penjualan harus satu entri Jurnal Umum, dapat %d: %+v", len(entri), entri)
+	}
+	e := entri[0]
+	var nBukti int
+	for _, x := range ju.Entri {
+		if x.Bukti == e.Bukti {
+			nBukti++
+		}
+	}
+	debit, kredit := map[string]int64{}, map[string]int64{}
+	for _, b := range e.Baris {
+		debit[b.Kode] += b.Debit
+		kredit[b.Kode] += b.Kredit
+	}
+	if nBukti != 1 || e.Debit != e.Kredit || debit["5101"] != 15_000 || kredit["1301"] != 10_000 || kredit["1302"] != 5_000 || kredit["4101"] != 50_000 {
+		t.Errorf("entri penjualan (bukti %s ×%d): %+v", e.Bukti, nBukti, e)
+	}
+	j, _ := tn.jurnalPeriode("2026-01")
+	var nHPP int
+	for _, l := range j.entri {
+		if l.TxID == jual.ID && l.Kode == "5101" && l.Debit > 0 {
+			nHPP++
+		}
+		if l.Ket == ketPenyesuaian {
+			t.Errorf("penyesuaian sisa harus 0: %+v", l)
+		}
+	}
+	if nHPP != 2 {
+		t.Errorf("baris HPP penjualan = %d, harus 2", nHPP)
+	}
+	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
+		t.Errorf("laba CoA %+v ≠ ringkas %d", c.IncomeStatement, is.NetProfit)
+	}
+	neracaSaldoSeimbang(t, c)
 }

@@ -276,6 +276,9 @@ export interface JenisInfo {
 }
 
 /** Transaksi bertanggal (sumber semua laporan). */
+/** Satu baris barang dalam transaksi; qty_stok per seribu satuan, nilai = bagian dari nominal. */
+export type RincianBarang = { stok_id: number; qty_stok: number; nilai?: number }
+
 export interface Tx {
   id: number
   tanggal: string
@@ -295,6 +298,10 @@ export interface Tx {
   /** Barang dari Stok & Gudang (Penjualan / Beli Bahan / Stok) dan jumlahnya per seribu satuan. */
   stok_id?: number
   qty_stok?: number
+  /** Beberapa barang dalam satu transaksi (menggantikan stok_id/qty_stok tunggal). */
+  rincian?: RincianBarang[]
+  /** Penjualan/pembelian yang memang bukan barang persediaan (mis. jasa). */
+  bukan_barang?: boolean
   /** Bagian dari catatan jurnal multi-akun (halaman Catat transaksi); diubah lewat halaman itu. */
   grup?: number
   no_bukti?: string
@@ -311,10 +318,17 @@ export type TxInput = Omit<Tx, 'id'>
 // --- Catat transaksi multi-akun (baris jurnal debit / kredit) ---
 export interface BarisCatat { akun: string; keterangan?: string; debit: number; kredit: number; jatuh_tempo?: string }
 /** bukti: token dari bacaNota; fotonya disimpan sebagai bukti catatan baru. */
-export interface CatatanJurnal { tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string }
+export interface CatatanJurnal {
+  tanggal: string; pihak?: string; no_bukti?: string; keterangan?: string; baris: BarisCatat[]; sumber?: 'foto'; bukti?: string
+  /** barang untuk satu-satunya transaksi Penjualan / Beli Bahan / Stok catatan ini */
+  rincian?: RincianBarang[]; bukan_barang?: boolean
+  /** nama barang terpilih, disimpan sebagai item transaksi berbarangnya (sama dengan form Transaksi) */
+  item?: string
+}
 /** Jejak foto nota yang menjadi bukti catatan: kapan dibaca AI, siapa yang menyimpan. */
 export interface FotoNota { dibaca_pada: string; disimpan_oleh: string; disimpan_pada: string; yakin?: string }
-export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang' }
+/** beli_barang: di debit jadi Beli Bahan / Stok; jual_barang: di kredit jadi Penjualan (membawa barang). */
+export interface AkunCatat { kode: string; nama: string; kelompok: string; lawan?: 'rekening' | 'piutang' | 'utang'; beli_barang?: boolean; jual_barang?: boolean }
 export interface OpsiCatat { akun: AkunCatat[]; bawaan: Record<string, string> }
 export const getOpsiCatat = () => api<OpsiCatat>('/catat/opsi')
 export const getCatatanJurnal = (grup: number) => api<CatatanJurnal & { grup: number; foto_nota?: FotoNota }>(`/catat/${grup}`)
@@ -588,6 +602,8 @@ export interface ImportResult {
   errors: { baris: number; pesan: string }[] | null
   sample: Tx[] | null
   imported: number
+  /** stok akan minus: seluruh impor ditolak sampai berkas diperbaiki */
+  galat?: string
 }
 
 /** Unggah .xlsx; commit=false hanya pratinjau (tidak menyimpan). */
@@ -1302,6 +1318,8 @@ export const getKartuBarang = (id: number, dari: string, sampai: string) => api<
 export const getMutasiStok = (dari: string, sampai: string) => api<LaporanMutasi>(`/stok/mutasi?dari=${dari}&sampai=${sampai}`)
 export const mutasiStokXlsxUrl = (dari: string, sampai: string) => `/api/v1/stok/mutasi.xlsx?dari=${dari}&sampai=${sampai}`
 export const getPilihanBarang = () => api<{ mulai: string; barang: PilihanBarang[] }>('/stok/pilihan')
+/** Sama dengan getPilihanBarang, untuk form invoice (dijaga menu Invoice, bukan Transaksi). */
+export const getPilihanBarangInvoice = () => api<{ mulai: string; barang: PilihanBarang[] }>('/invoice/pilihan-barang')
 
 export const getTagihan = () => api<TagihanSummary>('/tagihan')
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
@@ -1374,13 +1392,21 @@ export interface MutasiRow {
   mirip?: Mirip
   /** Diisi ID transaksi: baris dicatat sebagai pelunasan transaksi itu, bukan transaksi baru. */
   lunasi?: number
+  /** Diisi ID transaksi lunas yang sama: akun bayarnya dipindah ke rekening mutasi ini, tanpa transaksi baru. */
+  pindah?: number
   pilih: boolean
+  /** Barang baris Penjualan / Beli Bahan / Stok (wajib di perpetual), atau tanda jasa. */
+  rincian?: RincianBarang[]
+  bukan_barang?: boolean
 }
 
 /** Transaksi yang kemungkinan sama dengan uang masuk/keluar tertentu (cegah jurnal dobel). */
 export interface Mirip {
   id: number; invoice_id?: number; tanggal: string; jenis: string; keterangan?: string; pihak?: string
   nominal: number; sumber?: 'mutasi' | 'foto'; belum_lunas: boolean
+  /** Akun kas/bank tempat transaksi itu dibayar; grup = catatan jurnal / biaya produksinya;
+   *  produksi = biaya lain produksi, khusus = channel marketplace / B2B (akun bayar tak bisa dipindah). */
+  lawan?: string; grup?: number; produksi?: boolean; khusus?: boolean
 }
 export const cariMirip = (tanggal: string, nominal: number, arah: 'masuk' | 'keluar', kecualiGrup?: number) =>
   api<Mirip[]>(`/transactions/mirip?tanggal=${tanggal}&nominal=${nominal}&arah=${arah}${kecualiGrup ? `&kecuali_grup=${kecualiGrup}` : ''}`)
@@ -1412,6 +1438,10 @@ export interface MutasiHasil {
 
 export interface MutasiCommitResult {
   disimpan: number
+  /** Baris yang dicatat sebagai pelunasan transaksi belum lunas yang sudah ada. */
+  dilunasi: number
+  /** Transaksi lama yang akun bayarnya dipindah ke rekening mutasi ini. */
+  dipindah: number
   errors: ImportError[] | null
   contoh: Tx[] | null
 }
@@ -1428,9 +1458,10 @@ export async function previewMutasi(file: File, tahun?: number, sandi?: string):
   return res.json()
 }
 
-/** Langkah 2: simpan baris yang sudah diperiksa — termasuk koreksi jenisnya. */
-export const commitMutasi = (rows: MutasiRow[]) =>
-  api<MutasiCommitResult>('/transactions/mutasi/commit', { method: 'POST', body: { rows } })
+/** Langkah 2: simpan baris yang sudah diperiksa — termasuk koreksi jenisnya. rekening: kode akun
+ *  kas/bank mutasi ini (kosong = rekening bawaan). */
+export const commitMutasi = (rows: MutasiRow[], rekening?: string) =>
+  api<MutasiCommitResult>('/transactions/mutasi/commit', { method: 'POST', body: { rows, rekening: rekening || undefined } })
 
 // --- Produksi & Supplier: resep (BOM) dan HPP per produk ---
 
@@ -1574,6 +1605,9 @@ export interface InvoiceItem {
   qty: number
   satuan?: string
   harga_satuan: number
+  /** Barang yang dijual di baris ini (kartu stok); bukan_barang = baris jasa. Tidak dicetak di PDF. */
+  stok_id?: number
+  bukan_barang?: boolean
 }
 
 export interface InvoiceTotals {

@@ -432,6 +432,14 @@ CREATE TABLE IF NOT EXISTS mp_pengaturan (
 -- per seribu satuan); dokumen stok = stok awal (titik nol), stok opname, produksi.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS stok_id INT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS qty_stok BIGINT;
+-- Rincian barang (Okt 2026): beberapa barang per transaksi (JSONB) + tanda bukan barang.
+-- bukan_barang sengaja nullable: field omitempty hilang dari JSON, dan jsonb_populate_recordset
+-- mengisinya NULL (tanpa DEFAULT kolom); NOT NULL akan menggagalkan setiap simpan.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rincian JSONB;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS bukan_barang BOOLEAN;
+-- Akun persediaan per barang (StokItem.Akun). Nullable: tag omitempty + jsonb_populate_recordset
+-- mengisi NULL untuk kunci yang tidak ada, bukan DEFAULT.
+ALTER TABLE stok ADD COLUMN IF NOT EXISTS akun TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_gerak_id INT NOT NULL DEFAULT 1;
 CREATE TABLE IF NOT EXISTS gerak_stok (
 	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
@@ -515,3 +523,10 @@ CREATE TABLE IF NOT EXISTS pelanggan (
 	PRIMARY KEY (tenant_id, id)
 );
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_pelanggan_id INT NOT NULL DEFAULT 1;
+
+-- Barang per baris invoice (persediaan per akun tahap 2): sengaja nullable, sama dengan
+-- transactions.bukan_barang (field omitempty -> NULL lewat jsonb_populate_recordset).
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS stok_id INT;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS bukan_barang BOOLEAN;
+-- Rekening pelunasan invoice (impor mutasi): nullable, field omitempty.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS rekening_lunas TEXT;

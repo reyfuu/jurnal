@@ -6,14 +6,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
-  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type StokRow,
+  createTransaction, getGerakStok, getKartuBarang, getLaporanProduksi, getMutasiStok, getPilihanBarang, hapusGerakStok, laporanProduksiXlsxUrl, mutasiStokXlsxUrl,
+  type BarisKartu, type GerakStok, type JenisKartu, type KartuBarang, type LaporanMutasi, type LaporanProduksi, type PilihanBarang, type StokRow,
 } from '@/lib/api'
+import { PilihRincianBarang } from '@/components/PilihRincianBarang'
+import { barisTerpilih, bodyRincian, rincianSah, type NilaiRincian } from '@/lib/rincian'
 import { NAMA_METODE, NAMA_PENCATATAN, useMetodeStok } from '@/lib/metodeStok'
 import { angka } from '@/lib/angka'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { ekspor } from '@/lib/garansi'
-import { formatQty, parseQty } from '@/lib/qty'
+import { SKALA, formatQty } from '@/lib/qty'
 
 // Kartu stok: titik nol (stok awal), opname, beli bahan, kartu per barang, laporan mutasi,
 // dan riwayat dokumen stok. Beli bahan dicatat sebagai transaksi "Beli Bahan / Stok" yang
@@ -33,28 +35,36 @@ function Galat({ teks }: { teks: string }) {
 
 
 
-/** Beli bahan/barang: transaksi "Beli Bahan / Stok" yang memilih barang → stok & HPP (FIFO / rata-rata). */
-export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; onClose: () => void; onDone: () => void }) {
+/** Beli bahan/barang: transaksi "Beli Bahan / Stok" dengan satu atau beberapa barang → stok & HPP
+ *  (FIFO / rata-rata). Pembelian beberapa barang mengisi nilai tiap barang. */
+export function BeliBahanDialog({ items, bolehBarangBaru = false, onClose, onDone }: { items: StokRow[]; bolehBarangBaru?: boolean; onClose: () => void; onDone: () => void }) {
   const [tanggal, setTanggal] = useState(hariIni)
-  const [stokId, setStokId] = useState(items[0]?.id ?? 0)
-  const [qty, setQty] = useState('')
+  const [rincian, setRincian] = useState<NilaiRincian>(() => ({ rincian: [{ stok_id: items[0]?.id ?? 0, qty_stok: 0 }], bukan_barang: false }))
+  const [barang, setBarang] = useState<PilihanBarang[]>(() => items.map((x) => ({ id: x.id, sku: x.sku, nama: x.nama, kategori: x.kategori, satuan: x.satuan, jumlah_mili: x.jumlah * SKALA, harga_jual: x.harga_jual })))
   const [total, setTotal] = useState(0)
   const [pihak, setPihak] = useState('')
   const [lunas, setLunas] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const it = items.find((x) => x.id === stokId)
-  const q = parseQty(qty)
+  // jumlah menurut kartu stok (bukan daftar barang) bila kartu sudah dimulai
+  useEffect(() => { getPilihanBarang().then((p) => setBarang(p.barang), () => {}) }, [])
+  const terpilih = barisTerpilih(rincian.rincian)
+  const satu = terpilih.length === 1 ? barang.find((x) => x.id === terpilih[0].stok_id) : undefined
+  const q = terpilih.length === 1 ? terpilih[0].qty_stok : 0
+  const nilaiSatu = terpilih.length === 1 ? terpilih[0].nilai || total : 0
 
   async function kirim(e: FormEvent) {
     e.preventDefault()
-    if (!it) return
+    const jenis = 'Beli Bahan / Stok'
+    const salah = rincianSah(rincian, true, { jenis, nominal: total })
+    if (salah) return setError(salah)
+    const nama = terpilih.map((r) => barang.find((x) => x.id === r.stok_id)?.nama).filter(Boolean).join(', ')
     setBusy(true)
     setError('')
     try {
       await createTransaction({
-        tanggal, jenis: 'Beli Bahan / Stok', nominal: total, keterangan: `Beli ${it.nama}`, item: it.nama, qty: 0, channel: '',
-        pihak, lunas, tanggal_lunas: '', stok_id: it.id, qty_stok: q,
+        tanggal, jenis, nominal: total, keterangan: `Beli ${nama}`, item: nama, qty: 0, channel: '',
+        pihak, lunas, tanggal_lunas: '', ...bodyRincian(rincian, jenis),
       })
       onDone()
     } catch (err) {
@@ -64,32 +74,28 @@ export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; 
   }
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <form onSubmit={kirim} className="grid gap-3">
           <DialogHeader>
             <DialogTitle>Beli bahan / barang</DialogTitle>
             <DialogDescription>Menambah stok dan memperbarui nilai stok. Tercatat juga sebagai transaksi pengeluaran (atau utang bila belum lunas).</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-1.5"><Label htmlFor="bb-barang">Barang</Label>
-            <select id="bb-barang" className="input-field" value={stokId} onChange={(e) => setStokId(Number(e.target.value))}>
-              {items.map((x) => <option key={x.id} value={x.id}>{x.nama}{x.sku ? ` (${x.sku})` : ''}</option>)}
-            </select></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5"><Label htmlFor="bb-qty">Jumlah{it ? ` (${it.satuan})` : ''}</Label>
-              <Input id="bb-qty" required inputMode="decimal" className="tabular" placeholder="mis. 2,5" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.,]/g, ''))} /></div>
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5"><Label htmlFor="bb-total">Total harga (Rp)</Label>
               <Input id="bb-total" required className="tabular" {...angka(total, setTotal)} /></div>
             <div className="grid gap-1.5"><Label htmlFor="bb-tgl">Tanggal</Label>
               <Input id="bb-tgl" type="date" required value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label htmlFor="bb-pihak">Supplier</Label>
+            <PilihRincianBarang id="bb-barang" jenis="Beli Bahan / Stok" nominal={total} value={rincian} onChange={setRincian}
+              barang={barang} wajib bolehJasa={false} bolehBarangBaru={bolehBarangBaru} onBarangBaru={(b) => setBarang((xs) => [...xs, b])} />
+            <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="bb-pihak">Supplier</Label>
               <Input id="bb-pihak" placeholder="Opsional" value={pihak} onChange={(e) => setPihak(e.target.value)} /></div>
           </div>
-          {q > 0 && total > 0 && it && <p className="text-sm text-muted-foreground">Harga per {it.satuan || 'satuan'}: <strong>{formatRp(Math.round((total * 1000) / q))}</strong></p>}
+          {q > 0 && nilaiSatu > 0 && satu && <p className="text-sm text-muted-foreground">Harga per {satu.satuan || 'satuan'}: <strong>{formatRp(Math.round((nilaiSatu * SKALA) / q))}</strong></p>}
           <label className="flex items-center gap-3 text-sm"><Switch checked={lunas} onCheckedChange={setLunas} /> {lunas ? 'Sudah dibayar' : 'Belum dibayar (masuk utang)'}</label>
           <Galat teks={error} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
-            <Button type="submit" disabled={busy || !it || q <= 0 || total <= 0}>{busy ? 'Menyimpan…' : 'Simpan pembelian'}</Button>
+            <Button type="submit" disabled={busy || terpilih.length === 0 || total <= 0}>{busy ? 'Menyimpan…' : 'Simpan pembelian'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

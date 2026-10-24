@@ -1110,7 +1110,36 @@ func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Trans
 		http.Error(w, "barang yang dipilih tidak ada di Stok & Gudang", http.StatusBadRequest)
 		return t, false
 	}
+	finance.NormalkanBarang(&t) // stok_id tunggal disimpan sebagai rincian satu baris
 	return t, ok
+}
+
+// cekSimpanTxLocked: aturan simpan transaksi dari formulir — periode/saldo awal (409), wajib
+// barang (400), lalu stok tidak minus pada keadaan usulan (409). ganti = indeks transaksi yang
+// diubah, -1 untuk transaksi baru. Mengembalikan usulan stok awal otomatis (nil bila tidak
+// perlu). s.mu dipegang.
+func (s *tenant) cekSimpanTxLocked(t finance.Transaction, ganti int) (*finance.GerakStok, int, error) {
+	if err := s.cekTxLocked(t); err != nil {
+		return nil, http.StatusConflict, err
+	}
+	if err := s.cekBarangLocked(t); err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+	awal := s.stokAwalTxLocked(t)
+	txs := slices.Clone(s.txs)
+	if ganti >= 0 {
+		t.ID = txs[ganti].ID
+		txs[ganti] = t
+	} else {
+		t.ID = s.nextTxID
+		txs = append(txs, t)
+	}
+	// Dasar = keadaan sekarang + stok awal otomatis (bila ada), tanpa transaksi ini.
+	gerak := s.tambahGerakUsulan(awal)
+	if err := s.cekTanpaMinusDariLocked(s.txs, gerak, txs, gerak); err != nil {
+		return nil, http.StatusConflict, err
+	}
+	return awal, 0, nil
 }
 
 // txResp: transaksi tersimpan + peringatan kas minus di bulan transaksi (tidak memblokir simpan).
@@ -1131,10 +1160,18 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.mu.Lock()
-	if err := s.cekTxLocked(t); err != nil {
+	awal, kode, err := s.cekSimpanTxLocked(t, -1)
+	if err != nil {
 		s.mu.Unlock()
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), kode)
 		return
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+			s.mu.Unlock()
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+			return
+		}
 	}
 	s.pakaiRekeningBawaanLocked(&t, "")
 	t.ID = s.nextTxID
@@ -1177,9 +1214,16 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	if err := s.cekTxLocked(t); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+	awal, kode, err := s.cekSimpanTxLocked(t, i)
+	if err != nil {
+		http.Error(w, err.Error(), kode)
 		return
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+			return
+		}
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
 	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal
@@ -1214,6 +1258,10 @@ func (s *tenant) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "transaksi ini adalah pembelian aset \""+s.assets[j].Nama+"\"; ubah atau hapus dari menu Aset supaya neraca tetap seimbang", http.StatusConflict)
 		return
 	}
+	if err := s.cekTanpaMinusLocked(slices.Delete(slices.Clone(s.txs), i, i+1), s.gerak); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	s.txs = slices.Delete(s.txs, i, i+1)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1232,6 +1280,7 @@ type importResp struct {
 	Errors   []finance.ImportError `json:"errors"`
 	Sample   []finance.Transaction `json:"sample"`
 	Imported int                   `json:"imported"`
+	Galat    string                `json:"galat,omitempty"` // stok minus: seluruh impor ditolak
 }
 
 // handleImportTransactions: tanpa ?commit=1 hanya pratinjau (tidak ada yang disimpan).
@@ -1253,14 +1302,31 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error()+"; simpan ulang sebagai .xlsx atau pakai template", http.StatusBadRequest)
 		return
 	}
-	txs, errs := finance.ParseImport(rows)
+	baris, errs := finance.ParseImportBaris(rows)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	txs, errBarang := s.terapkanBarangImporLocked(baris)
+	errs = append(errs, errBarang...)
+	slices.SortStableFunc(errs, func(a, b finance.ImportError) int { return a.Baris - b.Baris })
 	res := importResp{Valid: len(txs), Errors: errs, Sample: txs[:min(5, len(txs))]}
+	awal, errStok := s.cekStokImporLocked(txs)
+	if errStok != nil {
+		res.Galat = errStok.Error() // pratinjau: tampilkan lebih awal; commit menolak
+	}
 	if r.URL.Query().Get("commit") == "1" {
-		s.mu.Lock()
 		for _, t := range txs {
 			if err := s.cekTxLocked(t); err != nil {
-				s.mu.Unlock()
 				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
+		if errStok != nil {
+			http.Error(w, errStok.Error(), http.StatusConflict)
+			return
+		}
+		if awal != nil {
+			if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+				http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -1270,7 +1336,6 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 			s.nextTxID++
 			s.txs = append(s.txs, t)
 		}
-		s.mu.Unlock()
 		res.Imported = len(txs)
 	}
 	writeJSON(w, res)

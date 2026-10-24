@@ -1,6 +1,7 @@
 package coa
 
 import (
+	"slices"
 	"testing"
 
 	"pajak/internal/finance"
@@ -149,7 +150,7 @@ func TestJournalBerjalan_PembelianKeAkunBarang(t *testing.T) {
 		{ID: 3, Tanggal: "2026-01-05", Jenis: finance.JenisBeliStok, Nominal: 7_000, Lunas: true, StokID: 2, Akun: "1305"},
 	}
 	akun := map[int]string{}
-	for _, l := range JournalBerjalan(txs, "2026-01", p, peta, akunUji) {
+	for _, l := range JournalBerjalan(txs, "2026-01", p, peta, akunUji, nil) {
 		if l.Debit > 0 {
 			akun[l.TxID] = l.Kode
 		}
@@ -157,7 +158,7 @@ func TestJournalBerjalan_PembelianKeAkunBarang(t *testing.T) {
 	if akun[1] != "1302" || akun[2] != peta.Kode(PeranPersediaan) || akun[3] != "1305" {
 		t.Errorf("akun debit %+v", akun)
 	}
-	for _, l := range JournalBerjalan(txs[:1], "2026-01", p, peta, nil) {
+	for _, l := range JournalBerjalan(txs[:1], "2026-01", p, peta, nil, nil) {
 		if l.Debit > 0 && l.Kode != peta.Kode(PeranPersediaan) {
 			t.Errorf("akunStok nil: debit %s", l.Kode)
 		}
@@ -180,5 +181,61 @@ func TestJurnalKartu_OpnameLebihDanNilaiNol(t *testing.T) {
 	}, "2026-01-01", "2026-01-31", akunUji, peta)
 	if len(nol) != 0 {
 		t.Errorf("baris bernilai 0 harus tanpa jurnal: %+v", nol)
+	}
+}
+
+// Data yang melewati Validate (Σ nilai > Nominal): jatuh ke satu debit sebesar Nominal ke akun
+// barang baris pertama, jadi jurnal tetap seimbang.
+func TestJournalBerjalan_NilaiRincianMelebihiNominal(t *testing.T) {
+	peta := PetaDari(Manufaktur)
+	p := finance.BusinessProfile{JenisUsaha: "manufaktur", MetodePersediaan: "perpetual"}
+	txs := []finance.Transaction{{ID: 1, Tanggal: "2026-01-03", Jenis: finance.JenisBeliStok, Nominal: 40_000, Lunas: true,
+		Rincian: []finance.RincianBarang{{StokID: 2, QtyStok: 1000, Nilai: 30_000}, {StokID: 1, QtyStok: 1000, Nilai: 20_000}}}}
+	lines := JournalBerjalan(txs, "2026-01", p, peta, akunUji, nil)
+	var dr []Line
+	var d, k int64
+	for _, l := range lines {
+		d, k = d+l.Debit, k+l.Kredit
+		if l.Debit > 0 {
+			dr = append(dr, l)
+		}
+	}
+	if d != k || d != 40_000 || len(dr) != 1 || dr[0].Kode != "1302" {
+		t.Errorf("jurnal %+v (debit %d kredit %d)", lines, d, k)
+	}
+}
+
+// Fix round 1 (R5): pembelian berbarang dengan akun pilihan persediaan (mis. dari Catat cepat)
+// dipecah ke akun barangnya seperti tanpa akun pilihan; akun pilihan jadi akun sisa. Akun
+// pilihan bukan persediaan (HPP) tetap satu debit.
+func TestJournalBerjalan_AkunPilihanPersediaanDipecah(t *testing.T) {
+	peta := PetaDari(Manufaktur)
+	p := finance.BusinessProfile{JenisUsaha: "manufaktur", MetodePersediaan: "perpetual"}
+	rincian := []finance.RincianBarang{{StokID: 2, QtyStok: 1000, Nilai: 30_000}, {StokID: 1, QtyStok: 1000, Nilai: 5_000}}
+	persediaan := func(kode string) bool {
+		return slices.ContainsFunc(AkunPersediaan(Manufaktur), func(a Account) bool { return a.Kode == kode })
+	}
+	debit := func(akun string) []Line {
+		txs := []finance.Transaction{{ID: 1, Tanggal: "2026-01-03", Jenis: finance.JenisBeliStok, Nominal: 40_000, Lunas: true, Akun: akun, Rincian: rincian}}
+		var dr []Line
+		var d, k int64
+		for _, l := range JournalBerjalan(txs, "2026-01", p, peta, akunUji, persediaan) {
+			d, k = d+l.Debit, k+l.Kredit
+			if l.Debit > 0 {
+				l.TxID, l.Tanggal = 0, ""
+				dr = append(dr, l)
+			}
+		}
+		if d != k {
+			t.Errorf("akun %s: debit %d ≠ kredit %d", akun, d, k)
+		}
+		return dr
+	}
+	if got, mau := debit("1305"), []Line{{Kode: "1302", Debit: 30_000}, {Kode: "1301", Debit: 5_000}, {Kode: "1305", Debit: 5_000}}; !slices.Equal(got, mau) {
+		t.Errorf("akun pilihan persediaan: Dr %+v, mau %+v", got, mau)
+	}
+	hpp := peta.Kode(PeranHPP)
+	if got, mau := debit(hpp), []Line{{Kode: hpp, Debit: 40_000}}; !slices.Equal(got, mau) {
+		t.Errorf("akun pilihan HPP: Dr %+v, mau %+v", got, mau)
 	}
 }

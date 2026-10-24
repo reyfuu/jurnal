@@ -2,6 +2,7 @@ package finance
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -73,7 +74,7 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 		if err := Validate(&u); err != nil {
 			return err
 		}
-		if u == tanpaNomor(k.Sebelum) {
+		if sama(u, tanpaNomor(k.Sebelum)) {
 			return errors.New("usulan sama dengan transaksi sekarang")
 		}
 		k.Usulan = &u
@@ -87,7 +88,7 @@ func SiapkanKoreksi(k *Koreksi, txs []Transaction) error {
 // TerapkanKoreksi mengembalikan daftar transaksi baru (txs tidak diubah).
 func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 	i := txIndex(txs, k.TransaksiID)
-	if i < 0 || tanpaNomor(txs[i]) != tanpaNomor(k.Sebelum) { // nomor jurnal bisa diberikan setelah usulan dibuat
+	if i < 0 || !sama(tanpaNomor(txs[i]), tanpaNomor(k.Sebelum)) { // nomor jurnal bisa diberikan setelah usulan dibuat
 		return nil, ErrKoreksiBasi
 	}
 	out := slices.Clone(txs)
@@ -100,6 +101,13 @@ func TerapkanKoreksi(txs []Transaction, k Koreksi) ([]Transaction, error) {
 }
 
 func tanpaNomor(t Transaction) Transaction { t.NoJurnal = ""; return t }
+
+// sama: kesamaan isi transaksi (Rincian berupa irisan, jadi tak bisa dibandingkan dengan ==).
+func sama(a, b Transaction) bool {
+	ra, rb := a.Rincian, b.Rincian
+	a.Rincian, b.Rincian = nil, nil // nil dan kosong dianggap sama
+	return slices.Equal(ra, rb) && reflect.DeepEqual(a, b)
+}
 
 // DampakKoreksi: laba bersih satu bulan sebelum & sesudah koreksi diterapkan (tanpa penyusutan
 // dari register aset, yang tidak ikut berubah).

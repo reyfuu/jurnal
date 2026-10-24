@@ -412,22 +412,29 @@ func HitungKartuMetode(metode string, stok []StokItem, txs []Transaction, gerak 
 			}})
 		}
 	}
+	// Tiap baris barang transaksi menjadi kejadian sendiri dengan TransaksiID yang sama; urutan
+	// tambahnya = urutan rincian, dan pengurutan stabil menjaganya untuk baris satu transaksi.
 	for _, t := range txs {
-		if t.StokID == 0 || t.QtyStok <= 0 || t.Tanggal < k.Mulai {
+		if t.Tanggal < k.Mulai {
 			continue
 		}
-		t := t
-		switch t.Jenis {
-		case JenisBeliStok:
-			ev = append(ev, kejadian{t.Tanggal, 1, t.ID, func() {
-				kor := masuk(t.StokID, t.QtyStok, t.Nominal)
-				catat(BarisKartu{Tanggal: t.Tanggal, StokID: t.StokID, Jenis: KartuBeli, TransaksiID: t.ID, Keterangan: cmp.Or(t.Keterangan, t.Pihak), Qty: t.QtyStok, Nilai: t.Nominal, Koreksi: kor})
-			}})
-		case JenisJual:
-			ev = append(ev, kejadian{t.Tanggal, 3, t.ID, func() {
-				biaya := keluar(t.StokID, t.QtyStok)
-				catat(BarisKartu{Tanggal: t.Tanggal, StokID: t.StokID, Jenis: KartuJual, TransaksiID: t.ID, Channel: t.Channel, Keterangan: cmp.Or(t.Keterangan, t.Pihak), Qty: -t.QtyStok, Nilai: -biaya})
-			}})
+		for _, r := range t.BarisBarang() {
+			if r.StokID == 0 || r.QtyStok <= 0 {
+				continue
+			}
+			t, r := t, r
+			switch t.Jenis {
+			case JenisBeliStok:
+				ev = append(ev, kejadian{t.Tanggal, 1, t.ID, func() {
+					kor := masuk(r.StokID, r.QtyStok, r.Nilai)
+					catat(BarisKartu{Tanggal: t.Tanggal, StokID: r.StokID, Jenis: KartuBeli, TransaksiID: t.ID, Keterangan: cmp.Or(t.Keterangan, t.Pihak), Qty: r.QtyStok, Nilai: r.Nilai, Koreksi: kor})
+				}})
+			case JenisJual:
+				ev = append(ev, kejadian{t.Tanggal, 3, t.ID, func() {
+					biaya := keluar(r.StokID, r.QtyStok)
+					catat(BarisKartu{Tanggal: t.Tanggal, StokID: r.StokID, Jenis: KartuJual, TransaksiID: t.ID, Channel: t.Channel, Keterangan: cmp.Or(t.Keterangan, t.Pihak), Qty: -r.QtyStok, Nilai: -biaya})
+				}})
+			}
 		}
 	}
 	slices.SortStableFunc(ev, func(a, b kejadian) int {

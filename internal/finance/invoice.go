@@ -1,8 +1,11 @@
 package finance
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +42,9 @@ type Invoice struct {
 
 	// TanggalLunas: tanggal pelanggan membayar (status lunas).
 	TanggalLunas string `json:"tanggal_lunas,omitempty"`
+	// RekeningLunas: kode rekening kas/bank tempat pelunasan masuk (diisi server saat invoice
+	// dilunasi lewat impor mutasi); kosong = rekening transaksi yang ada / bawaan. Hanya selama lunas.
+	RekeningLunas string `json:"rekening_lunas,omitempty"`
 	// Dibukukan: invoice ini tercatat di pembukuan — status terkirim/lunas otomatis membuat
 	// transaksi Penjualan (DPP) dan PPN Keluaran. Invoice lama (sebelum fitur ini) false sampai
 	// pengguna memilih "Bukukan", supaya tidak dobel dengan penjualan yang dicatat manual.
@@ -52,9 +58,65 @@ type InvoiceItem struct {
 	Qty         int64  `json:"qty"`
 	Satuan      string `json:"satuan,omitempty"` // mis. "pcs", "box", "jam"
 	HargaSatuan int64  `json:"harga_satuan"`
+	// StokID: barang yang dijual di baris ini (menggerakkan kartu stok lewat transaksi Penjualan
+	// invoice); BukanBarang: baris jasa. Keduanya tidak bersamaan; tidak dicetak di PDF.
+	StokID      int  `json:"stok_id,omitempty"`
+	BukanBarang bool `json:"bukan_barang,omitempty"`
 }
 
 func (it InvoiceItem) Jumlah() int64 { return it.Qty * it.HargaSatuan }
+
+// BarangPenjualan: rincian barang transaksi Penjualan invoice ini. Diskon dibagi ke semua baris
+// sebanding jumlahnya dengan cara sisa terbesar (Hamilton): tiap baris dapat bagian bulat ke bawah,
+// lalu sisa rupiahnya satu-satu ke baris dengan pecahan terbesar (seri: jumlah terbesar, lalu baris
+// teratas), dibatasi jumlah barisnya. Jadi Σ bagian = diskon, tidak ada nilai baris negatif, Σ
+// nilai seluruh baris = DPP, dan rincian (baris berbarang saja) ≤ DPP. QtyStok = qty ×
+// TakaranSkala. bukanBarang = semua baris bertanda Bukan barang (jasa).
+//
+// Invoice ber-DPP 0 (barang gratis / diskon sebesar subtotal) tidak membuat transaksi Penjualan
+// (lihat sinkronInvoiceLocked), jadi rinciannya tidak menggerakkan kartu stok.
+func (inv Invoice) BarangPenjualan() (rincian []RincianBarang, bukanBarang bool) {
+	tot := inv.Totals()
+	bagian := make([]int64, len(inv.Items))
+	pecahan := make([]*big.Int, len(inv.Items)) // sisa bagi diskon×jumlah / subtotal
+	sisa := tot.Diskon
+	for i, it := range inv.Items {
+		pecahan[i] = new(big.Int)
+		if tot.Subtotal > 0 {
+			var q big.Int
+			q.DivMod(new(big.Int).Mul(big.NewInt(tot.Diskon), big.NewInt(it.Jumlah())), big.NewInt(tot.Subtotal), pecahan[i])
+			bagian[i] = q.Int64()
+		}
+		sisa -= bagian[i]
+	}
+	urut := make([]int, len(inv.Items))
+	for i := range urut {
+		urut[i] = i
+	}
+	slices.SortStableFunc(urut, func(a, b int) int {
+		if c := pecahan[b].Cmp(pecahan[a]); c != 0 {
+			return c
+		}
+		return cmp.Compare(inv.Items[b].Jumlah(), inv.Items[a].Jumlah())
+	})
+	for _, i := range urut {
+		if sisa <= 0 {
+			break
+		}
+		if bagian[i] < inv.Items[i].Jumlah() {
+			bagian[i]++
+			sisa--
+		}
+	}
+	bukanBarang = len(inv.Items) > 0
+	for i, it := range inv.Items {
+		bukanBarang = bukanBarang && it.BukanBarang
+		if it.StokID > 0 {
+			rincian = append(rincian, RincianBarang{StokID: it.StokID, QtyStok: it.Qty * TakaranSkala, Nilai: it.Jumlah() - bagian[i]})
+		}
+	}
+	return rincian, bukanBarang
+}
 
 // InvoiceTotals: seluruh angka kaki faktur, selalu diturunkan dari baris.
 type InvoiceTotals struct {
@@ -126,7 +188,7 @@ func ValidateInvoice(inv *Invoice) error {
 	}
 	inv.TanggalLunas = strings.TrimSpace(inv.TanggalLunas)
 	if inv.Status != StatusLunas {
-		inv.TanggalLunas = ""
+		inv.TanggalLunas, inv.RekeningLunas = "", ""
 	} else if lunas, err := time.Parse(time.DateOnly, inv.TanggalLunas); err != nil {
 		return errors.New("isi tanggal pelanggan membayar untuk faktur lunas (format YYYY-MM-DD)")
 	} else if lunas.Before(terbit) {
@@ -144,6 +206,12 @@ func ValidateInvoice(inv *Invoice) error {
 		}
 		if it.HargaSatuan < 0 {
 			return fmt.Errorf("baris %d: harga satuan tidak boleh negatif", i+1)
+		}
+		if it.StokID < 0 {
+			return fmt.Errorf("baris %d: barang tidak dikenal", i+1)
+		}
+		if it.StokID > 0 && it.BukanBarang {
+			return fmt.Errorf("baris %d: pilih barang atau tandai Bukan barang (jasa), tidak keduanya", i+1)
 		}
 	}
 	if inv.DiskonRp < 0 {

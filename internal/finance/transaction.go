@@ -102,9 +102,48 @@ type Transaction struct {
 	// jumlahnya per seribu satuan; menggerakkan kartu stok setelah titik nol.
 	StokID  int   `json:"stok_id,omitempty"`
 	QtyStok int64 `json:"qty_stok,omitempty"`
+	// Rincian: beberapa barang dalam satu transaksi (bentuk baru; menggantikan StokID/QtyStok
+	// tunggal — keduanya tidak boleh terisi bersamaan). BukanBarang: penanda eksplisit bahwa
+	// penjualan/pembelian ini memang bukan barang persediaan (mis. jasa); tak boleh bersama barang.
+	Rincian     []RincianBarang `json:"rincian,omitempty"`
+	BukanBarang bool            `json:"bukan_barang,omitempty"`
 	// MasaPajak: masa (YYYY-MM) yang dilunasi setoran pajak (Setor PPh Final / Setor PPN);
 	// bawaan bulan sebelum tanggal setor. Kosong untuk jenis lain.
 	MasaPajak string `json:"masa_pajak,omitempty"`
+}
+
+// RincianBarang: satu baris barang dalam transaksi. QtyStok per seribu satuan (TakaranSkala);
+// Nilai = bagian Nominal transaksi untuk baris ini (0 = belum dibagi).
+type RincianBarang struct {
+	StokID  int   `json:"stok_id"`
+	QtyStok int64 `json:"qty_stok"`
+	Nilai   int64 `json:"nilai,omitempty"`
+}
+
+// BarisBarang: barang transaksi ini — Rincian bila ada; data lama (StokID tunggal) dibaca sebagai
+// satu baris bernilai Nominal; selain itu nil. Baris tunggal bernilai 0 memakai Nominal.
+func (t Transaction) BarisBarang() []RincianBarang {
+	if len(t.Rincian) > 0 {
+		out := slices.Clone(t.Rincian)
+		if len(out) == 1 && out[0].Nilai == 0 {
+			out[0].Nilai = t.Nominal
+		}
+		return out
+	}
+	if t.StokID > 0 {
+		return []RincianBarang{{StokID: t.StokID, QtyStok: t.QtyStok, Nilai: t.Nominal}}
+	}
+	return nil
+}
+
+// NormalkanBarang mengubah StokID/QtyStok tunggal menjadi Rincian satu baris (nilai = Nominal)
+// lalu mengosongkan keduanya. Dipanggil sesudah Validate; BarisBarang() tidak berubah.
+func NormalkanBarang(t *Transaction) {
+	if t.StokID <= 0 || len(t.Rincian) > 0 {
+		return
+	}
+	t.Rincian = t.BarisBarang()
+	t.StokID, t.QtyStok = 0, 0
 }
 
 // Validate merapikan isian dan menolak data yang tidak bisa dibukukan.
@@ -130,15 +169,44 @@ func Validate(t *Transaction) error {
 	if t.Qty < 0 {
 		return errors.New("jumlah tidak boleh negatif")
 	}
-	if t.StokID == 0 {
+	if len(t.Rincian) == 0 {
+		t.Rincian = nil
+	}
+	if len(t.Rincian) > 0 && t.StokID != 0 {
+		return errors.New("pilih satu cara: barang tunggal atau rincian barang")
+	}
+	adaBarang := t.StokID != 0 || len(t.Rincian) > 0
+	if !adaBarang {
 		t.QtyStok = 0
-	} else {
-		if t.Jenis != JenisJual && t.Jenis != JenisBeliStok {
-			return errors.New("barang hanya bisa dipilih untuk Penjualan atau Beli Bahan / Stok")
+	}
+	if (adaBarang || t.BukanBarang) && t.Jenis != JenisJual && t.Jenis != JenisBeliStok {
+		return errors.New("barang hanya bisa dipilih untuk Penjualan atau Beli Bahan / Stok")
+	}
+	if t.BukanBarang && adaBarang {
+		return errors.New("transaksi bertanda bukan barang tidak boleh berisi barang")
+	}
+	if t.StokID != 0 && t.QtyStok <= 0 {
+		return errors.New("jumlah barang harus lebih dari 0")
+	}
+	var jumlahNilai int64
+	for _, b := range t.Rincian {
+		if b.StokID <= 0 {
+			return errors.New("barang pada rincian wajib dipilih")
 		}
-		if t.QtyStok <= 0 {
+		if b.QtyStok <= 0 {
 			return errors.New("jumlah barang harus lebih dari 0")
 		}
+		if b.Nilai < 0 {
+			return errors.New("nilai barang tidak boleh negatif")
+		}
+		// pembelian beberapa barang: nilai tiap baris menentukan akun & kartu barangnya
+		if t.Jenis == JenisBeliStok && len(t.Rincian) >= 2 && b.Nilai == 0 {
+			return errors.New("isi nilai tiap barang pada pembelian beberapa barang")
+		}
+		jumlahNilai += b.Nilai
+	}
+	if jumlahNilai > t.Nominal {
+		return errors.New("jumlah nilai barang melebihi nominal transaksi")
 	}
 	if t.TanggalLunas != "" {
 		if !t.Lunas {

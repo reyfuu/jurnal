@@ -58,6 +58,13 @@ func (s *Server) handleUsulKoreksi(w http.ResponseWriter, r *http.Request) {
 	}
 	u := currentUser(r)
 	t.mu.Lock()
+	if k.Usulan != nil { // dicek lagi saat disetujui (barang bisa dihapus selama usulan menunggu)
+		if err := t.cekAdaBarangLocked(*k.Usulan); err != nil {
+			t.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	if err := finance.SiapkanKoreksi(&k, t.txs); err != nil {
 		t.mu.Unlock()
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -141,6 +148,25 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+		// Usulan ubah tunduk pada aturan wajib barang yang sama dengan formulir transaksi,
+		// termasuk barang rinciannya masih ada (sebelum apa pun diubah / kartu dimulai).
+		if k.Jenis == finance.KoreksiUbah && k.Usulan != nil {
+			if err := t.cekBarangLocked(*k.Usulan); err != nil {
+				t.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		// Keadaan sesudah koreksi (ubah atau hapus) tidak boleh membuat stok minus. Usulan basi
+		// ditangani di bawah (tidak diterapkan).
+		if txs, err := finance.TerapkanKoreksi(t.txs, *k); err == nil {
+			gerak := t.tambahGerakUsulan(t.stokAwalKoreksiLocked(*k)) // dasar: sekarang + stok awal otomatis
+			if err := t.cekTanpaMinusDariLocked(t.txs, gerak, txs, gerak); err != nil {
+				t.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
 	}
 	k.Catatan, k.DiputuskanOleh, k.DiputuskanPada = clip(strings.TrimSpace(req.Catatan), 500), u.Name, now
 	basi := false
@@ -150,6 +176,14 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 		case errors.Is(err, finance.ErrKoreksiBasi):
 			k.Status, basi = finance.KoreksiKedaluwarsa, true
 		default:
+			// usulan berbarang pertama memulai kartu stok, sama seperti formulir transaksi
+			if awal := t.stokAwalKoreksiLocked(*k); awal != nil {
+				if err := t.simpanStokAwalLocked(awal, u.Name, now); err != nil {
+					t.mu.Unlock()
+					http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+					return
+				}
+			}
 			k.Status, t.txs = finance.KoreksiDisetujui, txs
 		}
 	} else {
@@ -192,4 +226,12 @@ func (t *tenant) koreksiMenunggu() int {
 		}
 	}
 	return n
+}
+
+// stokAwalKoreksiLocked: usulan stok awal otomatis untuk koreksi ubah berbarang; nil bila tidak perlu.
+func (s *tenant) stokAwalKoreksiLocked(k finance.Koreksi) *finance.GerakStok {
+	if k.Jenis != finance.KoreksiUbah || k.Usulan == nil {
+		return nil
+	}
+	return s.stokAwalTxLocked(*k.Usulan)
 }

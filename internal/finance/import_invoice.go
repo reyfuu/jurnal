@@ -14,20 +14,23 @@ import (
 const sheetInvoice = "Invoice"
 
 var invoiceHeaders = []string{"Nomor", "Tanggal", "Jatuh Tempo", "Pelanggan", "Alamat", "NPWP", "No. PO", "Status", "Tanggal Lunas",
-	"Deskripsi", "Qty", "Satuan", "Harga Satuan", "Diskon (Rp)", "PPN (%)", "Catatan"}
+	"Deskripsi", "Qty", "Satuan", "Harga Satuan", "Diskon (Rp)", "PPN (%)", "Catatan", "Barang"}
 
 // InvoiceImpor: invoice hasil baca berkas beserta nomor baris Excel pertamanya (untuk pesan).
+// Barang: isi kolom Barang tiap item (sejajar Invoice.Items; "" = kosong atau "jasa", yang sudah
+// menjadi BukanBarang), dicocokkan ke daftar barang oleh server.
 type InvoiceImpor struct {
-	Baris   int     `json:"baris"`
-	Invoice Invoice `json:"invoice"`
+	Baris   int      `json:"baris"`
+	Invoice Invoice  `json:"invoice"`
+	Barang  []string `json:"-"`
 }
 
 // InvoiceTemplate: template impor menu Invoice beserta panduannya.
 func InvoiceTemplate() []ImportSheet {
 	rows := [][]string{invoiceHeaders,
-		{"INV-2026-101", "2026-09-01", "2026-09-30", "PT Karya Digital Mandiri", "Jl. Sudirman 10, Jakarta", "", "PO-778", "Terkirim", "", "Kopi literan 1L", "10", "botol", "120000", "", "", "Rapat bulanan"},
-		{"INV-2026-101", "", "", "", "", "", "", "", "", "Croissant butter", "20", "pcs", "25000", "", "", ""},
-		{"", "2026-09-05", "2026-09-05", "Coworking Space Kemang", "", "", "", "Lunas", "2026-09-05", "Katering rapat", "1", "paket", "1500000", "100000", "", ""},
+		{"INV-2026-101", "2026-09-01", "2026-09-30", "PT Karya Digital Mandiri", "Jl. Sudirman 10, Jakarta", "", "PO-778", "Terkirim", "", "Kopi literan 1L", "10", "botol", "120000", "", "", "Rapat bulanan", ""},
+		{"INV-2026-101", "", "", "", "", "", "", "", "", "Croissant butter", "20", "pcs", "25000", "", "", "", ""},
+		{"", "2026-09-05", "2026-09-05", "Coworking Space Kemang", "", "", "", "Lunas", "2026-09-05", "Katering rapat", "1", "paket", "1500000", "100000", "", "", "jasa"},
 	}
 	panduan := [][]string{
 		{"Kolom", "Wajib?", "Catatan"},
@@ -38,6 +41,7 @@ func InvoiceTemplate() []ImportSheet {
 		{"Deskripsi, Qty, Harga Satuan", "Wajib", "Satu baris per item. Qty bilangan bulat; harga angka rupiah tanpa titik."},
 		{"Diskon (Rp)", "Opsional", "Potongan untuk seluruh invoice, di baris pertama."},
 		{"PPN (%)", "Opsional", "Kosong = tarif PPN usaha (0 bila non-PKP). Isi 0 bila invoice ini tanpa PPN."},
+		{"Barang", "Opsional", "Per item: SKU atau nama barang persis seperti di Stok & Gudang (huruf besar/kecil bebas), atau jasa untuk item bukan barang. Metode perpetual: wajib diisi untuk invoice yang dikirim/lunas."},
 		{"", "", ""},
 		{"Nomor yang sudah ada di menu Invoice dan invoice di bulan yang sudah tutup buku dilewati; semuanya ditampilkan dulu sebelum diimpor.", "", ""},
 	}
@@ -45,6 +49,11 @@ func InvoiceTemplate() []ImportSheet {
 }
 
 func kolomInvoice(h string) string {
+	// Kolom barang hanya dari header persis "Barang" (sama dengan impor transaksi), supaya header
+	// lama seperti "Nama Barang" tidak berubah arti.
+	if strings.EqualFold(strings.TrimSpace(h), "barang") {
+		return "barang"
+	}
 	n := norm(h)
 	switch {
 	case strings.Contains(n, "jatuh"):
@@ -128,7 +137,12 @@ func parseInvoiceRows(rows [][]string, ppnBawaan int) ([]InvoiceImpor, []ImportE
 			rusak[cur] = true
 			continue
 		}
+		teks := b.get(i, "barang")
+		if JasaTeks(teks) {
+			it.BukanBarang, teks = true, ""
+		}
 		out[cur].Invoice.Items = append(out[cur].Invoice.Items, it)
+		out[cur].Barang = append(out[cur].Barang, teks)
 	}
 	hasil := out[:0]
 	for k, x := range out {

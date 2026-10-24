@@ -1,9 +1,13 @@
 import { FileSpreadsheet, Landmark } from 'lucide-react'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { PilihRincianBarang } from '@/components/PilihRincianBarang'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { commitMutasi, previewMutasi, type JenisInfo, type Keyakinan, type Mirip, type MutasiHasil, type MutasiRow } from '@/lib/api'
+import { commitMutasi, getOpsiCatat, getPilihanBarang, previewMutasi, type AkunCatat, type ImportError, type JenisInfo, type Keyakinan, type Mirip, type MutasiHasil, type MutasiRow, type PilihanBarang } from '@/lib/api'
 import { formatRp } from '@/lib/format'
+import { aksiMutasi, bolehPindah, patchAksi, sesuaikanRekening, type AksiMutasi } from '@/lib/mutasiAksi'
+import { barangMutasiBody, butuhBarang, kurangBarang, nilaiBarisMutasi, ringkasBarang, salahBarang, sisaSesudahSimpan } from '@/lib/mutasiBarang'
+import { rincianSah, wajibBarang, type NilaiRincian } from '@/lib/rincian'
 
 const WARNA: Record<Keyakinan, string> = { tinggi: 'pill-green', sedang: 'pill-amber', rendah: 'pill-red', ai: 'pill-brand' }
 const LABEL: Record<Keyakinan, string> = { tinggi: 'Yakin', sedang: 'Perkiraan', rendah: 'Periksa', ai: 'Saran AI' }
@@ -17,7 +21,7 @@ const ketMirip = (m: Mirip) =>
 function rekap(rows: MutasiRow[]) {
   const per = new Map<string, { jenis: string; arah: string; jumlah: number; total: number }>()
   for (const r of rows) {
-    if (!r.pilih || r.lunasi) continue // pelunasan transaksi lama bukan transaksi baru
+    if (!r.pilih || r.lunasi || r.pindah) continue // pelunasan / pindah akun bayar transaksi lama bukan transaksi baru
     const g = per.get(r.jenis) ?? { jenis: r.jenis, arah: r.arah, jumlah: 0, total: 0 }
     g.jumlah++
     g.total += r.nominal
@@ -31,6 +35,10 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onImported: () => void
   jenis: JenisInfo[]
+  /** Metode perpetual: baris Penjualan / Beli Bahan / Stok wajib barang atau tanda jasa. */
+  perpetual?: boolean
+  /** Boleh menambah barang lewat "+ Barang baru" (akses Stok & Gudang, bukan lihat-sebagai). */
+  bolehBarangBaru?: boolean
 }
 
 /**
@@ -40,7 +48,7 @@ interface Props {
  * dikirim saat menyimpan adalah baris hasil koreksi di layar ini, bukan hasil baca ulang
  * berkasnya — kalau tidak, koreksi pengguna hilang dan tebakan mesin yang terbukukan.
  */
-export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
+export function MutasiDialog({ open, onOpenChange, onImported, jenis, perpetual = false, bolehBarangBaru = false }: Props) {
   const [hasil, setHasil] = useState<MutasiHasil | null>(null)
   const [rows, setRows] = useState<MutasiRow[]>([])
   const [nama, setNama] = useState('')
@@ -55,6 +63,26 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   const perluSandi = pdf && /kata sandi/i.test(error)
   // PDF terkunci & sandi belum diisi: ajakan mengisi sandi, bukan galat.
   const mintaSandi = pdf && /dikunci kata sandi/i.test(error)
+  // Barang per baris: daftar barang & titik nol kartu stok, dan baris yang sedang dipilih barangnya.
+  const [barang, setBarang] = useState<{ mulai: string; barang: PilihanBarang[] }>({ mulai: '', barang: [] })
+  const [isiBarang, setIsiBarang] = useState<{ i: number; nilai: NilaiRincian } | null>(null)
+  const [galatBarang, setGalatBarang] = useState('')
+  // Hasil bukukan sebagian: dialog tetap terbuka berisi baris yang gagal untuk diperbaiki.
+  const [simpanSebagian, setSimpanSebagian] = useState<{ disimpan: number; dilunasi: number; dipindah: number; errors: ImportError[] } | null>(null)
+  // Rekening kas/bank mutasi ini: transaksi baru dicatat di sini, dan baris "sama" bisa memindah
+  // akun bayar transaksinya ke sini. Bawaan = rekening bawaan (Bank).
+  const [daftarRekening, setDaftarRekening] = useState<AkunCatat[]>([])
+  const [rekening, setRekening] = useState('')
+  useEffect(() => {
+    if (!open) return
+    getPilihanBarang().then((b) => { setBarang(b); setGalatBarang('') }, (e: Error) => setGalatBarang(e.message))
+    getOpsiCatat().then((o) => {
+      const r = o.akun.filter((a) => a.lawan === 'rekening')
+      setDaftarRekening(r)
+      setRekening((x) => x || o.bawaan.bank || r[0]?.kode || '')
+    }, () => {}) // gagal: rekening bawaan server, tanpa pilihan pindah akun bayar
+  }, [open])
+  const namaRekening = daftarRekening.find((a) => a.kode === rekening)?.nama ?? rekening
 
   function reset(next: boolean) {
     if (!next) {
@@ -64,6 +92,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
       setBerkas(null)
       setSandi('')
       setError('')
+      setSimpanSebagian(null)
     }
     onOpenChange(next)
   }
@@ -90,9 +119,12 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
     setBusy(true)
     setError('')
     try {
-      await commitMutasi(rows)
+      const res = await commitMutasi(rows.map((r) => ({ ...r, ...barangMutasiBody(r) })), rekening)
       onImported()
-      reset(false)
+      const gagal = res.errors ?? []
+      if (!gagal.length) return reset(false)
+      setSimpanSebagian({ disimpan: res.disimpan, dilunasi: res.dilunasi ?? 0, dipindah: res.dipindah ?? 0, errors: gagal })
+      setRows(sisaSesudahSimpan(rows, gagal))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -101,14 +133,22 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
   }
 
   const ubah = (i: number, patch: Partial<MutasiRow>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
-  const terpilih = rows.filter((r) => r.pilih && !r.lunasi)
+  const terpilih = rows.filter((r) => r.pilih && !r.lunasi && !r.pindah)
   const dilunasi = rows.filter((r) => r.pilih && r.lunasi).length
+  const dipindah = rows.filter((r) => r.pilih && r.pindah).length
   // Baris yang kemungkinan sudah tercatat dikelompokkan di bawah, supaya mudah diperiksa.
   const urutan = [...rows.keys()].sort((a, b) => Number(rows[a].duplikat) - Number(rows[b].duplikat))
   const pertamaDobel = urutan.find((i) => rows[i].duplikat)
   const perluDiperiksa = terpilih.filter((r) => r.keyakinan === 'rendah').length
   const grup = rekap(rows)
   const errors = hasil?.errors ?? []
+  const kartu = { perpetual, mulai: barang.mulai }
+  const kurang = kurangBarang(rows, kartu)
+  // Periodik tanpa daftar barang: barang tidak dipakai, tombolnya tidak perlu tampil.
+  const pakaiBarang = perpetual || barang.barang.length > 0
+  const rowBarang = isiBarang ? rows[isiBarang.i] : null
+  const wajibIsi = !!rowBarang && wajibBarang({ ...kartu, jenis: rowBarang.jenis, tanggal: rowBarang.tanggal })
+  const salahIsi = rowBarang && isiBarang ? rincianSah(isiBarang.nilai, wajibIsi, rowBarang) : ''
 
   return (
     <Dialog open={open} onOpenChange={reset}>
@@ -158,6 +198,18 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                 </span>
               </form>
             )}
+            {daftarRekening.length > 0 && (
+              <label className="grid gap-1" style={{ width: 240, maxWidth: '100%' }}>
+                <span className="kpi-label">Rekening mutasi ini</span>
+                <select className="input-field" value={rekening}
+                  onChange={(e) => { setRekening(e.target.value); setRows(sesuaikanRekening(rows, e.target.value)) }}>
+                  {daftarRekening.map((a) => <option key={a.kode} value={a.kode}>{a.kode} {a.nama}</option>)}
+                </select>
+                <span style={{ fontSize: 11, lineHeight: 1.3, color: 'var(--text-muted)' }}>
+                  transaksi baru dicatat di rekening ini.
+                </span>
+              </label>
+            )}
             {nama && <span className="text-sm text-muted-foreground" style={{ paddingBottom: 2 }}>{nama}</span>}
           </div>
 
@@ -165,6 +217,19 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
           {error && (mintaSandi
             ? <div className="note-box" role="status">{error}</div>
             : <p className="text-sm text-destructive" role="alert">{error}</p>)}
+
+          {simpanSebagian && (
+            <div className="note-box warn" role="status">
+              <strong>{simpanSebagian.disimpan} disimpan{simpanSebagian.dilunasi ? ` · ${simpanSebagian.dilunasi} dilunasi` : ''}{simpanSebagian.dipindah ? ` · ${simpanSebagian.dipindah} dipindah` : ''}.</strong>{' '}
+              Baris berikut belum dibukukan; perbaiki lalu bukukan lagi (baris yang sudah tersimpan tidak ditampilkan lagi).
+              <ul className="mt-1 text-sm">
+                {simpanSebagian.errors.map((e, i) => <li key={i}>baris {e.baris}: {e.pesan}</li>)}
+              </ul>
+            </div>
+          )}
+          {perpetual && galatBarang && (
+            <div className="note-box warn" role="status">Daftar barang gagal dimuat ({galatBarang}); baris penjualan & pembelian belum bisa diberi barang. Tutup dan buka lagi dialog ini, atau tandai Bukan barang (jasa).</div>
+          )}
 
           {hasil && (
             <>
@@ -220,7 +285,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                         <input
                           type="checkbox" aria-label="Pilih semua baris"
                           checked={rows.length > 0 && rows.every((r) => r.pilih)}
-                          onChange={(e) => setRows(rows.map((r) => ({ ...r, pilih: e.target.checked, lunasi: e.target.checked ? r.lunasi : 0 })))}
+                          onChange={(e) => setRows(rows.map((r) => ({ ...r, pilih: e.target.checked, lunasi: e.target.checked ? r.lunasi : 0, pindah: e.target.checked ? r.pindah : 0 })))}
                         />
                       </th>
                       <th>Tanggal</th><th>Keterangan dari bank</th>
@@ -235,7 +300,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                     {urutan.map((i) => {
                       const r = rows[i]
                       const pilihan = jenis.filter((j) => j.arah === r.arah && j.pos !== 'pindah') // pindah dana hanya lewat Catat
-                      const aksi = !r.pilih ? 'lewati' : r.lunasi ? 'lunasi' : 'baru'
+                      const aksi = aksiMutasi(r)
                       return (
                         <Fragment key={`${r.baris}-${i}`}>
                         {i === pertamaDobel && (
@@ -259,12 +324,10 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                                   {r.mirip.belum_lunas ? 'Cocok dengan tagihan belum lunas: ' : 'Sudah tercatat? Cocok dengan: '}{ketMirip(r.mirip)}
                                 </span>
                                 <select className="input-field" style={{ fontSize: 12, padding: '4px 8px', maxWidth: 280 }} aria-label={`Tindakan baris ${r.baris}`} value={aksi}
-                                  onChange={(e) => {
-                                    const v = e.target.value
-                                    ubah(i, v === 'lewati' ? { pilih: false, lunasi: 0 } : v === 'lunasi' ? { pilih: true, lunasi: r.mirip!.id } : { pilih: true, lunasi: 0 })
-                                  }}>
+                                  onChange={(e) => ubah(i, patchAksi(e.target.value as AksiMutasi, r.mirip!))}>
                                   <option value="lewati">Lewati — sudah tercatat</option>
                                   {r.mirip.belum_lunas && <option value="lunasi">Catat sebagai pelunasannya</option>}
+                                  {(bolehPindah(r.mirip, rekening) || !!r.pindah) && <option value="pindah">Sama — pindah akun bayar ke {namaRekening}</option>}
                                   <option value="baru">Tetap catat sebagai transaksi baru</option>
                                 </select>
                               </div>
@@ -274,11 +337,24 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
                           <td style={{ color: r.arah === 'masuk' ? 'var(--text-profit)' : 'var(--text-danger)' }}>{r.arah}</td>
                           <td>
                             <select
-                              className="input-field" value={r.jenis} aria-label={`Jenis untuk baris ${r.baris}`} disabled={!!r.lunasi}
+                              className="input-field" value={r.jenis} aria-label={`Jenis untuk baris ${r.baris}`} disabled={!!r.lunasi || !!r.pindah}
                               onChange={(e) => ubah(i, { jenis: e.target.value, keyakinan: 'tinggi', alasan: 'dipilih sendiri' })}
                             >
                               {pilihan.map((j) => <option key={j.nama} value={j.nama}>{j.nama}</option>)}
                             </select>
+                            {pakaiBarang && butuhBarang(r) && (() => {
+                              const ringkas = ringkasBarang(r)
+                              const salah = salahBarang(r, kartu)
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5" style={{ marginTop: 4 }}>
+                                  <Button type="button" size="sm" variant="outline" aria-label={`Barang baris ${r.baris}`}
+                                    onClick={() => setIsiBarang({ i, nilai: nilaiBarisMutasi(r) })}>Barang…</Button>
+                                  <span className="text-xs" style={{ color: salah ? 'var(--text-danger)' : 'var(--text-muted)' }}>
+                                    {salah ? (ringkas ? `${ringkas} · ${salah}` : 'belum diisi') : ringkas || 'opsional'}
+                                  </span>
+                                </div>
+                              )
+                            })()}
                           </td>
                           <td>
                             <span className={'pill-status ' + WARNA[r.keyakinan]} style={{ fontSize: 10 }} title={r.alasan}>
@@ -312,11 +388,42 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis }: Props) {
 
         <DialogFooter className="sticky -bottom-5 z-10 bg-popover">
           <Button type="button" variant="outline" onClick={() => reset(false)}>Batal</Button>
-          <Button type="button" disabled={busy || terpilih.length + dilunasi === 0} onClick={() => void simpan()}>
-            {busy && hasil ? 'Menyimpan…' : `Bukukan ${terpilih.length} transaksi${dilunasi ? ` · lunasi ${dilunasi}` : ''}`}
+          {kurang > 0 && <span className="text-sm text-destructive self-center" role="status">Lengkapi barang di {kurang} baris</span>}
+          <Button type="button" disabled={busy || terpilih.length + dilunasi + dipindah === 0 || kurang > 0} onClick={() => void simpan()}
+            title={kurang > 0 ? `Lengkapi barang di ${kurang} baris` : undefined}>
+            {busy && hasil ? 'Menyimpan…' : `Bukukan ${terpilih.length} transaksi${dilunasi ? ` · lunasi ${dilunasi}` : ''}${dipindah ? ` · pindah ${dipindah}` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={!!isiBarang} onOpenChange={(o) => { if (!o) setIsiBarang(null) }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Barang baris {rowBarang?.baris}</DialogTitle>
+            <DialogDescription>
+              {rowBarang && `${rowBarang.tanggal} · ${rowBarang.jenis} · ${formatRp(rowBarang.nominal)}`}
+              {rowBarang?.keterangan ? ` · ${rowBarang.keterangan}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {rowBarang && isiBarang && (
+            <div className="grid gap-2">
+              <PilihRincianBarang key={isiBarang.i} id="mutasi-barang" jenis={rowBarang.jenis} nominal={rowBarang.nominal}
+                value={isiBarang.nilai} onChange={(nilai) => setIsiBarang({ ...isiBarang, nilai })}
+                barang={barang.barang} wajib={wajibIsi} bolehBarangBaru={bolehBarangBaru}
+                onBarangBaru={(b) => setBarang((x) => ({ ...x, barang: [...x.barang, b] }))} />
+              {salahIsi && <p className="text-sm text-destructive" role="alert">{salahIsi}</p>}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsiBarang(null)}>Batal</Button>
+            <Button type="button" disabled={!!salahIsi} onClick={() => {
+              if (!isiBarang) return
+              ubah(isiBarang.i, isiBarang.nilai)
+              setIsiBarang(null)
+            }}>Pakai</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

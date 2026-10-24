@@ -29,6 +29,16 @@ type Mirip struct {
 	Sumber     string `json:"sumber,omitempty"`
 	// BelumLunas: transaksi masih piutang/utang — mutasi ini bisa dicatat sebagai pelunasannya.
 	BelumLunas bool `json:"belum_lunas"`
+	// Lawan: rekening kas/bank transaksi itu (Transaction.Lawan; pratinjau mutasi di server
+	// mengisinya dengan akun bayar efektif). Grup: catatan jurnal (Catat cepat) atau biaya lain
+	// produksi tempat transaksi itu berada (Transaction.Grup). Produksi / Khusus diisi pratinjau
+	// mutasi di server: transaksi biaya lain produksi / ber-channel khusus (marketplace, B2B) yang
+	// akun bayarnya tidak bisa dipindah dari impor mutasi. Dipakai menawarkan "sama — pindah akun
+	// bayar".
+	Lawan    string `json:"lawan,omitempty"`
+	Grup     int    `json:"grup,omitempty"`
+	Produksi bool   `json:"produksi,omitempty"`
+	Khusus   bool   `json:"khusus,omitempty"`
 }
 
 func selisihHari(a, b string) int {
@@ -68,7 +78,7 @@ func CariMirip(txs []Transaction, tanggal string, nominal int64, arah string, ke
 		if t.Nominal != nominal {
 			continue
 		}
-		m := Mirip{ID: t.ID, Tanggal: t.Tanggal, Jenis: t.Jenis, Keterangan: t.Keterangan, Pihak: t.Pihak, Nominal: t.Nominal, Sumber: t.Sumber, BelumLunas: !t.Lunas}
+		m := Mirip{ID: t.ID, InvoiceID: t.InvoiceID, Tanggal: t.Tanggal, Jenis: t.Jenis, Keterangan: t.Keterangan, Pihak: t.Pihak, Nominal: t.Nominal, Sumber: t.Sumber, BelumLunas: !t.Lunas, Lawan: t.Lawan, Grup: t.Grup}
 		switch {
 		case t.Lunas && selisihHari(tanggalKas(t), tanggal) <= ToleransiHariMirip:
 			out = append(out, m)

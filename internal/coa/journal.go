@@ -1,6 +1,7 @@
 package coa
 
 import (
+	"cmp"
 	"slices"
 
 	"pajak/internal/finance"
@@ -126,7 +127,9 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []
 // transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
 // atau Dr Utang / Cr Kas) di tanggal bayar. akunStok: akun persediaan per barang; perpetual,
 // pembelian barang tanpa akun pilihan didebit ke akun barangnya. nil = akun peran persediaan.
-func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta, akunStok func(stokID int) string) []Line {
+// persediaan: akun pilihan yang termasuk akun persediaan (AkunPersediaan); pembelian berbarang ke
+// akun itu juga dipecah ke akun barangnya, akun pilihan jadi akun bawaan/sisa. nil = tidak ada.
+func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta, akunStok func(stokID int) string, persediaan func(kode string) bool) []Line {
 	piutang, utang := peta.Kode(PeranPiutang), peta.Kode(PeranUtangUsaha)
 	akhir := period + "-31"
 	var out []Line
@@ -151,9 +154,10 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 				}
 			}
 			akun := AccountFor(t, p, peta)
-			if akunStok != nil && perpetual(p) && t.Jenis == finance.JenisBeliStok && t.StokID > 0 && t.Akun == "" {
-				if k := akunStok(t.StokID); k != "" {
-					akun = k
+			if akunStok != nil && perpetual(p) && t.Jenis == finance.JenisBeliStok && (t.Akun == "" || persediaan != nil && persediaan(t.Akun)) {
+				if dr := debitBarang(t, akun, akunStok); dr != nil {
+					out = append(append(out, dr...), Line{t.ID, t.Tanggal, lawan, 0, t.Nominal})
+					continue
 				}
 			}
 			if masuk {
@@ -168,6 +172,40 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 				out = append(out, Line{t.ID, bayar, utang, t.Nominal, 0}, Line{t.ID, bayar, kas, 0, t.Nominal})
 			}
 		}
+	}
+	return out
+}
+
+// debitBarang: sisi debit pembelian perpetual berbarang — tiap baris barang ke akun barangnya
+// sebesar nilainya, sisa Nominal − Σ nilai (mis. ongkir) ke akun bawaan pembelian tanpa barang.
+// Akun barang kosong memakai akun bawaan. nil bila transaksi tanpa barang. Σ nilai > Nominal
+// (data yang melewati Validate): satu debit sebesar Nominal ke akun barang baris pertama.
+func debitBarang(t finance.Transaction, bawaan string, akunStok func(stokID int) string) []Line {
+	baris := t.BarisBarang()
+	if len(baris) == 0 {
+		return nil
+	}
+	var jumlah int64
+	for _, b := range baris {
+		jumlah += b.Nilai
+	}
+	if jumlah > t.Nominal {
+		return []Line{{t.ID, t.Tanggal, cmp.Or(akunStok(baris[0].StokID), bawaan), t.Nominal, 0}}
+	}
+	out := make([]Line, 0, len(baris)+1)
+	sisa := t.Nominal
+	for _, b := range baris {
+		if b.StokID <= 0 || b.Nilai == 0 {
+			continue
+		}
+		out = append(out, Line{t.ID, t.Tanggal, cmp.Or(akunStok(b.StokID), bawaan), b.Nilai, 0})
+		sisa -= b.Nilai
+	}
+	if sisa > 0 {
+		out = append(out, Line{t.ID, t.Tanggal, bawaan, sisa, 0})
+	}
+	if len(out) == 0 {
+		return nil // Nominal 0: jurnal biasa
 	}
 	return out
 }

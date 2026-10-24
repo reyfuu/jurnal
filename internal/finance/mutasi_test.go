@@ -1,6 +1,7 @@
 package finance_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -335,5 +336,37 @@ func TestParseMutasi_PeringatanTanggalMasaDepan(t *testing.T) {
 	}, 2099, nil)
 	if !strings.Contains(strings.Join(h.Peringatan, " "), "masa depan") {
 		t.Errorf("peringatan %v", h.Peringatan)
+	}
+}
+
+// Barang per baris mutasi ikut ke transaksinya (wajib barang di perpetual, lihat server).
+func TestMutasiKeTransaksi_MembawaRincian(t *testing.T) {
+	rows := []finance.MutasiRow{
+		{Baris: 2, Tanggal: "2026-09-01", Jenis: "Penjualan", Nominal: 100_000, Arah: "masuk", Pilih: true,
+			Rincian: []finance.RincianBarang{{StokID: 7, QtyStok: 2_500}}},
+		{Baris: 3, Tanggal: "2026-09-02", Jenis: "Penjualan", Nominal: 50_000, Arah: "masuk", Pilih: true, BukanBarang: true},
+		{Baris: 4, Tanggal: "2026-09-03", Jenis: "Beli Bahan / Stok", Nominal: 90_000, Arah: "keluar", Pilih: true,
+			Rincian: []finance.RincianBarang{{StokID: 7, QtyStok: 1_000, Nilai: 40_000}, {StokID: 8, QtyStok: 3_000, Nilai: 50_000}}},
+	}
+	txs, baris, errs := finance.MutasiKeTransaksiBaris(rows)
+	if len(errs) != 0 || len(txs) != 3 {
+		t.Fatalf("txs %+v errs %+v", txs, errs)
+	}
+	if !slices.Equal(baris, []int{2, 3, 4}) {
+		t.Errorf("nomor baris tiap transaksi: %v", baris)
+	}
+	if b := txs[0].BarisBarang(); len(b) != 1 || b[0].StokID != 7 || b[0].QtyStok != 2_500 || txs[0].BukanBarang {
+		t.Errorf("penjualan berbarang: %+v", txs[0])
+	}
+	if !txs[1].BukanBarang || len(txs[1].BarisBarang()) != 0 {
+		t.Errorf("jasa: %+v", txs[1])
+	}
+	if b := txs[2].BarisBarang(); len(b) != 2 || b[1].StokID != 8 || b[1].Nilai != 50_000 {
+		t.Errorf("pembelian dua barang: %+v", txs[2])
+	}
+	// Bukan jenis berbarang: barangnya diabaikan (sama dengan formulir transaksi).
+	rows[0].Jenis, rows[0].Rincian = "Pendapatan Lain", []finance.RincianBarang{{StokID: 7, QtyStok: 1_000}}
+	if txs, _ := finance.MutasiKeTransaksi(rows[:1]); len(txs) != 1 || len(txs[0].BarisBarang()) != 0 {
+		t.Errorf("barang di jenis bukan berbarang harus dibuang: %+v", txs)
 	}
 }

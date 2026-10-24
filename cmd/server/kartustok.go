@@ -42,18 +42,23 @@ func (s *tenant) stokByID(id int) (finance.StokItem, bool) {
 // validStok: barang yang dipilih di transaksi harus ada. s.mu dipegang pemanggil atau tidak
 // sama sekali — cukup baca singkat.
 func (s *tenant) validStok(t finance.Transaction) bool {
-	if t.StokID == 0 {
+	baris := t.BarisBarang()
+	if len(baris) == 0 {
 		return true
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.stokByID(t.StokID)
-	return ok
+	for _, b := range baris {
+		if _, ok := s.stokByID(b.StokID); !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // stokDipakai: barang yang sudah punya riwayat tidak boleh dihapus (kartunya jadi yatim).
 func (s *tenant) stokDipakai(id int) bool {
-	if slices.ContainsFunc(s.txs, func(t finance.Transaction) bool { return t.StokID == id }) {
+	if slices.ContainsFunc(s.txs, func(t finance.Transaction) bool { return slices.ContainsFunc(t.BarisBarang(), func(b finance.RincianBarang) bool { return b.StokID == id }) }) {
 		return true
 	}
 	return slices.ContainsFunc(s.gerak, func(g finance.GerakStok) bool {
@@ -150,12 +155,18 @@ func (s *tenant) handleStokAwal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Transaksi berbarang sesudah titik nol masuk kartu: stoknya tidak boleh jadi minus.
+	g := finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakAwal, Baris: b.Baris, Keterangan: b.Keterangan}
+	if err := s.cekTanpaMinusLocked(s.txs, s.tambahGerakUsulan(&g)); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	// Kartu stok dimulai: metode nilai stok (pilihan atau bawaan FIFO) dikunci sejak titik nol.
 	if err := s.kunciMetodeStokLocked(); err != nil {
 		http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 		return
 	}
-	s.simpanGerak(w, r, finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakAwal, Baris: b.Baris, Keterangan: b.Keterangan})
+	s.simpanGerak(w, r, g)
 }
 
 // mulaiLocked: tanggal titik nol, atau error bila belum ada / tanggal sebelum titik nol.
@@ -188,7 +199,12 @@ func (s *tenant) handleStokOpname(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.simpanGerak(w, r, finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakOpname, Baris: b.Baris, Keterangan: b.Keterangan})
+	g := finance.GerakStok{Tanggal: b.Tanggal, Jenis: finance.GerakOpname, Baris: b.Baris, Keterangan: b.Keterangan}
+	if err := s.cekTanpaMinusLocked(s.txs, s.tambahGerakUsulan(&g)); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	s.simpanGerak(w, r, g)
 }
 
 // handleStokProduksi: jalankan resep sebanyak batch — bahan dari stok berkurang, barang jadi
@@ -208,9 +224,15 @@ func (s *tenant) handleStokProduksi(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	nStok, nextStok := len(s.stok), s.nextStokID
 	g, err := s.gerakProduksiLocked(b)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.cekTanpaMinusLocked(s.txs, s.tambahGerakUsulan(&g)); err != nil {
+		s.stok, s.nextStokID = s.stok[:nStok], nextStok // barang jadi baru ikut batal
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	s.simpanGerak(w, r, g)
@@ -321,6 +343,15 @@ func (s *tenant) handleDeleteGerak(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.gerak[i].Jenis == finance.GerakAwal && len(s.gerak) > 1 {
 		http.Error(w, "hapus dulu stok opname & produksi sebelum menghapus stok awal", http.StatusConflict)
+		return
+	}
+	// Keadaan usulan tanpa dokumen ini (dan biaya lain satu grupnya) tidak boleh membuat stok minus.
+	txsUsulan := s.txs
+	if g := s.gerak[i].Grup; g > 0 {
+		txsUsulan = slices.DeleteFunc(slices.Clone(s.txs), func(t finance.Transaction) bool { return t.Grup == g })
+	}
+	if err := s.cekTanpaMinusLocked(txsUsulan, slices.Delete(slices.Clone(s.gerak), i, i+1)); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	// Biaya lain produksi (transaksi satu grup) ikut terhapus bersama dokumennya.
@@ -575,6 +606,8 @@ func (s *Server) kartuStokRoutes() {
 	s.mux.HandleFunc("GET /api/v1/produksi/laporan", p(s.on((*tenant).handleLaporanProduksi)))
 	s.mux.HandleFunc("GET /api/v1/produksi/laporan.xlsx", p(s.exporting(s.on((*tenant).handleLaporanProduksiXlsx))))
 	s.mux.HandleFunc("GET /api/v1/stok/pilihan", s.guard("transaksi", s.on((*tenant).handlePilihanBarang)))
+	// sama, untuk pemilih barang per baris invoice (pengguna menu Invoice tanpa menu Transaksi)
+	s.mux.HandleFunc("GET /api/v1/invoice/pilihan-barang", s.guard("invoice", s.on((*tenant).handlePilihanBarang)))
 	g := func(h http.HandlerFunc) http.HandlerFunc { return s.guard("stok-gudang", h) }
 	m := s.mux
 	m.HandleFunc("POST /api/v1/stok/awal", s.persisting(g(s.on((*tenant).handleStokAwal))))

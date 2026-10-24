@@ -36,6 +36,12 @@ type FormatTabel struct {
 	Referensi, Kunci                          bool
 }
 
+// BarisAwal: satu baris sheet transaksi impor data awal beserta nama sheet-nya (untuk galat).
+type BarisAwal struct {
+	Sheet string
+	ImportRow
+}
+
 // SheetError menunjuk sheet dan baris Excel (1-based) yang gagal; Baris 0 = masalah header.
 type SheetError struct {
 	Sheet string `json:"sheet"`
@@ -52,6 +58,10 @@ type OnboardingData struct {
 	Tagihan   []Tagihan       `json:"tagihan"`
 	Stok      []StokItem      `json:"stok"`
 	Errors    []SheetError    `json:"errors"`
+	// BarisTransaksi: baris sheet transaksi lengkap dengan kolom barang & jumlah_barang (sejajar
+	// Transaksi); server mencocokkan barangnya dan menerapkan wajib barang, sama dengan impor
+	// transaksi Excel, lalu mengganti Transaksi dengan hasilnya.
+	BarisTransaksi []BarisAwal `json:"-"`
 	// Terbaca mencatat sheet mana yang dikenali, supaya user tahu kalau ada sheet terlewat.
 	Terbaca []string `json:"terbaca"`
 }
@@ -161,8 +171,11 @@ func ParseOnboarding(sheets []ImportSheet) OnboardingData {
 			d.Karyawan = append(d.Karyawan, ks...)
 			d.Errors = append(d.Errors, tag(sh.Nama, errs)...)
 		case sheetTransaksi:
-			txs, errs := ParseImport(sh.Rows)
-			d.Transaksi = append(d.Transaksi, txs...)
+			baris, errs := ParseImportBaris(sh.Rows)
+			for _, r := range baris {
+				d.Transaksi = append(d.Transaksi, r.Tx)
+				d.BarisTransaksi = append(d.BarisTransaksi, BarisAwal{sh.Nama, r})
+			}
 			d.Errors = append(d.Errors, tag(sh.Nama, errs)...)
 		case sheetTagihan:
 			ts, errs := parseTagihanRows(sh.Rows)

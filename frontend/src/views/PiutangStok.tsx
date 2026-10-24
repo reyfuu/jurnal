@@ -575,7 +575,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
 
       </>}
 
-      {dialog === 'beli' && list.length > 0 && <BeliBahanDialog items={list} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
+      {dialog === 'beli' && list.length > 0 && <BeliBahanDialog items={list} bolehBarangBaru={bisaUbah} onClose={() => setDialog(null)} onDone={selesaiDialog} />}
       {kartu && <KartuBarangDialog item={kartu} onClose={() => setKartu(null)} />}
 
       <MenuImportDialog

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"pajak/internal/coa"
 	"pajak/internal/finance"
@@ -112,6 +113,18 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 		sheets = append(sheets, finance.ImportSheet{Nama: sh.Name, Rows: sh.Rows})
 	}
 	d := finance.ParseOnboarding(sheets)
+	// Transaksi data awal tunduk pada aturan impor transaksi Excel: barang dicocokkan, wajib
+	// barang per baris (baris gagal dilaporkan & dilewati), stok tidak minus untuk seluruh berkas
+	// (menolak simpan). Dihitung ulang di bawah kunci saat commit.
+	stokBaru := stokDataAwal(d.Stok)
+	s.mu.Lock()
+	txsAwal, errBarang, _, errStok := s.barangDataAwalLocked(d.BarisTransaksi, stokBaru)
+	s.mu.Unlock()
+	d.Transaksi = txsAwal
+	d.Errors = append(d.Errors, errBarang...)
+	if errStok != nil {
+		d.Errors = append(d.Errors, finance.SheetError{Sheet: sheetTransaksiAwal(d.BarisTransaksi), Pesan: errStok.Error()})
+	}
 	var akun []coa.Account
 	if d.Opening != nil {
 		s.kodePersediaanImpor(d.Opening.Rincian)
@@ -198,6 +211,9 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 			resp.Errors = append(resp.Errors, finance.SheetError{Sheet: "Saldo Awal", Pesan: p})
 		}
 	}
+	if errStok != nil {
+		tolak = append(tolak, errStok.Error())
+	}
 	resp.BisaDisimpan = len(tolak) == 0
 	if r.URL.Query().Get("commit") != "1" {
 		writeJSON(w, resp)
@@ -220,6 +236,23 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+	}
+	// Ulangi cek barang di bawah kunci commit (daftar barang / kartu bisa berubah sejak
+	// pratinjau di atas), sebelum apa pun diubah.
+	txsAwal, _, awalStok, errStok := s.barangDataAwalLocked(d.BarisTransaksi, stokBaru)
+	if errStok != nil {
+		s.mu.Unlock()
+		http.Error(w, errStok.Error(), http.StatusConflict)
+		return
+	}
+	if awalStok != nil { // transaksi berbarang pertama memulai kartu stok
+		if err := s.simpanStokAwalLocked(awalStok, currentUser(r).Name, time.Now().UTC()); err != nil {
+			s.mu.Unlock()
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+			return
+		}
+	}
+	if d.Opening != nil {
 		o := *d.Opening
 		if s.opening != nil {
 			o.Pelunasan = s.opening.Pelunasan
@@ -260,15 +293,10 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 	}
 	if len(d.Stok) > 0 {
 		resp.ReplacedStok = len(s.stok)
-		s.stok = nil
-		s.nextStokID = 1
-		for _, it := range d.Stok {
-			it.ID = s.nextStokID
-			s.nextStokID++
-			s.stok = append(s.stok, it)
-		}
+		s.stok = stokBaru // ID sama dengan yang dipakai mencocokkan barang transaksi di atas
+		s.nextStokID = len(stokBaru) + 1
 	}
-	for _, t := range d.Transaksi {
+	for _, t := range txsAwal {
 		t.ID = s.nextTxID
 		s.nextTxID++
 		s.txs = append(s.txs, t)
@@ -553,4 +581,57 @@ const ketSelisihSaldoAwal = "selisih saldo awal yang disimpan walau belum seimba
 
 func barisSelisihSaldoAwal(r finance.SaldoAkun) bool {
 	return r.Kategori == finance.KatLabaDitahan && r.Keterangan == ketSelisihSaldoAwal
+}
+
+// stokDataAwal: daftar barang dari berkas data awal dengan ID yang akan dipakai saat commit
+// (1, 2, …; daftar lama diganti). nil bila berkas tidak berisi daftar barang.
+func stokDataAwal(stok []finance.StokItem) []finance.StokItem {
+	if len(stok) == 0 {
+		return nil
+	}
+	out := slices.Clone(stok)
+	for i := range out {
+		out[i].ID = i + 1
+	}
+	return out
+}
+
+// sheetTransaksiAwal: nama sheet transaksi untuk galat seluruh berkas (stok minus).
+func sheetTransaksiAwal(baris []finance.BarisAwal) string {
+	if len(baris) > 0 {
+		return baris[0].Sheet
+	}
+	return "Transaksi"
+}
+
+// barangDataAwalLocked: baris transaksi impor data awal lewat aturan impor transaksi Excel —
+// barang dicocokkan & wajib barang per baris (terapkanBarangImporLocked; perpetual ketat,
+// periodik longgar; baris sebelum kartu stok dimulai dikecualikan), lalu stok tidak minus untuk
+// seluruh kumpulan (cekStokImporLocked, mengembalikan stok awal otomatis bila kartu belum
+// dimulai). stokBaru: daftar barang dari berkas yang sama, yang menggantikan daftar sekarang saat
+// commit; nil = daftar sekarang. s.mu dipegang (tulis): s.stok dipinjamkan ke stokBaru lalu
+// dikembalikan sebelum fungsi kembali.
+func (s *tenant) barangDataAwalLocked(baris []finance.BarisAwal, stokBaru []finance.StokItem) ([]finance.Transaction, []finance.SheetError, *finance.GerakStok, error) {
+	if stokBaru != nil {
+		lama := s.stok
+		s.stok = stokBaru
+		defer func() { s.stok = lama }()
+	}
+	var txs []finance.Transaction
+	var errs []finance.SheetError
+	for i := 0; i < len(baris); { // per sheet: nomor baris galat milik sheet-nya
+		j := i
+		var grup []finance.ImportRow
+		for ; j < len(baris) && baris[j].Sheet == baris[i].Sheet; j++ {
+			grup = append(grup, baris[j].ImportRow)
+		}
+		ok, galat := s.terapkanBarangImporLocked(grup)
+		txs = append(txs, ok...)
+		for _, e := range galat {
+			errs = append(errs, finance.SheetError{Sheet: baris[i].Sheet, Baris: e.Baris, Pesan: e.Pesan})
+		}
+		i = j
+	}
+	awal, err := s.cekStokImporLocked(txs)
+	return txs, errs, awal, err
 }
