@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { Info } from 'lucide-react'
 import { ThUrut } from '@/components/ThUrut'
 import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
 import { useGulirKeForm } from '@/lib/gulir'
@@ -27,6 +28,15 @@ const SUMBER: { value: SumberDanaAset; label: string; hint: string }[] = [
   { value: 'utang', label: 'Dibeli kredit / dicicil', hint: 'Tercatat sebagai utang. Lunasi nanti dari menu Piutang & Utang.' },
   { value: 'modal', label: 'Barang dari pemilik (setoran modal)', hint: 'Barang pribadi pemilik yang dipakai usaha; menambah modal.' },
 ]
+// Contoh harta per kelompok PMK 72/2023 untuk petunjuk orang awam (bukan daftar resmi; cocokkan dengan Lampiran).
+const CONTOH_KELOMPOK: Record<string, string> = {
+  k1: 'Komputer, laptop, printer, HP, mebel kayu, alat dapur kecil, sepeda motor',
+  k2: 'Mobil, pick-up, mebel logam, AC, mesin ringan',
+  k3: 'Mesin produksi berat, alat berat',
+  k4: 'Mesin industri sangat berat (jarang untuk UMKM)',
+  bangunan_permanen: 'Gedung, gudang, kandang permanen',
+  bangunan_tidak_permanen: 'Renovasi ruko sewa, kandang semi permanen',
+}
 const NAMA_SUMBER: Record<string, string> = { kas: 'dibayar kas', utang: 'kredit / utang', modal: 'setoran modal' }
 
 function toInput(a: Asset): AssetInput {
@@ -94,6 +104,7 @@ function PilihMetode({ data, onChanged }: { data: AssetSummary; onChanged: () =>
 export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary; onChanged: () => void; tanggalSaldoAwal?: string }) {
   const tglAwal = tanggalSaldoAwal || data.tanggal_saldo_awal
   const [form, setForm] = useState<AssetInput | null>(null)
+  const [petunjukKelompok, setPetunjukKelompok] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   useGulirKeForm(formRef, !!form)
   const [editId, setEditId] = useState<number | null>(null)
@@ -167,15 +178,6 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
         </div>
       )}
 
-      {data.pemetaan_belum_dicek > 0 && (
-        <div className="note-box warn" style={{ marginTop: 0, marginBottom: 14 }}>
-          <strong>{data.pemetaan_belum_dicek} jenis harta belum diverifikasi</strong> ke Lampiran PMK 72/2023.
-          Tarif dan masa manfaat per kelompok sudah sesuai pasal, yang belum dicek adalah pemetaan nama harta
-          ke kelompoknya. Periksa dulu bersama tim pajak sebelum angkanya dipakai untuk SPT; kalau tidak yakin,
-          pilih <em>Lainnya</em> dan tentukan kelompoknya sendiri.
-        </div>
-      )}
-
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))' }}>
         <div className="card">
           <div className="kpi-label">Harga Perolehan</div>
@@ -233,21 +235,49 @@ export function Aset({ data, onChanged, tanggalSaldoAwal }: { data: AssetSummary
                 <option value="">Lainnya — pilih kelompok sendiri</option>
                 {data.jenis_harta.map((j) => (
                   <option key={j.id} value={j.id}>
-                    {j.nama}{j.terverifikasi ? '' : ' — pemetaan perlu dicek'}
+                    {j.nama}
                   </option>
                 ))}
               </select>
             </label>
 
             {form.jenis_harta === '' && (
-              <label>
-                <span className="kpi-label">Kelompok PMK</span>
-                <select className="input-field" value={form.kelompok} onChange={(e) => setForm({ ...form, kelompok: e.target.value })}>
+              <div>
+                <span className="kpi-label inline-flex items-center gap-1">
+                  <label htmlFor="aset-kelompok">Kelompok PMK</label>
+                  <button type="button" className="text-muted-foreground" aria-label="Petunjuk memilih kelompok" aria-expanded={petunjukKelompok}
+                    aria-controls="petunjuk-kelompok" onClick={() => setPetunjukKelompok((x) => !x)}>
+                    <Info size={14} aria-hidden="true" />
+                  </button>
+                </span>
+                <select id="aset-kelompok" className="input-field" value={form.kelompok} onChange={(e) => setForm({ ...form, kelompok: e.target.value })}>
                   {data.kelompok.map((k) => (
                     <option key={k.id} value={k.id}>{k.nama}</option>
                   ))}
                 </select>
-              </label>
+              </div>
+            )}
+            {form.jenis_harta === '' && petunjukKelompok && (
+              // Petunjuk orang awam: umur & tarif dari data kelompok (PMK), contoh harta per kelompok.
+              <div id="petunjuk-kelompok" className="note-box" style={{ gridColumn: '1 / -1', margin: 0 }}>
+                <div className="text-sm font-semibold">Cara memilih kelompok</div>
+                <p className="text-xs text-muted-foreground" style={{ margin: '2px 0 8px' }}>
+                  Pilih yang contohnya paling mirip dengan harta Anda. Kelompok menentukan umur penyusutan untuk pajak.
+                </p>
+                <table className="data-table text-xs" data-kartu="tidak">
+                  <thead><tr><th>Kelompok</th><th>Umur</th><th>Tarif / tahun</th><th>Contoh</th></tr></thead>
+                  <tbody>
+                    {data.kelompok.map((k) => (
+                      <tr key={k.id}>
+                        <td>{k.nama.replace('Bukan bangunan — ', '')}</td>
+                        <td>{k.masa_manfaat / 12} tahun</td>
+                        <td>{formatTarif(k.tarif_gl_bps)}</td>
+                        <td style={{ whiteSpace: 'normal' }}>{CONTOH_KELOMPOK[k.id] ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             <label>

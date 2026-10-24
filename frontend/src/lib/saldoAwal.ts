@@ -11,3 +11,16 @@ export function urutSaldo<T extends { kode?: string; kategori: string }>(rows: T
       || a.i - b.i)
     .map((x) => x.r)
 }
+
+/**
+ * Sisipkan baris aset tetap ke antara baris harta menurut kodenya (mis. 1503 sesudah 14xx, sebelum
+ * 17xx). Baris harta lain tidak diurutkan ulang, jadi baris yang sedang diketik tidak melompat.
+ */
+export function sisipkanUrutKode<H extends { kode?: string }, A extends { kode?: string }>(harta: H[], aset: A[]): (H | A)[] {
+  const out: (H | A)[] = [...harta]
+  for (const a of aset) {
+    const i = out.findIndex((r) => !!r.kode && !!a.kode && r.kode.localeCompare(a.kode, undefined, { numeric: true }) > 0)
+    out.splice(i < 0 ? out.length : i, 0, a)
+  }
+  return out
+}

@@ -97,7 +97,7 @@ export function Sidebar({ me, tenant, view, onNavigate, onLogout, terkunci, onCa
       <div className="tenant-box">
         {tenant && (
           <div className="tenant-meta tabular" style={{ padding: '0 6px 8px' }}>
-            {tenant.name} · {tenant.category} · {tenant.total_transactions.toLocaleString('id-ID')} transaksi
+            {tenant.name} · {tenant.category}
           </div>
         )}
         <div className="tenant-pill">

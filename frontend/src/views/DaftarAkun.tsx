@@ -100,19 +100,6 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
       )}
       {c?.supported && c.accounts && (
         <>
-          <div className="card">
-            <div className="chart-title">Pemetaan otomatis jenis transaksi ke akun</div>
-            <p className="kpi-meta-row" style={{ marginTop: 4 }}>Setiap transaksi otomatis masuk ke akun ini. Akun bisa dikoreksi per transaksi di form Transaksi.</p>
-            <table className="data-table tabular">
-              <thead><tr><th>Jenis transaksi</th><th>Kode</th><th>Akun</th></tr></thead>
-              <tbody>
-                {c.mapping?.map((m) => (
-                  <tr key={m.jenis}><td>{m.jenis}</td><td>{m.kode}</td><td>{m.nama}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
           {bisaPerbarui && (
             <div className="card" style={{ padding: 20 }}>
               <div className="chart-title">Tambah akun</div>
@@ -147,6 +134,19 @@ export function DaftarAkun({ bisaPerbarui }: { bisaPerbarui: boolean }) {
               {pesan && <p className="text-sm" role="status" style={{ marginTop: 8, color: 'var(--accent-green)' }}>{pesan}</p>}
             </div>
           )}
+
+          <div className="card">
+            <div className="chart-title">Pemetaan otomatis jenis transaksi ke akun</div>
+            <p className="kpi-meta-row" style={{ marginTop: 4 }}>Setiap transaksi otomatis masuk ke akun ini. Akun bisa dikoreksi per transaksi di form Transaksi.</p>
+            <table className="data-table tabular">
+              <thead><tr><th>Jenis transaksi</th><th>Kode</th><th>Akun</th></tr></thead>
+              <tbody>
+                {c.mapping?.map((m) => (
+                  <tr key={m.jenis}><td>{m.jenis}</td><td>{m.kode}</td><td>{m.nama}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {c.kelompok.map((k) => {
             const rows = c.accounts!.filter((a) => a.kelompok === k)
