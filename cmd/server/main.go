@@ -42,6 +42,7 @@ type tenant struct {
 	id          int
 	demo        bool // data contoh: saldo awal & dashboard memakai seed
 	mu          sync.RWMutex
+	checkoutMu  sync.Mutex // checkout berurutan per usaha: cari-atau-buat order pending (billing.go)
 	snapshots   map[string]finance.DashboardSnapshot // seed per periode; KPI dihitung ulang dari txs
 	txs         []finance.Transaction
 	nextTxID    int
