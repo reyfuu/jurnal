@@ -66,6 +66,29 @@ func (k KartuStok) Rentang(dari, sampai string) StokPeriode {
 	return p
 }
 
+// NilaiPerAkun: nilai persediaan tiap akun pada akhir tanggal sampai (YYYY-MM-DD). Nilai tiap
+// barang = SaldoNilai baris terakhir ≤ sampai, lalu dijumlah per akun menurut akunOf; barang
+// tanpa akun (akunOf == "") tidak ikut. Kosong bila kartu belum dimulai atau sampai sebelum titik nol.
+func (k KartuStok) NilaiPerAkun(sampai string, akunOf func(stokID int) string) map[string]int64 {
+	out := map[string]int64{}
+	if k.Mulai == "" || k.Mulai > sampai {
+		return out
+	}
+	akhir := map[int]int64{}
+	for _, b := range k.Baris {
+		if b.Tanggal > sampai {
+			break
+		}
+		akhir[b.StokID] = b.SaldoNilai
+	}
+	for id, v := range akhir {
+		if a := akunOf(id); a != "" {
+			out[a] += v
+		}
+	}
+	return out
+}
+
 // BuildPeriodReportStok: BuildPeriodReport plus efek kartu stok bila sp.Aktif.
 func BuildPeriodReportStok(txs []Transaction, assets []Asset, period string, opening ReportOpening, sp StokPeriode) PeriodReport {
 	if !sp.Aktif {
