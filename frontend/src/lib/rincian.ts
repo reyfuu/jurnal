@@ -4,6 +4,7 @@ import type { RincianBarang } from '@/lib/api'
 // transaksinya ditandai Bukan barang (jasa); aturannya sama dengan server (cekBarangLocked).
 
 export const PESAN_WAJIB_BARANG = 'pilih barang & jumlahnya, atau tandai Bukan barang (jasa)'
+export const PESAN_QTY = 'jumlah barang harus lebih dari 0'
 export const JENIS_BERBARANG = ['Penjualan', 'Beli Bahan / Stok']
 export const JENIS_BELI = 'Beli Bahan / Stok'
 
@@ -19,17 +20,17 @@ export const nilaiRincian = (rincian: RincianBarang[]) => rincian.reduce((n, r) 
 /** Bagian nominal yang tidak menjadi nilai barang (mis. ongkir), tetap ke akun bawaan. */
 export const sisaNominal = (nominal: number, rincian: RincianBarang[]) => nominal - nilaiRincian(rincian)
 
-/** Barang wajib: perpetual, jenis berbarang, usaha punya daftar barang, dan tanggal tidak sebelum
- *  kartu stok dimulai (kartu belum dimulai = dimulai otomatis oleh transaksi ini). */
-export function wajibBarang(p: { perpetual: boolean; jenis: string; tanggal: string; mulai: string; adaBarang: boolean }) {
-  return p.perpetual && berbarang(p.jenis) && p.adaBarang && (!p.mulai || p.tanggal >= p.mulai)
+/** Barang wajib: perpetual, jenis berbarang, dan tanggal tidak sebelum kartu stok dimulai
+ *  (kartu belum dimulai = dimulai otomatis oleh transaksi ini). Daftar barang kosong tetap wajib. */
+export function wajibBarang(p: { perpetual: boolean; jenis: string; tanggal: string; mulai: string }) {
+  return p.perpetual && berbarang(p.jenis) && (!p.mulai || p.tanggal >= p.mulai)
 }
 
 /** '' bila sah; selain itu pesan galat (sama dengan server). */
 export function rincianSah(v: NilaiRincian, wajib: boolean, tx?: { jenis: string; nominal: number }): string {
   if (v.bukan_barang) return ''
   const baris = barisTerpilih(v.rincian)
-  if (baris.some((r) => r.qty_stok <= 0)) return PESAN_WAJIB_BARANG
+  if (baris.some((r) => r.qty_stok <= 0)) return PESAN_QTY
   if (!baris.length) return wajib ? PESAN_WAJIB_BARANG : ''
   if (tx?.jenis === JENIS_BELI) {
     if (baris.length >= 2 && baris.some((r) => !r.nilai)) return 'isi nilai tiap barang pada pembelian beberapa barang'

@@ -47,8 +47,9 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
 /** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat).
  *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan).
  *  onJurnalUmum: buka Jurnal Umum (hanya bila pengguna boleh melihatnya).
- *  perpetual: pencatatan stok perpetual (profil usaha) — barang wajib di Penjualan & Beli Bahan. */
-export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, perpetual = false }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI; onJurnalUmum?: () => void; perpetual?: boolean }) {
+ *  perpetual: pencatatan stok perpetual (profil usaha) — barang wajib di Penjualan & Beli Bahan.
+ *  bolehBarangBaru: pengguna boleh menambah barang (Stok & Gudang) dan tidak sedang lihat-sebagai. */
+export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, perpetual = false, bolehBarangBaru = false }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI; onJurnalUmum?: () => void; perpetual?: boolean; bolehBarangBaru?: boolean }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
@@ -167,7 +168,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, per
     e.preventDefault()
     if (!editing) return
     const { id, input } = editing
-    const wajib = wajibBarang({ perpetual, jenis: input.jenis, tanggal: input.tanggal, mulai: barang.mulai, adaBarang: barang.barang.length > 0 })
+    const wajib = wajibBarang({ perpetual, jenis: input.jenis, tanggal: input.tanggal, mulai: barang.mulai })
     const salah = berbarang(input.jenis) ? rincianSah(rincian, wajib, { jenis: input.jenis, nominal: input.nominal }) : ''
     if (salah) return setError(salah)
     const terpilih = berbarang(input.jenis) && !rincian.bukan_barang ? barisTerpilih(rincian.rincian) : []
@@ -460,11 +461,11 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, per
                 {(() => {
                   const bolehBarang = berbarang(editing.input.jenis) && (barang.barang.length > 0 || perpetual)
                   const adaPilih = bolehBarang && !rincian.bukan_barang && barisTerpilih(rincian.rincian).length > 0
-                  const wajib = wajibBarang({ perpetual, jenis: editing.input.jenis, tanggal: editing.input.tanggal, mulai: barang.mulai, adaBarang: barang.barang.length > 0 })
+                  const wajib = wajibBarang({ perpetual, jenis: editing.input.jenis, tanggal: editing.input.tanggal, mulai: barang.mulai })
                   return <>
                     {bolehBarang && <>
                       <PilihRincianBarang key={versiRincian} id="tx-barang" jenis={editing.input.jenis} nominal={editing.input.nominal}
-                        value={rincian} onChange={setRincianAsli} barang={barang.barang} wajib={wajib}
+                        value={rincian} onChange={setRincianAsli} barang={barang.barang} wajib={wajib} bolehBarangBaru={bolehBarangBaru && !lihat}
                         onBarangBaru={(b) => setBarang((x) => ({ ...x, barang: [...x.barang, b] }))} />
                       {adaPilih && (
                         <p className="text-xs text-muted-foreground sm:col-span-2">{!barang.mulai

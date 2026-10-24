@@ -141,6 +141,14 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+		// Usulan ubah tunduk pada aturan wajib barang yang sama dengan formulir transaksi.
+		if k.Jenis == finance.KoreksiUbah && k.Usulan != nil {
+			if err := t.cekBarangLocked(*k.Usulan); err != nil {
+				t.mu.Unlock()
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
 	}
 	k.Catatan, k.DiputuskanOleh, k.DiputuskanPada = clip(strings.TrimSpace(req.Catatan), 500), u.Name, now
 	basi := false
@@ -150,6 +158,16 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 		case errors.Is(err, finance.ErrKoreksiBasi):
 			k.Status, basi = finance.KoreksiKedaluwarsa, true
 		default:
+			// usulan berbarang pertama memulai kartu stok, sama seperti formulir transaksi
+			if k.Jenis == finance.KoreksiUbah && k.Usulan != nil {
+				if awal := t.stokAwalTxLocked(*k.Usulan); awal != nil {
+					if err := t.simpanStokAwalLocked(awal, u.Name, now); err != nil {
+						t.mu.Unlock()
+						http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+						return
+					}
+				}
+			}
 			k.Status, t.txs = finance.KoreksiDisetujui, txs
 		}
 	} else {

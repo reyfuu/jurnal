@@ -17,10 +17,11 @@ const BARU = -1 // nilai opsi "+ Barang baru"
 const barisKosong = (): RincianBarang => ({ stok_id: 0, qty_stok: 0 })
 
 /** onBarangBaru: barang yang baru dibuat lewat "+ Barang baru", supaya induk ikut memperbarui daftarnya.
- *  bolehJasa=false menyembunyikan centang Bukan barang (jasa), mis. di dialog Beli bahan. */
-export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange, barang, wajib, onBarangBaru, bolehJasa = true }: {
+ *  bolehJasa=false menyembunyikan centang Bukan barang (jasa), mis. di dialog Beli bahan.
+ *  bolehBarangBaru: opsi "+ Barang baru" hanya untuk yang boleh menambah barang (bukan lihat-sebagai). */
+export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange, barang, wajib, onBarangBaru, bolehJasa = true, bolehBarangBaru = false }: {
   id?: string; jenis: string; nominal: number; value: NilaiRincian; onChange: (v: NilaiRincian) => void; barang: PilihanBarang[]; wajib: boolean
-  onBarangBaru?: (b: PilihanBarang) => void; bolehJasa?: boolean
+  onBarangBaru?: (b: PilihanBarang) => void; bolehJasa?: boolean; bolehBarangBaru?: boolean
 }) {
   const [tambahan, setTambahan] = useState<PilihanBarang[]>([]) // barang baru dari dialog
   const [teks, setTeks] = useState<string[]>(() => value.rincian.map((r) => qtyKeTeks(r.qty_stok)))
@@ -57,7 +58,8 @@ export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange,
           const b = semua.find((x) => x.id === r.stok_id)
           const idSel = i === 0 ? id : `${id}-${i}`
           return (
-            <div key={i} className={`grid gap-2 ${beli ? 'sm:grid-cols-[minmax(0,1fr)_7rem_9rem_auto]' : 'sm:grid-cols-[minmax(0,1fr)_7rem_auto]'} items-start`}>
+            <div key={i} className="flex items-start gap-2">
+              <div className={`grid min-w-0 flex-1 gap-2 ${beli ? 'sm:grid-cols-[minmax(0,1fr)_7rem_9rem]' : 'sm:grid-cols-[minmax(0,1fr)_7rem]'} items-start`}>
               <div className="grid gap-1">
                 <select id={idSel} aria-label={`Barang baris ${i + 1}`} className="input-field" value={r.stok_id || 0}
                   onChange={(e) => {
@@ -67,7 +69,7 @@ export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange,
                   }}>
                   <option value={0}>— pilih barang —</option>
                   {semua.map((x) => <option key={x.id} value={x.id}>{x.nama}{x.sku ? ` (${x.sku})` : ''}</option>)}
-                  <option value={BARU}>+ Barang baru</option>
+                  {bolehBarangBaru && <option value={BARU}>+ Barang baru</option>}
                 </select>
                 {b && <span className="text-xs text-muted-foreground">Stok sekarang {formatQty(b.jumlah_mili)} {b.satuan}</span>}
               </div>
@@ -80,6 +82,7 @@ export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange,
                 }} />
               {beli && <Input aria-label={`Nilai baris ${i + 1} (Rp)`} className="tabular" placeholder={baris.length > 1 ? 'nilai (Rp)' : 'nilai (Rp), opsional'}
                 {...angka(r.nilai ?? 0, (n) => ubahBaris(i, { nilai: n || undefined }))} />}
+              </div>
               <Button type="button" variant="ghost" size="icon-sm" aria-label={`Hapus baris ${i + 1}`} disabled={baris.length === 1 && !r.stok_id}
                 onClick={() => hapus(i)}><Trash2 /></Button>
             </div>
@@ -95,6 +98,9 @@ export function PilihRincianBarang({ id = 'rb', jenis, nominal, value, onChange,
           {beli && baris.length === 1 && !baris[0].nilai && <span className="text-xs text-muted-foreground">Nilai kosong = seluruh nominal.</span>}
         </div>
       </>}
+      {!bolehBarangBaru && !value.bukan_barang && (
+        <p className="text-xs text-muted-foreground">Barang belum ada di daftar? Minta pemilik menambahkannya di Stok & Gudang{bolehJasa ? ', atau centang Bukan barang (jasa)' : ''}.</p>
+      )}
       {wajib && bolehJasa && <p className="text-xs text-muted-foreground">Pencatatan perpetual: pilih barang & jumlahnya, atau tandai Bukan barang (jasa).</p>}
       {baru && baru.akun && (
         <BarangBaruDialog pilihanAkun={baru.akun} skuTerpakai={semua.map((x) => x.sku).filter(Boolean)} onBatal={() => setBaru(null)}

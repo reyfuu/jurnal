@@ -141,9 +141,37 @@ func TestWajibBarang_GagalSimpanTidakMemulaiKartu(t *testing.T) {
 	}
 }
 
-func TestWajibBarang_TanpaDaftarBarangTidakBerubah(t *testing.T) {
+// Perpetual selalu wajib barang, juga saat daftar barang masih kosong.
+func TestWajibBarang_TanpaDaftarBarangTetapWajib(t *testing.T) {
 	srv, qa := usahaManufakturPerpetual(t)
-	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", `{"tanggal":"2026-02-05","jenis":"Penjualan","nominal":100000,"lunas":true}`)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", `{"tanggal":"2026-02-05","jenis":"Penjualan","nominal":100000,"lunas":true}`)
+	harusDitolakWajibBarang(t, rec.Code, rec.Body.String())
+	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", `{"tanggal":"2026-02-05","jenis":"Penjualan","nominal":100000,"lunas":true,"bukan_barang":true}`)
+	if n := jumlahGerakAwal(t, srv, qa); n != 0 {
+		t.Errorf("tanpa daftar barang tidak ada kartu yang dimulai (%d)", n)
+	}
+}
+
+// Usulan koreksi yang disetujui pemilik tunduk pada aturan wajib barang.
+func TestWajibBarang_KoreksiDisetujuiDicek(t *testing.T) {
+	srv, _, qa, k := siapKlien(t)
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/business", manufakturPerpetual); rec.Code != http.StatusOK {
+		t.Fatalf("profil perpetual: %d %s", rec.Code, rec.Body)
+	}
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	usul(t, srv, k, `{"transaksi_id":1,"jenis":"ubah","alasan":"Sebenarnya beli bahan","usulan":{"tanggal":"2026-10-13","jenis":"Beli Bahan / Stok","nominal":4500000,"keterangan":"Beli kain","lunas":true}}`)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/koreksi/1/setujui", `{}`)
+	harusDitolakWajibBarang(t, rec.Code, rec.Body.String())
+	if got := txsOf(t, srv, qa); got[0].Jenis != "Perawatan & Perlengkapan" {
+		t.Errorf("usulan tertolak tetap mengubah pembukuan: %+v", got[0])
+	}
+	usul(t, srv, k, `{"transaksi_id":1,"jenis":"ubah","alasan":"Beli kain 10 m","usulan":{"tanggal":"2026-10-13","jenis":"Beli Bahan / Stok","nominal":4500000,"keterangan":"Beli kain","lunas":true,"rincian":[{"stok_id":`+itoa(kain.ID)+`,"qty_stok":10000}]}}`)
+	if rec := do(srv, qa, http.MethodPost, "/api/v1/koreksi/2/setujui", `{}`); rec.Code != http.StatusOK {
+		t.Fatalf("usulan berbarang: %d %s", rec.Code, rec.Body)
+	}
+	if n := jumlahGerakAwal(t, srv, qa); n != 1 {
+		t.Errorf("usulan berbarang pertama harus memulai kartu stok (%d)", n)
+	}
 }
 
 func TestWajibBarang_SebelumMulaiKartuBoleh(t *testing.T) {

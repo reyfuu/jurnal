@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PESAN_WAJIB_BARANG, bodyRincian, nilaiRincian, rincianDariTx, rincianSah, sisaNominal, wajibBarang } from './rincian'
+import { PESAN_QTY, PESAN_WAJIB_BARANG, bodyRincian, nilaiRincian, rincianDariTx, rincianSah, sisaNominal, wajibBarang } from './rincian'
 
 describe('rincian barang transaksi', () => {
   it('sisa nominal = nominal dikurangi nilai barang', () => {
@@ -19,7 +19,9 @@ describe('rincian barang transaksi', () => {
   it('tidak wajib: kosong boleh, tetapi barang tanpa jumlah tetap ditolak', () => {
     expect(rincianSah({ rincian: [], bukan_barang: false }, false)).toBe('')
     expect(rincianSah({ rincian: [{ stok_id: 0, qty_stok: 0 }], bukan_barang: false }, false)).toBe('')
-    expect(rincianSah({ rincian: [{ stok_id: 3, qty_stok: 0 }], bukan_barang: false }, false)).toBe(PESAN_WAJIB_BARANG)
+    expect(PESAN_QTY).toBe('jumlah barang harus lebih dari 0')
+    expect(rincianSah({ rincian: [{ stok_id: 3, qty_stok: 0 }], bukan_barang: false }, false)).toBe(PESAN_QTY)
+    expect(rincianSah({ rincian: [{ stok_id: 3, qty_stok: 0 }], bukan_barang: false }, true)).toBe(PESAN_QTY)
   })
 
   it('pembelian beberapa barang: nilai tiap barang wajib dan totalnya ≤ nominal', () => {
@@ -30,14 +32,14 @@ describe('rincian barang transaksi', () => {
     expect(rincianSah({ rincian: lebih, bukan_barang: false }, true, { jenis: 'Beli Bahan / Stok', nominal: 100_000 })).toMatch(/melebihi nominal/)
   })
 
-  it('wajib hanya perpetual, jenis berbarang, ada daftar barang, dan tanggal ≥ mulai kartu', () => {
-    const dasar = { perpetual: true, jenis: 'Penjualan', tanggal: '2026-02-01', mulai: '2026-01-01', adaBarang: true }
+  it('wajib hanya perpetual, jenis berbarang, dan tanggal ≥ mulai kartu', () => {
+    const dasar = { perpetual: true, jenis: 'Penjualan', tanggal: '2026-02-01', mulai: '2026-01-01' }
     expect(wajibBarang(dasar)).toBe(true)
     expect(wajibBarang({ ...dasar, mulai: '' })).toBe(true) // kartu dimulai otomatis
     expect(wajibBarang({ ...dasar, tanggal: '2025-12-31' })).toBe(false)
     expect(wajibBarang({ ...dasar, perpetual: false })).toBe(false)
     expect(wajibBarang({ ...dasar, jenis: 'Gaji & Upah' })).toBe(false)
-    expect(wajibBarang({ ...dasar, adaBarang: false })).toBe(false)
+    expect(wajibBarang({ ...dasar, mulai: '', tanggal: '2020-01-01' })).toBe(true) // daftar barang kosong pun tetap wajib
   })
 
   it('data lama stok_id tunggal jadi satu baris; payload membuang baris kosong', () => {

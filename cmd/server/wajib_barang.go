@@ -34,9 +34,9 @@ func (s *tenant) mulaiKartuStokLocked() string {
 }
 
 // cekBarangLocked: aturan wajib barang untuk satu transaksi usulan. s.mu dipegang.
-// Usaha tanpa daftar barang tidak terkena aturan (tidak ada yang bisa dipilih).
+// Berlaku juga bila daftar barang masih kosong: barang ditambah dulu, atau tandai jasa.
 func (s *tenant) cekBarangLocked(t finance.Transaction) error {
-	if !s.perpetualLocked() || len(s.stok) == 0 || (t.Jenis != finance.JenisJual && t.Jenis != finance.JenisBeliStok) {
+	if !s.perpetualLocked() || (t.Jenis != finance.JenisJual && t.Jenis != finance.JenisBeliStok) {
 		return nil
 	}
 	if t.BukanBarang || len(t.BarisBarang()) > 0 {

@@ -37,7 +37,7 @@ function Galat({ teks }: { teks: string }) {
 
 /** Beli bahan/barang: transaksi "Beli Bahan / Stok" dengan satu atau beberapa barang → stok & HPP
  *  (FIFO / rata-rata). Pembelian beberapa barang mengisi nilai tiap barang. */
-export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; onClose: () => void; onDone: () => void }) {
+export function BeliBahanDialog({ items, bolehBarangBaru = false, onClose, onDone }: { items: StokRow[]; bolehBarangBaru?: boolean; onClose: () => void; onDone: () => void }) {
   const [tanggal, setTanggal] = useState(hariIni)
   const [rincian, setRincian] = useState<NilaiRincian>(() => ({ rincian: [{ stok_id: items[0]?.id ?? 0, qty_stok: 0 }], bukan_barang: false }))
   const [barang, setBarang] = useState<PilihanBarang[]>(() => items.map((x) => ({ id: x.id, sku: x.sku, nama: x.nama, kategori: x.kategori, satuan: x.satuan, jumlah_mili: x.jumlah * SKALA, harga_jual: x.harga_jual })))
@@ -86,7 +86,7 @@ export function BeliBahanDialog({ items, onClose, onDone }: { items: StokRow[]; 
             <div className="grid gap-1.5"><Label htmlFor="bb-tgl">Tanggal</Label>
               <Input id="bb-tgl" type="date" required value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
             <PilihRincianBarang id="bb-barang" jenis="Beli Bahan / Stok" nominal={total} value={rincian} onChange={setRincian}
-              barang={barang} wajib bolehJasa={false} onBarangBaru={(b) => setBarang((xs) => [...xs, b])} />
+              barang={barang} wajib bolehJasa={false} bolehBarangBaru={bolehBarangBaru} onBarangBaru={(b) => setBarang((xs) => [...xs, b])} />
             <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="bb-pihak">Supplier</Label>
               <Input id="bb-pihak" placeholder="Opsional" value={pihak} onChange={(e) => setPihak(e.target.value)} /></div>
           </div>

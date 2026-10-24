@@ -428,7 +428,7 @@ export default function App() {
       case 'transaksi':
         return <Transaksi key={bukaTab.n} aksiAwal={bukaTab.tab} isiAI={sinyalAI} onChanged={() => reload(me!, period)}
           onJurnalUmum={canSee('jurnal-umum') ? () => navigate('jurnal-umum') : undefined}
-          perpetual={business?.profile?.metode_persediaan === 'perpetual'}
+          perpetual={business?.profile?.metode_persediaan === 'perpetual'} bolehBarangBaru={canSee('stok-gudang') && !me!.lihat}
           lihat={me!.lihat && { klienId: me!.lihat.klien_id, bolehUsul: !!me!.master?.izin.includes('usul_koreksi') }} />
       case 'stok-gudang':
         return <StokGudang key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
