@@ -6,7 +6,7 @@ import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import { BeliBahanDialog, KartuBarangDialog, MutasiStokPanel, RiwayatGerakPanel } from '@/views/KartuStok'
 import { StokOpnamePanel } from '@/views/StokOpname'
-import { TambahBarangBanyak, akunAwalBarang } from '@/views/TambahBarang'
+import { TambahBarangBanyak } from '@/views/TambahBarang'
 import { ThUrut } from '@/components/ThUrut'
 import { urutkan, useKolomUrut, type Pengurut } from '@/lib/urut'
 import { useGulirKeForm } from '@/lib/gulir'
@@ -15,7 +15,7 @@ import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
   STOK_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
-  type PilihanAkunStok, type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
+  akunAwalBarang, type PilihanAkunStok, type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -487,7 +487,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
                   <select className="input-field" value={form.akun ?? ''}
                     onChange={(e) => setForm({ ...form, akun: e.target.value, kategori: pilihanAkun.find((p) => p.kode === e.target.value)?.nama ?? form.kategori })}>
                     {!pilihanAkun.some((p) => p.kode === form.akun) && <option value={form.akun ?? ''}>{form.kategori}</option>}
-                    {pilihanAkun.map((p) => <option key={p.kode} value={p.kode}>{p.kode} · {p.nama}</option>)}
+                    {pilihanAkun.map((p) => <option key={p.kode} value={p.kode}>{p.kode} Â· {p.nama}</option>)}
                   </select>
                 </label>
               )}

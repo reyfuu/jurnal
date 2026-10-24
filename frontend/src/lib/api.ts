@@ -1224,6 +1224,9 @@ export interface StokRow extends StokItem {
 
 export interface PilihanAkunStok { kode: string; nama: string }
 
+/** Akun persediaan awal barang baru: Bahan Baku bila ada, kalau tidak yang pertama. */
+export const akunAwalBarang = (pilihan: PilihanAkunStok[]) => (pilihan.find((p) => /bahan baku/i.test(p.nama)) ?? pilihan[0])?.kode
+
 export interface StokSummary {
   items: StokRow[] | null
   /** Akun persediaan aktif di CoA usaha, untuk pilihan kategori barang. */
