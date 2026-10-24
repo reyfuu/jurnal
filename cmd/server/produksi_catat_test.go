@@ -59,7 +59,12 @@ func TestCatatProduksi_LangsungTanpaKartuStok(t *testing.T) {
 // siapProduksiKaos: manufaktur perpetual dengan Kain 100 m @10.000 dan produk Kaos (10 pcs per batch, 1 m kain per pcs).
 func siapProduksiKaos(t *testing.T) (*Server, *http.Cookie, finance.StokItem, finance.Produk) {
 	t.Helper()
-	srv, qa := usahaManufakturPerpetual(t)
+	return siapProduksiKaosDengan(t, usahaManufakturPerpetual)
+}
+
+func siapProduksiKaosDengan(t *testing.T, usaha func(*testing.T) (*Server, *http.Cookie)) (*Server, *http.Cookie, finance.StokItem, finance.Produk) {
+	t.Helper()
+	srv, qa := usaha(t)
 	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
 	kaos := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs"}`)
 	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[`+
@@ -138,4 +143,36 @@ func TestCatatProduksi_BiayaAkunBebanTidakDikapitalisasi(t *testing.T) {
 	if len(txBiayaProduksi(t, srv, qa)) != 0 {
 		t.Fatal("biaya beban harus ikut terhapus")
 	}
+}
+
+// Periodik: akun beban pilihan pengguna juga tidak dikapitalisasi, jadi nilai kartu produk = bahan
+// saja dan laba CoA tetap sama dengan laba ringkas.
+func TestCatatProduksi_BiayaAkunBebanTidakDikapitalisasiPeriodik(t *testing.T) {
+	srv, qa, kain, pKaos := siapProduksiKaosDengan(t, usahaManufaktur)
+	body := `{"tanggal":"2026-01-05","produk":[{"produk_id":` + itoa(pKaos.ID) + `,"hasil":10000,"bahan":[{"stok_id":` + itoa(kain.ID) + `,"qty":10000}],` +
+		`"biaya":[{"keterangan":"Upah jahit","akun":"5103","nominal":15000}]}]}`
+	rec := do(srv, qa, http.MethodPost, "/api/v1/stok/produksi/catat", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("catat produksi: %d %s", rec.Code, rec.Body)
+	}
+	var out produksiCatatResp
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	if len(out.Gerak) != 1 || out.Gerak[0].Biaya != 0 {
+		t.Fatalf("g.Biaya harus 0: %+v", out)
+	}
+	var nilai int64
+	for _, it := range getJSON[finance.StokSummary](t, srv, qa, "/api/v1/stok").Items {
+		if it.Nama == "Kaos" {
+			nilai = it.Nilai
+		}
+	}
+	if nilai != 100_000 {
+		t.Fatalf("nilai Kaos %d, mau 100000 (bahan saja)", nilai)
+	}
+	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
+	is := getJSON[finance.IncomeStatement](t, srv, qa, "/api/v1/reports/financial?period=2026-01")
+	if c.IncomeStatement == nil || c.IncomeStatement.LabaBersih != is.NetProfit {
+		t.Fatalf("laba CoA harus = laba ringkas %d: %+v", is.NetProfit, c.IncomeStatement)
+	}
+	neracaSaldoSeimbang(t, c)
 }

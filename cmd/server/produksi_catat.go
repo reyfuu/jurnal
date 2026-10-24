@@ -144,7 +144,7 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 				}
 				akun = b.Akun
 				// Akun beban pilihan pengguna tetap beban; hanya akun persediaan yang menambah nilai barang.
-				kapitalisasi = punyaPersediaan[b.Akun] || !perpetual
+				kapitalisasi = punyaPersediaan[b.Akun]
 			}
 			t := finance.Transaction{Tanggal: req.Tanggal, Jenis: finance.JenisBeliStok, Nominal: b.Nominal, Akun: akun, Lunas: true, Lawan: bayar,
 				Keterangan: "Biaya produksi " + prod.Nama + ": " + strings.TrimSpace(b.Keterangan), Grup: grup}
