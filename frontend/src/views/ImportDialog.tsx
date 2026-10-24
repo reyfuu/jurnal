@@ -65,7 +65,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: Props) {
         <DialogHeader>
           <DialogTitle>Impor transaksi dari Excel</DialogTitle>
           <DialogDescription>
-            Pakai template supaya kolomnya dikenali. Wajib: Tanggal, Jenis, Nominal. Opsional: Barang (SKU atau nama; isi "jasa" bila bukan barang) dan Jumlah Barang, satu barang per baris; di metode persediaan perpetual, Penjualan dan Beli Bahan / Stok wajib diisi salah satunya. Baris yang bermasalah dilewati dan ditampilkan di bawah.
+            Pakai template supaya kolomnya dikenali. Wajib: Tanggal, Jenis, Nominal. Opsional: Barang (SKU atau nama; isi "jasa" bila bukan barang) dan jumlah_barang (desimal, mis. 2,5), satu barang per baris; di metode persediaan perpetual, Penjualan dan Beli Bahan / Stok wajib diisi salah satunya. Baris yang bermasalah dilewati dan ditampilkan di bawah.
           </DialogDescription>
         </DialogHeader>
 

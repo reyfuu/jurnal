@@ -46,21 +46,27 @@ func (s *tenant) terapkanBarangImporLocked(baris []finance.ImportRow) ([]finance
 	for _, r := range baris {
 		t := r.Tx
 		gagal := func(err error) { errs = append(errs, finance.ImportError{Baris: r.Baris, Pesan: err.Error()}) }
+		// Periodik: barang opsional, jadi yang tak bisa dicocokkan dilewati tanpa galat.
+		longgar := !s.perpetualLocked()
+		bisaBarang := t.Jenis == finance.JenisJual || t.Jenis == finance.JenisBeliStok
 		switch {
+		case longgar && !bisaBarang:
 		case finance.JasaTeks(r.BarangTeks):
 			t.BukanBarang = true
 		case r.BarangTeks != "":
 			id, err := s.cariBarangImporLocked(r.BarangTeks)
 			if err != nil {
+				if longgar {
+					break
+				}
 				gagal(err)
 				continue
 			}
-			if !r.AdaJumlah {
-				gagal(fmt.Errorf("barang %q butuh jumlah barang lebih dari 0", r.BarangTeks))
-				continue
+			if !r.AdaJumlah && longgar {
+				break
 			}
 			t.Rincian = []finance.RincianBarang{{StokID: id, QtyStok: r.JumlahBarang, Nilai: t.Nominal}}
-		case r.AdaJumlah:
+		case r.AdaJumlah && !longgar:
 			gagal(fmt.Errorf("jumlah barang diisi tetapi kolom barang kosong"))
 			continue
 		}

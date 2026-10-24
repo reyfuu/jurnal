@@ -15,7 +15,7 @@ type ImportError struct {
 	Pesan string `json:"pesan"`
 }
 
-var importHeaders = []string{"Tanggal", "Jenis", "Nominal", "Keterangan", "Produk / Bahan", "Jumlah", "Channel", "Pelanggan / Supplier", "Status Bayar", "Tanggal Lunas", "Barang (SKU / nama; jasa = bukan barang)", "Jumlah Barang"}
+var importHeaders = []string{"Tanggal", "Jenis", "Nominal", "Keterangan", "Produk / Bahan", "Jumlah", "Channel", "Pelanggan / Supplier", "Status Bayar", "Tanggal Lunas", "Barang", "jumlah_barang"}
 
 // TemplateRows: header + contoh untuk template Excel; contohnya harus lolos ParseImport.
 func TemplateRows() [][]string {
@@ -94,12 +94,16 @@ func findJenis(s string) (string, bool) {
 
 // column menebak arti header; urutan cek penting ("tanggal lunas" sebelum "tanggal", "nominal" sebelum "jumlah").
 func column(h string) string {
+	// Kolom barang hanya dikenali dari header persis template ("Barang", "jumlah_barang") supaya
+	// berkas lama dengan header seperti "Nama Barang" / "Jumlah Barang" tetap terbaca seperti dulu.
+	switch strings.ToLower(strings.TrimSpace(h)) {
+	case "barang":
+		return "barang"
+	case "jumlah_barang":
+		return "jumlah_barang"
+	}
 	h = norm(h)
 	switch {
-	case strings.Contains(h, "jumlah") && strings.Contains(h, "barang"):
-		return "jumlah_barang"
-	case strings.Contains(h, "barang") || h == "sku":
-		return "barang"
 	case strings.Contains(h, "tanggal") && strings.Contains(h, "lunas"):
 		return "tanggal_lunas"
 	case strings.Contains(h, "tanggal") || h == "tgl":
@@ -174,28 +178,29 @@ type ImportRow struct {
 // JasaTeks: isi kolom barang yang berarti transaksi ini bukan barang persediaan (BukanBarang).
 func JasaTeks(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "jasa") }
 
-// parseJumlahBarang membaca desimal ("2,5", "2.5", "1.250,5", "1,250.5") menjadi per seribu;
-// maksimum tiga angka desimal, harus lebih dari 0.
+var (
+	ribuanTitik = regexp.MustCompile(`^\d{1,3}(\.\d{3})+$`)
+	desimalKoma = regexp.MustCompile(`^(\d+|\d{1,3}(\.\d{3})+),(\d{1,3})$`)
+	desimalTtk  = regexp.MustCompile(`^\d+\.\d{1,3}$`)
+	hanyaAngka  = regexp.MustCompile(`^\d+$`)
+)
+
+// parseJumlahBarang membaca jumlah desimal menjadi per seribu (TakaranSkala), aturan sama dengan
+// parseRupiah: bila ada "," maka "," adalah desimal dan "." pemisah ribuan ("1.250,5" = 1250,5);
+// bila hanya "." maka ribuan jika berpola 1-3 angka lalu kelompok tiga angka ("1.250" = 1250),
+// selain itu desimal ("2.5", "1.25" dari sel angka Excel). Campuran gaya "1,250.5" ditolak.
+// Maksimum tiga angka desimal; harus lebih dari 0.
 func parseJumlahBarang(s string) (int64, bool) {
 	s = strings.ReplaceAll(strings.TrimSpace(s), " ", "")
-	if s == "" {
+	switch {
+	case hanyaAngka.MatchString(s):
+	case ribuanTitik.MatchString(s):
+		s = strings.ReplaceAll(s, ".", "")
+	case desimalKoma.MatchString(s):
+		s = strings.Replace(strings.ReplaceAll(s, ".", ""), ",", ".", 1)
+	case desimalTtk.MatchString(s):
+	default:
 		return 0, false
-	}
-	if i := strings.LastIndexAny(s, ".,"); i >= 0 {
-		sep := s[i]
-		depan, belakang := s[:i], s[i+1:]
-		if strings.Count(s, string(sep)) > 1 { // pemisah ribuan saja ("1.250.000")
-			depan, belakang = strings.NewReplacer(".", "", ",", "").Replace(s), ""
-		} else {
-			depan = strings.NewReplacer(".", "", ",", "").Replace(depan)
-		}
-		s = depan
-		if belakang != "" {
-			if len(belakang) > 3 {
-				return 0, false
-			}
-			s += "." + belakang
-		}
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil || f <= 0 || f > 1e12 {
