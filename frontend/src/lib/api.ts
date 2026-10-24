@@ -602,6 +602,8 @@ export interface ImportResult {
   errors: { baris: number; pesan: string }[] | null
   sample: Tx[] | null
   imported: number
+  /** stok akan minus: seluruh impor ditolak sampai berkas diperbaiki */
+  galat?: string
 }
 
 /** Unggah .xlsx; commit=false hanya pratinjau (tidak menyimpan). */

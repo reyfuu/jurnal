@@ -1280,6 +1280,7 @@ type importResp struct {
 	Errors   []finance.ImportError `json:"errors"`
 	Sample   []finance.Transaction `json:"sample"`
 	Imported int                   `json:"imported"`
+	Galat    string                `json:"galat,omitempty"` // stok minus: seluruh impor ditolak
 }
 
 // handleImportTransactions: tanpa ?commit=1 hanya pratinjau (tidak ada yang disimpan).
@@ -1301,14 +1302,31 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error()+"; simpan ulang sebagai .xlsx atau pakai template", http.StatusBadRequest)
 		return
 	}
-	txs, errs := finance.ParseImport(rows)
+	baris, errs := finance.ParseImportBaris(rows)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	txs, errBarang := s.terapkanBarangImporLocked(baris)
+	errs = append(errs, errBarang...)
+	slices.SortStableFunc(errs, func(a, b finance.ImportError) int { return a.Baris - b.Baris })
 	res := importResp{Valid: len(txs), Errors: errs, Sample: txs[:min(5, len(txs))]}
+	awal, errStok := s.cekStokImporLocked(txs)
+	if errStok != nil {
+		res.Galat = errStok.Error() // pratinjau: tampilkan lebih awal; commit menolak
+	}
 	if r.URL.Query().Get("commit") == "1" {
-		s.mu.Lock()
 		for _, t := range txs {
 			if err := s.cekTxLocked(t); err != nil {
-				s.mu.Unlock()
 				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
+		if errStok != nil {
+			http.Error(w, errStok.Error(), http.StatusConflict)
+			return
+		}
+		if awal != nil {
+			if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+				http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -1318,7 +1336,6 @@ func (s *tenant) handleImportTransactions(w http.ResponseWriter, r *http.Request
 			s.nextTxID++
 			s.txs = append(s.txs, t)
 		}
-		s.mu.Unlock()
 		res.Imported = len(txs)
 	}
 	writeJSON(w, res)

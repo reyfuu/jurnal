@@ -65,7 +65,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: Props) {
         <DialogHeader>
           <DialogTitle>Impor transaksi dari Excel</DialogTitle>
           <DialogDescription>
-            Pakai template supaya kolomnya dikenali. Wajib: Tanggal, Jenis, Nominal. Baris yang bermasalah dilewati dan ditampilkan di bawah.
+            Pakai template supaya kolomnya dikenali. Wajib: Tanggal, Jenis, Nominal. Opsional: Barang (SKU atau nama; isi "jasa" bila bukan barang) dan Jumlah Barang, satu barang per baris; di metode persediaan perpetual, Penjualan dan Beli Bahan / Stok wajib diisi salah satunya. Baris yang bermasalah dilewati dan ditampilkan di bawah.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,6 +90,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: Props) {
 
           {busy && !preview && <p className="text-sm text-muted-foreground">Membaca berkas…</p>}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          {preview?.galat && <p className="text-sm text-destructive" role="alert">{preview.galat}. Perbaiki berkas ini sebelum mengimpor.</p>}
 
           {preview && (
             <>
@@ -138,7 +139,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: Props) {
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => reset(false)}>Batal</Button>
-          <Button type="button" disabled={busy || !preview || preview.valid === 0} onClick={() => void commit()}>
+          <Button type="button" disabled={busy || !preview || preview.valid === 0 || !!preview.galat} onClick={() => void commit()}>
             {busy && preview ? 'Mengimpor…' : `Impor ${preview?.valid ?? 0} transaksi`}
           </Button>
         </DialogFooter>

@@ -70,3 +70,26 @@ func TestTemplateRows_RoundTrip(t *testing.T) {
 		t.Fatalf("template examples must import cleanly: %d txs, errs %+v", len(txs), errs)
 	}
 }
+
+func TestParseImportBaris_KolomBarang(t *testing.T) {
+	rows := [][]string{
+		{"Tanggal", "Jenis", "Nominal", "Barang", "Jumlah Barang"},
+		{"2026-01-10", "Penjualan", "1000", "Kaos", "2,5"},
+		{"2026-01-11", "Penjualan", "1000", "jasa", ""},
+		{"2026-01-12", "Penjualan", "1000", "Kaos", "abc"},
+		{"2026-01-13", "Penjualan", "1000", "Kaos", "1.250,5"},
+	}
+	got, errs := finance.ParseImportBaris(rows)
+	if len(got) != 3 || len(errs) != 1 || errs[0].Baris != 4 {
+		t.Fatalf("hasil: %+v %+v", got, errs)
+	}
+	if got[0].Baris != 2 || got[0].BarangTeks != "Kaos" || got[0].JumlahBarang != 2500 || !got[0].AdaJumlah {
+		t.Errorf("baris 2: %+v", got[0])
+	}
+	if !finance.JasaTeks(got[1].BarangTeks) || got[1].AdaJumlah {
+		t.Errorf("jasa: %+v", got[1])
+	}
+	if got[2].JumlahBarang != 1250500 {
+		t.Errorf("1.250,5: %d", got[2].JumlahBarang)
+	}
+}
