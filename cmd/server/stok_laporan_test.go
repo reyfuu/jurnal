@@ -41,7 +41,8 @@ func TestKartuStok_MasukLaporanKeuangan(t *testing.T) {
 			buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+id+`,"fisik":10000,"harga_unit":200000}]}`)
 			for _, tx := range []string{
 				`{"tanggal":"2026-01-05","jenis":"Beli Bahan / Stok","nominal":2500000,"lunas":true,"stok_id":` + id + `,"qty_stok":10000}`,
-				`{"tanggal":"2026-01-06","jenis":"Beli Bahan / Stok","nominal":300000,"lunas":false}`,
+				// perpetual wajib barang: belanja tanpa barang ditandai jasa (tanpa pengaruh ke jurnal)
+				`{"tanggal":"2026-01-06","jenis":"Beli Bahan / Stok","nominal":300000,"lunas":false,"bukan_barang":true}`,
 				`{"tanggal":"2026-01-10","jenis":"Penjualan","nominal":3000000,"lunas":true,"stok_id":` + id + `,"qty_stok":2500}`,
 			} {
 				buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", tx)

@@ -396,8 +396,8 @@ func TestPersediaanAkun_PerpetualBeliTanpaBarang(t *testing.T) {
 	srv, qa := usahaManufakturPerpetual(t)
 	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
 	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+itoa(kain.ID)+`,"fisik":1000,"harga_unit":10000}]}`)
-	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
-		`{"tanggal":"2026-01-10","jenis":"Beli Bahan / Stok","nominal":100000,"lunas":true}`)
+	// Data lama sebelum aturan wajib barang: kini POST tanpa barang ditolak, jadi ditaruh langsung.
+	seedTx(t, srv, qa, finance.Transaction{Tanggal: "2026-01-10", Jenis: finance.JenisBeliStok, Nominal: 100000, Lunas: true})
 
 	c := getJSON[coaReport](t, srv, qa, "/api/v1/reports/coa?period=2026-01")
 	tn := tenantByEmail(t, srv, qa)

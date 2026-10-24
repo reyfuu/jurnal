@@ -174,17 +174,11 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 	oleh, kini := currentUser(r).Name, time.Now().UTC()
 	if !mulai {
 		// Kartu stok belum dimulai: daftar barang hari ini jadi stok awal (titik nol).
-		awal := finance.GerakStok{Tanggal: req.Tanggal, Jenis: finance.GerakAwal, Keterangan: "Stok awal otomatis dari daftar barang (produksi pertama)"}
-		for _, it := range s.stok {
-			awal.Baris = append(awal.Baris, finance.BarisGerak{StokID: it.ID, Fisik: max(0, it.Jumlah) * finance.TakaranSkala, HargaUnit: it.HargaPokok})
-		}
-		if err := s.kunciMetodeStokLocked(); err != nil {
+		awal := s.stokAwalDariDaftarLocked(req.Tanggal, "Stok awal otomatis dari daftar barang (produksi pertama)")
+		if err := s.simpanStokAwalLocked(&awal, oleh, kini); err != nil {
 			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
 			return
 		}
-		awal.ID, awal.Oleh, awal.Dibuat = s.nextGerakID, oleh, kini
-		s.nextGerakID++
-		s.gerak = append(s.gerak, awal)
 		out.StokAwal = true
 	}
 	for _, g := range gerak {

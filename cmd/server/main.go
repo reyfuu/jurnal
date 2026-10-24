@@ -1110,7 +1110,20 @@ func (s *tenant) decodeTx(w http.ResponseWriter, r *http.Request) (finance.Trans
 		http.Error(w, "barang yang dipilih tidak ada di Stok & Gudang", http.StatusBadRequest)
 		return t, false
 	}
+	finance.NormalkanBarang(&t) // stok_id tunggal disimpan sebagai rincian satu baris
 	return t, ok
+}
+
+// cekSimpanTxLocked: aturan simpan transaksi dari formulir — periode/saldo awal (409) lalu wajib
+// barang (400). Mengembalikan usulan stok awal otomatis (nil bila tidak perlu). s.mu dipegang.
+func (s *tenant) cekSimpanTxLocked(t finance.Transaction) (*finance.GerakStok, int, error) {
+	if err := s.cekTxLocked(t); err != nil {
+		return nil, http.StatusConflict, err
+	}
+	if err := s.cekBarangLocked(t); err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+	return s.stokAwalTxLocked(t), 0, nil
 }
 
 // txResp: transaksi tersimpan + peringatan kas minus di bulan transaksi (tidak memblokir simpan).
@@ -1131,10 +1144,18 @@ func (s *tenant) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.mu.Lock()
-	if err := s.cekTxLocked(t); err != nil {
+	awal, kode, err := s.cekSimpanTxLocked(t)
+	if err != nil {
 		s.mu.Unlock()
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), kode)
 		return
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+			s.mu.Unlock()
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+			return
+		}
 	}
 	s.pakaiRekeningBawaanLocked(&t, "")
 	t.ID = s.nextTxID
@@ -1177,9 +1198,16 @@ func (s *tenant) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	if err := s.cekTxLocked(t); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+	awal, kode, err := s.cekSimpanTxLocked(t)
+	if err != nil {
+		http.Error(w, err.Error(), kode)
 		return
+	}
+	if awal != nil {
+		if err := s.simpanStokAwalLocked(awal, currentUser(r).Name, time.Now().UTC()); err != nil {
+			http.Error(w, "gagal menyimpan metode nilai stok", http.StatusInternalServerError)
+			return
+		}
 	}
 	s.pakaiRekeningBawaanLocked(&t, s.txs[i].Lawan)
 	t.ID, t.NoJurnal = s.txs[i].ID, s.txs[i].NoJurnal

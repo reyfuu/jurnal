@@ -20,7 +20,9 @@ import {
   createTransaction, deleteTransaction, getCoA, getPilihanBarang, listTransactions, updateTransaction, usulKoreksi, type CashWarning, type CoAInfo, type JenisInfo,
   type PilihanBarang, type SavedTx, type Tx, type TxInput,
 } from '@/lib/api'
-import { formatQty, parseQty, qtyKeTeks } from '@/lib/qty'
+import { formatQty } from '@/lib/qty'
+import { PilihRincianBarang } from '@/components/PilihRincianBarang'
+import { barisTerpilih, berbarang, bodyRincian, rincianDariTx, rincianSah, wajibBarang, type NilaiRincian } from '@/lib/rincian'
 import { formatRp } from '@/lib/format'
 import { ImportDialog } from '@/views/ImportDialog'
 import { MutasiDialog } from '@/views/MutasiDialog'
@@ -44,8 +46,9 @@ type Editing = { id: number | null; input: TxInput; confirmDelete: boolean } | n
  *  koreksi; pembukuan klien baru berubah setelah pemiliknya menyetujui. */
 /** aksiAwal "baru:<jenis>": langsung membuka formulir transaksi baru (dari tombol + Catat).
  *  isiAI: isian dari Tanya AI, diisi ke formulir baru (bisa diurungkan).
- *  onJurnalUmum: buka Jurnal Umum (hanya bila pengguna boleh melihatnya). */
-export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI; onJurnalUmum?: () => void }) {
+ *  onJurnalUmum: buka Jurnal Umum (hanya bila pengguna boleh melihatnya).
+ *  perpetual: pencatatan stok perpetual (profil usaha) — barang wajib di Penjualan & Beli Bahan. */
+export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum, perpetual = false }: { onChanged: () => Promise<void>; lihat?: { klienId: number; bolehUsul: boolean }; aksiAwal?: string; isiAI?: SinyalAI; onJurnalUmum?: () => void; perpetual?: boolean }) {
   const [txs, setTxs] = useState<Tx[]>([])
   const [jenis, setJenis] = useState<JenisInfo[]>([])
   const [imporMutasi, setImporMutasi] = useState(false)
@@ -84,7 +87,9 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
   useEffect(() => { getCoA().then(setCoa, () => {}) }, [])
   // Barang untuk Penjualan / Beli Bahan: stok bergerak otomatis setelah kartu stok dimulai.
   const [barang, setBarang] = useState<{ mulai: string; barang: PilihanBarang[] }>({ mulai: '', barang: [] })
-  const [qtyTeks, setQtyTeks] = useState('')
+  const [rincian, setRincianAsli] = useState<NilaiRincian>({ rincian: [], bukan_barang: false })
+  const [versiRincian, setVersiRincian] = useState(0) // naik saat diisi dari luar → pemilih barang dimuat ulang
+  const isiRincian = (v: NilaiRincian) => { setRincianAsli(v); setVersiRincian((n) => n + 1) }
   useEffect(() => { getPilihanBarang().then(setBarang, () => {}) }, [])
   const autoKode = (j: string) => coa?.mapping?.find((m) => m.jenis === j)?.kode ?? ''
   const akunNama = (kode: string) => coa?.accounts?.find((a) => a.kode === kode)?.nama ?? ''
@@ -112,12 +117,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     setLimit(PAGE)
   }
   const set = (patch: Partial<TxInput>) => setEditing((ed) => ed && { ...ed, input: { ...ed.input, ...patch } })
-  const isiAi = useIsiAI<{ editing: Editing; qtyTeks: string }, Partial<TxInput>>(isiAI, 'transaksi', {
-    ambil: () => ({ editing, qtyTeks }),
-    pasang: (s) => { setEditing(s.editing); setQtyTeks(s.qtyTeks) },
+  const isiAi = useIsiAI<{ editing: Editing; rincian: NilaiRincian }, Partial<TxInput>>(isiAI, 'transaksi', {
+    ambil: () => ({ editing, rincian }),
+    pasang: (s) => { setEditing(s.editing); isiRincian(s.rincian) },
     isi: (isian) => {
       setError('')
-      setQtyTeks('')
+      isiRincian({ rincian: [], bukan_barang: false })
       getPilihanBarang().then(setBarang, () => {})
       setEditing({ id: null, input: { ...EMPTY, tanggal: today(), ...isian }, confirmDelete: false })
     },
@@ -137,7 +142,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     setError('')
     setAlasan('')
     const { id, ...input } = t
-    setQtyTeks(qtyKeTeks(t.qty_stok ?? 0))
+    isiRincian(rincianDariTx(t)) // data lama stok_id tunggal → satu baris rincian
     setEditing({ id, input, confirmDelete: false })
   }
 
@@ -149,6 +154,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
       if (usulMode) setTerkirim(`${(res as { nomor: string }).nomor} terkirim ke pemilik usaha. Pembukuan belum berubah sampai disetujui.`)
       else setWarnings((res as SavedTx | undefined)?.warnings)
       setEditing(null)
+      getPilihanBarang().then(setBarang, () => {}) // stok & titik nol kartu bisa berubah (mulai otomatis)
       await Promise.all([refresh(), onChanged()])
     } catch (err) {
       setError((err as Error).message)
@@ -161,7 +167,12 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
     e.preventDefault()
     if (!editing) return
     const { id, input } = editing
-    const body = { ...input, tanggal_lunas: input.lunas ? input.tanggal_lunas : '' }
+    const wajib = wajibBarang({ perpetual, jenis: input.jenis, tanggal: input.tanggal, mulai: barang.mulai, adaBarang: barang.barang.length > 0 })
+    const salah = berbarang(input.jenis) ? rincianSah(rincian, wajib, { jenis: input.jenis, nominal: input.nominal }) : ''
+    if (salah) return setError(salah)
+    const terpilih = berbarang(input.jenis) && !rincian.bukan_barang ? barisTerpilih(rincian.rincian) : []
+    const namaBarang = terpilih.map((r) => barang.barang.find((b) => b.id === r.stok_id)?.nama).filter(Boolean).join(', ')
+    const body = { ...input, ...bodyRincian(rincian, input.jenis), item: namaBarang || input.item, tanggal_lunas: input.lunas ? input.tanggal_lunas : '' }
     if (usulMode && id !== null) return void run(() => usulKoreksi(lihat!.klienId, { transaksi_id: id, jenis: 'ubah', usulan: body, alasan }))
     void run(() => (id === null ? createTransaction(body) : updateTransaction(id, body)))
   }
@@ -334,7 +345,8 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
               {urutkan(shown, urut.kunci ? kolomTx[urut.kunci] : undefined, urut.arah).slice(0, limit).map((t) => {
                 const masuk = isMasuk(posOf[t.jenis])
                 const pindah = posOf[t.jenis] === 'pindah' // antar rekening sendiri: bukan masuk/keluar
-                const sub = [t.item && (t.qty_stok ? `${t.item} × ${formatQty(t.qty_stok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
+                const qtyStok = t.qty_stok || (t.rincian?.length === 1 ? t.rincian[0].qty_stok : 0)
+                const sub = [t.item && (qtyStok ? `${t.item} × ${formatQty(qtyStok)}` : t.qty ? `${t.item} × ${t.qty}` : t.item), t.channel].filter(Boolean).join(' · ')
                 return (
                   <tr key={t.id} className={bisaBuka ? 'tx-row' : undefined} onClick={() => openEdit(t)}>
                     <td className="tabular" style={{ whiteSpace: 'nowrap' }}>
@@ -398,7 +410,7 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                   <Input id="tx-tanggal" type="date" required value={editing.input.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
                 </Field>
                 <Field id="tx-jenis" label="Jenis transaksi">
-                  <Select value={editing.input.jenis} onValueChange={(v) => set(v === 'Penjualan' || v === 'Beli Bahan / Stok' ? { jenis: v } : { jenis: v, stok_id: undefined, qty_stok: undefined })}>
+                  <Select value={editing.input.jenis} onValueChange={(v) => { if (!berbarang(v)) isiRincian({ rincian: [], bukan_barang: false }); set(berbarang(v) ? { jenis: v } : { jenis: v, stok_id: undefined, qty_stok: undefined }) }}>
                     <SelectTrigger id="tx-jenis" className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -446,31 +458,21 @@ export function Transaksi({ onChanged, lihat, aksiAwal, isiAI, onJurnalUmum }: {
                   <Input id="tx-ket" placeholder="Misal: rekap kasir, belanja susu" value={editing.input.keterangan} onChange={(e) => set({ keterangan: e.target.value })} />
                 </Field>
                 {(() => {
-                  const bolehBarang = (editing.input.jenis === 'Penjualan' || editing.input.jenis === 'Beli Bahan / Stok') && barang.barang.length > 0
-                  const pilih = bolehBarang ? barang.barang.find((b) => b.id === editing.input.stok_id) : undefined
+                  const bolehBarang = berbarang(editing.input.jenis) && (barang.barang.length > 0 || perpetual)
+                  const adaPilih = bolehBarang && !rincian.bukan_barang && barisTerpilih(rincian.rincian).length > 0
+                  const wajib = wajibBarang({ perpetual, jenis: editing.input.jenis, tanggal: editing.input.tanggal, mulai: barang.mulai, adaBarang: barang.barang.length > 0 })
                   return <>
-                    {bolehBarang && (
-                      <Field id="tx-barang" label="Barang dari Stok & Gudang"
-                        hint={!pilih ? 'Opsional. Pilih supaya stok & HPP ikut bergerak.'
-                          : !barang.mulai ? 'Kartu stok belum dimulai, jadi stok belum bergerak.'
-                            : editing.input.tanggal < barang.mulai ? `Tanggal ini sebelum titik nol stok (${barang.mulai}), jadi stok tidak bergerak.`
-                              : `Stok sekarang ${formatQty(pilih.jumlah_mili)} ${pilih.satuan}.`}>
-                        <select id="tx-barang" className="input-field" value={editing.input.stok_id ?? 0}
-                          onChange={(e) => {
-                            const b = barang.barang.find((x) => x.id === Number(e.target.value))
-                            set(b ? { stok_id: b.id, item: b.nama, qty_stok: parseQty(qtyTeks) } : { stok_id: undefined, qty_stok: undefined })
-                          }}>
-                          <option value={0}>— tidak dari daftar stok —</option>
-                          {barang.barang.map((b) => <option key={b.id} value={b.id}>{b.nama}{b.sku ? ` (${b.sku})` : ''}</option>)}
-                        </select>
-                      </Field>
-                    )}
-                    {pilih ? (
-                      <Field id="tx-qty-stok" label={`Jumlah barang (${pilih.satuan || 'satuan'})`} hint="Boleh desimal, mis. 2,5">
-                        <Input id="tx-qty-stok" required inputMode="decimal" className="tabular" value={qtyTeks}
-                          onChange={(e) => { const v = e.target.value.replace(/[^\d.,]/g, ''); setQtyTeks(v); set({ qty_stok: parseQty(v) }) }} />
-                      </Field>
-                    ) : <>
+                    {bolehBarang && <>
+                      <PilihRincianBarang key={versiRincian} id="tx-barang" jenis={editing.input.jenis} nominal={editing.input.nominal}
+                        value={rincian} onChange={setRincianAsli} barang={barang.barang} wajib={wajib}
+                        onBarangBaru={(b) => setBarang((x) => ({ ...x, barang: [...x.barang, b] }))} />
+                      {adaPilih && (
+                        <p className="text-xs text-muted-foreground sm:col-span-2">{!barang.mulai
+                          ? perpetual ? 'Kartu stok belum dimulai: dimulai otomatis dari daftar barang pada tanggal transaksi ini.' : 'Kartu stok belum dimulai, jadi stok belum bergerak.'
+                          : editing.input.tanggal < barang.mulai ? `Tanggal ini sebelum titik nol stok (${barang.mulai}), jadi stok tidak bergerak.` : 'Stok & HPP ikut bergerak.'}</p>
+                      )}
+                    </>}
+                    {!adaPilih && <>
                       <Field id="tx-item" label="Produk / bahan" hint="Penjualan: nama produk. Beli bahan: nama bahan.">
                         <Input id="tx-item" placeholder="Opsional" value={editing.input.item} onChange={(e) => set({ item: e.target.value })} />
                       </Field>
