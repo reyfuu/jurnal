@@ -84,3 +84,21 @@ func TestKartu_DataLamaSamaDenganRincian(t *testing.T) {
 		}
 	}
 }
+
+// Barang yang sama dua kali dalam satu pembelian: qty & nilai keduanya terjumlah.
+func TestKartu_RincianBarangSamaDuaKali(t *testing.T) {
+	txs := []Transaction{{ID: 9, Tanggal: "2026-01-05", Jenis: JenisBeliStok, Nominal: 50_000,
+		Rincian: []RincianBarang{{StokID: 1, QtyStok: 2_000, Nilai: 20_000}, {StokID: 1, QtyStok: 3_000, Nilai: 30_000}}}}
+	for _, m := range []string{MetodeRataRata, MetodeFIFO} {
+		k := HitungKartuMetode(m, stokRincianUji(), txs, gerakAwalRincianUji())
+		var n int
+		for _, b := range k.Baris {
+			if b.Jenis == KartuBeli && b.TransaksiID == 9 {
+				n++
+			}
+		}
+		if p := k.Posisi[1]; n != 2 || p.Qty != 1_000+5_000 || p.Nilai != 10_000+50_000 {
+			t.Errorf("%s: baris beli %d, posisi kain %+v", m, n, p)
+		}
+	}
+}

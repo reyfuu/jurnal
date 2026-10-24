@@ -199,6 +199,10 @@ func Validate(t *Transaction) error {
 		if b.Nilai < 0 {
 			return errors.New("nilai barang tidak boleh negatif")
 		}
+		// pembelian beberapa barang: nilai tiap baris menentukan akun & kartu barangnya
+		if t.Jenis == JenisBeliStok && len(t.Rincian) >= 2 && b.Nilai == 0 {
+			return errors.New("isi nilai tiap barang pada pembelian beberapa barang")
+		}
 		jumlahNilai += b.Nilai
 	}
 	if jumlahNilai > t.Nominal {

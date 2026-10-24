@@ -70,6 +70,21 @@ func TestValidate_Rincian(t *testing.T) {
 		{"dua baris sah", func(t *Transaction) {
 			t.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1000, Nilai: 60_000}, {StokID: 2, QtyStok: 2000, Nilai: 40_000}}
 		}, false},
+		{"jual dua baris nilai 0 sah", func(t *Transaction) {
+			t.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1000}, {StokID: 2, QtyStok: 2000}}
+		}, false},
+		{"beli dua baris nilai 0", func(t *Transaction) {
+			t.Jenis = JenisBeliStok
+			t.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1000, Nilai: 60_000}, {StokID: 2, QtyStok: 2000}}
+		}, true},
+		{"beli satu baris nilai 0 sah", func(t *Transaction) {
+			t.Jenis = JenisBeliStok
+			t.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1000}}
+		}, false},
+		{"beli dua baris bernilai sah", func(t *Transaction) {
+			t.Jenis = JenisBeliStok
+			t.Rincian = []RincianBarang{{StokID: 1, QtyStok: 1000, Nilai: 60_000}, {StokID: 2, QtyStok: 2000, Nilai: 40_000}}
+		}, false},
 	}
 	for _, c := range cases {
 		tx := dasar()
@@ -77,6 +92,14 @@ func TestValidate_Rincian(t *testing.T) {
 		if err := Validate(&tx); (err != nil) != c.err {
 			t.Errorf("%s: err = %v, want error=%v", c.nama, err, c.err)
 		}
+	}
+}
+
+func TestValidate_BeliBeberapaBarangWajibNilai(t *testing.T) {
+	tx := Transaction{Tanggal: "2026-01-05", Jenis: JenisBeliStok, Nominal: 100_000, Lunas: true,
+		Rincian: []RincianBarang{{StokID: 1, QtyStok: 1000}, {StokID: 2, QtyStok: 2000, Nilai: 40_000}}}
+	if err := Validate(&tx); err == nil || err.Error() != "isi nilai tiap barang pada pembelian beberapa barang" {
+		t.Errorf("err = %v", err)
 	}
 }
 

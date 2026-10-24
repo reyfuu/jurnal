@@ -182,3 +182,24 @@ func TestJurnalKartu_OpnameLebihDanNilaiNol(t *testing.T) {
 		t.Errorf("baris bernilai 0 harus tanpa jurnal: %+v", nol)
 	}
 }
+
+// Data yang melewati Validate (Σ nilai > Nominal): jatuh ke satu debit sebesar Nominal ke akun
+// barang baris pertama, jadi jurnal tetap seimbang.
+func TestJournalBerjalan_NilaiRincianMelebihiNominal(t *testing.T) {
+	peta := PetaDari(Manufaktur)
+	p := finance.BusinessProfile{JenisUsaha: "manufaktur", MetodePersediaan: "perpetual"}
+	txs := []finance.Transaction{{ID: 1, Tanggal: "2026-01-03", Jenis: finance.JenisBeliStok, Nominal: 40_000, Lunas: true,
+		Rincian: []finance.RincianBarang{{StokID: 2, QtyStok: 1000, Nilai: 30_000}, {StokID: 1, QtyStok: 1000, Nilai: 20_000}}}}
+	lines := JournalBerjalan(txs, "2026-01", p, peta, akunUji)
+	var dr []Line
+	var d, k int64
+	for _, l := range lines {
+		d, k = d+l.Debit, k+l.Kredit
+		if l.Debit > 0 {
+			dr = append(dr, l)
+		}
+	}
+	if d != k || d != 40_000 || len(dr) != 1 || dr[0].Kode != "1302" {
+		t.Errorf("jurnal %+v (debit %d kredit %d)", lines, d, k)
+	}
+}

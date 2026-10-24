@@ -176,11 +176,19 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 
 // debitBarang: sisi debit pembelian perpetual berbarang — tiap baris barang ke akun barangnya
 // sebesar nilainya, sisa Nominal − Σ nilai (mis. ongkir) ke akun bawaan pembelian tanpa barang.
-// Akun barang kosong memakai akun bawaan. nil bila transaksi tanpa barang.
+// Akun barang kosong memakai akun bawaan. nil bila transaksi tanpa barang. Σ nilai > Nominal
+// (data yang melewati Validate): satu debit sebesar Nominal ke akun barang baris pertama.
 func debitBarang(t finance.Transaction, bawaan string, akunStok func(stokID int) string) []Line {
 	baris := t.BarisBarang()
 	if len(baris) == 0 {
 		return nil
+	}
+	var jumlah int64
+	for _, b := range baris {
+		jumlah += b.Nilai
+	}
+	if jumlah > t.Nominal {
+		return []Line{{t.ID, t.Tanggal, cmp.Or(akunStok(baris[0].StokID), bawaan), t.Nominal, 0}}
 	}
 	out := make([]Line, 0, len(baris)+1)
 	sisa := t.Nominal
