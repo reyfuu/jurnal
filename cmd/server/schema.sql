@@ -432,6 +432,9 @@ CREATE TABLE IF NOT EXISTS mp_pengaturan (
 -- per seribu satuan); dokumen stok = stok awal (titik nol), stok opname, produksi.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS stok_id INT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS qty_stok BIGINT;
+-- Akun persediaan per barang (StokItem.Akun). Nullable: tag omitempty + jsonb_populate_recordset
+-- mengisi NULL untuk kunci yang tidak ada, bukan DEFAULT.
+ALTER TABLE stok ADD COLUMN IF NOT EXISTS akun TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS next_gerak_id INT NOT NULL DEFAULT 1;
 CREATE TABLE IF NOT EXISTS gerak_stok (
 	tenant_id  INT NOT NULL REFERENCES tenants ON DELETE CASCADE,
