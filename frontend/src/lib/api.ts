@@ -1034,6 +1034,8 @@ export interface OpeningInfo {
   /** Nilai persediaan yang seharusnya di saldo awal (daftar barang / hitung fisik pertama). */
   persediaan: number
   label_persediaan: string
+  /** Pembanding persediaan per akun persediaan (urut kode); kosong = belum ada barang bernilai. */
+  persediaan_akun?: SaldoAkun[]
   /** Alasan saldo awal tidak bisa diubah lagi (ada bulan yang sudah tutup buku). */
   terkunci?: string
 }

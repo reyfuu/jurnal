@@ -24,3 +24,12 @@ export function sisipkanUrutKode<H extends { kode?: string }, A extends { kode?:
   }
   return out
 }
+
+/**
+ * Baris persediaan form Saldo Awal dikunci (diisi per akun dari daftar barang) bila ada nilai
+ * persediaan per akun dan isian belum memuat persediaan bernilai. Nilai yang sudah diketik /
+ * disimpan pengguna tidak pernah ditimpa.
+ */
+export function persediaanTerkunci(persediaanAkun: { nominal: number }[] | undefined, rows: { kategori: string; nominal: number }[]): boolean {
+  return !!persediaanAkun?.length && !rows.some((r) => r.kategori === 'persediaan' && !!r.nominal)
+}

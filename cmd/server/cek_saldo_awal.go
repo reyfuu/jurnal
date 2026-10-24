@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
+	"strings"
 
+	"pajak/internal/coa"
 	"pajak/internal/finance"
 )
 
@@ -34,6 +37,68 @@ func (s *tenant) pembandingPersediaanLocked() (int64, string) {
 		return k.Periode(k.Mulai[:7]).PersediaanAwal, "Nilai hitung fisik pertama " + finance.FormatTanggalID(k.Mulai)
 	}
 	return finance.SummarizeStok(s.stok).NilaiPersediaan, "Nilai daftar barang (jumlah × harga pokok)"
+}
+
+// pembandingPersediaanPerAkunLocked: pembanding persediaan per akun persediaan efektif barang —
+// hitung fisik pertama bila kartu stok sudah dimulai, selain itu jumlah × harga pokok daftar
+// barang. Jumlahnya sama dengan pembandingPersediaanLocked. s.mu dipegang.
+func (s *tenant) pembandingPersediaanPerAkunLocked(all []coa.Account, peta coa.Peta) map[string]int64 {
+	if k := s.kartuLocked(); k.Mulai != "" {
+		return s.persediaanAwalPerAkunLocked(k.Mulai[:7], all, peta)
+	}
+	akunOf := s.akunStokLocked(all, peta)
+	out := map[string]int64{}
+	for _, it := range s.stok {
+		out[akunOf(it.ID)] += it.Jumlah * it.HargaPokok
+	}
+	return out
+}
+
+// persediaanSaldoAwalPerAkun: persediaan saldo awal per akun. Baris berkode akun persediaan masuk
+// akunnya, sisanya (baris lain, saldo awal tanpa rincian) ke akun peran — sama dengan jurnal.
+func persediaanSaldoAwalPerAkun(ob finance.OpeningBalance, all []coa.Account, peta coa.Peta) map[string]int64 {
+	peran := peta.Kode(coa.PeranPersediaan)
+	punya := map[string]bool{}
+	for _, a := range coa.AkunPersediaan(all) {
+		punya[a.Kode] = true
+	}
+	out := map[string]int64{}
+	sisa := ob.Persediaan
+	for _, r := range ob.Rincian {
+		if r.Kategori == finance.KatPersediaan && punya[r.Kode] && r.Kode != peran {
+			out[r.Kode] += r.Nominal
+			sisa -= r.Nominal
+		}
+	}
+	out[peran] += sisa
+	return out
+}
+
+// barisPersediaanAkun: pembanding per akun sebagai baris saldo awal (urut kode, hanya yang
+// bernilai), untuk baris persediaan form Saldo Awal yang diisi dari daftar barang.
+func barisPersediaanAkun(per map[string]int64, all []coa.Account, label string) []finance.SaldoAkun {
+	out := []finance.SaldoAkun{}
+	for _, kd := range slices.Sorted(maps.Keys(per)) {
+		if per[kd] == 0 {
+			continue
+		}
+		nama := "Persediaan"
+		if a, ok := coa.Find(all, kd); ok {
+			nama = a.Nama
+		}
+		out = append(out, finance.SaldoAkun{Kode: kd, Nama: nama, Kategori: finance.KatPersediaan, Nominal: per[kd], Keterangan: label})
+	}
+	return out
+}
+
+// akunCekLocked: akun CoA usaha untuk pemeriksaan saldo awal (CoA dagang bawaan bila usaha
+// belum punya template, seperti akunSaldoAwal). s.mu dipegang.
+func (s *tenant) akunCekLocked() ([]coa.Account, coa.Peta) {
+	all := s.coaTemplateLocked()
+	if len(all) == 0 {
+		all = coa.Master
+	}
+	return all, coa.PetaDari(all)
 }
 
 // cekSaldoAwalLocked: pemanggil memegang s.mu. Kosong bila saldo awal belum diisi.
@@ -79,20 +144,60 @@ func (s *tenant) cekSaldoAwalLocked() []cekKecocokan {
 	if k.Mulai != "" {
 		c.Judul, c.Langkah = "Persediaan = hitung fisik pertama (kartu stok)", "kartu"
 	}
-	switch {
-	case ob.Persediaan == 0 && c.Pembanding == 0:
-		c.Status, c.Pesan = "info", "Saldo awal tanpa persediaan dan belum ada barang bernilai."
-	case ob.Persediaan == c.Pembanding:
-		c.Status, c.Pesan = "ok", "Persediaan di saldo awal sama dengan "+lower(c.LabelBanding)+" ("+rp(c.Pembanding)+")."
-	default:
-		c.Status, c.Selisih = "selisih", ob.Persediaan-c.Pembanding
-		c.Pesan = fmt.Sprintf("Saldo awal mencatat persediaan %s, sedangkan %s %s — selisih %s. Samakan jumlah / harga pokok barang, atau ubah persediaan di Saldo Awal.",
-			rp(ob.Persediaan), lower(c.LabelBanding), rp(c.Pembanding), rp(c.Selisih))
-		if k.Mulai != "" {
-			c.Pesan += " Selama belum sama, selisihnya dicatat sebagai tambahan modal di neraca."
+	// Beberapa akun persediaan terisi (bahan baku, barang jadi, …): satu entri per akun yang
+	// berbeda, karena total yang sama belum tentu sama per akunnya.
+	all, peta := s.akunCekLocked()
+	simpan, banding := persediaanSaldoAwalPerAkun(ob, all, peta), s.pembandingPersediaanPerAkunLocked(all, peta)
+	akun := map[string]bool{}
+	for _, m := range []map[string]int64{simpan, banding} {
+		for kd, v := range m {
+			if v != 0 {
+				akun[kd] = true
+			}
 		}
 	}
-	out = append(out, c)
+	if len(akun) > 1 {
+		var beda []cekKecocokan
+		for _, kd := range slices.Sorted(maps.Keys(akun)) {
+			if simpan[kd] == banding[kd] {
+				continue
+			}
+			nama := kd
+			if a, ok := coa.Find(all, kd); ok {
+				nama = kd + " " + a.Nama
+			}
+			ck := c
+			ck.Kode, ck.Status, ck.SaldoAwal, ck.Pembanding, ck.Selisih = "persediaan_"+kd, "selisih", simpan[kd], banding[kd], simpan[kd]-banding[kd]
+			ck.Judul = "Persediaan " + nama + " = " + strings.TrimPrefix(c.Judul, "Persediaan = ")
+			ck.Pesan = fmt.Sprintf("Saldo awal mencatat %s sebesar %s, sedangkan %s untuk akun ini %s — selisih %s. Samakan jumlah / harga pokok / akun barang, atau ubah baris akun ini di Saldo Awal.",
+				nama, rp(ck.SaldoAwal), lower(c.LabelBanding), rp(ck.Pembanding), rp(ck.Selisih))
+			if k.Mulai != "" {
+				ck.Pesan += " Selama belum sama, selisihnya dicatat sebagai tambahan modal di neraca."
+			}
+			beda = append(beda, ck)
+		}
+		if len(beda) > 0 {
+			out = append(out, beda...)
+		} else {
+			c.Status, c.Pesan = "ok", "Persediaan di saldo awal sama dengan "+lower(c.LabelBanding)+" per akun ("+rp(c.Pembanding)+")."
+			out = append(out, c)
+		}
+	} else {
+		switch {
+		case ob.Persediaan == 0 && c.Pembanding == 0:
+			c.Status, c.Pesan = "info", "Saldo awal tanpa persediaan dan belum ada barang bernilai."
+		case ob.Persediaan == c.Pembanding:
+			c.Status, c.Pesan = "ok", "Persediaan di saldo awal sama dengan "+lower(c.LabelBanding)+" ("+rp(c.Pembanding)+")."
+		default:
+			c.Status, c.Selisih = "selisih", ob.Persediaan-c.Pembanding
+			c.Pesan = fmt.Sprintf("Saldo awal mencatat persediaan %s, sedangkan %s %s — selisih %s. Samakan jumlah / harga pokok barang, atau ubah persediaan di Saldo Awal.",
+				rp(ob.Persediaan), lower(c.LabelBanding), rp(c.Pembanding), rp(c.Selisih))
+			if k.Mulai != "" {
+				c.Pesan += " Selama belum sama, selisihnya dicatat sebagai tambahan modal di neraca."
+			}
+		}
+		out = append(out, c)
+	}
 
 	// Harta = Kewajiban + Modal (saldo awal per akun).
 	if d := ob.SelisihModal(nbv); d != 0 {

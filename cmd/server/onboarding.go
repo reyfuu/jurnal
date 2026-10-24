@@ -114,6 +114,7 @@ func (s *tenant) handleOnboardingImport(w http.ResponseWriter, r *http.Request) 
 	d := finance.ParseOnboarding(sheets)
 	var akun []coa.Account
 	if d.Opening != nil {
+		s.kodePersediaanImpor(d.Opening.Rincian)
 		akun = s.isiKodeSaldoAwal(d.Opening)
 	}
 	s.mu.RLock()
@@ -299,6 +300,9 @@ type openingResp struct {
 	// Persediaan: nilai yang seharusnya di saldo awal (daftar barang / hitung fisik pertama).
 	Persediaan      int64  `json:"persediaan"`
 	LabelPersediaan string `json:"label_persediaan"`
+	// PersediaanAkun: pembanding persediaan per akun persediaan (urut kode); kosong bila belum
+	// ada barang bernilai. Form Saldo Awal mengisi baris persediaan dari sini.
+	PersediaanAkun []finance.SaldoAkun `json:"persediaan_akun"`
 	// Terkunci: alasan saldo awal tidak bisa diubah lagi (ada bulan yang sudah tutup buku).
 	Terkunci string `json:"terkunci,omitempty"`
 }
@@ -323,6 +327,7 @@ func (s *tenant) openingSummary(tanggal string) openingResp {
 		out.AkunTemplate = finance.TemplateAkunSaldo()
 	}
 	out.Persediaan, out.LabelPersediaan = s.pembandingPersediaanLocked()
+	out.PersediaanAkun = barisPersediaanAkun(s.pembandingPersediaanPerAkunLocked(all, peta), all, out.LabelPersediaan)
 	period := s.bukuAwalLocked().Period()
 	if s.opening != nil {
 		o := *s.opening
@@ -432,6 +437,19 @@ func (s *tenant) isiKodeSaldoAwal(o *finance.OpeningBalance) []coa.Account {
 	all, active, _ := s.akunSaldoAwal()
 	coa.IsiKodeSaldo(o.Rincian, active, coa.PetaDari(all))
 	return all
+}
+
+// kodePersediaanImpor: baris persediaan impor ("Persediaan — <kategori>") masuk akun persediaan
+// kategorinya (bahan baku, barang jadi, …), sama dengan tebakan akun barangnya di Stok & Gudang.
+// Jangan dipanggil dengan s.mu terkunci.
+func (s *tenant) kodePersediaanImpor(rows []finance.SaldoAkun) {
+	all, _, _ := s.akunSaldoAwal()
+	peta := coa.PetaDari(all)
+	for i, r := range rows {
+		if kat, ok := strings.CutPrefix(r.Nama, "Persediaan — "); ok && r.Kategori == finance.KatPersediaan {
+			rows[i].Kode = coa.AkunPersediaanBarang(kat, all, peta)
+		}
+	}
 }
 
 // akunHilangDipakaiLocked: akun tambahan Saldo Awal yang hilang dari saldo awal baru tetapi
