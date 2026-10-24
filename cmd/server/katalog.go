@@ -140,16 +140,32 @@ func (s *tenant) coaAkun() (all, active []coa.Account, p finance.BusinessProfile
 	if !ok {
 		return nil, nil, p
 	}
-	all = t.Akun
 	s.mu.RLock()
+	all = s.akunSendiriLocked(t.Akun)
+	s.mu.RUnlock()
+	return all, coa.ActiveFrom(all, p), p
+}
+
+// akunSendiriLocked: akun template ditambah akun yang dibuat sendiri di Saldo Awal dan akun
+// tambahan klien (Daftar Akun). Pemanggil memegang s.mu.
+func (s *tenant) akunSendiriLocked(all []coa.Account) []coa.Account {
 	if s.opening != nil {
 		all = coa.AkunSaldoAwal(s.opening.Rincian, all, coa.PetaDari(all))
 	}
 	if s.profile != nil {
 		all = coa.AkunTambahanKlien(s.profile.AkunTambahan, all)
 	}
-	s.mu.RUnlock()
-	return all, coa.ActiveFrom(all, p), p
+	return all
+}
+
+// akunLocked: daftar akun yang sama dengan coaAkun / akunSaldoAwal (CoA dagang bawaan bila usaha
+// belum punya template), untuk pemanggil yang sudah memegang s.mu.
+func (s *tenant) akunLocked() []coa.Account {
+	all := s.coaTemplateLocked()
+	if len(all) == 0 {
+		all = coa.Master
+	}
+	return s.akunSendiriLocked(all)
 }
 
 type coaPembaruan struct {

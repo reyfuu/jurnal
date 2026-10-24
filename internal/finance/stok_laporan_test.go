@@ -94,3 +94,38 @@ func TestLaporanDenganKartuStok(t *testing.T) {
 		t.Errorf("sebelum titik nol berubah: %+v", des.BalanceSheet.Assets)
 	}
 }
+
+// Tiga barang: id 1 & 2 di akun 1301, id 3 di akun 1305.
+// Saldo terakhir ≤ 15 Jan: 100 + 50 + 200; baris 20 Jan (999) di luar batas.
+func TestNilaiPerAkun(t *testing.T) {
+	akun := map[int]string{1: "1301", 2: "1301", 3: "1305"}
+	akunOf := func(id int) string { return akun[id] }
+	k := KartuStok{Mulai: "2026-01-01", Metode: MetodeRataRata, Baris: []BarisKartu{
+		{Tanggal: "2026-01-02", StokID: 1, Jenis: KartuAwal, SaldoNilai: 80},
+		{Tanggal: "2026-01-03", StokID: 2, Jenis: KartuAwal, SaldoNilai: 50},
+		{Tanggal: "2026-01-05", StokID: 1, Jenis: KartuBeli, SaldoNilai: 100},
+		{Tanggal: "2026-01-10", StokID: 3, Jenis: KartuBeli, SaldoNilai: 200},
+		{Tanggal: "2026-01-20", StokID: 3, Jenis: KartuJual, SaldoNilai: 999},
+	}}
+
+	got := k.NilaiPerAkun("2026-01-15", akunOf)
+	if len(got) != 2 || got["1301"] != 150 || got["1305"] != 200 {
+		t.Fatalf("NilaiPerAkun = %v, mau map[1301:150 1305:200]", got)
+	}
+	if p := k.Rentang("2026-01-01", "2026-01-15"); p.PersediaanAkhir != got["1301"]+got["1305"] {
+		t.Errorf("jumlah %d tidak sama dengan PersediaanAkhir %d", got["1301"]+got["1305"], p.PersediaanAkhir)
+	}
+
+	tanpaAkun := KartuStok{Mulai: "2026-01-01", Baris: []BarisKartu{
+		{Tanggal: "2026-01-02", StokID: 4, Jenis: KartuBeli, SaldoNilai: 500},
+	}}
+	if g := tanpaAkun.NilaiPerAkun("2026-01-15", akunOf); g == nil || len(g) != 0 {
+		t.Errorf("barang tanpa akun harus dilewati (map kosong non-nil), dapat %v", g)
+	}
+	if g := (KartuStok{}).NilaiPerAkun("2026-01-15", akunOf); g == nil || len(g) != 0 {
+		t.Errorf("kartu belum dimulai harus map kosong non-nil, dapat %v", g)
+	}
+	if g := k.NilaiPerAkun("2025-12-31", akunOf); g == nil || len(g) != 0 {
+		t.Errorf("sampai sebelum titik nol harus map kosong non-nil, dapat %v", g)
+	}
+}

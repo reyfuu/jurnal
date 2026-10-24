@@ -105,7 +105,7 @@ func BuildLaporanBerjalan(txs []Transaction, assets []Asset, period string, ob O
 // dibukukan di akhir bulan.
 func BuildNeracaPada(txs []Transaction, assets []Asset, tanggal string, ob OpeningBalance, kartu KartuStok) BalanceSheet {
 	period := tanggal[:7]
-	if tanggal >= akhirBulan(period) {
+	if tanggal >= AkhirBulan(period) {
 		return BuildLaporanBerjalan(txs, assets, period, ob, kartu).BalanceSheet
 	}
 	var sd []Transaction
@@ -130,7 +130,7 @@ func buildBerjalan(txs []Transaction, assets []Asset, period, sampai string, ob 
 	if mulai == "" || period < mulai {
 		mulai = period
 	}
-	penuh := sampai >= period+"-31" || sampai >= akhirBulan(period)
+	penuh := sampai >= period+"-31" || sampai >= AkhirBulan(period)
 	sp := kartu.Periode(period)
 	if !penuh {
 		sp = kartu.Rentang(period+"-01", sampai)
@@ -210,7 +210,7 @@ func buildBerjalan(txs []Transaction, assets []Asset, period, sampai string, ob 
 	cf.SetorModal, cf.Prive = p1.SetorModal-p0.SetorModal, p1.Prive-p0.Prive
 	return PeriodReport{
 		Period: period, Income: is, CashFlow: cf, Assets: as,
-		BalanceSheet: BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total, Tanggal: min(sampai, akhirBulan(period))},
+		BalanceSheet: BalanceSheet{Assets: a, Liabilities: l, Equity: q, IsBalanced: a.Total == l.Total+q.Total, Tanggal: min(sampai, AkhirBulan(period))},
 	}
 }
 

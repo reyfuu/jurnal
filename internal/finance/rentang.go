@@ -36,7 +36,8 @@ func LabelRentang(dari, sampai string) string {
 	return TanggalPanjang(dari) + " – " + TanggalPanjang(sampai)
 }
 
-func akhirBulan(period string) string {
+// AkhirBulan: tanggal terakhir bulan period (YYYY-MM), mis. "2026-02" → "2026-02-28".
+func AkhirBulan(period string) string {
 	t, err := time.Parse("2006-01", period)
 	if err != nil {
 		return period + "-31"
@@ -63,7 +64,7 @@ func BuildLaporanRentang(txs []Transaction, assets []Asset, dari, sampai string,
 	}
 	var susut, amortisasi int64
 	for m := dari[:7]; m <= sampai[:7]; m = geserBulan(m, 1) {
-		if akhir := akhirBulan(m); akhir >= dari && akhir <= sampai {
+		if akhir := AkhirBulan(m); akhir >= dari && akhir <= sampai {
 			as := AssetsForPeriod(assets, txs, m)
 			susut += as.BebanPenyusutan
 			amortisasi += as.BebanAmortisasi

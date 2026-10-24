@@ -53,6 +53,7 @@ func susunManufaktur() []Account {
 		m("1205", "Piutang Lain-lain", "receivable", Debit, AsetLancar, ""),
 		m("1301", "Persediaan Bahan Baku", "inventory", Debit, AsetLancar, ""),
 		m("1302", "Persediaan Bahan Penolong", "inventory", Debit, AsetLancar, ""),
+		m("1303", "Persediaan Barang Setengah Jadi", "inventory", Debit, AsetLancar, "Barang olahan yang disimpan dan dipakai lagi di produksi berikutnya"),
 		m("1304", "Persediaan Barang Dalam Proses (WIP)", "inventory", Debit, AsetLancar, "Dipakai pada Opsi B (perpetual)"),
 		m("1305", "Persediaan Barang Jadi", "inventory", Debit, AsetLancar, ""),
 		m("1306", "Persediaan Suku Cadang Mesin", "inventory", Debit, AsetLancar, ""),

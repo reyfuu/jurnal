@@ -3,7 +3,9 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -97,12 +99,32 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		ketTx[t.ID] = ket
 	}
-	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta) {
+	k := s.kartuLocked()
+	sp := k.Periode(period)
+	akunOf := s.akunStokLocked(all, peta)
+	// Perpetual dengan kartu stok aktif: pembelian barang langsung ke akun persediaan barangnya.
+	var akunBeli func(int) string
+	if sp.Aktif {
+		akunBeli = akunOf
+	}
+	for _, l := range coa.JournalBerjalan(s.txs, period, p, peta, akunBeli) {
 		ket := ketTx[l.TxID]
 		if bulanTx[l.TxID] < period {
 			ket = "Pelunasan: " + ket // transaksi bulan lalu yang dibayar bulan ini
 		}
 		j.entri = append(j.entri, entriJurnal{l, ket})
+	}
+	// Perpetual dengan kartu stok aktif: penjualan, produksi, dan stok opname dijurnal di tanggal
+	// kejadiannya ke akun barangnya; penyesuaian sisa di bawah hanya menyapu sisanya (pembelian
+	// tanpa barang, koreksi stok minus, biaya lain yang tidak berakun barang hasil).
+	if sp.Aktif && p.MetodePersediaan == "perpetual" {
+		for _, l := range coa.JurnalKartuKet(k.Baris, period+"-01", finance.AkhirBulan(period), akunOf, peta) {
+			ket := l.Ket
+			if l.TxID != 0 && ketTx[l.TxID] != "" {
+				ket = ketHPP + ketTx[l.TxID]
+			}
+			j.entri = append(j.entri, entriJurnal{l.Line, ket})
+		}
 	}
 	// Pelunasan piutang/utang saldo awal bulan ini: Dr Kas / Cr Piutang, atau Dr Utang / Cr Kas.
 	kas, piutang, utang := peta.Kode(coa.PeranKas), peta.Kode(coa.PeranPiutang), peta.Kode(coa.PeranUtangUsaha)
@@ -145,7 +167,11 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 			kasAwal -= v
 		}
 	}
-	sp := s.kartuLocked().Periode(period)
+	persediaanAwal := s.persediaanAwalPerAkunLocked(period, all, peta)
+	var target map[string]int64 // nilai kartu per akun di akhir bulan
+	if sp.Aktif {
+		target = k.NilaiPerAkun(period+"-31", akunOf)
+	}
 	rep := s.reportLocked(period)
 	s.mu.RUnlock()
 	// Register aset ikut dijurnal supaya laba bersih & total aset di laporan per akun sama
@@ -161,26 +187,90 @@ func (s *tenant) jurnalPeriode(period string) (jurnalBulan, bool) {
 		}
 		j.entri = append(j.entri, entriJurnal{susut[i], ket}, entriJurnal{susut[i+1], ket})
 	}
-	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, opening.Inventory, opening.Payables, opening.Loans,
+	j.saldoAwal = coa.OpeningBerjalan(kasAwal, opening.Receivables, persediaanAwal, opening.Payables, opening.Loans,
 		rep.BalanceSheet.Equity.RetainedEarnings, coa.OpeningAssets(as, period, peta), saldoLain, peta, p)
 	j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
-	// Kartu stok: sesuaikan akun persediaan ke nilai persediaan akhir; selisihnya masuk HPP.
+	// Kartu stok: sesuaikan tiap akun persediaan ke nilai kartu barang-barangnya di akhir bulan;
+	// selisihnya masuk HPP. Akun persediaan yang terisi transaksi tanpa barang ikut ditutup ke
+	// nilai kartu, jadi persediaan tidak terhitung dua kali.
 	if sp.Aktif {
 		j.kartuAktif = true
-		var saldoPersediaan int64
+		saldo := map[string]int64{}
 		for _, b := range j.tb {
-			if b.Kode == peta.Kode(coa.PeranPersediaan) {
-				saldoPersediaan = b.Saldo
+			if b.Subtype == "inventory" {
+				saldo[b.Kode] = b.Saldo
 			}
 		}
-		if j.penyesuaian = sp.PersediaanAkhir - saldoPersediaan; j.penyesuaian != 0 {
-			for _, l := range coa.PenyesuaianPersediaan(period+"-28", j.penyesuaian, p, peta) {
+		kode := map[string]bool{}
+		for _, a := range coa.AkunPersediaan(active) {
+			kode[a.Kode] = true
+		}
+		for kd := range target {
+			kode[kd] = true
+		}
+		for kd := range saldo {
+			kode[kd] = true
+		}
+		for kd := range persediaanAwal {
+			kode[kd] = true
+		}
+		// penyesuaian = perubahan bersih akun persediaan bulan ini (akhir kartu − saldo awal),
+		// bukan jumlah selisih: persediaan yang terisi transaksi tanpa barang tetap tampil
+		// sebagai pembelian, dan persediaan awal di laba rugi = saldo awal sebenarnya.
+		disesuaikan := false
+		tanggal := finance.AkhirBulan(period) // hari terakhir bulan: urut paling akhir di jurnal
+		for _, kd := range slices.Sorted(maps.Keys(kode)) {
+			j.penyesuaian += target[kd] - persediaanAwal[kd]
+			selisih := target[kd] - saldo[kd]
+			if selisih == 0 {
+				continue
+			}
+			disesuaikan = true
+			for _, l := range coa.PenyesuaianPersediaan(tanggal, kd, selisih, p, peta) {
 				j.entri = append(j.entri, entriJurnal{l, "Penyesuaian persediaan ke nilai kartu stok"})
 			}
+		}
+		if disesuaikan {
 			j.tb = coa.TrialBalanceFrom(all, active, j.saldoAwal, j.lines())
 		}
 	}
 	return j, true
+}
+
+// persediaanAwalPerAkunLocked: saldo awal persediaan per akun pada awal periode. Kartu aktif:
+// nilai kartu per akun di akhir bulan lalu, ditambah baris stok awal (titik nol / barang baru)
+// bulan ini — sama dengan PersediaanAwal kartu. Selain itu baris persediaan saldo awal
+// berkode akun persediaan masuk ke akunnya, sisanya ke akun peran. Jumlahnya selalu sama
+// dengan openingFor(period).Inventory. Pemanggil memegang s.mu.
+func (s *tenant) persediaanAwalPerAkunLocked(period string, all []coa.Account, peta coa.Peta) map[string]int64 {
+	peran := peta.Kode(coa.PeranPersediaan)
+	k := s.kartuLocked()
+	if k.Periode(period).Aktif {
+		akunOf := s.akunStokLocked(all, peta)
+		out := k.NilaiPerAkun(period+"-00", akunOf) // semua baris sebelum tanggal 1
+		out[peran] += 0                              // akun peran selalu tampil, seperti sebelumnya
+		for _, b := range k.Baris {
+			if b.Jenis == finance.KartuAwal && b.Tanggal >= period+"-01" && b.Tanggal <= period+"-31" {
+				out[cmp.Or(akunOf(b.StokID), peran)] += b.Nilai
+			}
+		}
+		return out
+	}
+	ob := s.bukuAwalLocked()
+	punya := map[string]bool{}
+	for _, a := range coa.AkunPersediaan(all) {
+		punya[a.Kode] = true
+	}
+	out := map[string]int64{}
+	sisa := ob.Persediaan
+	for _, r := range ob.Rincian {
+		if r.Kategori == finance.KatPersediaan && punya[r.Kode] && r.Kode != peran {
+			out[r.Kode] += r.Nominal
+			sisa -= r.Nominal
+		}
+	}
+	out[peran] += sisa
+	return out
 }
 
 // kodeModal: akun modal usaha ini (sama dengan pilihan jurnal otomatis).
@@ -225,7 +315,30 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	}
 	rep := s.buildCoAReport(r)
 	all, _, _ := s.coaAkun()
-	kodePersediaan := coa.PetaDari(all).Kode(coa.PeranPersediaan)
+	// Persediaan awal/akhir = jumlah semua akun persediaan. Kode akun hanya ditulis bila periode ini
+	// memakai satu akun persediaan saja (saldo awal atau akhir tidak nol), yaitu akun itu.
+	peta := coa.PetaDari(all)
+	dipakai := map[string]bool{}
+	for _, b := range rep.TrialBalance {
+		if b.Subtype == "inventory" && b.Saldo != 0 {
+			dipakai[b.Kode] = true
+		}
+	}
+	s.mu.RLock()
+	for kode, v := range s.persediaanAwalPerAkunLocked(period, all, peta) {
+		if v != 0 {
+			dipakai[kode] = true
+		}
+	}
+	s.mu.RUnlock()
+	kodePersediaan, namaAwal, namaAkhir := peta.Kode(coa.PeranPersediaan), "Persediaan Awal", "Persediaan Akhir"
+	if len(dipakai) > 1 {
+		kodePersediaan, namaAwal, namaAkhir = "", "Persediaan Awal (semua akun)", "Persediaan Akhir (semua akun)"
+	} else {
+		for kode := range dipakai {
+			kodePersediaan = kode
+		}
+	}
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)
 		return
@@ -241,11 +354,11 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 	add("Pendapatan Usaha", is.Pendapatan)
 	lr = append(lr, []string{"", "Penjualan Bersih", rp(is.PenjualanBersih)})
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{kodePersediaan, "Persediaan Awal", rp(is.PersediaanAwal)})
+		lr = append(lr, []string{kodePersediaan, namaAwal, rp(is.PersediaanAwal)})
 	}
 	add("Harga Pokok Penjualan", is.HPPLines)
 	if is.Metode == "periodik" {
-		lr = append(lr, []string{kodePersediaan, "Persediaan Akhir", rp(-is.PersediaanAkhir)})
+		lr = append(lr, []string{kodePersediaan, namaAkhir, rp(-is.PersediaanAkhir)})
 	}
 	lr = append(lr, []string{"", "Harga Pokok Penjualan", rp(is.HPP)}, []string{"", "Laba (Rugi) Kotor", rp(is.LabaKotor)})
 	add("Beban Operasional", is.BebanOperasional)

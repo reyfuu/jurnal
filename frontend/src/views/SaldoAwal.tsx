@@ -10,7 +10,7 @@ import {
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
-import { sisipkanUrutKode, urutSaldo } from '@/lib/saldoAwal'
+import { persediaanTerkunci, sisipkanUrutKode, urutSaldo } from '@/lib/saldoAwal'
 
 const RED = 'var(--text-danger)'
 const GREEN = 'var(--accent-green)'
@@ -18,6 +18,8 @@ const AMBER = 'var(--accent-amber)'
 // Sama dengan ketSelisihSaldoAwal di server.
 const DRAFT_SALDO = 'saldo-awal'
 const KET_PAKSA = 'selisih saldo awal yang disimpan walau belum seimbang'
+// persKunci: baris persediaan terkunci dari daftar barang (tidak ada di draft lama).
+type DraftSaldo = { tanggal: string; baris: SaldoAkun[]; persKunci?: boolean }
 
 // Baris layar: _k kunci baris; _baru = ditambah pengguna (dapat saran kategori & kode);
 // _katManual / _kodeAuto menjaga pilihan pengguna tidak tertimpa saran.
@@ -51,6 +53,8 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const [tanggal, setTanggal] = useState('')
   const [baris, setBaris] = useState<Baris[] | null>(null)
   const [asetEdit, setAsetEdit] = useState<SaldoAkun[]>([])
+  // true = baris persediaan diisi per akun dari daftar barang (terkunci), bukan diketik.
+  const [persKunci, setPersKunci] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [paksa, setPaksa] = useState(false)
@@ -90,11 +94,16 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   const sisi = (id: string) => kategori.find((k) => k.id === id)?.sisi
   const asetRows: SaldoAkun[] = ((editing ? asetEdit : info?.aset_tetap) ?? [])
   const nbv = asetRows.reduce((t, r) => t + r.nominal, 0)
-  // Baris aset tetap disisipkan di antara baris harta menurut kodenya (15xx sebelum 17xx), sebelum kewajiban.
+  // Baris persediaan terkunci (per akun dari daftar barang) dan baris aset tetap disisipkan di
+  // antara baris harta menurut kodenya (13xx, 15xx sebelum 17xx), sebelum kewajiban.
+  const persRows: SaldoAkun[] = editing && persKunci ? (info?.persediaan_akun ?? []) : []
   const biasa = baris ?? []
   const pos = biasa.findIndex((b) => b.kategori && sisi(b.kategori) !== 'harta')
-  const tampil: (Baris | (SaldoAkun & { _k: -1 }))[] = [
-    ...sisipkanUrutKode(biasa.slice(0, pos < 0 ? biasa.length : pos), asetRows.map((r) => ({ ...r, _k: -1 as const }))),
+  const tampil: (Baris | (SaldoAkun & { _k: -1 | -2 }))[] = [
+    ...sisipkanUrutKode(biasa.slice(0, pos < 0 ? biasa.length : pos), [
+      ...persRows.map((r) => ({ ...r, _k: -2 as const })),
+      ...asetRows.map((r) => ({ ...r, _k: -1 as const })),
+    ]),
     ...(pos < 0 ? [] : biasa.slice(pos)),
   ]
   const jumlah = (s: string) => tampil.filter((b) => sisi(b.kategori) === s).reduce((t, b) => t + (b.nominal || 0), 0)
@@ -103,7 +112,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
   // Laba ditahan minus = rugi tahun lalu, wajar; tidak ikut diperingatkan.
   const minus = biasa.filter((b) => b.nominal < 0 && b.kategori !== 'laba_ditahan')
   const tanpaKategori = biasa.filter((b) => (b.nama.trim() || b.nominal) && !b.kategori)
-  const totalPersediaan = biasa.filter((b) => b.kategori === 'persediaan').reduce((t, b) => t + (b.nominal || 0), 0)
+  const totalPersediaan = tampil.filter((b) => b.kategori === 'persediaan').reduce((t, b) => t + (b.nominal || 0), 0)
   const nilaiBarang = info?.persediaan ?? 0
 
   function mulaiUbah() {
@@ -112,18 +121,28 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setAsetEdit(info.aset_tetap ?? [])
     const awal = o?.rincian?.length ? o.rincian : o ? dariPos(o, info.nilai_buku_aset) : info.akun_template.map((a) => ({ ...a, nominal: 0 }))
     // Baris penyeimbang hasil simpan paksa tidak diedit: dihitung ulang server setiap simpan.
-    const rows = awal.filter((r) => r.kategori !== 'aset_tetap' && r.keterangan !== KET_PAKSA).map((r) => jadiBaris({ ...r }))
-    // Saldo awal baru: persediaan langsung diisi dari daftar barang, bukan diketik ulang.
+    // Persediaan per akun dari daftar barang (baris terkunci) selama saldo awal / draft belum
+    // memuat persediaan bernilai; baris persediaan kosong bawaan template diganti baris itu.
+    const tersimpan = o ? (o.rincian?.length ? o.rincian : [{ kategori: 'persediaan', nominal: o.persediaan }]) : []
+    const draft = bacaDraft<DraftSaldo>(DRAFT_SALDO)
+    // Draft menyimpan status kunci, supaya baris persediaan manual tambahan pengguna tidak membuat
+    // baris terkunci hilang saat dipulihkan; draft lama tanpa status itu memakai tebakan isinya.
+    const kunci = !!draft?.baris?.length && typeof draft.persKunci === 'boolean'
+      ? draft.persKunci && !!info.persediaan_akun?.length
+      : persediaanTerkunci(info.persediaan_akun, tersimpan) && persediaanTerkunci(info.persediaan_akun, draft?.baris ?? [])
+    const tanpaPersKosong = (r: SaldoAkun) => !kunci || r.kategori !== 'persediaan' || !!r.nominal
+    setPersKunci(kunci)
+    const rows = awal.filter((r) => r.kategori !== 'aset_tetap' && r.keterangan !== KET_PAKSA && tanpaPersKosong(r)).map((r) => jadiBaris({ ...r }))
+    // Saldo awal baru tanpa nilai per akun: persediaan langsung diisi dari daftar barang, bukan diketik ulang.
     const p = rows.find((r) => r.kategori === 'persediaan')
-    if (!o && p && nilaiBarang > 0) {
+    if (!o && !kunci && p && nilaiBarang > 0) {
       p.nominal = nilaiBarang
       p.keterangan = info.label_persediaan
     }
     // Isian yang belum tersimpan (error, muat ulang) dipulihkan dari draft.
-    const draft = bacaDraft<{ tanggal: string; baris: SaldoAkun[] }>(DRAFT_SALDO)
     if (draft?.baris?.length) {
       setTanggal(draft.tanggal)
-      setBaris(urutSaldo(draft.baris.map((r) => jadiBaris(r)), kategori.map((k) => k.id)))
+      setBaris(urutSaldo(draft.baris.filter(tanpaPersKosong).map((r) => jadiBaris(r)), kategori.map((k) => k.id)))
       setDipulihkan(true)
     } else {
       setBaris(urutSaldo(rows, kategori.map((k) => k.id)))
@@ -132,7 +151,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setError('')
   }
 
-  useSimpanDraft(baris ? DRAFT_SALDO : null, useMemo(() => (baris ? { tanggal, baris: baris.map(bersih) } : null), [tanggal, baris]))
+  useSimpanDraft(baris ? DRAFT_SALDO : null, useMemo((): DraftSaldo | null => (baris ? { tanggal, baris: baris.map(bersih), persKunci } : null), [tanggal, baris, persKunci]))
 
   const ubah = (k: number, patch: Partial<Baris>) => setBaris((bs) => bs && bs.map((b) => (b._k === k ? { ...b, ...patch } : b)))
 
@@ -173,7 +192,7 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
     setError('')
     try {
       // urutan simpan = urutan nomor akun, juga bila saran kategori datang setelah baris ditinggalkan
-      const rincian = urutSaldo(tampil, kategori.map((k) => k.id)).filter((b) => (b._k === -1 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
+      const rincian = urutSaldo(tampil, kategori.map((k) => k.id)).filter((b) => (b._k < 0 ? b.nominal !== 0 : b.nama.trim() || b.nominal)).map(bersih)
       const res = await saveOpening({ tanggal, kas: 0, piutang: 0, persediaan: 0, utang: 0, pinjaman: 0, modal_disetor: 0, rincian }, selisih !== 0 && paksa)
       setPaksa(false)
       hapusDraft(DRAFT_SALDO)
@@ -327,6 +346,23 @@ export function SaldoAwal({ onChanged, navigate, bisaUbah }: { onChanged: () => 
                 </thead>
                 <tbody>
                   {tampil.map((b, i) => {
+                    if (b._k === -2) {
+                      return (
+                        <tr key={`persediaan-${b.kode ?? i}`}>
+                          <td><div className="input-field tabular" style={{ borderStyle: 'dashed' }}>{b.kode}</div></td>
+                          <td><div className="input-field" style={{ borderStyle: 'dashed' }}>{b.nama}</div></td>
+                          <td><div className="input-field" style={{ borderStyle: 'dashed' }}>{kategori.find((k) => k.id === 'persediaan')?.label}</div></td>
+                          <td><div className="input-field tabular" style={{ textAlign: 'right', borderStyle: 'dashed' }} title="Dari daftar barang">{formatRp(b.nominal)}</div></td>
+                          <td>
+                            {/* isian lain tetap tersimpan sebagai draf */}
+                            <button type="button" className="text-xs underline underline-offset-4" onClick={() => { setBaris(null); navigate('stok-gudang') }}>
+                              dari daftar barang · ubah di Stok &amp; Gudang
+                            </button>
+                          </td>
+                          <td />
+                        </tr>
+                      )
+                    }
                     if (b._k === -1) {
                       return (
                         <tr key={`aset-${i}`}>

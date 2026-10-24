@@ -93,10 +93,10 @@ type Line struct {
 	Kredit  int64  `json:"kredit"`
 }
 
-// PenyesuaianPersediaan: jurnal akhir periode supaya 1301 Persediaan = nilai kartu stok.
-// Lawannya akun HPP: 5102 (periodik) atau 5101 (perpetual).
-func PenyesuaianPersediaan(tanggal string, selisih int64, p finance.BusinessProfile, peta Peta) []Line {
-	hpp, persediaan := peta.Kode(PeranPembelian), peta.Kode(PeranPersediaan)
+// PenyesuaianPersediaan: jurnal akhir periode supaya akun persediaan akun = nilai kartu stok
+// barang-barangnya. Lawannya akun HPP: 5102 (periodik) atau 5101 (perpetual).
+func PenyesuaianPersediaan(tanggal, akun string, selisih int64, p finance.BusinessProfile, peta Peta) []Line {
+	hpp, persediaan := peta.Kode(PeranPembelian), akun
 	if perpetual(p) {
 		hpp = peta.Kode(PeranHPP)
 	}
@@ -124,8 +124,9 @@ func Journal(txs []finance.Transaction, p finance.BusinessProfile, peta Peta) []
 // JournalBerjalan: jurnal satu periode untuk buku berjalan. Transaksi bulan ini dijurnal ke
 // kas bila sudah lunas sampai akhir bulan, selain itu ke piutang (1201) / utang (2101);
 // transaksi bulan lalu yang dilunasi bulan ini mendapat jurnal pelunasan (Dr Kas / Cr Piutang,
-// atau Dr Utang / Cr Kas) di tanggal bayar.
-func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta) []Line {
+// atau Dr Utang / Cr Kas) di tanggal bayar. akunStok: akun persediaan per barang; perpetual,
+// pembelian barang tanpa akun pilihan didebit ke akun barangnya. nil = akun peran persediaan.
+func JournalBerjalan(txs []finance.Transaction, period string, p finance.BusinessProfile, peta Peta, akunStok func(stokID int) string) []Line {
 	piutang, utang := peta.Kode(PeranPiutang), peta.Kode(PeranUtangUsaha)
 	akhir := period + "-31"
 	var out []Line
@@ -150,6 +151,11 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 				}
 			}
 			akun := AccountFor(t, p, peta)
+			if akunStok != nil && perpetual(p) && t.Jenis == finance.JenisBeliStok && t.StokID > 0 && t.Akun == "" {
+				if k := akunStok(t.StokID); k != "" {
+					akun = k
+				}
+			}
 			if masuk {
 				out = append(out, Line{t.ID, t.Tanggal, lawan, t.Nominal, 0}, Line{t.ID, t.Tanggal, akun, 0, t.Nominal})
 			} else {
@@ -169,13 +175,18 @@ func JournalBerjalan(txs []finance.Transaction, period string, p finance.Busines
 // OpeningBerjalan: saldo awal akun pada awal periode dari posisi buku berjalan. Modal (3101)
 // adalah selisih aset − kewajiban − laba ditahan (3201). lain: saldo awal akun lain per kode
 // (posisi debit positif, kewajiban negatif) — aset lancar lain & kewajiban lain saldo awal.
-func OpeningBerjalan(kas, piutang, persediaan, utang, pinjaman, labaDitahan int64, assetAwal, lain map[string]int64, peta Peta, p finance.BusinessProfile) map[string]int64 {
+// persediaan: saldo awal per akun persediaan; jumlahnya ikut dihitung ke modal.
+func OpeningBerjalan(kas, piutang int64, persediaan map[string]int64, utang, pinjaman, labaDitahan int64, assetAwal, lain map[string]int64, peta Peta, p finance.BusinessProfile) map[string]int64 {
 	out := map[string]int64{}
-	for kode, v := range map[string]int64{peta.Kode(PeranKas): kas, peta.Kode(PeranPiutang): piutang, peta.Kode(PeranPersediaan): persediaan,
+	for kode, v := range map[string]int64{peta.Kode(PeranKas): kas, peta.Kode(PeranPiutang): piutang,
 		peta.Kode(PeranUtangUsaha): -utang, peta.Kode(PeranPinjaman): -pinjaman, peta.Kode(PeranLabaDitahan): -labaDitahan} {
 		out[kode] += v
 	}
-	bersih := kas + piutang + persediaan - utang - pinjaman
+	bersih := kas + piutang - utang - pinjaman
+	for kode, v := range persediaan {
+		out[kode] += v
+		bersih += v
+	}
 	for kode, v := range assetAwal {
 		out[kode] += v
 		bersih += v

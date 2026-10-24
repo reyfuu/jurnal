@@ -166,3 +166,33 @@ func TestSaldoAwal_AkunSendiriDiDaftarAkunDanBukuBesar(t *testing.T) {
 		t.Fatalf("akun yang dipakai transaksi tidak boleh hilang: %d %s", rec.Code, rec.Body)
 	}
 }
+
+// Akun persediaan tambahan klien (turunan 1301) ikut dikenali pemeriksaan per akun: saldo awal
+// yang sama dengan daftar barang per akun tidak memunculkan selisih palsu.
+func TestCekSaldoAwal_PersediaanAkunTambahanKlien(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/coa/akun", `{"nama":"Persediaan Kemasan","induk":"1301"}`)
+	var akun finance.AkunTambahan
+	if err := json.Unmarshal(rec.Body.Bytes(), &akun); err != nil || rec.Code != http.StatusOK || akun.Kode == "" {
+		t.Fatalf("akun tambahan: %d %s", rec.Code, rec.Body)
+	}
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m","jumlah":10,"harga_pokok":10000}`)
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Plastik","kategori":"Bahan Penolong","satuan":"pcs","jumlah":4,"harga_pokok":5000,"akun":"`+akun.Kode+`"}`)
+	saldo := `{"tanggal":"2026-01-01","rincian":[
+		{"nama":"Kas","kategori":"kas","nominal":880000},
+		{"kode":"1301","nama":"Persediaan Bahan Baku","kategori":"persediaan","nominal":100000},
+		{"kode":"` + akun.Kode + `","nama":"Persediaan Kemasan","kategori":"persediaan","nominal":20000},
+		{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", saldo); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	var persediaan []cekKecocokan
+	for _, c := range getJSON[[]cekKecocokan](t, srv, qa, "/api/v1/saldo-awal/cek") {
+		if strings.HasPrefix(c.Kode, "persediaan") {
+			persediaan = append(persediaan, c)
+		}
+	}
+	if len(persediaan) != 1 || persediaan[0].Kode != "persediaan" || persediaan[0].Status != "ok" {
+		t.Fatalf("persediaan harus satu entri ok: %+v", persediaan)
+	}
+}

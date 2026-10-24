@@ -103,10 +103,11 @@ type StokItem struct {
 	StokMin    int64  `json:"stok_min"` // batas peringatan; 0 = tanpa peringatan
 	HargaPokok int64  `json:"harga_pokok"`
 	HargaJual  int64  `json:"harga_jual"`
+	Akun       string `json:"akun,omitempty"` // kode akun persediaan CoA; kosong = ditebak dari Kategori
 }
 
 func ValidateStok(s *StokItem) error {
-	for _, p := range []*string{&s.SKU, &s.Nama, &s.Kategori, &s.Satuan} {
+	for _, p := range []*string{&s.SKU, &s.Nama, &s.Kategori, &s.Satuan, &s.Akun} {
 		*p = strings.TrimSpace(*p)
 	}
 	if s.Nama == "" {

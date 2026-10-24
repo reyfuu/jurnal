@@ -501,3 +501,85 @@ func unzipSemua(t *testing.T, b []byte) []byte {
 	}
 	return out.Bytes()
 }
+
+// Saldo awal persediaan per akun: nilai daftar barang (jumlah × harga pokok) per akun efektif.
+func TestSaldoAwal_PersediaanPerAkunDariDaftarBarang(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m","jumlah":10,"harga_pokok":10000}`)
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs","jumlah":5,"harga_pokok":40000}`)
+	o := getJSON[openingResp](t, srv, qa, "/api/v1/opening")
+	if len(o.PersediaanAkun) != 2 || o.PersediaanAkun[0].Kode != "1301" || o.PersediaanAkun[0].Nominal != 100_000 ||
+		o.PersediaanAkun[1].Kode != "1305" || o.PersediaanAkun[1].Nominal != 200_000 {
+		t.Fatalf("persediaan_akun: %+v", o.PersediaanAkun)
+	}
+	for _, r := range o.PersediaanAkun {
+		if r.Kategori != finance.KatPersediaan || r.Nama == "" {
+			t.Errorf("baris persediaan per akun: %+v", r)
+		}
+	}
+}
+
+// Nilai persediaan yang sudah disimpan tidak ditimpa daftar barang; selisihnya diperiksa per akun.
+func TestSaldoAwal_PersediaanTersimpanTidakDitimpa(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m","jumlah":10,"harga_pokok":10000}`)
+	buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs","jumlah":5,"harga_pokok":40000}`)
+	saldo := `{"tanggal":"2026-01-01","rincian":[
+		{"nama":"Kas","kategori":"kas","nominal":880000},
+		{"kode":"1301","nama":"Persediaan Bahan Baku","kategori":"persediaan","nominal":120000},
+		{"nama":"Modal Pemilik","kategori":"modal","nominal":1000000}]}`
+	if rec := do(srv, qa, http.MethodPut, "/api/v1/opening", saldo); rec.Code != http.StatusOK {
+		t.Fatalf("saldo awal: %d %s", rec.Code, rec.Body)
+	}
+	o := getJSON[openingResp](t, srv, qa, "/api/v1/opening")
+	var tersimpan int64
+	for _, r := range o.Opening.Rincian {
+		if r.Kode == "1301" {
+			tersimpan = r.Nominal
+		}
+	}
+	if tersimpan != 120_000 {
+		t.Fatalf("persediaan 1301 tersimpan harus tetap 120.000: %+v", o.Opening.Rincian)
+	}
+	cek := map[string]cekKecocokan{}
+	for _, c := range getJSON[[]cekKecocokan](t, srv, qa, "/api/v1/saldo-awal/cek") {
+		cek[c.Kode] = c
+	}
+	if c := cek["persediaan_1301"]; c.Status != "selisih" || c.Selisih != 20_000 || c.SaldoAwal != 120_000 || c.Pembanding != 100_000 || !strings.Contains(c.Judul, "1301") {
+		t.Fatalf("cek persediaan 1301: %+v (semua: %+v)", c, cek)
+	}
+	if c := cek["persediaan_1305"]; c.Status != "selisih" || c.Selisih != -200_000 {
+		t.Fatalf("cek persediaan 1305: %+v", c)
+	}
+	if _, ada := cek["persediaan"]; ada {
+		t.Errorf("usaha dengan beberapa akun persediaan tidak memakai satu entri gabungan: %+v", cek["persediaan"])
+	}
+}
+
+// Impor data awal: baris persediaan per kategori masuk akun persediaan kategorinya.
+func TestImporDataAwal_PersediaanKeAkunKategori(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	sheets := []finance.ImportSheet{
+		{Nama: "Petunjuk", Rows: [][]string{{"Tanggal Saldo Awal", "2026-01-01"}}},
+		{Nama: "Kas dan Bank", Rows: [][]string{{"Nama Kas / Bank", "Saldo"}, {"Kas", "200000"}}},
+		{Nama: "Persediaan", Rows: [][]string{
+			{"Nama Barang", "Kategori", "Satuan", "Jumlah (Qty)", "Harga Pokok / Satuan"},
+			{"Kaos", "Barang Jadi", "pcs", "5", "40000"},
+		}},
+	}
+	body, ctype := workbookUpload(t, sheets)
+	rec := upload(srv, qa, "/api/v1/onboarding/import", body, ctype)
+	var res onboardingResp
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil || rec.Code != http.StatusOK || res.Opening == nil {
+		t.Fatalf("pratinjau: %d %v %+v", rec.Code, err, res)
+	}
+	var kode []string
+	for _, r := range res.Opening.Rincian {
+		if r.Kategori == finance.KatPersediaan {
+			kode = append(kode, r.Kode)
+		}
+	}
+	if len(kode) != 1 || kode[0] != "1305" {
+		t.Fatalf("kode baris persediaan Barang Jadi: %v (rincian %+v)", kode, res.Opening.Rincian)
+	}
+}

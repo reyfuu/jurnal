@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"pajak/internal/coa"
 	"pajak/internal/finance"
 	"pajak/internal/xlsx"
 )
@@ -75,6 +76,7 @@ func (s *tenant) handleDeleteTagihan(w http.ResponseWriter, r *http.Request) {
 // handleListStok: posisi sekarang, atau ?pada=YYYY-MM-DD untuk jumlah & nilai per tanggal itu
 // dari kartu stok (checklist No 22).
 func (s *tenant) handleListStok(w http.ResponseWriter, r *http.Request) {
+	all, active, _ := s.coaAkun()
 	k, list := s.kartu()
 	if pada := r.URL.Query().Get("pada"); pada != "" {
 		if _, err := time.Parse(time.DateOnly, pada); err != nil {
@@ -87,7 +89,16 @@ func (s *tenant) handleListStok(w http.ResponseWriter, r *http.Request) {
 		}
 		k = k.Pada(pada)
 	}
-	writeJSON(w, finance.RingkasStok(list, k))
+	sum := finance.RingkasStok(list, k)
+	// Akun efektif dihitung seluruhnya di bawah kunci: closure akunStokLocked membaca s.stok.
+	akunPer := make(map[int]string, len(sum.Items))
+	s.mu.RLock()
+	akun := s.akunStokLocked(all, coa.PetaDari(all))
+	for _, r := range sum.Items {
+		akunPer[r.ID] = akun(r.ID)
+	}
+	s.mu.RUnlock()
+	writeJSON(w, denganAkun(sum, func(id int) string { return akunPer[id] }, active))
 }
 
 func decodeStok(w http.ResponseWriter, r *http.Request) (finance.StokItem, bool) {
@@ -106,6 +117,9 @@ func decodeStok(w http.ResponseWriter, r *http.Request) (finance.StokItem, bool)
 func (s *tenant) handleCreateStok(w http.ResponseWriter, r *http.Request) {
 	it, ok := decodeStok(w, r)
 	if !ok {
+		return
+	}
+	if !s.akunStokValid(w, it) {
 		return
 	}
 	s.mu.Lock()
@@ -133,6 +147,9 @@ func (s *tenant) stokIndex(r *http.Request) int {
 func (s *tenant) handleUpdateStok(w http.ResponseWriter, r *http.Request) {
 	it, ok := decodeStok(w, r)
 	if !ok {
+		return
+	}
+	if !s.akunStokValid(w, it) {
 		return
 	}
 	s.mu.Lock()

@@ -524,7 +524,7 @@ func AssetsPada(assets []Asset, txs []Transaction, tanggal string) AssetSummary 
 	txs = st
 	period := tanggal[:7]
 	as := AssetsForPeriod(sd, txs, period)
-	if tanggal >= akhirBulan(period) {
+	if tanggal >= AkhirBulan(period) {
 		return as
 	}
 	for i := range as.Assets {

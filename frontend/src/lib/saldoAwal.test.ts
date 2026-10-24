@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sisipkanUrutKode, urutSaldo } from './saldoAwal'
+import { persediaanTerkunci, sisipkanUrutKode, urutSaldo } from './saldoAwal'
 
 const KAT = ['kas', 'piutang', 'persediaan', 'aset_lain', 'utang', 'kewajiban_lain', 'modal', 'laba_ditahan']
 
@@ -38,4 +38,18 @@ describe('sisipkanUrutKode', () => {
     expect(sisipkanUrutKode(k('1101', '1301'), k('1503')).map((r) => r.kode)).toEqual(['1101', '1301', '1503']))
   it('baris tanpa kode (baru diketik) tidak dipindah', () =>
     expect(sisipkanUrutKode(k('1101', '', '1701'), k('1503')).map((r) => r.kode)).toEqual(['1101', '', '1503', '1701']))
+})
+
+describe('persediaanTerkunci', () => {
+  const akun = [{ kode: '1301', nominal: 100000 }, { kode: '1305', nominal: 200000 }]
+  it('ada daftar barang dan belum ada persediaan bernilai: baris persediaan dikunci', () => {
+    expect(persediaanTerkunci(akun, [{ kategori: 'kas', nominal: 5000 }, { kategori: 'persediaan', nominal: 0 }])).toBe(true)
+  })
+  it('nilai persediaan yang sudah diisi pengguna tidak ditimpa', () => {
+    expect(persediaanTerkunci(akun, [{ kategori: 'persediaan', nominal: 120000 }])).toBe(false)
+  })
+  it('tanpa daftar barang tidak dikunci', () => {
+    expect(persediaanTerkunci([], [])).toBe(false)
+    expect(persediaanTerkunci(undefined, [])).toBe(false)
+  })
 })
