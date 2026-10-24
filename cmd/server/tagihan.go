@@ -89,10 +89,16 @@ func (s *tenant) handleListStok(w http.ResponseWriter, r *http.Request) {
 		}
 		k = k.Pada(pada)
 	}
+	sum := finance.RingkasStok(list, k)
+	// Akun efektif dihitung seluruhnya di bawah kunci: closure akunStokLocked membaca s.stok.
+	akunPer := make(map[int]string, len(sum.Items))
 	s.mu.RLock()
 	akun := s.akunStokLocked(all, coa.PetaDari(all))
+	for _, r := range sum.Items {
+		akunPer[r.ID] = akun(r.ID)
+	}
 	s.mu.RUnlock()
-	writeJSON(w, denganAkun(finance.RingkasStok(list, k), akun, active))
+	writeJSON(w, denganAkun(sum, func(id int) string { return akunPer[id] }, active))
 }
 
 func decodeStok(w http.ResponseWriter, r *http.Request) (finance.StokItem, bool) {

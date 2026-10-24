@@ -415,3 +415,45 @@ func TestPersediaanAkun_PerpetualBeliTanpaBarang(t *testing.T) {
 	}
 	neracaSaldoSeimbang(t, c)
 }
+
+// Manufaktur punya 7 akun persediaan, tetapi bila periode hanya memakai satu, ekspor Excel
+// tetap memakai kode dan label akun tunggal itu.
+func TestPersediaanAkun_XlsxSatuAkunTerpakai(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	buat[finance.GerakStok](t, srv, qa, "/api/v1/stok/awal", `{"tanggal":"2026-01-01","baris":[{"stok_id":`+itoa(kain.ID)+`,"fisik":10000,"harga_unit":10000}]}`)
+
+	rec := do(srv, qa, http.MethodGet, "/api/v1/reports/coa.xlsx?period=2026-01", "")
+	rows, err := xlsx.Read(rec.Body.Bytes())
+	if rec.Code != http.StatusOK || err != nil {
+		t.Fatalf("ekspor xlsx: %d %v", rec.Code, err)
+	}
+	var awal []string
+	for _, r := range rows {
+		if len(r) >= 3 && strings.HasPrefix(r[1], "Persediaan Awal") {
+			awal = r
+		}
+	}
+	if len(awal) < 3 || awal[0] != "1301" || awal[1] != "Persediaan Awal" || awal[2] != "100000" {
+		t.Errorf("baris persediaan awal xlsx: %q", awal)
+	}
+}
+
+// GET /stok bersamaan dengan PUT /stok: akun efektif dihitung di bawah kunci (smoke test untuk -race).
+func TestListStokBersamaanDenganUbah(t *testing.T) {
+	srv, qa := usahaManufaktur(t)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			do(srv, qa, http.MethodPut, "/api/v1/stok/"+itoa(kain.ID), `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m","akun":"1301"}`)
+		}
+	}()
+	for i := 0; i < 50; i++ {
+		if rec := do(srv, qa, http.MethodGet, "/api/v1/stok", ""); rec.Code != http.StatusOK {
+			t.Fatalf("GET /stok: %d", rec.Code)
+		}
+	}
+	<-done
+}

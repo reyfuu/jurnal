@@ -15,7 +15,7 @@ import { formatQty } from '@/lib/qty'
 import {
   createStok, deleteStok, deleteTagihan, importStok,
   STOK_TEMPLATE_URL, getStok, getTagihan, updateStok, updateTagihan,
-  akunAwalBarang, type PilihanAkunStok, type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
+  akunIsianBarang, type PilihanAkunStok, type StokInput, type StokRow, type StokSummary, type TagihanInput, type TagihanRow, type TagihanSummary,
 } from '@/lib/api'
 import { formatRp, formatTanggal } from '@/lib/format'
 import { angka } from '@/lib/angka'
@@ -314,7 +314,7 @@ export function StokGudang({ bisaUbah = true, aksi, isiAI }: { bisaUbah?: boolea
     pasang: (s) => { setTab(s.tab); setForm(s.form); setEditId(s.editId); setTambahBanyak(s.tambahBanyak) },
     isi: (isian) => {
       setError(''); setPada(''); setTab('daftar'); setEditId(null); setTambahBanyak(false)
-      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, akun: akunAwalBarang(pilihanAkun), ...isian }
+      const b: StokInput = { sku: '', nama: '', kategori: 'Bahan Baku', jumlah: 0, satuan: 'pcs', stok_min: 0, harga_pokok: 0, harga_jual: 0, ...isian, akun: akunIsianBarang(pilihanAkun, isian) }
       // SKU otomatis dari nama, sama seperti tabel Tambah barang
       if (!b.sku) b.sku = buatSKU(b.nama, new Set((data?.items ?? []).map((x) => x.sku.toUpperCase()).filter(Boolean)))
       setForm(b)

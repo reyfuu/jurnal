@@ -314,12 +314,30 @@ func (s *tenant) handleReportCoAXlsx(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rep := s.buildCoAReport(r)
-	all, active, _ := s.coaAkun()
-	// Persediaan awal/akhir = jumlah semua akun persediaan; kode akun hanya ditulis bila usaha
-	// ini memang punya satu akun persediaan.
-	kodePersediaan, namaAwal, namaAkhir := coa.PetaDari(all).Kode(coa.PeranPersediaan), "Persediaan Awal", "Persediaan Akhir"
-	if len(coa.AkunPersediaan(active)) > 1 {
+	all, _, _ := s.coaAkun()
+	// Persediaan awal/akhir = jumlah semua akun persediaan. Kode akun hanya ditulis bila periode ini
+	// memakai satu akun persediaan saja (saldo awal atau akhir tidak nol), yaitu akun itu.
+	peta := coa.PetaDari(all)
+	dipakai := map[string]bool{}
+	for _, b := range rep.TrialBalance {
+		if b.Subtype == "inventory" && b.Saldo != 0 {
+			dipakai[b.Kode] = true
+		}
+	}
+	s.mu.RLock()
+	for kode, v := range s.persediaanAwalPerAkunLocked(period, all, peta) {
+		if v != 0 {
+			dipakai[kode] = true
+		}
+	}
+	s.mu.RUnlock()
+	kodePersediaan, namaAwal, namaAkhir := peta.Kode(coa.PeranPersediaan), "Persediaan Awal", "Persediaan Akhir"
+	if len(dipakai) > 1 {
 		kodePersediaan, namaAwal, namaAkhir = "", "Persediaan Awal (semua akun)", "Persediaan Akhir (semua akun)"
+	} else {
+		for kode := range dipakai {
+			kodePersediaan = kode
+		}
 	}
 	if !rep.Supported {
 		http.Error(w, "CoA untuk jenis usaha ini belum tersedia", http.StatusNotFound)

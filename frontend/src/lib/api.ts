@@ -1229,6 +1229,26 @@ export interface PilihanAkunStok { kode: string; nama: string }
 /** Akun persediaan awal barang baru: Bahan Baku bila ada, kalau tidak yang pertama. */
 export const akunAwalBarang = (pilihan: PilihanAkunStok[]) => (pilihan.find((p) => /bahan baku/i.test(p.nama)) ?? pilihan[0])?.kode
 
+/** Tebakan akun dari kategori barang, urutan aturan sama dengan coa.AkunPersediaanBarang di server. */
+export function akunDariKategori(kategori: string, pilihan: PilihanAkunStok[]): string | undefined {
+  const kat = kategori.toLowerCase()
+  const cari = (...kata: string[]) => pilihan.find((p) => kata.some((k) => p.nama.toLowerCase().includes(k)))?.kode
+  if (kat.includes('setengah jadi')) return cari('setengah jadi')
+  if (kat.includes('dalam proses')) return cari('dalam proses')
+  if (kat.includes('jadi')) return cari('barang jadi')
+  if (kat.includes('penolong') || kat.includes('kemasan')) return cari('penolong', 'kemasan')
+  if (kat.includes('bahan baku')) return cari('bahan baku')
+  return undefined
+}
+
+/** Akun untuk barang hasil isian AI: akun eksplisit menang; ada kategori -> tebak dari kategori
+ * (tak cocok = kosong, server yang memilih); tanpa keduanya -> akun awal barang baru. */
+export function akunIsianBarang(pilihan: PilihanAkunStok[], isian: { akun?: string; kategori?: string }): string | undefined {
+  if (isian.akun) return isian.akun
+  if (isian.kategori) return akunDariKategori(isian.kategori, pilihan)
+  return akunAwalBarang(pilihan)
+}
+
 export interface StokSummary {
   items: StokRow[] | null
   /** Akun persediaan aktif di CoA usaha, untuk pilihan kategori barang. */
