@@ -23,7 +23,7 @@ Desain **Master Pajak** memakai permukaan terang dan netral dengan biru DJP seba
 
 ## 2. Brand, Warna & Design Tokens
 
-**Sumber kebenaran: Brand Guideline Master Pajak v1.0 (Oktober 2026)**, salinan di [`docs/brand/Brand Guideline Master Pajak v1.0.pdf`](docs/brand/Brand%20Guideline%20Master%20Pajak%20v1.0.pdf). Bila dokumen ini berbeda dengan PDF, ikuti PDF. Brand sementara 19 Oktober 2026 (navy `#222852`, emas `#F5C428`, logo segitiga "A", nama "Laporan Bisnis by Master Pajak") sudah tidak berlaku.
+**Sumber kebenaran: Brand Guideline Master Pajak v1.0 (Oktober 2026)**, salinan di [`docs/brand/Brand Guideline MasterPajak AI v1.0.pdf`](docs/brand/Brand%20Guideline%20MasterPajak%20AI%20v1.0.pdf). Bila dokumen ini berbeda dengan PDF, ikuti PDF. Brand sementara 19 Oktober 2026 (navy `#222852`, emas `#F5C428`, logo segitiga "A", nama "Laporan Bisnis by Master Pajak") sudah tidak berlaku.
 
 ### 2.1 Logo
 - Logo = monogram **M dua warna** (kiri biru, kanan kuning, bertemu di lembah) + wordmark **`masterpajak`** Rubik Bold. Komponen: `frontend/src/components/Logo.tsx` (`<Logo tinggi={24} />`, `<Monogram />`). Konstruksi SVG mengikuti hlm. 8 (grid 100, tebal garis 13, ujung membulat).
@@ -128,7 +128,7 @@ flowchart TD
 ## 5. Spesifikasi Komponen Detail (`shadcn/ui` + `Kokonut UI` + `21st.dev`)
 
 ### 5.1 Top Marketing Bar
-Mengikuti mockup hlm. 25 (`views/Landing.tsx`): header putih, `<Logo tinggi={26} />` kiri, tautan `Fitur` · `Harga` · `FAQ` (`--text-secondary`), tombol sekunder `Masuk` + primer `Daftar sekarang`. Hero berlatar Awan dengan chip, headline tagline, setengah lingkaran navy 50, dan satu titik kuning di sudut screenshot. Band CTA penutup navy dengan tombol `accent`.
+Mengikuti mockup final "MasterPajak AI" (artifact 24 Okt 2026, `views/Landing.tsx`): header putih, `<Logo tinggi={26} />` kiri, tautan `Kalkulator gratis` · `Klinik Master` · `Harga` · `FAQ` (`--text-secondary`, tampil mulai `lg`), tombol sekunder `Masuk` + primer `Beli sekarang`. Hero 2 kolom (headline + slot video 16:9), lalu pita slogan *Jualan jalan terus, pajaknya AI yang urus.* dan maskot robot Master (`views/landing/RobotMaster.tsx`).
 
 ### 5.2 Sidebar Navigasi (5 Grup, 12 Menu)
 - **Lebar Tetap**: `232px`, `border-right: 1px solid rgba(255,255,255,0.06)`.

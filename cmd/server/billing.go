@@ -41,8 +41,8 @@ var paketList = []paket{
 	{"starter-tahunan", "Starter Tahunan", 1_990_000, 365, "Hemat 2 bulan", "starter", 4_790_000},
 	{"pro-bulanan", "Pro Bulanan", 499_000, 30, "", "pro", 999_000},
 	{"pro-tahunan", "Pro Tahunan", 5_000_000, 365, "Hemat 2 bulan", "pro", 11_990_000},
-	{"premium-bulanan", "Premium Master Bulanan", 1_490_000, 30, "", "premium", 2_990_000},
-	{"premium-tahunan", "Premium Master Tahunan", 14_900_000, 365, "Hemat 2 bulan", "premium", 35_900_000},
+	{"premium-bulanan", "VIP Bulanan", 1_490_000, 30, "", "premium", 2_990_000},
+	{"premium-tahunan", "VIP Tahunan", 14_900_000, 365, "Hemat 2 bulan", "premium", 35_900_000},
 }
 
 // paketLama: tidak dijual lagi, tetap dikenali untuk order yang sudah ada (notifikasi Midtrans
