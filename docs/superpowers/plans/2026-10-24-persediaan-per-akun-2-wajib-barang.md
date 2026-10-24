@@ -13,6 +13,7 @@
 ## Global Constraints
 
 - Aturan wajib barang **hanya** untuk `MetodePersediaan == "perpetual"`; periodik dan usaha tanpa daftar barang tidak berubah.
+- Setiap jalur simpan di Task 5–9 memanggil `cekBarangLocked` (Task 3) per transaksi dan `cekTanpaMinusLocked` (Task 4) atas keadaan usulan sebelum menyimpan.
 - Hanya jenis `Penjualan` (`finance.JenisJual`) dan `Beli Bahan / Stok` (`finance.JenisBeliStok`) yang membawa barang.
 - Data lama (`stok_id`/`qty_stok` tunggal, tanpa `rincian`) harus menghasilkan kartu stok, jurnal, dan laporan **identik** dengan sekarang.
 - `QtyStok` dan `qty_stok` rincian tetap per seribu satuan (`finance.TakaranSkala`).
@@ -23,7 +24,8 @@
 
 ## Keputusan pembuat dalam rencana ini (mohon dicek)
 
-1. **Perpetual tapi kartu stok belum dimulai:** transaksi tetap boleh disimpan tanpa barang (seperti sekarang). Kewajiban barang berlaku untuk transaksi bertanggal **sejak tanggal mulai kartu stok**. Alasannya: memblokir semua penjualan sebelum hitung fisik pertama akan menghentikan usaha yang baru memilih perpetual. Langkah memulai sudah mengarahkan ke "Mulai kartu stok".
+1. **(Diputuskan pemilik produk.) Perpetual: barang selalu wajib.** Bila kartu stok belum dimulai, Penjualan/Beli Bahan / Stok tanpa `BukanBarang` ditolak dengan `"mulai kartu stok dulu (hitung fisik pertama) sebelum mencatat penjualan/pembelian barang"`. Pengecualian satu-satunya: transaksi bertanggal **sebelum** tanggal mulai kartu stok (catatan stok belum ada).
+1a. **(Diputuskan pemilik produk.) Perpetual: stok tidak boleh minus.** Perubahan apa pun yang membuat saldo qty suatu barang di kartu stok minus (penjualan, pemakaian produksi, hapus/ubah pembelian, opname, hapus dokumen) ditolak. Data lama yang sudah minus sebelum aturan ini tidak memblokir perubahan lain.
 2. **Nilai per baris rincian:** `Σ nilai ≤ Nominal`. Untuk pembelian, nilai baris = nilai barang yang masuk kartu; sisanya (mis. ongkir jasa) tetap ke akun bawaan seperti sekarang. Rincian satu baris dengan nilai 0 otomatis bernilai Nominal. Untuk penjualan, nilai baris hanya informasi (HPP tetap dari kartu FIFO/rata-rata).
 3. **Impor Excel:** satu baris Excel = satu barang (kolom baru `barang` = SKU atau nama persis, `jumlah_barang`); nilai `jasa` di kolom `barang` = Bukan barang (jasa). Multi-barang lewat impor Excel di luar tahap ini.
 4. **Catat cepat:** rincian berlaku untuk satu-satunya transaksi Penjualan/Beli yang dihasilkan catatan itu; bila catatan menghasilkan lebih dari satu transaksi berbarang, server menolak dengan pesan agar dipecah.
@@ -34,7 +36,7 @@
 
 1. Transaksi lama dengan `stok_id` tunggal (tanpa `rincian`) diubah tanpa menyentuh barang → tersimpan dengan rincian setara, kartu & laporan identik (tes Task 1 dan Task 2).
 2. Pelunasan piutang/utang atas penjualan perpetual lama tanpa barang tetap berhasil (tes Task 3).
-3. Invoice diubah (baris barang dihapus/ditambah) setelah dibukukan → rincian transaksi Penjualan-nya ikut, kartu stok mengikuti (tes Task 8).
+3. Invoice diubah (baris barang dihapus/ditambah) setelah dibukukan → rincian transaksi Penjualan-nya ikut, kartu stok mengikuti (tes Task 9).
 4. Baris mutasi yang cocok dengan catatan manual berbarang dijawab "sama" → tidak ada transaksi baru dan kartu stok tidak berubah (tes Task 7).
 5. Barang yang dipakai di rincian (bukan hanya `stok_id`) tidak boleh dihapus dari daftar barang (tes Task 1).
 
@@ -90,17 +92,33 @@
 - Test: `cmd/server/wajib_barang_test.go`
 
 **Interfaces:**
-- Produces: `func (s *tenant) cekBarangLocked(t finance.Transaction) error` — galat `"pilih barang & jumlahnya, atau tandai Bukan barang (jasa)"` bila perpetual, jenis Penjualan/Beli Bahan / Stok, `!BukanBarang`, `len(BarisBarang())==0`, kartu stok sudah dimulai dan `Tanggal >= k.Mulai`. Selain itu nil. Dipanggil di create/update transaksi (HTTP 400). Tidak dipanggil di `lunasiTxLocked`.
+- Produces: `func (s *tenant) cekBarangLocked(t finance.Transaction) error` — galat `"pilih barang & jumlahnya, atau tandai Bukan barang (jasa)"` bila perpetual, jenis Penjualan/Beli Bahan / Stok, `!BukanBarang`, `len(BarisBarang())==0`, dan (kartu belum dimulai **atau** `Tanggal >= k.Mulai`). Bila kartu belum dimulai, pesannya `"mulai kartu stok dulu (hitung fisik pertama) sebelum mencatat penjualan/pembelian barang"` — juga bila barang diisi tapi kartu belum dimulai. Transaksi bertanggal sebelum `k.Mulai` → nil. Dipanggil di create/update transaksi (HTTP 400). Tidak dipanggil di `lunasiTxLocked`.
 - Produces (frontend): `<PilihRincianBarang jenis nominal value onChange barang wajib />` dengan `value: { rincian: RincianBarang[]; bukan_barang: boolean }`; baris = select barang (opsi terakhir `"+ Barang baru"`), qty (`parseQty`), nilai (hanya untuk Beli), tombol tambah/hapus baris, centang `"Bukan barang (jasa)"`. `<BarangBaruDialog pilihanAkun onSelesai(barang) onBatal />` membuat satu barang (nama, satuan, akun persediaan; SKU via `buatSKU`) lewat `createStok`.
 - Produces: `lib/rincian.ts` — `sisaNominal(nominal, rincian)`, `rincianSah(value, wajib)` (pesan galat sama dengan server).
 
-- [ ] **Step 1: Tes** `TestWajibBarang_PerpetualTolakTanpaBarang` (POST Penjualan tanpa barang sesudah mulai kartu → 400 berpesan persis), `_BukanBarangBoleh`, `_PeriodikBoleh`, `_SebelumMulaiKartuBoleh`, `_PelunasanTransaksiLamaTetapBoleh` (Review Focus 2), `_EditLamaWajibLengkap`; vitest `rincian.test.ts` (sisa nominal, rincianSah dengan/ tanpa wajib).
+- [ ] **Step 1: Tes** `TestWajibBarang_PerpetualTolakTanpaBarang` (POST Penjualan tanpa barang sesudah mulai kartu → 400 berpesan persis), `_BukanBarangBoleh`, `_PeriodikBoleh`, `_KartuBelumDimulaiDitolak` (perpetual tanpa kartu → 400 pesan "mulai kartu stok dulu…"), `_SebelumMulaiKartuBoleh`, `_PelunasanTransaksiLamaTetapBoleh` (Review Focus 2), `_EditLamaWajibLengkap`; vitest `rincian.test.ts` (sisa nominal, rincianSah dengan/ tanpa wajib).
 - [ ] **Step 2:** → FAIL
 - [ ] **Step 3:** Implementasi server; ganti select barang tunggal di Transaksi.tsx dan dialog beli di KartuStok.tsx dengan `PilihRincianBarang`; prop `wajib` = perpetual dan tanggal ≥ mulai (dari `getPilihanBarang().mulai` + profil).
 - [ ] **Step 4:** `go test ./cmd/server -run 'WajibBarang|Transaksi|KartuStok'`; `cd frontend && npx tsc -b && npx vitest run && npx oxlint src` (24)
 - [ ] **Step 5: Commit** `feat(transaksi): wajib barang di perpetual, rincian multi-barang & barang baru di tempat`
 
-### Task 4: Catat cepat & foto nota
+### Task 4: Stok tidak boleh minus (perpetual)
+
+**Files:**
+- Create: `cmd/server/tanpa_minus.go`
+- Modify: `cmd/server/main.go` (create/update/delete transaksi), `cmd/server/kartustok.go` (`handleStokOpname` :180, produksi :207, hapus gerak), `cmd/server/produksi_catat.go`
+- Test: `cmd/server/tanpa_minus_test.go`
+
+**Interfaces:**
+- Consumes: `BarisKartu.Minus`, `kartuLocked()`, `finance.HitungKartuMetode`.
+- Produces: `func (s *tenant) cekTanpaMinusLocked(txs []finance.Transaction, gerak []finance.GerakStok) error` — hitung kartu dari keadaan **usulan** (`txs`, `gerak`); bila perpetual dan ada barang yang punya baris `Minus` di kartu usulan tetapi tidak minus di kartu sekarang (pada tanggal yang sama atau sesudahnya), galat `"stok <nama> tidak cukup pada <tanggal ID>: tersedia <qty> <satuan>, dibutuhkan <qty> <satuan>"` (qty memakai `formatQty`; tanggal `finance.FormatTanggalID`). Periodik → nil. Dipanggil sebelum menyimpan di semua jalur yang mengubah kartu: transaksi (create/update/delete), opname, produksi, hapus dokumen gerak, dan oleh Task 5–9 di jalurnya masing-masing (HTTP 409).
+- Frontend: tidak ada komponen baru; galat server tampil apa adanya di form.
+
+- [ ] **Step 1: Tes** `TestTanpaMinus_PenjualanMelebihiStokDitolak` (stok awal Kaos 5, jual 6 → 409 pesan persis), `_HapusPembelianYangDipakaiDitolak`, `_ProduksiBahanKurangDitolak`, `_MinusLamaTidakMemblokir` (data lama sudah minus, penjualan barang lain tetap boleh), `_PeriodikBoleh`.
+- [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** `go test ./internal/... ./cmd/server` → PASS (tes lama yang sengaja membuat minus pada perpetual diperbarui dengan sengaja; daftar perubahannya di laporan)
+- [ ] **Step 5: Commit** `feat(stok): perpetual menolak stok minus`
+
+### Task 5: Catat cepat & foto nota
 
 **Files:**
 - Modify: `cmd/server/catat.go` (`catatReq` :19, `susunTxCatat` :80), `internal/coa/catat.go` (`PecahCatat` :93)
@@ -116,7 +134,7 @@
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** tes server + frontend (tsc, vitest, oxlint 24) → PASS
 - [ ] **Step 5: Commit** `feat(catat): rincian barang di catat cepat & foto nota`
 
-### Task 5: Impor Excel transaksi
+### Task 6: Impor Excel transaksi
 
 **Files:**
 - Modify: `internal/finance/import.go` (`ParseImport` :160, `column` :96, template), `cmd/server/main.go` (`handleImportTransactions` :1238, `handleTransactionsTemplate`)
@@ -131,7 +149,7 @@
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** → PASS
 - [ ] **Step 5: Commit** `feat(impor): barang & jumlah di impor Excel transaksi`
 
-### Task 6: Impor mutasi — barang per baris
+### Task 7: Impor mutasi — barang per baris
 
 **Files:**
 - Modify: `internal/finance/mutasi.go` (`MutasiRow` :30, `MutasiKeTransaksi` :508), `cmd/server/mutasi.go` (commit :230)
@@ -146,7 +164,7 @@
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** → PASS
 - [ ] **Step 5: Commit** `feat(mutasi): pilih barang per baris mutasi`
 
-### Task 7: Mutasi "sama" — pindah akun bayar
+### Task 8: Mutasi "sama" — pindah akun bayar
 
 **Files:**
 - Modify: `cmd/server/mutasi.go` (`mutasiCommitReq`, commit), `internal/finance/mutasi.go` (`MutasiRow`), `frontend/src/views/MutasiDialog.tsx` (:238-267, :316)
@@ -161,7 +179,7 @@
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** → PASS (+ tsc/vitest/oxlint)
 - [ ] **Step 5: Commit** `feat(mutasi): jawaban sama bisa memindah akun bayar ke rekening bank`
 
-### Task 8: Invoice per baris
+### Task 9: Invoice per baris
 
 **Files:**
 - Modify: `internal/finance/invoice.go` (`InvoiceItem` :49, `ValidateInvoice`), `cmd/server/invoice_buku.go` (`jagaTxInvoiceLocked` :42), `cmd/server/invoice.go` (create/update: panggil aturan wajib), `internal/finance/import_invoice.go` (`itemInvoice`), `cmd/server/schema.sql` (`invoice_items`), `cmd/server/pgstore.go` bila tulis/baca item eksplisit
@@ -180,7 +198,7 @@
 - [ ] **Step 2:** → FAIL · **Step 3:** Implementasi · **Step 4:** → PASS (+ tsc/vitest/oxlint)
 - [ ] **Step 5: Commit** `feat(invoice): barang per baris invoice`
 
-### Task 9: Verifikasi akhir & PR
+### Task 10: Verifikasi akhir & PR
 
 - [ ] **Step 1:** `go vet ./...`, `go test ./...` (hanya 2 kegagalan Windows), `cd frontend && npx tsc -b && npx vitest run && npm run build`, oxlint 24.
 - [ ] **Step 2:** Data contoh Kedai Kopi Senja: laporan CoA & keuangan Juni–Oktober 2026 identik dengan `main` (probe sama seperti tahap 1).
