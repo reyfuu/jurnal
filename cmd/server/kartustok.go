@@ -606,6 +606,8 @@ func (s *Server) kartuStokRoutes() {
 	s.mux.HandleFunc("GET /api/v1/produksi/laporan", p(s.on((*tenant).handleLaporanProduksi)))
 	s.mux.HandleFunc("GET /api/v1/produksi/laporan.xlsx", p(s.exporting(s.on((*tenant).handleLaporanProduksiXlsx))))
 	s.mux.HandleFunc("GET /api/v1/stok/pilihan", s.guard("transaksi", s.on((*tenant).handlePilihanBarang)))
+	// sama, untuk pemilih barang per baris invoice (pengguna menu Invoice tanpa menu Transaksi)
+	s.mux.HandleFunc("GET /api/v1/invoice/pilihan-barang", s.guard("invoice", s.on((*tenant).handlePilihanBarang)))
 	g := func(h http.HandlerFunc) http.HandlerFunc { return s.guard("stok-gudang", h) }
 	m := s.mux
 	m.HandleFunc("POST /api/v1/stok/awal", s.persisting(g(s.on((*tenant).handleStokAwal))))

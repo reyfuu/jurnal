@@ -435,7 +435,7 @@ export default function App() {
       case 'produksi-supplier':
         return <ProduksiSupplier key={bukaTab.n} aksi={bukaTab.tab} isiAI={sinyalAI} bisaUbah={!me!.lihat} />
       case 'invoice':
-        return <InvoiceView isiAI={sinyalAI} />
+        return <InvoiceView isiAI={sinyalAI} perpetual={business?.profile?.metode_persediaan === 'perpetual'} bolehBarangBaru={canSee('stok-gudang') && !me!.lihat} />
       case 'pelanggan':
         return <HalamanPelanggan />
       case 'simulasi-harga':

@@ -10,12 +10,17 @@ import { IsiAIBanner } from '@/components/IsiAIBanner'
 import { useIsiAI, type SinyalAI } from '@/lib/useIsiAI'
 import { MenuImportDialog } from '@/views/MenuImportDialog'
 import {
-  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, getPelanggan, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
-  type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow, type Pelanggan,
+  bukukanInvoice, createInvoice, deleteInvoice, getInvoices, getPelanggan, getPilihanBarangInvoice, getStok, importInvoice, INVOICE_TEMPLATE_URL, invoicePdfUrl, updateInvoice,
+  type InvoiceInfo, type InvoiceInput, type InvoiceItem, type InvoiceRow, type Pelanggan, type PilihanAkunStok, type PilihanBarang,
 } from '@/lib/api'
 import { ekspor } from '@/lib/garansi'
 import { formatRp } from '@/lib/format'
+import { formatQty } from '@/lib/qty'
 import { angka } from '@/lib/angka'
+import { BarangBaruDialog } from '@/components/BarangBaruDialog'
+import { barisTanpaBarang, galatBarangInvoice, isiDariBarang, perluCekBarang, PESAN_BARIS_BARANG, wajibBarangInvoice } from '@/lib/invoiceBarang'
+
+const BARANG_BARU = -1 // nilai opsi "+ Barang baru"
 
 const AMBER = 'var(--text-warn)'
 
@@ -64,9 +69,15 @@ function hitung(f: InvoiceInput) {
   return { subtotal, diskon, dpp, ppn, total: dpp + ppn }
 }
 
-/** isiAI: isian dari Tanya AI untuk invoice baru (bisa diurungkan). */
-export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
+/** isiAI: isian dari Tanya AI untuk invoice baru (bisa diurungkan).
+ *  perpetual: tiap baris invoice terkirim wajib memilih barang atau Bukan barang (jasa).
+ *  bolehBarangBaru: opsi "+ Barang baru" di pemilih barang (bukan lihat-sebagai). */
+export function InvoiceView({ isiAI, perpetual = false, bolehBarangBaru = false }: { isiAI?: SinyalAI; perpetual?: boolean; bolehBarangBaru?: boolean }) {
   const [info, setInfo] = useState<InvoiceInfo | null>(null)
+  const [barang, setBarang] = useState<PilihanBarang[]>([])
+  const [mulaiKartu, setMulaiKartu] = useState('')
+  const [barangBaru, setBarangBaru] = useState<{ baris: number; akun: PilihanAkunStok[] | null } | null>(null)
+  useEffect(() => { getPilihanBarangInvoice().then((p) => { setBarang(p.barang); setMulaiKartu(p.mulai) }, () => {}) }, [])
   const [form, setForm] = useState<InvoiceInput | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   useGulirKeForm(formRef, !!form)
@@ -117,6 +128,11 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
     if (!form) return
+    const galat = galatBarangInvoice(form.items, wajibBarang)
+    if (galat) {
+      setError(galat)
+      return
+    }
     setBusy(true)
     try {
       await (editId === null ? createInvoice(form) : updateInvoice(editId, form))
@@ -162,6 +178,28 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
   const t = form ? hitung(form) : null
   const ubahBaris = (i: number, patch: Partial<InvoiceItem>) =>
     setForm((f) => f && { ...f, items: f.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) })
+  // Barang per baris: wajib di perpetual saat invoice dikirim (sama dengan server); invoice lama
+  // yang hanya dilunasi tanpa diubah tidak diblokir.
+  const asli = editId === null ? null : rows.find((r) => r.id === editId)
+  const dibukukan = !asli || asli.dibukukan || form?.dibukukan || asli.status === 'draft'
+  const wajibBarang = !!form && !!dibukukan && perluCekBarang(asli, form) &&
+    wajibBarangInvoice({ perpetual, status: form.status, tanggal: form.tanggal, mulai: mulaiKartu })
+  const tanpaBarang = form && wajibBarang ? barisTanpaBarang(form.items) : []
+  const pakaiBarang = perpetual || barang.length > 0
+  function pilihBarang(i: number, id: number) {
+    if (id === BARANG_BARU) {
+      setBarangBaru({ baris: i, akun: null })
+      // pilihan akun persediaan dari Stok & Gudang; gagal → server menebak akun
+      getStok().then((s) => setBarangBaru((b) => b && { ...b, akun: s.pilihan_akun ?? [] }), () => setBarangBaru((b) => b && { ...b, akun: [] }))
+      return
+    }
+    const b = barang.find((x) => x.id === id)
+    ubahBaris(i, b && form ? isiDariBarang(form.items[i], b) : { stok_id: undefined })
+  }
+  function stokBaris(id?: number) {
+    const b = id ? barang.find((x) => x.id === id) : undefined
+    return b && <span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--text-muted)' }}>Stok sekarang {formatQty(b.jumlah_mili)} {b.satuan}</span>
+  }
 
   return (
     <>
@@ -294,7 +332,7 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
             <table className="data-table tabular" style={{ minWidth: 700 }}>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 220 }}>Deskripsi</th>
+                  <th style={{ minWidth: pakaiBarang ? 280 : 220 }}>{pakaiBarang ? 'Barang & deskripsi' : 'Deskripsi'}</th>
                   <th style={{ width: 80 }}>Qty</th>
                   <th style={{ width: 90 }}>Satuan</th>
                   <th style={{ width: 150, textAlign: 'right' }}>Harga Satuan</th>
@@ -305,7 +343,36 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
               <tbody>
                 {form.items.map((it, i) => (
                   <tr key={i}>
-                    <td><input className="input-field" required value={it.deskripsi} onChange={(e) => ubahBaris(i, { deskripsi: e.target.value })} /></td>
+                    <td>
+                      {pakaiBarang ? (
+                        <div style={{ display: 'grid', gap: 6, width: '100%', minWidth: 0 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                            {!it.bukan_barang && (
+                              <select className="input-field" aria-label={`Barang baris ${i + 1}`} style={{ flex: '1 1 160px', minWidth: 0 }}
+                                value={it.stok_id || 0} onChange={(e) => pilihBarang(i, Number(e.target.value))}>
+                                <option value={0}>— pilih barang —</option>
+                                {barang.map((b) => <option key={b.id} value={b.id}>{b.nama}{b.sku ? ` (${b.sku})` : ''}</option>)}
+                                {it.stok_id && !barang.some((b) => b.id === it.stok_id) ? <option value={it.stok_id}>Barang #{it.stok_id}</option> : null}
+                                {bolehBarangBaru && <option value={BARANG_BARU}>+ Barang baru</option>}
+                              </select>
+                            )}
+                            {perpetual && (
+                              <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, fontWeight: 400, whiteSpace: 'nowrap' }}>
+                                <input type="checkbox" checked={!!it.bukan_barang}
+                                  onChange={(e) => ubahBaris(i, e.target.checked ? { bukan_barang: true, stok_id: undefined } : { bukan_barang: undefined })} />
+                                Bukan barang (jasa)
+                              </label>
+                            )}
+                          </div>
+                          {stokBaris(it.stok_id)}
+                          <input className="input-field" required aria-label={`Deskripsi baris ${i + 1}`} placeholder="Deskripsi di faktur" value={it.deskripsi}
+                            onChange={(e) => ubahBaris(i, { deskripsi: e.target.value })} />
+                          {tanpaBarang.includes(i) && <span style={{ fontSize: 11.5, fontWeight: 400, color: RED }}>{PESAN_BARIS_BARANG}</span>}
+                        </div>
+                      ) : (
+                        <input className="input-field" required value={it.deskripsi} onChange={(e) => ubahBaris(i, { deskripsi: e.target.value })} />
+                      )}
+                    </td>
                     <td><input className="input-field tabular" {...angka(it.qty, (n) => ubahBaris(i, { qty: n }))} /></td>
                     <td><input className="input-field" value={it.satuan ?? ''} placeholder="pcs" onChange={(e) => ubahBaris(i, { satuan: e.target.value })} /></td>
                     <td><input className="input-field tabular" style={{ textAlign: 'right' }} {...angka(it.harga_satuan, (n) => ubahBaris(i, { harga_satuan: n }))} /></td>
@@ -326,6 +393,19 @@ export function InvoiceView({ isiAI }: { isiAI?: SinyalAI }) {
             onClick={() => setForm({ ...form, items: [...form.items, { ...BARIS_KOSONG }] })}>
             + Tambah baris
           </button>
+          {wajibBarang && (
+            <p className="text-xs text-muted-foreground" style={{ marginTop: 6 }}>
+              Pencatatan perpetual: tiap baris pilih barangnya (stok berkurang saat invoice dikirim), atau tandai Bukan barang (jasa).
+            </p>
+          )}
+          {barangBaru && barangBaru.akun && form && (
+            <BarangBaruDialog pilihanAkun={barangBaru.akun} skuTerpakai={barang.map((x) => x.sku).filter(Boolean)} onBatal={() => setBarangBaru(null)}
+              onSelesai={(x) => {
+                setBarang((bs) => [...bs, x])
+                ubahBaris(barangBaru.baris, isiDariBarang(form.items[barangBaru.baris], x))
+                setBarangBaru(null)
+              }} />
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
             <div>

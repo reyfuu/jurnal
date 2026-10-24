@@ -63,6 +63,41 @@ func (s *tenant) decodeInvoice(w http.ResponseWriter, r *http.Request) (finance.
 	return inv, true
 }
 
+// galatBarangInvoice: baris invoice melanggar aturan barang (HTTP 400, bukan 409).
+type galatBarangInvoice struct{ error }
+
+// cekBarangInvoiceLocked: barang tiap baris harus ada di daftar barang; di perpetual, invoice yang
+// dikirim/lunas bertanggal sejak kartu stok dimulai (atau kartu belum dimulai) wajib memilih
+// barang atau menandai Bukan barang (jasa) di tiap baris. Dipanggil saat invoice dibuat atau
+// barisnya / tanggal / statusnya dari draft berubah; invoice lama yang tidak diubah tidak dicek.
+func (s *tenant) cekBarangInvoiceLocked(inv finance.Invoice) error {
+	for i, it := range inv.Items {
+		if _, ok := s.stokByID(it.StokID); it.StokID != 0 && !ok {
+			return galatBarangInvoice{fmt.Errorf("baris %d: barang yang dipilih tidak ada di Stok & Gudang", i+1)}
+		}
+	}
+	if !s.perpetualLocked() || inv.Status == finance.StatusDraft {
+		return nil
+	}
+	if mulai := s.mulaiKartuStokLocked(); mulai != "" && inv.Tanggal < mulai {
+		return nil
+	}
+	for i, it := range inv.Items {
+		if it.StokID == 0 && !it.BukanBarang {
+			return galatBarangInvoice{fmt.Errorf("baris %d: pilih barang atau tandai Bukan barang (jasa)", i+1)}
+		}
+	}
+	return nil
+}
+
+// kodeGalatInvoice: 400 untuk galat baris barang, selain itu 409.
+func kodeGalatInvoice(err error) int {
+	if errors.As(err, new(galatBarangInvoice)) {
+		return http.StatusBadRequest
+	}
+	return http.StatusConflict
+}
+
 func (s *tenant) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 	inv, ok := s.decodeInvoice(w, r)
 	if !ok {
@@ -72,7 +107,7 @@ func (s *tenant) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 	err := s.tambahInvoiceLocked(&inv)
 	s.mu.Unlock()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), kodeGalatInvoice(err))
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
@@ -88,6 +123,9 @@ func (s *tenant) tambahInvoiceLocked(inv *finance.Invoice) error {
 	}
 	if slices.ContainsFunc(s.invoices, func(x finance.Invoice) bool { return x.Nomor == inv.Nomor }) {
 		return errors.New("nomor faktur " + inv.Nomor + " sudah dipakai")
+	}
+	if err := s.cekBarangInvoiceLocked(*inv); err != nil {
+		return err
 	}
 	inv.ID = s.nextInvoiceID
 	inv.Dibukukan = true
@@ -121,9 +159,14 @@ func (s *tenant) handleImportInvoice(w http.ResponseWriter, r *http.Request) {
 	resp := menuImportResp{Sheet: nama, Errors: errs, Invoice: []finance.Invoice{}}
 	s.mu.Lock()
 	txs, nextTx, invs, nextInv := s.txs, s.nextTxID, s.invoices, s.nextInvoiceID
+	gerak, nextGerak, prof := s.gerak, s.nextGerakID, s.profile // kartu stok yang dimulai otomatis
 	for _, x := range list {
 		inv := x.Invoice
-		if err := s.tambahInvoiceLocked(&inv); err != nil {
+		err := s.barangImporInvoiceLocked(&inv, x.Barang)
+		if err == nil {
+			err = s.tambahInvoiceLocked(&inv)
+		}
+		if err != nil {
 			resp.Errors = append(resp.Errors, finance.SheetError{Sheet: nama, Baris: x.Baris, Pesan: "invoice " + cmp.Or(inv.Nomor, inv.PelangganNama) + ": " + err.Error()})
 			continue
 		}
@@ -131,6 +174,13 @@ func (s *tenant) handleImportInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	if !commit {
 		s.txs, s.nextTxID, s.invoices, s.nextInvoiceID = txs, nextTx, invs, nextInv
+		s.gerak, s.nextGerakID = gerak, nextGerak
+		if s.profile != prof && prof != nil { // metode nilai stok sempat dikunci: pulihkan juga berkasnya
+			s.profile = prof
+			if err := saveProfile(s.file("business"), *prof); err != nil {
+				log.Printf("pulihkan profil setelah pratinjau impor invoice: %v", err)
+			}
+		}
 	}
 	s.mu.Unlock()
 	resp.Valid = len(resp.Invoice)
@@ -140,6 +190,26 @@ func (s *tenant) handleImportInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.Imported = commit
 	writeJSON(w, resp)
+}
+
+// barangImporInvoiceLocked: cocokkan teks kolom Barang tiap item (sejajar inv.Items) ke daftar
+// barang, aturan sama dengan impor transaksi (cariBarangImporLocked). Periodik: barang opsional,
+// jadi yang tak cocok dibiarkan kosong. s.mu dipegang.
+func (s *tenant) barangImporInvoiceLocked(inv *finance.Invoice, barang []string) error {
+	for k, teks := range barang {
+		if teks == "" || k >= len(inv.Items) {
+			continue
+		}
+		id, err := s.cariBarangImporLocked(teks)
+		if err != nil {
+			if !s.perpetualLocked() {
+				continue
+			}
+			return fmt.Errorf("baris %d: %w", k+1, err)
+		}
+		inv.Items[k].StokID = id
+	}
+	return nil
 }
 
 // invoiceIndex harus dipanggil dengan s.mu terkunci.
@@ -177,7 +247,17 @@ func (s *tenant) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	// Draft belum pernah terbit, jadi belum mungkin dicatat manual: begitu dikirim langsung dibukukan.
 	inv.Dibukukan = lama.Dibukukan || inv.Dibukukan || lama.Status == finance.StatusDraft
 	inv.TransaksiID, inv.TransaksiPPNID, inv.NoJurnal = lama.TransaksiID, lama.TransaksiPPNID, lama.NoJurnal
+	// Invoice lama yang hanya dilunasi / dikirim ulang tanpa mengubah baris & tanggal tidak dicek.
+	berubah := lama.Status == finance.StatusDraft || lama.Tanggal != inv.Tanggal || !slices.Equal(lama.Items, inv.Items)
+	if berubah && inv.Dibukukan {
+		if err := s.cekBarangInvoiceLocked(inv); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	txs, nextTx := slices.Clone(s.txs), s.nextTxID
 	if err := s.sinkronInvoiceLocked(&inv); err != nil {
+		s.txs, s.nextTxID = txs, nextTx // transaksi DPP yang sempat diubah ikut dipulihkan
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	"pajak/internal/finance"
 )
@@ -25,16 +26,55 @@ func (s *tenant) sinkronInvoiceLocked(inv *finance.Invoice) error {
 	tot := inv.Totals()
 	aktif := inv.Status != finance.StatusDraft
 	lunas := inv.Status == finance.StatusLunas
-	if err := s.jagaTxInvoiceLocked(&inv.TransaksiID, aktif && tot.DPP > 0, finance.Transaction{
+	jual := finance.Transaction{
 		Tanggal: inv.Tanggal, Jenis: "Penjualan", Nominal: tot.DPP, Keterangan: "Invoice " + inv.Nomor,
+		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
+	}
+	jual.Rincian, jual.BukanBarang = inv.BarangPenjualan()
+	var awal *finance.GerakStok
+	if aktif && tot.DPP > 0 {
+		var err error
+		if awal, err = s.cekStokInvoiceLocked(inv.TransaksiID, jual); err != nil {
+			return err
+		}
+	}
+	if err := s.jagaTxInvoiceLocked(&inv.TransaksiID, aktif && tot.DPP > 0, jual); err != nil {
+		return err
+	}
+	if err := s.jagaTxInvoiceLocked(&inv.TransaksiPPNID, aktif && tot.PPN > 0, finance.Transaction{
+		Tanggal: inv.Tanggal, Jenis: "PPN Keluaran", Nominal: tot.PPN, Keterangan: "PPN invoice " + inv.Nomor,
 		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
 	}); err != nil {
 		return err
 	}
-	return s.jagaTxInvoiceLocked(&inv.TransaksiPPNID, aktif && tot.PPN > 0, finance.Transaction{
-		Tanggal: inv.Tanggal, Jenis: "PPN Keluaran", Nominal: tot.PPN, Keterangan: "PPN invoice " + inv.Nomor,
-		Pihak: inv.PelangganNama, Lunas: lunas, TanggalLunas: inv.TanggalLunas, InvoiceID: inv.ID, JatuhTempo: inv.JatuhTempo,
-	})
+	if awal != nil { // terakhir: gagal di atas → kartu belum dimulai (pemanggil memulihkan transaksi)
+		if err := s.simpanStokAwalLocked(awal, "Invoice "+inv.Nomor, time.Now().UTC()); err != nil {
+			return errors.New("gagal menyimpan metode nilai stok")
+		}
+	}
+	return nil
+}
+
+// cekStokInvoiceLocked: stok tidak minus bila transaksi Penjualan invoice (id lama; 0 = baru)
+// diganti jual. Kartu yang belum dimulai dimulai otomatis oleh invoice berbarang pertama:
+// usulan stok awalnya dikembalikan (nil bila tidak perlu) untuk disimpan pemanggil. Dasar
+// pembanding = sekarang + stok awal itu, tanpa perubahan invoice ini (lihat cekSimpanTxLocked),
+// jadi invoice lama yang tidak berubah tidak terblokir minus lama. s.mu dipegang.
+func (s *tenant) cekStokInvoiceLocked(id int, jual finance.Transaction) (*finance.GerakStok, error) {
+	if !s.perpetualLocked() {
+		return nil, nil
+	}
+	awal := s.stokAwalTxLocked(jual)
+	txs := slices.Clone(s.txs)
+	if i := slices.IndexFunc(txs, func(x finance.Transaction) bool { return id != 0 && x.ID == id }); i >= 0 {
+		jual.ID = id
+		txs[i] = jual
+	} else {
+		jual.ID = s.nextTxID
+		txs = append(txs, jual)
+	}
+	gerak := s.tambahGerakUsulan(awal)
+	return awal, s.cekTanpaMinusDariLocked(s.txs, gerak, txs, gerak)
 }
 
 // jagaTxInvoiceLocked membuat, memperbarui, atau menghapus satu transaksi milik invoice.

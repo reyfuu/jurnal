@@ -59,3 +59,32 @@ func TestSchema_KolomOmitemptyTransactionsNullable(t *testing.T) {
 		t.Fatal("tidak ada ALTER transactions terbaca")
 	}
 }
+
+// Sama untuk invoice_items (Task 9): kolom stok_id & bukan_barang ada, dan kolom yang field
+// InvoiceItem-nya omitempty tidak NOT NULL.
+func TestSchema_KolomOmitemptyInvoiceItemsNullable(t *testing.T) {
+	sql, err := os.ReadFile("schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	omit := map[string]bool{}
+	rt := reflect.TypeFor[finance.InvoiceItem]()
+	for i := range rt.NumField() {
+		if nama, opsi, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ","); strings.Contains(opsi, "omitempty") {
+			omit[nama] = true
+		}
+	}
+	re := regexp.MustCompile(`(?im)^ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS (\w+)([^;]*);`)
+	ada := map[string]bool{}
+	for _, m := range re.FindAllStringSubmatch(string(sql), -1) {
+		ada[m[1]] = true
+		if omit[m[1]] && strings.Contains(strings.ToUpper(m[2]), "NOT NULL") {
+			t.Errorf("kolom invoice_items.%s omitempty tetapi NOT NULL", m[1])
+		}
+	}
+	for _, k := range []string{"stok_id", "bukan_barang"} {
+		if !ada[k] || !omit[k] {
+			t.Errorf("invoice_items.%s: kolom ada %v, field omitempty %v", k, ada[k], omit[k])
+		}
+	}
+}

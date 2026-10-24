@@ -1318,6 +1318,8 @@ export const getKartuBarang = (id: number, dari: string, sampai: string) => api<
 export const getMutasiStok = (dari: string, sampai: string) => api<LaporanMutasi>(`/stok/mutasi?dari=${dari}&sampai=${sampai}`)
 export const mutasiStokXlsxUrl = (dari: string, sampai: string) => `/api/v1/stok/mutasi.xlsx?dari=${dari}&sampai=${sampai}`
 export const getPilihanBarang = () => api<{ mulai: string; barang: PilihanBarang[] }>('/stok/pilihan')
+/** Sama dengan getPilihanBarang, untuk form invoice (dijaga menu Invoice, bukan Transaksi). */
+export const getPilihanBarangInvoice = () => api<{ mulai: string; barang: PilihanBarang[] }>('/invoice/pilihan-barang')
 
 export const getTagihan = () => api<TagihanSummary>('/tagihan')
 export const updateTagihan = (id: number, t: TagihanInput) => api<Tagihan>(`/tagihan/${id}`, { method: 'PUT', body: t })
@@ -1603,6 +1605,9 @@ export interface InvoiceItem {
   qty: number
   satuan?: string
   harga_satuan: number
+  /** Barang yang dijual di baris ini (kartu stok); bukan_barang = baris jasa. Tidak dicetak di PDF. */
+  stok_id?: number
+  bukan_barang?: boolean
 }
 
 export interface InvoiceTotals {

@@ -1,6 +1,7 @@
 package finance_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,5 +41,38 @@ func TestParseInvoiceFile_Pengelompokan(t *testing.T) {
 	}
 	if _, errs, _ := finance.ParseInvoiceFile(finance.InvoiceTemplate(), 1100); len(errs) != 0 {
 		t.Errorf("template sendiri harus bersih: %+v", errs)
+	}
+}
+
+// Kolom Barang (opsional, header persis seperti impor transaksi): teksnya dibawa per item untuk
+// dicocokkan server; "jasa" langsung menjadi Bukan barang.
+func TestParseInvoiceFile_KolomBarang(t *testing.T) {
+	h := []string{"Nomor", "Tanggal", "Jatuh Tempo", "Pelanggan", "Deskripsi", "Qty", "Harga Satuan", "Barang"}
+	rows := [][]string{h,
+		{"INV-B-1", "2026-09-01", "2026-09-30", "PT Satu", "Kain", "2", "20000", "KN-01"},
+		{"INV-B-1", "", "", "", "Ongkir", "1", "10000", " Jasa "},
+		{"INV-B-1", "", "", "", "Bonus", "1", "0", ""},
+	}
+	list, errs, _ := finance.ParseInvoiceFile([]finance.ImportSheet{{Nama: "Invoice", Rows: rows}}, 0)
+	if len(list) != 1 || len(errs) != 0 {
+		t.Fatalf("%d invoice, errors %+v", len(list), errs)
+	}
+	x := list[0]
+	if len(x.Barang) != 3 || x.Barang[0] != "KN-01" || x.Barang[1] != "" || x.Barang[2] != "" {
+		t.Errorf("teks barang per item: %q", x.Barang)
+	}
+	if it := x.Invoice.Items; it[0].BukanBarang || !it[1].BukanBarang || it[2].BukanBarang || it[0].StokID != 0 {
+		t.Errorf("tanda bukan barang: %+v", it)
+	}
+	// Header "Nama Barang" bukan kolom barang (berkas lama tetap terbaca seperti dulu).
+	h2 := []string{"Nomor", "Tanggal", "Jatuh Tempo", "Pelanggan", "Nama Barang", "Deskripsi", "Qty", "Harga Satuan"}
+	list, _, _ = finance.ParseInvoiceFile([]finance.ImportSheet{{Nama: "Invoice", Rows: [][]string{h2,
+		{"INV-B-2", "2026-09-01", "2026-09-30", "PT Dua", "jasa", "Kopi", "1", "1000"}}}}, 0)
+	if len(list) != 1 || list[0].Invoice.Items[0].BukanBarang || list[0].Barang[0] != "" {
+		t.Errorf("header Nama Barang tidak boleh dibaca sebagai kolom barang: %+v", list)
+	}
+	// Template memuat kolom Barang.
+	if tpl := finance.InvoiceTemplate(); !slices.Contains(tpl[0].Rows[0], "Barang") {
+		t.Errorf("template tanpa kolom Barang: %q", tpl[0].Rows[0])
 	}
 }

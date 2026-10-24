@@ -3,6 +3,7 @@ package finance
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -52,9 +53,44 @@ type InvoiceItem struct {
 	Qty         int64  `json:"qty"`
 	Satuan      string `json:"satuan,omitempty"` // mis. "pcs", "box", "jam"
 	HargaSatuan int64  `json:"harga_satuan"`
+	// StokID: barang yang dijual di baris ini (menggerakkan kartu stok lewat transaksi Penjualan
+	// invoice); BukanBarang: baris jasa. Keduanya tidak bersamaan; tidak dicetak di PDF.
+	StokID      int  `json:"stok_id,omitempty"`
+	BukanBarang bool `json:"bukan_barang,omitempty"`
 }
 
 func (it InvoiceItem) Jumlah() int64 { return it.Qty * it.HargaSatuan }
+
+// BarangPenjualan: rincian barang transaksi Penjualan invoice ini. Diskon dibagi ke semua baris
+// sebanding jumlahnya (sisa pembulatan ke baris terbesar), jadi Σ nilai seluruh baris = DPP dan
+// rincian (baris berbarang saja) ≤ DPP. QtyStok = qty × TakaranSkala. bukanBarang = semua baris
+// bertanda Bukan barang (jasa).
+func (inv Invoice) BarangPenjualan() (rincian []RincianBarang, bukanBarang bool) {
+	tot := inv.Totals()
+	bagian := make([]int64, len(inv.Items))
+	terbesar, sisa := -1, tot.Diskon
+	for i, it := range inv.Items {
+		if tot.Subtotal > 0 {
+			var b big.Int
+			bagian[i] = b.Div(b.Mul(big.NewInt(tot.Diskon), big.NewInt(it.Jumlah())), big.NewInt(tot.Subtotal)).Int64()
+		}
+		sisa -= bagian[i]
+		if terbesar < 0 || it.Jumlah() > inv.Items[terbesar].Jumlah() {
+			terbesar = i
+		}
+	}
+	if terbesar >= 0 {
+		bagian[terbesar] += sisa
+	}
+	bukanBarang = len(inv.Items) > 0
+	for i, it := range inv.Items {
+		bukanBarang = bukanBarang && it.BukanBarang
+		if it.StokID > 0 {
+			rincian = append(rincian, RincianBarang{StokID: it.StokID, QtyStok: it.Qty * TakaranSkala, Nilai: it.Jumlah() - bagian[i]})
+		}
+	}
+	return rincian, bukanBarang
+}
 
 // InvoiceTotals: seluruh angka kaki faktur, selalu diturunkan dari baris.
 type InvoiceTotals struct {
@@ -144,6 +180,12 @@ func ValidateInvoice(inv *Invoice) error {
 		}
 		if it.HargaSatuan < 0 {
 			return fmt.Errorf("baris %d: harga satuan tidak boleh negatif", i+1)
+		}
+		if it.StokID < 0 {
+			return fmt.Errorf("baris %d: barang tidak dikenal", i+1)
+		}
+		if it.StokID > 0 && it.BukanBarang {
+			return fmt.Errorf("baris %d: pilih barang atau tandai Bukan barang (jasa), tidak keduanya", i+1)
 		}
 	}
 	if inv.DiskonRp < 0 {
