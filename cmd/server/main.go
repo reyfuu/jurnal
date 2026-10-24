@@ -1134,7 +1134,9 @@ func (s *tenant) cekSimpanTxLocked(t finance.Transaction, ganti int) (*finance.G
 		t.ID = s.nextTxID
 		txs = append(txs, t)
 	}
-	if err := s.cekTanpaMinusLocked(txs, s.tambahGerakUsulan(awal)); err != nil {
+	// Dasar = keadaan sekarang + stok awal otomatis (bila ada), tanpa transaksi ini.
+	gerak := s.tambahGerakUsulan(awal)
+	if err := s.cekTanpaMinusDariLocked(s.txs, gerak, txs, gerak); err != nil {
 		return nil, http.StatusConflict, err
 	}
 	return awal, 0, nil

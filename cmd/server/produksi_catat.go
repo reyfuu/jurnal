@@ -184,7 +184,8 @@ func (s *tenant) handleCatatProduksi(w http.ResponseWriter, r *http.Request) {
 	for i := range gerak {
 		usulan = append(usulan, &gerak[i])
 	}
-	if err := s.cekTanpaMinusLocked(append(slices.Clone(s.txs), txs...), s.tambahGerakUsulan(usulan...)); err != nil {
+	// Dasar = keadaan sekarang + stok awal otomatis (bila ada), tanpa dokumen produksi ini.
+	if err := s.cekTanpaMinusDariLocked(s.txs, s.tambahGerakUsulan(awal), append(slices.Clone(s.txs), txs...), s.tambahGerakUsulan(usulan...)); err != nil {
 		s.stok, s.nextStokID = s.stok[:nStok], nextStok
 		http.Error(w, err.Error(), http.StatusConflict)
 		return

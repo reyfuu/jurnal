@@ -146,3 +146,55 @@ func TestTanpaMinus_KoreksiDisetujuiDicek(t *testing.T) {
 		t.Errorf("stok awal otomatis tersimpan padahal usulan ditolak (%d)", n)
 	}
 }
+
+// Fix round 1: kartu dimulai otomatis menarik transaksi lama ke kartu; minus lama barang lain
+// (sudah ada sebelum perubahan ini) tidak boleh memblokir penjualan yang stoknya cukup.
+func TestTanpaMinus_MulaiOtomatisMinusLamaBarangLainTidakMemblokir(t *testing.T) {
+	srv, qa := usahaManufakturPerpetual(t)
+	kaos := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs","jumlah":5}`)
+	kain := buat[finance.StokItem](t, srv, qa, "/api/v1/stok", `{"nama":"Kain","kategori":"Bahan Baku","satuan":"m"}`)
+	seedTx(t, srv, qa, finance.Transaction{Tanggal: "2026-01-20", Jenis: finance.JenisJual, Nominal: 100000, Lunas: true,
+		Rincian: []finance.RincianBarang{{StokID: kain.ID, QtyStok: 1000}}})
+	rec := do(srv, qa, http.MethodPost, "/api/v1/transactions", jualBody("2026-01-10", kaos.ID, 1000))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("penjualan Kaos dengan minus lama Kain: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// Fix round 1: memindah penjualan lama yang sudah minus tanpa memperdalam minusnya boleh, baik ke
+// hari tanpa baris lain maupun ke hari yang punya baris barang itu; memindahnya ke sebelum
+// pembelian (minus lebih dalam) ditolak.
+func TestTanpaMinus_PindahPenjualanMinusLama(t *testing.T) {
+	srv, qa, _, kain := perpetualKaos(t, 0, 10000)
+	buat[finance.Transaction](t, srv, qa, "/api/v1/transactions",
+		`{"tanggal":"2026-01-03","jenis":"Beli Bahan / Stok","nominal":20000,"lunas":true,"rincian":[{"stok_id":`+itoa(kain.ID)+`,"qty_stok":2000}]}`)
+	lama := seedTx(t, srv, qa, finance.Transaction{Tanggal: "2026-01-05", Jenis: finance.JenisJual, Nominal: 100000, Lunas: true,
+		Rincian: []finance.RincianBarang{{StokID: kain.ID, QtyStok: 20000}}})
+	url := "/api/v1/transactions/" + itoa(lama.ID)
+	for _, tgl := range []string{"2026-01-04", "2026-01-03"} {
+		if rec := do(srv, qa, http.MethodPut, url, jualBody(tgl, kain.ID, 20000)); rec.Code != http.StatusOK {
+			t.Fatalf("pindah penjualan lama ke %s: %d %s", tgl, rec.Code, rec.Body)
+		}
+	}
+	rec := do(srv, qa, http.MethodPut, url, jualBody("2026-01-02", kain.ID, 20000))
+	cekMinus(t, rec.Code, rec.Body.String(), "stok Kain tidak cukup pada 02 Jan 2026: tersedia 10 m, dibutuhkan 20 m")
+}
+
+// Fix round 1: baris barang masuk yang saldonya turun jadi (lebih) minus memakai pesan saldo.
+func TestTanpaMinus_BarisMasukPesanSaldo(t *testing.T) {
+	srv, qa, _, kain := perpetualKaos(t, 0, 10000)
+	seedTx(t, srv, qa, finance.Transaction{Tanggal: "2026-01-05", Jenis: finance.JenisJual, Nominal: 100000, Lunas: true,
+		Rincian: []finance.RincianBarang{{StokID: kain.ID, QtyStok: 20000}}})
+	beli := `{"tanggal":"2026-01-08","jenis":"Beli Bahan / Stok","nominal":50000,"lunas":true,"rincian":[{"stok_id":` + itoa(kain.ID) + `,"qty_stok":%d}]}`
+	tx := buat[finance.Transaction](t, srv, qa, "/api/v1/transactions", strings.Replace(beli, "%d", "5000", 1))
+	rec := do(srv, qa, http.MethodPut, "/api/v1/transactions/"+itoa(tx.ID), strings.Replace(beli, "%d", "3000", 1))
+	cekMinus(t, rec.Code, rec.Body.String(), "stok Kain jadi minus pada 08 Jan 2026: saldo -7 m")
+}
+
+// Fix round 1: barang yang sama di beberapa baris satu transaksi dilaporkan dengan total kebutuhannya.
+func TestTanpaMinus_BarisSamaDijumlah(t *testing.T) {
+	srv, qa, kaos, _ := perpetualKaos(t, 5000, 0)
+	rec := do(srv, qa, http.MethodPost, "/api/v1/transactions",
+		`{"tanggal":"2026-01-10","jenis":"Penjualan","nominal":100000,"lunas":true,"rincian":[{"stok_id":`+itoa(kaos.ID)+`,"qty_stok":3000,"nilai":50000},{"stok_id":`+itoa(kaos.ID)+`,"qty_stok":3000,"nilai":50000}]}`)
+	cekMinus(t, rec.Code, rec.Body.String(), "stok Kaos tidak cukup pada 10 Jan 2026: tersedia 5 pcs, dibutuhkan 6 pcs")
+}

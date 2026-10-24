@@ -152,7 +152,8 @@ func (s *Server) putuskanKoreksi(w http.ResponseWriter, r *http.Request, setuju 
 		// Keadaan sesudah koreksi (ubah atau hapus) tidak boleh membuat stok minus. Usulan basi
 		// ditangani di bawah (tidak diterapkan).
 		if txs, err := finance.TerapkanKoreksi(t.txs, *k); err == nil {
-			if err := t.cekTanpaMinusLocked(txs, t.tambahGerakUsulan(t.stokAwalKoreksiLocked(*k))); err != nil {
+			gerak := t.tambahGerakUsulan(t.stokAwalKoreksiLocked(*k)) // dasar: sekarang + stok awal otomatis
+			if err := t.cekTanpaMinusDariLocked(t.txs, gerak, txs, gerak); err != nil {
 				t.mu.Unlock()
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
