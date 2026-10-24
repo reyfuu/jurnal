@@ -1431,6 +1431,8 @@ export interface MutasiHasil {
 
 export interface MutasiCommitResult {
   disimpan: number
+  /** Baris yang dicatat sebagai pelunasan transaksi belum lunas yang sudah ada. */
+  dilunasi: number
   errors: ImportError[] | null
   contoh: Tx[] | null
 }

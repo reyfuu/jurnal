@@ -3,9 +3,9 @@ import { Fragment, useEffect, useState } from 'react'
 import { PilihRincianBarang } from '@/components/PilihRincianBarang'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { commitMutasi, getPilihanBarang, previewMutasi, type JenisInfo, type Keyakinan, type Mirip, type MutasiHasil, type MutasiRow, type PilihanBarang } from '@/lib/api'
+import { commitMutasi, getPilihanBarang, previewMutasi, type ImportError, type JenisInfo, type Keyakinan, type Mirip, type MutasiHasil, type MutasiRow, type PilihanBarang } from '@/lib/api'
 import { formatRp } from '@/lib/format'
-import { barangMutasiBody, butuhBarang, kurangBarang, nilaiBarisMutasi, ringkasBarang, salahBarang } from '@/lib/mutasiBarang'
+import { barangMutasiBody, butuhBarang, kurangBarang, nilaiBarisMutasi, ringkasBarang, salahBarang, sisaSesudahSimpan } from '@/lib/mutasiBarang'
 import { rincianSah, wajibBarang, type NilaiRincian } from '@/lib/rincian'
 
 const WARNA: Record<Keyakinan, string> = { tinggi: 'pill-green', sedang: 'pill-amber', rendah: 'pill-red', ai: 'pill-brand' }
@@ -65,7 +65,13 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis, perpetual 
   // Barang per baris: daftar barang & titik nol kartu stok, dan baris yang sedang dipilih barangnya.
   const [barang, setBarang] = useState<{ mulai: string; barang: PilihanBarang[] }>({ mulai: '', barang: [] })
   const [isiBarang, setIsiBarang] = useState<{ i: number; nilai: NilaiRincian } | null>(null)
-  useEffect(() => { if (open) getPilihanBarang().then(setBarang, () => {}) }, [open])
+  const [galatBarang, setGalatBarang] = useState('')
+  // Hasil bukukan sebagian: dialog tetap terbuka berisi baris yang gagal untuk diperbaiki.
+  const [simpanSebagian, setSimpanSebagian] = useState<{ disimpan: number; dilunasi: number; errors: ImportError[] } | null>(null)
+  useEffect(() => {
+    if (!open) return
+    getPilihanBarang().then((b) => { setBarang(b); setGalatBarang('') }, (e: Error) => setGalatBarang(e.message))
+  }, [open])
 
   function reset(next: boolean) {
     if (!next) {
@@ -75,6 +81,7 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis, perpetual 
       setBerkas(null)
       setSandi('')
       setError('')
+      setSimpanSebagian(null)
     }
     onOpenChange(next)
   }
@@ -101,9 +108,12 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis, perpetual 
     setBusy(true)
     setError('')
     try {
-      await commitMutasi(rows.map((r) => ({ ...r, ...barangMutasiBody(r) })))
+      const res = await commitMutasi(rows.map((r) => ({ ...r, ...barangMutasiBody(r) })))
       onImported()
-      reset(false)
+      const gagal = res.errors ?? []
+      if (!gagal.length) return reset(false)
+      setSimpanSebagian({ disimpan: res.disimpan, dilunasi: res.dilunasi ?? 0, errors: gagal })
+      setRows(sisaSesudahSimpan(rows, gagal))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -183,6 +193,19 @@ export function MutasiDialog({ open, onOpenChange, onImported, jenis, perpetual 
           {error && (mintaSandi
             ? <div className="note-box" role="status">{error}</div>
             : <p className="text-sm text-destructive" role="alert">{error}</p>)}
+
+          {simpanSebagian && (
+            <div className="note-box warn" role="status">
+              <strong>{simpanSebagian.disimpan} disimpan{simpanSebagian.dilunasi ? ` · ${simpanSebagian.dilunasi} dilunasi` : ''}.</strong>{' '}
+              Baris berikut belum dibukukan; perbaiki lalu bukukan lagi (baris yang sudah tersimpan tidak ditampilkan lagi).
+              <ul className="mt-1 text-sm">
+                {simpanSebagian.errors.map((e, i) => <li key={i}>baris {e.baris}: {e.pesan}</li>)}
+              </ul>
+            </div>
+          )}
+          {perpetual && galatBarang && (
+            <div className="note-box warn" role="status">Daftar barang gagal dimuat ({galatBarang}); baris penjualan & pembelian belum bisa diberi barang. Tutup dan buka lagi dialog ini, atau tandai Bukan barang (jasa).</div>
+          )}
 
           {hasil && (
             <>

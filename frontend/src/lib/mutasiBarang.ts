@@ -32,6 +32,14 @@ export function salahBarang(r: BarisBarangMutasi, p: { perpetual: boolean; mulai
 export const kurangBarang = (rows: BarisBarangMutasi[], p: { perpetual: boolean; mulai: string }) =>
   rows.filter((r) => salahBarang(r, p) !== '').length
 
+/** Baris yang tersisa sesudah membukukan sebagian: baris terpilih yang tidak gagal sudah
+ *  tersimpan (atau dilunasi) dan dibuang supaya tidak terbukukan dua kali saat dicoba ulang;
+ *  baris gagal dan baris yang tidak dicentang tetap untuk diperbaiki. */
+export function sisaSesudahSimpan<T extends { baris: number; pilih: boolean }>(rows: T[], errors: { baris: number }[]): T[] {
+  const gagal = new Set(errors.map((e) => e.baris))
+  return rows.filter((r) => !r.pilih || gagal.has(r.baris))
+}
+
 /** Bagian barang baris untuk dikirim saat membukukan. */
 export function barangMutasiBody(r: BarisBarangMutasi): { rincian?: RincianBarang[]; bukan_barang?: boolean } {
   if (!butuhBarang(r)) return { rincian: undefined, bukan_barang: undefined }

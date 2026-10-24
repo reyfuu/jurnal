@@ -235,12 +235,6 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txs, baris, errs := finance.MutasiKeTransaksiBaris(req.Rows)
-	txs, baris, errs = s.saringBarangMutasi(txs, baris, errs, func(t finance.Transaction) error {
-		if !s.validStok(t) { // validStok mengunci sendiri: dicek sebelum s.mu.Lock
-			return errors.New("barang yang dipilih tidak ada di Stok & Gudang")
-		}
-		return nil
-	})
 	var lunasi []finance.MutasiRow
 	for _, r := range req.Rows {
 		if r.Pilih && r.Lunasi != 0 {
@@ -255,9 +249,9 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Wajib barang: galat per baris, baris lain tetap dibukukan.
-	txs, _, errs = s.saringBarangMutasi(txs, baris, errs, s.cekBarangLocked)
-	slices.SortStableFunc(errs, func(a, b finance.ImportError) int { return a.Baris - b.Baris })
+	// Barang harus ada & wajib barang: galat per baris, baris lain tetap dibukukan.
+	txs, baris, errs = s.saringBarangMutasi(txs, baris, errs)
+	urutGalat(errs)
 	if len(txs) == 0 && len(lunasi) == 0 {
 		s.mu.Unlock()
 		// Tidak ada yang bisa dibukukan: laporkan kenapa, jangan balas "berhasil 0".
@@ -269,8 +263,14 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 	// termasuk baris tanpa barang dan pelunasan: menyimpan sebagian akan bergantung urutan baris.
 	awal, err := s.cekStokImporLocked(txs)
 	if err != nil {
+		pesan := err.Error()
+		// cekStokImporLocked memberi txs ID sementara nextTxID+i: tunjuk baris berkasnya.
+		var gm *galatMinus
+		if errors.As(err, &gm) && gm.txID >= s.nextTxID && gm.txID < s.nextTxID+len(txs) {
+			pesan += " (baris " + strconv.Itoa(baris[gm.txID-s.nextTxID]) + ")"
+		}
 		s.mu.Unlock()
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, pesan, http.StatusConflict)
 		return
 	}
 	if awal != nil { // hanya bila ada baris berbarang yang akan tersimpan
@@ -306,14 +306,28 @@ func (s *tenant) handleMutasiCommit(w http.ResponseWriter, r *http.Request) {
 		txs[i].NoJurnal = s.txs[len(s.txs)-len(txs)+i].NoJurnal
 	}
 	s.mu.Unlock()
+	urutGalat(errs) // galat pelunasan menyusul sesudah galat barang
 	writeJSON(w, mutasiCommitResp{Disimpan: len(txs), Dilunasi: dilunasi, Errors: errs, Contoh: txs[:min(5, len(txs))]})
 }
 
-// saringBarangMutasi: rapikan barang tiap transaksi mutasi dan buang yang ditolak cek (galatnya
-// masuk errs dengan nomor baris berkasnya). baris sejajar txs.
-func (s *tenant) saringBarangMutasi(txs []finance.Transaction, baris []int, errs []finance.ImportError, cek func(finance.Transaction) error) ([]finance.Transaction, []int, []finance.ImportError) {
+func urutGalat(errs []finance.ImportError) {
+	slices.SortStableFunc(errs, func(a, b finance.ImportError) int { return a.Baris - b.Baris })
+}
+
+// saringBarangMutasi: rapikan barang tiap transaksi mutasi, lalu buang yang barangnya tidak ada
+// di daftar atau melanggar wajib barang (galatnya masuk errs dengan nomor baris berkasnya).
+// baris sejajar txs. s.mu dipegang.
+func (s *tenant) saringBarangMutasi(txs []finance.Transaction, baris []int, errs []finance.ImportError) ([]finance.Transaction, []int, []finance.ImportError) {
 	var okTx []finance.Transaction
 	var okBaris []int
+	cek := func(t finance.Transaction) error {
+		for _, b := range t.BarisBarang() {
+			if _, ok := s.stokByID(b.StokID); !ok {
+				return errors.New("barang yang dipilih tidak ada di Stok & Gudang")
+			}
+		}
+		return s.cekBarangLocked(t)
+	}
 	for i, t := range txs {
 		finance.NormalkanBarang(&t)
 		if err := cek(t); err != nil {

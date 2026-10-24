@@ -129,6 +129,15 @@ func batasSaldoLama(k finance.KartuStok) func(id int, tanggal string) int64 {
 //     <qty> <satuan>". Baris keluar barang yang sama dari sumber yang sama di tanggal itu
 //     (mis. dua baris rincian satu penjualan) dijumlah; tersedia = saldo sebelum baris pertamanya.
 //   - baris masuk (saldo tetap minus): "stok <nama> jadi minus pada <tanggal>: saldo <qty> <satuan>".
+// galatMinus: pesan stok minus + transaksi asal baris pelanggarnya (0 bila dari dokumen stok),
+// supaya pemanggil impor bisa menunjuk nomor baris berkasnya.
+type galatMinus struct {
+	pesan string
+	txID  int
+}
+
+func (e *galatMinus) Error() string { return e.pesan }
+
 func (s *tenant) galatStokKurang(k finance.KartuStok, i int) error {
 	b := k.Baris[i]
 	it, _ := s.stokByID(b.StokID)
@@ -142,7 +151,7 @@ func (s *tenant) galatStokKurang(k finance.KartuStok, i int) error {
 	}
 	tgl := finance.FormatTanggalID(b.Tanggal)
 	if b.Qty >= 0 {
-		return fmt.Errorf("stok %s jadi minus pada %s: saldo %s%s", nama, tgl, finance.FormatQty(b.SaldoQty), satuan)
+		return &galatMinus{fmt.Sprintf("stok %s jadi minus pada %s: saldo %s%s", nama, tgl, finance.FormatQty(b.SaldoQty), satuan), b.TransaksiID}
 	}
 	tersedia, butuh, pertama := int64(0), int64(0), true
 	for _, x := range k.Baris {
@@ -154,8 +163,8 @@ func (s *tenant) galatStokKurang(k finance.KartuStok, i int) error {
 		}
 		butuh -= x.Qty
 	}
-	return fmt.Errorf("stok %s tidak cukup pada %s: tersedia %s%s, dibutuhkan %s%s", nama, tgl,
-		finance.FormatQty(tersedia), satuan, finance.FormatQty(butuh), satuan)
+	return &galatMinus{fmt.Sprintf("stok %s tidak cukup pada %s: tersedia %s%s, dibutuhkan %s%s", nama, tgl,
+		finance.FormatQty(tersedia), satuan, finance.FormatQty(butuh), satuan), b.TransaksiID}
 }
 
 // tambahGerakUsulan: gerak sekarang + dokumen usulan dengan ID sementara sesuai urutan simpan

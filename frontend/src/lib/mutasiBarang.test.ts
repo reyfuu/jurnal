@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barangMutasiBody, butuhBarang, kurangBarang, nilaiBarisMutasi, ringkasBarang } from './mutasiBarang'
+import { barangMutasiBody, butuhBarang, kurangBarang, nilaiBarisMutasi, ringkasBarang, sisaSesudahSimpan } from './mutasiBarang'
 
 const jual = { pilih: true, jenis: 'Penjualan', tanggal: '2026-02-01', nominal: 100_000 }
 
@@ -42,6 +42,17 @@ describe('barang per baris mutasi', () => {
     expect(barangMutasiBody({ ...jual, bukan_barang: true })).toEqual({ rincian: undefined, bukan_barang: true })
     expect(barangMutasiBody({ ...jual, lunasi: 3, rincian: [{ stok_id: 1, qty_stok: 1000 }] })).toEqual({ rincian: undefined, bukan_barang: undefined })
     expect(barangMutasiBody({ ...jual, jenis: 'Biaya Lain', bukan_barang: true })).toEqual({ rincian: undefined, bukan_barang: undefined })
+  })
+
+  it('sesudah simpan sebagian: hanya baris gagal & yang tidak dicentang yang tersisa', () => {
+    const rows = [
+      { baris: 2, pilih: true }, // tersimpan
+      { baris: 3, pilih: true }, // gagal
+      { baris: 4, pilih: false }, // dilewati
+      { baris: 5, pilih: true, lunasi: 9 }, // dilunasi
+    ]
+    expect(sisaSesudahSimpan(rows, [{ baris: 3 }]).map((r) => r.baris)).toEqual([3, 4])
+    expect(sisaSesudahSimpan(rows, [])).toEqual([{ baris: 4, pilih: false }])
   })
 
   it('nilai pemilih dari baris', () => {

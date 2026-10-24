@@ -78,7 +78,7 @@ func TestMutasi_MelebihiStokDitolak(t *testing.T) {
 		barisJual(3, "2026-01-11", 100000, finance.RincianBarang{StokID: kaos.ID, QtyStok: 3000}),
 		finance.MutasiRow{Baris: 4, Tanggal: "2026-01-12", Jenis: "Biaya Lain", Nominal: 10000, Arah: "keluar", Pilih: true},
 	)
-	cekMinus(t, code, body, "stok Kaos tidak cukup pada 11 Jan 2026: tersedia 2 pcs, dibutuhkan 3 pcs")
+	cekMinus(t, code, body, "stok Kaos tidak cukup pada 11 Jan 2026: tersedia 2 pcs, dibutuhkan 3 pcs (baris 3)")
 	if n := len(txsOf(t, srv, qa)); n != 0 {
 		t.Fatalf("commit tertolak tetap menyimpan %d transaksi", n)
 	}
@@ -112,7 +112,7 @@ func TestMutasi_KartuDimulaiOtomatis(t *testing.T) {
 	srv2, qa2 := usahaManufakturPerpetual(t)
 	kaos2 := buat[finance.StokItem](t, srv2, qa2, "/api/v1/stok", `{"nama":"Kaos","kategori":"Produk Jadi","satuan":"pcs","jumlah":2}`)
 	code, _, body = commitMutasiRows(t, srv2, qa2, barisJual(2, "2026-01-10", 100000, finance.RincianBarang{StokID: kaos2.ID, QtyStok: 3000}))
-	cekMinus(t, code, body, "stok Kaos tidak cukup pada 10 Jan 2026: tersedia 2 pcs, dibutuhkan 3 pcs")
+	cekMinus(t, code, body, "stok Kaos tidak cukup pada 10 Jan 2026: tersedia 2 pcs, dibutuhkan 3 pcs (baris 2)")
 	if n := jumlahGerakAwal(t, srv2, qa2); n != 0 {
 		t.Errorf("stok awal otomatis tersimpan padahal commit ditolak (%d)", n)
 	}
@@ -144,5 +144,18 @@ func TestMutasi_DuplikatLewatiTidakMengubahKartu(t *testing.T) {
 	code, _, body = commitMutasiRows(t, srv, qa, baru)
 	if code != http.StatusBadRequest || !strings.Contains(body, errWajibBarang.Error()) {
 		t.Errorf("duplikat dicatat baru tanpa barang: %d %s", code, body)
+	}
+}
+
+// Galat dari pelunasan (diproses sesudah wajib barang) tetap terurut per baris di respons.
+func TestMutasi_GalatUrutPerBaris(t *testing.T) {
+	srv, qa, _, _ := perpetualKaos(t, 10000, 0)
+	code, res, body := commitMutasiRows(t, srv, qa,
+		finance.MutasiRow{Baris: 2, Tanggal: "2026-01-10", Jenis: "Penjualan", Nominal: 5000, Arah: "masuk", Pilih: true, Lunasi: 99},
+		barisJual(3, "2026-01-11", 1000),
+		finance.MutasiRow{Baris: 4, Tanggal: "2026-01-12", Jenis: "Biaya Lain", Nominal: 10000, Arah: "keluar", Pilih: true},
+	)
+	if code != http.StatusOK || res.Disimpan != 1 || len(res.Errors) != 2 || res.Errors[0].Baris != 2 || res.Errors[1].Baris != 3 {
+		t.Fatalf("commit: %d %s", code, body)
 	}
 }
